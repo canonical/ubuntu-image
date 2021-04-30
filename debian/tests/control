@@ -1,0 +1,6 @@
+Tests: build
+Depends: @builddeps@
+
+Tests: run-tests
+Depends: @builddeps@
+

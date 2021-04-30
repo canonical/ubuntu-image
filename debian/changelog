@@ -1,0 +1,559 @@
+ubuntu-image (2) UNRELEASED; urgency=medium
+
+  * Re-write ubuntu-image in Go
+
+ -- William 'jawn-smith' Wilson <william.wilson@canonical.com>  Mon, 26 Apr 2021 15:33:22 -0500
+
+ubuntu-image (1.11+21.04ubuntu2) hirsute; urgency=medium
+
+  * Refreshed manpage.
+  * debian/control: remove the explicit grub-common dependency in
+    python3-ubuntu-image.  This was added as a workaround for snapd using
+    grub-editenv without an explicit dependency - but since long they switched
+    to using a native implementation instead.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Fri, 09 Apr 2021 11:14:38 +0200
+
+ubuntu-image (1.11+21.04ubuntu1) hirsute; urgency=medium
+
+  [ Michael Vogt ]
+  * Use "resolved-content" directory provided by newer versions
+    of "snap prepare-image". (LP: #1636927)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Thu, 25 Mar 2021 14:55:14 +0100
+
+ubuntu-image (1.10+20.10ubuntu4) hirsute; urgency=medium
+
+  * Add python3.9 to the test envlists.
+  * Minor README fixups and additions, minor test-related compatibility
+    changes.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Wed, 13 Jan 2021 11:27:53 +0100
+
+ubuntu-image (1.10+20.10ubuntu3) hirsute; urgency=medium
+
+  * setup.py:
+    - get the version in a way which is compatible with the current
+      python-debian
+
+ -- Sebastien Bacher <seb128@ubuntu.com>  Thu, 26 Nov 2020 15:30:53 +0100
+
+ubuntu-image (1.10+20.10ubuntu2) groovy; urgency=medium
+
+  [ Brian Murray ]
+  * Fix a typo in README.rst.
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Add a workaround for mkfs.ext4 forcefully sparsifying our classic image
+    swapfile (LP: #1900718)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Tue, 20 Oct 2020 19:40:57 +0200
+
+ubuntu-image (1.10+20.10ubuntu1) groovy; urgency=medium
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Add a quick option to disable console-conf.  (LP: #1866002)
+  * Disable some of the unsupported features for UC20 models.  (LP: #1875431)
+    - --disable-console-conf
+    - --cloud-init
+    - Running the post-populate-rootfs hook.
+  * Do not create an empty /boot on the system-seed partition.
+  * Switch the approach of building UC20 images to ensure that all partitions
+    defined in the gadget are considered in image size calculations.
+    (LP: #1859973)
+
+  [ Michael Hudson-Doyle ]
+  * Add dependency on fdisk now that it is no longer Essential.  (LP: #1877485)
+
+  [ Maciej Borzecki ]
+  * Do not overwrite the files that snap prepare-image has created.
+    (LP: #1884247)
+
+  [ Dimitri John Ledkov ]
+  * Pacify flake8 in groovy.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Thu, 03 Sep 2020 10:20:28 +0200
+
+ubuntu-image (1.9+20.04ubuntu3) groovy; urgency=medium
+
+  * Newest sfdisk includes a new field of 'sectorsize' in its output, which our
+    tests did not expect to see - work-around it by ignoring it for the
+    relevant tests.  Fixes FTBFS.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Fri, 26 Jun 2020 10:17:36 +0200
+
+ubuntu-image (1.9+20.04ubuntu2) groovy; urgency=medium
+
+  [ Michael Hudson-Doyle ]
+  * Add dependency on fdisk now that it is no longer Essential. (LP: #1877485)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Thu, 18 Jun 2020 09:33:47 +0200
+
+ubuntu-image (1.9+20.04ubuntu1) focal; urgency=medium
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Add support for populating a .disk/info file on the target image rootfs.
+    (LP: #1856684)
+  * Design change: no longer remove /boot/grub from the rootfs for classic
+    image builds.  This allows developers to have more freedom on deciding how
+    boot configuration should be handled.  (LP: #1817050)
+  * Fix the autopkgtest story on focal.  Only for this series, remove the py37
+    tox environment as it does not work due to pyparted being 3.8-only.
+
+  [ Maciej Borzecki ]
+  * ubuntu_image: update schema validator to allow gadget update specific
+    keys & little cleanups.  (LP: #1856903)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Wed, 29 Jan 2020 16:33:36 +0100
+
+ubuntu-image (1.8+20.04ubuntu2) focal; urgency=medium
+
+  * Fix manifest generation for uc20 builds.  (LP: #1856205)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Thu, 12 Dec 2019 17:05:59 +0100
+
+ubuntu-image (1.8+20.04ubuntu1) focal; urgency=medium
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Add support for uc20 images and the system-seed partition role.
+    (LP: #1847231)
+
+  [ Alfonso Sanchez-Beato ]
+  * Add support for LK (little kernel) bootloader (LP: #1845964)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Tue, 08 Oct 2019 12:56:43 +0200
+
+ubuntu-image (1.7+19.10ubuntu6) eoan; urgency=medium
+
+  * Require isolation-machine for snapcraft specific autopkgtests
+
+ -- Sergio Schvezov <sergio.schvezov@canonical.com>  Thu, 12 Sep 2019 12:59:48 +0000
+
+ubuntu-image (1.7+19.10ubuntu5) eoan; urgency=medium
+
+  * Fix previous upload, to also fix E501 long line error
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Tue, 30 Jul 2019 12:24:12 +0200
+
+ubuntu-image (1.7+19.10ubuntu4) eoan; urgency=medium
+
+  * Try to fix F723 syntax error in type comment
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Tue, 30 Jul 2019 11:39:33 +0200
+
+ubuntu-image (1.7+19.10ubuntu3) eoan; urgency=medium
+
+  [ Dimitri John Ledkov ]
+  * Use modern apt commands.
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Tue, 30 Jul 2019 08:26:32 +0200
+
+ubuntu-image (1.7+19.10ubuntu2) eoan; urgency=medium
+
+  * Fix E117 over-indended line
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Tue, 30 Jul 2019 08:03:58 +0200
+
+ubuntu-image (1.7+19.10ubuntu1) eoan; urgency=medium
+
+  [ Maciej Borzecki ]
+  * Some parser improvements: more strict schema for volume names, make sure
+    structure names are unique.  (LP: #1823160)
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Add support for the new prepare-image --snap=<snap>=<channel|risk> syntax,
+    bump the snapd dependency to 2.38.  (LP: #1815580)
+  * Print a deprecation warning when using the old --extra-snaps syntax.
+  * Ignore the new 'grain' field in the pyparted partitiontable structure
+    during unit-tests, as otherwise it's causing test failures for disco+.
+    (LP: #1826224)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Wed, 24 Apr 2019 16:54:22 +0200
+
+ubuntu-image (1.6+19.04ubuntu1) disco; urgency=medium
+
+  * Do not copy-over /etc/cloud to the rootfs if it's empty.  This can cause
+    base snaps that define the writable-path as 'persistent' and 'transition'
+    to not be able to provide default configuration.  (LP: #1808554)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Fri, 14 Dec 2018 17:08:09 +0100
+
+ubuntu-image (1.5+19.04ubuntu3) disco; urgency=medium
+
+  * Fix --with-proposed handling to properly pass PROPOSED to live-build.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Tue, 04 Dec 2018 23:49:03 +0200
+
+ubuntu-image (1.5+19.04ubuntu2) disco; urgency=medium
+
+  * Temporarily drop all test environments besides py37.  Normally this should
+    not be needed at all as we're skipping unsupported environments, but
+    because of some unknown reasons some python3.6 lefrovers remain on ADT
+    envs causing test failures on arm64 - even though python3.6 has been
+    removed completely from the archive.  This change will not be committed to
+    the vcs.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Thu, 29 Nov 2018 09:15:39 +0100
+
+ubuntu-image (1.5+19.04ubuntu1) disco; urgency=medium
+
+  [ Alfonso Sanchez-Beato (email Canonical) ]
+  * Fix bug with setting file owners in classic.  (LP: #1783577)
+  * Add --filesystem option for classic. This gives us the option to use an
+    existing unpacked root file system instead of calling live-build to create
+    it.  (LP: #1782795)
+  * Remove content of /boot/grub instead of the full folder, so update-grub
+    can still run.  (LP: #1791049)
+
+  [ Dimitri John Ledkov ]
+  * Add python3.7 to tox commands everywhere.
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Fix handling of --extra-ppas for classic builds.  (LP: #1790708)
+  * Check for image/boot/<bootloader> for bootfs additional contents also for
+    classic builds.  Ignore if it does not exist.  (LP: #1792561)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Tue, 02 Oct 2018 17:07:58 +0200
+
+ubuntu-image (1.4+18.10ubuntu4) cosmic; urgency=medium
+
+  * Change the default values of our GadgetYAML voluptuous schema for
+    enumerated objects from objects to the strings they represent.  Voluptuous
+    starting with 0.11.0 started validating default values and apparently the
+    way we defined them no longer works.  Fixes failing autopkgtests.
+    (LP: #1795610)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Tue, 02 Oct 2018 17:07:55 +0200
+
+ubuntu-image (1.4+18.10ubuntu3) cosmic; urgency=medium
+
+  * Use the r prefix for regex in helpers to make the new pycodestyle happy.
+    This essentially fixes all the new u-i ADT qa regressions in cosmic.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Mon, 01 Oct 2018 21:05:28 +0200
+
+ubuntu-image (1.4+18.10ubuntu2) cosmic; urgency=medium
+
+  * Demote the qemu-user-static dependency to Suggests, modify the code to
+    gracefully handle the lack of qemu binaries for cross-compilation.
+    (LP: #1788177)
+  * Add missing information about UBUNTU_IMAGE_QEMU_USER_STATIC_PATH to the
+    manpage.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Tue, 21 Aug 2018 15:25:59 +0200
+
+ubuntu-image (1.4+18.10ubuntu1) cosmic; urgency=medium
+
+  * Add support for classic cross-compilation, add qemu-user-static as a
+    dependency.  (LP: #1772061)
+  * Work-around the API rate limit exceeded failures from github in the
+    haschangelog test case by re-writing it not to use python3-github anymore
+    and instead check for the PR trivial label manually.  (LP: #1690081)
+  * Work-around Permission denied errors printing to stderr whenever parted is
+    imported, causing some of our basic autopkgtests failing.  (LP: #1775085)
+  * Fix some coverage and autopkgtest failures per changes in the environment.
+    Switch to using deb-packaged voluptuous.  (LP: #1782313)
+  * Add the new connections: stanza to the gadget.yaml parser.  (LP: #1780217)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Fri, 20 Jul 2018 16:43:51 +0200
+
+ubuntu-image (1.3+18.04ubuntu2) bionic; urgency=medium
+
+  * Ignore the E722 error on our bare-except statements as those are intended,
+    it's a way for us to clean up on errors.  (LP: #1741246)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Thu, 04 Jan 2018 13:10:46 +0100
+
+ubuntu-image (1.3+18.04ubuntu1) bionic; urgency=medium
+
+  * Remove the snapcraft dependency by moving the gadget tree priming step away
+    from ubuntu-image.  (LP: #1734655)
+  * Add support for defining the livecd-rootfs configuration path through
+    an environment variable.  (LP: #1734949)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Mon, 27 Nov 2017 11:12:08 +0100
+
+ubuntu-image (1.2+18.04ubuntu1) bionic; urgency=medium
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Add a generic hook mechanism and add our first supported snap-image hook:
+    post-populate-rootfs.  (LP: #1672436)
+  * Document the newly added hook API in the ubuntu-image manpage.
+    (LP: #1715849)
+  * Make sure ubuntu-image has 100% code-coverage after getting the classic
+    image support added.
+
+  [ Gary Wang ]
+  * Add classic image creation support.  (LP: #1726391)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Mon, 31 Jul 2017 15:54:06 +0200
+
+ubuntu-image (1.1+17.10ubuntu3) artful; urgency=medium
+
+  * Only run the snap.sh test on github PRs as it doesn't make sense to run it
+    as part of regular deb package migration.  (LP: #1704979)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Wed, 19 Jul 2017 15:31:06 +0200
+
+ubuntu-image (1.1+17.10ubuntu1) artful; urgency=medium
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Fix snapcraft.yaml for classic snappage.  (LP: #1673576)
+  * Add a new step in the builder that generates .manifest files listing all
+    snaps installed in the resulting image.  (LP: #1680574)
+  * Further fixes to snapcraft.yaml, making sure that we only have one
+    ubuntu-image version installed in the snap.  (LP: #1692901)
+  * Move files around during snap build to have all needed libraries and python
+    files in common accessible paths, install missing dependencies into the
+    snap.  (LP: #1694982, LP: #1694993)
+
+  [ Michael Vogt ]
+  * Use fakeroot when running mkfs.ext4.  (LP: #1702628)
+
+  [ Steve Langasek ]
+  * Add fakeroot to the snapcraft.yaml and as a test dep.  (LP: #1702628)
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Fri, 21 Apr 2017 19:35:00 +0200
+
+ubuntu-image (1.0+17.04ubuntu1) zesty; urgency=medium
+
+  * Exit with a console message instead of crashing when the contents of a
+    partition does not fit within the specified size.  (LP: #1666580)
+  * Don't install an unusable global flake8 extension.  (LP: #1631156)
+  * Fix the autopkgtests to use --output-dir instead of the obsolete
+    --output command line switch.  (LP: #1667140)
+  * Added ``--image-file-list`` command line argument to record the paths
+    of all the disk image files written.
+  * Added an autopkgtest to prove that generated images can be
+    successfully booted (on amd64 only).  (LP: #1625732)
+  * Add an autopkgtest for ensuring each PR has a changelog entry and a bug
+    linked to it.  (LP: #1655671)
+  * Make ubuntu-image a classic confinement snap.  (LP: #1638645)
+
+ -- Barry Warsaw <barry@ubuntu.com>  Wed, 22 Feb 2017 11:30:01 -0500
+
+ubuntu-image (0.15+17.04ubuntu1) zesty; urgency=medium
+
+  * ubuntu-image now supports gadget.yaml files with multiple volume
+    specifications.  Each volume describes a different disk image.  For
+    the multi-volume case, no implicit root file system structure is added
+    at all; the root file system partition must be defined in the
+    gadget.yaml.  -o/--output is ignored in the multi-volume case.
+    (LP: #1641727)
+  * Add -O/--output-dir command line options.  Disk image files are
+    written here using the volume name and a .img suffix.  Deprecate
+    -o/--output.  -O and -o are mutually exclusive.
+  * Handle structure parts with size or offset < 1MiB.  (LP: #1630709)
+  * Warn when the size or offset is not a multiple of the sector size.
+    (LP: #1663172 and LP: #1621151)
+  * Allow and ignore any string values in the ``defaults`` section.
+    (LP: #1661515)
+  * Handle a couple more cases where ubuntu-image as a snap cannot read
+    from /tmp (model assertions and extra snaps).  (LP: #1663424)
+  * Add a release script.  (LP: #1655669)
+  * Version numbers for the snap now say "+snap" instead of "+real".
+    (LP: #1664296)
+
+ -- Barry Warsaw <barry@ubuntu.com>  Mon, 06 Feb 2017 18:36:02 -0500
+
+ubuntu-image (0.14+17.04ubuntu1) zesty; urgency=medium
+
+  * Add CI for Python 3.6.  (LP: #1650402)
+  * Fix the test suite for sparse files on ZFS.  (LP: #1656371)
+  * d/t/control: Add Restriction: isolation-machine for the mount test
+    since devmapper is not namespaced and thus can interfere with other
+    containers.  This will prevent the test from running in schroot and
+    lxd/lxc backends, but will continue to run in qemu backends.
+    (LP: #1656391)
+
+ -- Barry Warsaw <barry@ubuntu.com>  Fri, 13 Jan 2017 18:20:39 -0500
+
+ubuntu-image (0.13+17.04ubuntu2) zesty; urgency=medium
+
+  * d/tests/mount: Fix a typo and handle a case where the root file system
+    isn't found.
+
+ -- Barry Warsaw <barry@ubuntu.com>  Tue, 10 Jan 2017 17:33:58 -0500
+
+ubuntu-image (0.13+17.04ubuntu1) zesty; urgency=medium
+
+  * Refuse to write images to /tmp when running ubuntu-image as a snap,
+    since the snap's /tmp is not accessible to the user.  (LP: #1646968)
+  * When sparse copying the resulting disk image, don't try to preserve
+    mode,ownership,timestamps.  Over remote file systems (e.g. afp, hgfs)
+    this can fail.  Over local file systems, they'll be preserved anyway.
+    (LP: #1637554)
+  * Use the `role` attribute of the gadget.yaml when creating images,
+    especially for `role:mbr` and `role:system-data` (LP: #1642914 and
+    LP: #1643086)
+  * d/tests/mount: Switch to the stable channel for snaps.
+  * Make the test suite immune to the locale.  (LP: #1638570)
+
+ -- Barry Warsaw <barry@ubuntu.com>  Mon, 09 Jan 2017 15:38:40 -0500
+
+ubuntu-image (0.12+17.04ubuntu1) zesty; urgency=medium
+
+  * Revert previous change which sorted structure volumes by their
+    offset.  Instead, we preserve gadget.yaml order for purposes of
+    partition numbering, but we still provide implicit offsets when they
+    are missing, and we still sanity check for partition overlap.
+    (LP: #1642999)
+  * Provide human-readable error messages on gadget.yaml parser failures,
+    not Python tracebacks (unless --debug is given).  (LP: #1617421)
+  * Change the way we invoke the autopkgtests.
+    - Use a standard d/t/control file instead of d/t/control.autodep8.  We
+      were only using the Python 3 import test anyway.
+    - Add an import.sh stanza to reproduce the Python 3 import bits we
+      lost by removing autodep8.
+    - Turn the `tox -e coverage` Test-Command into a separate test
+      script so that we can manipulate the $UBUNTU_IMAGE_CODENAME
+      environment variable.  This is used by tox.ini to select an
+      appropriate *-coverage.ini file since Xenial does not and cannot
+      cover certain code paths.  Everything after Xenial gets named 'devel'.
+    - Narrow the dependencies so that they aren't just importing all
+      binary packages.  The effects may be similar, but EIBTI.
+  * d/control: Drop Testsuite header; we're not doing autodep8 anymore.
+  * Rename the environment variable $UBUNTUIMAGE_MOCK_SNAP to
+    $UBUNTU_IMAGE_MOCK_SNAP for consistency.
+  * Skip some tests which touch the actual store when running without
+    network access (e.g. during package build time).
+  * Move the __version__ calculation to the package's __init__.py
+  * Parse all YAML integer-like values as strings, and then turn them into
+    integers if necessary during post-processing.  (LP: #1640523)
+  * gadget.yaml files can include an optional `format` key which names the
+    version number supported by the gadget.yaml.  Currently only format 0
+    is supported, which is a legacy version (omitting the format is
+    equivalent).  (LP: #1638926)
+  * d/control: Add run-time dependencies which are missing from snapd but
+    are required for `snap prepare-image`.  (LP: #1642427)
+  * Structures with type='mbr' are deprecated.  Use structure role
+    instead.  (LP: #1638660)
+  * mbr structures must start at offset 0.  (LP: #1630769)
+  * Fixed sanity checking of --image-size argument for out-of-offset-order
+    structure definitions.  (LP: #1643598)
+  * Prevent wrapping blobs in disk partitions by using the `type: bare`
+    structure key.  (LP: #1645750)
+
+ -- Barry Warsaw <barry@ubuntu.com>  Tue, 08 Nov 2016 17:31:21 -0500
+
+ubuntu-image (0.11+17.04ubuntu1) zesty; urgency=medium
+
+  * Sort the structures in a volume by their offset, even if the offset is
+    defined implicitly (i.e. not present in the gadget.yaml).  Also, check
+    for any structure conflicts and raise a ValueError in that case.
+    (LP: #1631423)
+  * offset-write arguments will only accept 32 bit integers.  (LP: #1617443)
+  * Add a better manpage.  (LP: #1638386)
+  * Tracebacks in the `snap prepare-image` command are suppressed unless
+    --debug is given.  However, the failure is still logged.  (LP: #1621445)
+  * Handle -but ignore- the gadget.yaml `defaults` section.  (LP: #1632449)
+  * Structure ids are disallowed on mbr volumes.  (LP: #1632724)
+  * The package can still be built if python3-debian is not available.
+
+ -- Barry Warsaw <barry@ubuntu.com>  Fri, 04 Nov 2016 18:54:16 -0400
+
+ubuntu-image (0.10+17.04ubuntu1) zesty; urgency=medium
+
+  * Only write out nocloud-net metadata file (thus indicating a local seed
+    and preventing a search elsewhere for user data) when the --cloud-init
+    parameter is given.  (LP: #1633232)
+
+ -- Barry Warsaw <barry@ubuntu.com>  Tue, 25 Oct 2016 09:51:24 -0400
+
+ubuntu-image (0.9+17.04ubuntu1) zesty; urgency=medium
+
+  * Fix snap creation.  (LP: #1631961)
+  * Copy everything under <unpackdir>/image into <rootfs>/system-data
+    except boot/.  (LP: #1632134)
+  * Optional --image-size command line option can be used to force the
+    resulting disk image to a larger than calculated size.  (LP: #1632085)
+  * Fix MBR partition size rounding error due to internal bug and implicit
+    sfdisk(8) behavior.  Give by Steve Langasek.  (LP: #1634557)
+  * Added autopkgtests to ensure all official models can be built, and
+    their mountable partitions can be mounted.  (LP: #1635337)
+  * During image building, stash a copy of the gadget.yaml into the workdir.
+  * d/control: gdisk is a run-time dependency; remove the duplicate snapd
+    run-time dependency.
+
+ -- Barry Warsaw <barry@ubuntu.com>  Mon, 10 Oct 2016 10:48:49 -0400
+
+ubuntu-image (0.7ubuntu1) yakkety; urgency=medium
+
+  [ Steve Langasek ]
+  * Don't build 4GB images, instead build images just as large as needed
+    to hold the contents and let ubuntu-core resize them dynamically on
+    first boot.  LP: #1619362.
+  * Ensure cross-filesystem copies don't accidentally de-sparsify our
+    image.
+  * Update model.assertion test file to be compatible with snapd 2.14.2.
+  * debian/control:
+    - Declare Testsuite: autopkgtest-pkg-python in debian/control so that the
+      package is visible to the test infrastructure.
+    - Remove e2fsprogs from Build-Depends and Depends as per lintian.
+
+  [ Barry Warsaw ]
+  * Repair snapcraft.yaml for Python plugin changes.
+  * Reorganize and flesh out command line options.
+  * 100% test coverage. (LP: #1617445)
+  * Use only the autopkgtest infrastructure for pull request testing.
+    Don't use Travis-CI anymore.  (LP: #1625729)
+
+ -- Barry Warsaw <barry@ubuntu.com>  Thu, 06 Oct 2016 18:46:06 -0400
+
+ubuntu-image (0.6ubuntu3) yakkety; urgency=medium
+
+  * Make the mtools a versioned dep for real, not a versioned build-dep.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Thu, 08 Sep 2016 00:45:37 -0700
+
+ubuntu-image (0.6ubuntu2) yakkety; urgency=medium
+
+  * Add a versioned dependency on a fixed mtools.  LP: #1619718.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Thu, 08 Sep 2016 00:03:19 -0700
+
+ubuntu-image (0.6ubuntu1) yakkety; urgency=medium
+
+  * Add --extra-snaps option to support specifying extra snaps to include.
+    LP: #1619219.
+  * Show output of snap prep-image, so that the user gets download progress
+    instead of long pauses with no activity.  LP: #1619194.
+  * Only set UBUNTU_IMAGE_SKIP_COPY_UNVERIFIED_MODEL in tests, now that
+    model assertions are live.  LP: #1619374.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 07 Sep 2016 08:36:23 -0700
+
+ubuntu-image (0.5ubuntu1) yakkety; urgency=medium
+
+  * Relax versioned build-dependency on e2fsprogs.  Either we have this
+    version available in the target release, in which case the versioned
+    dependency is not required; or we don't, in which case the testsuite
+    already degrades gracefully and we should avoid blocking the build.
+  * fix regression in gpt partition handling.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Thu, 01 Sep 2016 01:52:30 -0700
+
+ubuntu-image (0.4ubuntu1) yakkety; urgency=medium
+
+  * More image building fixes: uboot, mbr support now implemented, which
+    lets the rpi2 image build.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 31 Aug 2016 18:27:20 -0700
+
+ubuntu-image (0.3ubuntu1) yakkety; urgency=medium
+
+  * More image building fixes.
+
+ -- Barry Warsaw <barry@ubuntu.com>  Fri, 26 Aug 2016 17:15:53 -0400
+
+ubuntu-image (0.2ubuntu1) yakkety; urgency=medium
+
+  * Some additional fixes needed for RTM.
+
+ -- Barry Warsaw <barry@ubuntu.com>  Fri, 26 Aug 2016 10:35:03 -0400
+
+ubuntu-image (0.1ubuntu1) yakkety; urgency=medium
+
+  * Initial release.
+
+ -- Barry Warsaw <barry@ubuntu.com>  Thu, 25 Aug 2016 17:11:25 -0400

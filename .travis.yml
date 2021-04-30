@@ -1,0 +1,25 @@
+language: go
+dist: bionic
+sudo: false
+go:
+  - 1.16.x
+
+before_install:
+  - go get github.com/spf13/cobra
+
+env:
+  - GO116MODULE=on
+
+before_script:
+  - go vet ./...
+  - FMT=`go fmt ./...` && [ -z "$FMT" ]
+
+script:
+  - go test -coverprofile=coverage.txt -covermode=atomic ./...
+  - go test -race ./...
+  - echo "Build assets"
+  - pushd cmd/ubuntu-image && go build -o ../../build/ubuntu-image && popd
+  - go generate ./...
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

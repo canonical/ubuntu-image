@@ -1,0 +1,3 @@
+./obj-x86_64-linux-gnu/bin/ubuntu-image
+./obj-x86_64-linux-gnu/build/ubuntu-image
+./obj-x86_64-linux-gnu/build/_ubuntu-image

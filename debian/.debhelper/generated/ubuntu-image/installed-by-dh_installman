@@ -1,0 +1,3 @@
+./obj-x86_64-linux-gnu/build/ubuntu-image-classic.1
+./obj-x86_64-linux-gnu/build/ubuntu-image-snap.1
+./obj-x86_64-linux-gnu/build/ubuntu-image.1
