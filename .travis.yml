@@ -5,7 +5,7 @@ go:
   - 1.16.x
 
 before_install:
-  - go get github.com/spf13/cobra
+  - go get -t -v ./...
 
 env:
   - GO116MODULE=on
