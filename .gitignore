@@ -1,0 +1,19 @@
+# Binary
+cmd/ubuntu-image/ubuntu-image
+
+# Generated binaries and corresponding assets
+build/
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+
+# Packaging artefacts
+debian/*debhelper*
+debian/ubuntu-image.substvars
+debian/files
+obj-*
+vendor/
