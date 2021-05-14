@@ -13,5 +13,4 @@ Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
 Description: toolkit for building Ubuntu images.
- .
  This package contains the ubuntu-image program.

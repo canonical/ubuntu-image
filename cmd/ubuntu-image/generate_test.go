@@ -45,3 +45,5 @@ func TestGenerateCompletion(t *testing.T) {
 		t.Fatalf("couldn't generate bazshsh completion: %v", err)
 	}
 }
+
+//TODO: cobra can also generate the README.md. Do that.
