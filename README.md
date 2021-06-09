@@ -12,8 +12,8 @@ images from a model assertion, but it will be generalized to build more
 
 # Requirements
 
-Ubuntu 16.04 (Xenial Xerus) is the minimum platform requirement, but Ubuntu
-18.04 (Bionic Beaver) or newer is recommended. All required third party packages are available in the
+Ubuntu 18.04 (Bionic Beaver) is the minimum platform requirement, but Ubuntu
+20.04 (Focal Fossa) or newer is recommended. All required third party packages are available in the
 Ubuntu archive.
 
 If you want to run the test suite locally, you should install all the build
@@ -35,3 +35,10 @@ course, you can just install the packages named in the `Build-Depends` field.
   (https://github.com/Canonical/ubuntu-image/blob/master/ubuntu-image.md)
 
 The "gadget.yaml" specification has moved to [the snapcraft forum](https://forum.snapcraft.io/t/the-gadget-snap)
+
+# Build Instructions
+
+* Clone the git repository using `git clone https://github.com/canonical/ubuntu-image.git`
+* `cd` into the newly cloned repository
+* Run `go build -o . ./...`
+* The newly compiled executable `ubuntu-image` will be created in the current directory
