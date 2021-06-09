@@ -7,9 +7,6 @@ export DH_GOPKG := github.com/canonical/ubuntu-image
 # strict symbols checking
 export DPKG_GENSYMBOLS_CHECK_LEVEL=4
 
-# generate shared lib, shell completion, man pages and shared lib
-export DH_GOLANG_GO_GENERATE := 1
-
 BUILDFLAGS+= -buildmode=pie
 builddir = $(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)
 artifactsdir = $(builddir)/build
@@ -22,13 +19,14 @@ override_dh_auto_clean:
 	# create the vendor directory when building the source package
 	[ -d vendor/ ] || go mod vendor
 
+
+override_dh_installman:
+	mkdir -p $(artifactsdir)
+	rst2man ubuntu-image.rst $(artifactsdir)/ubuntu-image.1
+	dh_installman
+
 override_dh_auto_build:
 	dh_auto_build -- $(BUILDFLAGS)
-	# move shell completion, man pages and shared lib
-	mv $(builddir)/src/github.com/canonical/ubuntu-image/build $(artifactsdir)
-	mv $(artifactsdir)/bash-completion $(artifactsdir)/ubuntu-image
-	mv $(artifactsdir)/zsh-completion $(artifactsdir)/_ubuntu-image
 
 override_dh_missing:
 	dh_missing --fail-missing
-
