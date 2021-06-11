@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/commands"
+	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/jessevdk/go-flags"
 )
 

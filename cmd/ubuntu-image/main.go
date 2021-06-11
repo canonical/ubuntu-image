@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/canonical/ubuntu-image/commands"
+	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -23,8 +23,16 @@ func main() {
 	parser.AddGroup("[Common Options]", "Options common to both commands", &commands.CommonOpts)
 
 	if _, err := parser.Parse(); err != nil {
-		fmt.Printf("Error %s\n", err.Error())
-		osExit(1)
+		if e, ok := err.(*flags.Error); ok {
+			// TODO add more specific error handling
+                        switch e.Type {
+                        case flags.ErrHelp:
+				osExit(0)
+			default:
+				fmt.Printf("Error %s\n", err.Error())
+				osExit(1)
+			}
+		}
 	}
 
 	if os.Args[1] == "snap" {

@@ -10,7 +10,7 @@ Homepage: http://launchpad.net/ubuntu-image
 
 Package: ubuntu-image
 Architecture: any
-Depends: ${shlibs:Depends},
-         ${misc:Depends},
+Built-Using: ${misc:Built-Using},
+Depends: ${misc:Depends},
 Description: toolkit for building Ubuntu images.
  This package contains the ubuntu-image program.
