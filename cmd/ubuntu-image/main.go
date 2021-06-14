@@ -19,8 +19,8 @@ case since the state is saved in a .ubuntu-image.pck file in the working directo
 func main() {
 
 	parser := flags.NewParser(&commands.UbuntuImageCommand, flags.Default)
-	parser.AddGroup("[State Machine Options]", stateMachineLongDesc, &commands.StateMachineOpts)
-	parser.AddGroup("[Common Options]", "Options common to both commands", &commands.CommonOpts)
+	parser.AddGroup("State Machine Options", stateMachineLongDesc, &commands.StateMachineOpts)
+	parser.AddGroup("Common Options", "Options common to both commands", &commands.CommonOpts)
 
 	if _, err := parser.Parse(); err != nil {
 		if e, ok := err.(*flags.Error); ok {
