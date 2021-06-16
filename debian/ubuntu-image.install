@@ -1,0 +1,3 @@
+obj*/bin/ubuntu-image usr/bin
+#obj-*/build/ubuntu-image usr/share/bash-completion/completions/
+#obj-*/build/_ubuntu-image usr/share/zsh/vendor-completions/

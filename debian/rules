@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE = 1
+
+export DEB_BUILD_MAINT_OPTIONS = optimize=-lto
+export DH_GOPKG := github.com/canonical/ubuntu-image
+
+# strict symbols checking
+export DPKG_GENSYMBOLS_CHECK_LEVEL=4
+
+BUILDFLAGS+= -buildmode=pie
+builddir = $(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)
+artifactsdir = $(builddir)/build
+
+%:
+	dh $@ --buildsystem=golang --with=golang
+
+override_dh_auto_clean:
+	dh_auto_clean
+	# create the vendor directory when building the source package
+	[ -d vendor/ ] || go mod vendor
+
+
+override_dh_installman:
+	mkdir -p $(artifactsdir)
+	rst2man ubuntu-image.rst $(artifactsdir)/ubuntu-image.1
+	dh_installman
+
+override_dh_auto_build:
+	dh_auto_build -- $(BUILDFLAGS)
+
+override_dh_missing:
+	dh_missing --fail-missing

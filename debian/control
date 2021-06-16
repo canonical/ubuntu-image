@@ -1,0 +1,16 @@
+Source: ubuntu-image
+Section: utils
+Priority: optional
+Maintainer: Lukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>
+Build-Depends: debhelper (>= 11),
+               dh-golang (>= 1.17~),
+               golang-go (>= 2:1.10~),
+Standards-Version: 4.1.2
+Homepage: http://launchpad.net/ubuntu-image
+
+Package: ubuntu-image
+Architecture: any
+Built-Using: ${misc:Built-Using},
+Depends: ${misc:Depends},
+Description: toolkit for building Ubuntu images.
+ This package contains the ubuntu-image program.
