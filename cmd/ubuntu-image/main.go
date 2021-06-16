@@ -15,7 +15,6 @@ Other than -w, these options are mutually exclusive. When -u or -t is given,
 the state machine can be resumed later with -r, but -w must be given in that
 case since the state is saved in a .ubuntu-image.pck file in the working directory.`
 
-
 func main() {
 
 	parser := flags.NewParser(&commands.UbuntuImageCommand, flags.Default)
@@ -25,8 +24,8 @@ func main() {
 	if _, err := parser.Parse(); err != nil {
 		if e, ok := err.(*flags.Error); ok {
 			// TODO add more specific error handling
-                        switch e.Type {
-                        case flags.ErrHelp:
+			switch e.Type {
+			case flags.ErrHelp:
 				osExit(0)
 			default:
 				fmt.Printf("Error %s\n", err.Error())
