@@ -105,8 +105,10 @@ func TestExitCode(t *testing.T) {
 		flags    []string
 		expected int
 	}{
-		{"exit 0", []string{"snap", "model_assertion.yml"}, 0},
+		{"snap exit 0", []string{"snap", "model_assertion.yml"}, 0},
+		{"classic exit 0", []string{"classic", "gadget_tree.yml"}, 0},
 		{"exit 1", []string{"--help-me"}, 1},
+		{"help exit 0", []string{"--help"}, 0},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
