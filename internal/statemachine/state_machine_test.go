@@ -55,11 +55,11 @@ func TestUntilFlag(t *testing.T) {
 					partialStateMachine.Thru = stateName
 					break
 				}
-				if !partialStateMachine.Run() {
+				if err := partialStateMachine.Run(); err != nil {
 					t.Errorf("Failed to run partial state machine")
 				}
 				resumeStateMachine := StateMachine{WorkDir: tempDir, Resume: true}
-				if !resumeStateMachine.Run() {
+				if err := resumeStateMachine.Run(); err != nil {
 					t.Errorf("Failed to resume state machine from state: %s\n", stateName)
 				}
 			}
@@ -92,7 +92,7 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 			stateMachine.Thru = tc.thru
 			stateMachine.Resume = tc.resume
 
-			if stateMachine.Run() {
+			if err := stateMachine.Run(); err == nil {
 				t.Error("Expected an error but there was none!")
 			}
 		})
@@ -133,7 +133,9 @@ func TestFileErrors(t *testing.T) {
 			}
 			partialStateMachine.Until = tc.pauseStep
 
-			partialStateMachine.Run()
+			if err := partialStateMachine.Run(); err != nil {
+				t.Errorf("Failed to run state machine")
+			}
 
 			// mess with files or directories
 			if tc.causeProblems != nil {
@@ -143,7 +145,7 @@ func TestFileErrors(t *testing.T) {
 			// try to resume the state machine
 			resumeStateMachine := StateMachine{WorkDir: partialStateMachine.WorkDir, Resume: true}
 
-			if resumeStateMachine.Run() {
+			if err := resumeStateMachine.Run(); err == nil {
 				t.Error("Expected an error but there was none!")
 			}
 

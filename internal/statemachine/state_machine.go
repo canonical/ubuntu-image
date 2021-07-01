@@ -26,7 +26,7 @@ var stateNames = map[string]int{
 }
 
 // iterated over by the state machine, and individual functions can be overridden for tests
-var stateFuncs = map[int]func(StateMachine) bool{
+var stateFuncs = map[int]func(StateMachine) error{
 	0:  StateMachine.makeTemporaryDirectories,
 	1:  StateMachine.prepareGadgetTree,
 	2:  StateMachine.prepareImage,
@@ -56,50 +56,47 @@ type StateMachine struct {
 	ThruOrdinal  int    // numeric step to stop after
 	CurrentStep  int    // tracks the current progress of the state machine
 	tempLocation string // used for testing, "" in non test cases
+	startingStep int    // when --resume is used we need to know what step to start from
 }
 
 /* Certain combinations of arguments are not allowed. Validate proper
  * state machine arguments were provided */
-func (stateMachine StateMachine) validateInput() bool {
+func (stateMachine StateMachine) validateInput() error {
 	// Validate command line options
 	if stateMachine.Thru != "" && stateMachine.Until != "" {
-		fmt.Println("Cannot specify both --until and --thru!")
-		return false
+		return fmt.Errorf("Cannot specify both --until and --thru!")
 	}
 	if stateMachine.WorkDir == "" && stateMachine.Resume {
-		fmt.Println("Must specify workdir when using --resume flag!")
-		return false
+		return fmt.Errorf("Must specify workdir when using --resume flag!")
 	}
 
-	if !stateMachine.getUntilThruOrdinals() {
-		return false
+	if err := stateMachine.getUntilThruOrdinals(); err != nil {
+		return err
 	}
 
 	// handle the resume case
-	var startingState int
 	if stateMachine.Resume {
 		// open the ubuntu-image.gob file and determine the state
 		var partialStateMachine = new(StateMachine)
 		gobfile, err := os.Open(stateMachine.WorkDir + "/ubuntu-image.gob")
 		if err != nil {
-			fmt.Printf("Error reading metadata file: %s\n", err.Error())
-			return false
+			return fmt.Errorf("Error reading metadata file: %s\n", err.Error())
 		}
 		defer gobfile.Close()
 		dec := gob.NewDecoder(gobfile)
 		err = dec.Decode(&partialStateMachine)
 		if err != nil {
-			fmt.Printf("Failed to parse metadata file: %s\n", err.Error())
-			return false
+			return fmt.Errorf("Failed to parse metadata file: %s\n", err.Error())
 		}
-		startingState = partialStateMachine.CurrentStep
+		stateMachine.startingStep = partialStateMachine.CurrentStep
 	} else {
 		// start from the beginning
-		startingState = 0
+		stateMachine.startingStep = 0
 	}
+	return nil
 }
 
-func (stateMachine StateMachine) getUntilThruOrdinals() {
+func (stateMachine StateMachine) getUntilThruOrdinals() error {
 	// attempt to parse thru and until
 	if stateMachine.Until != "" {
 		// first check if it is a digit
@@ -108,13 +105,12 @@ func (stateMachine StateMachine) getUntilThruOrdinals() {
 			if val >= 0 && val <= len(stateNames) {
 				stateMachine.UntilOrdinal = val
 			} else {
-				return false
+				return fmt.Errorf("Provided \"until\" step out of range")
 			}
 		} else if val, exists := stateNames[stateMachine.Until]; exists {
 			stateMachine.UntilOrdinal = val
 		} else {
-			fmt.Printf("Invalid value for Until: %s\n", stateMachine.Until)
-			return false
+			return fmt.Errorf("Invalid value for Until: %s\n", stateMachine.Until)
 		}
 	} else {
 		// go "until" the end
@@ -128,38 +124,37 @@ func (stateMachine StateMachine) getUntilThruOrdinals() {
 			if val >= 0 && val <= len(stateNames) {
 				stateMachine.ThruOrdinal = val
 			} else {
-				return false
+				return fmt.Errorf("Provided \"thru\" step out of range")
 			}
 		} else if val, exists := stateNames[stateMachine.Thru]; exists {
 			stateMachine.ThruOrdinal = val
 		} else {
-			fmt.Printf("Invalid value for Thru: %s\n", stateMachine.Thru)
-			return false
+			return fmt.Errorf("Invalid value for Thru: %s\n", stateMachine.Thru)
 		}
 	} else {
 		// go "thru" the end
 		stateMachine.ThruOrdinal = len(stateFuncs)
 	}
+	return nil
 }
 
 /* For state machine runs that will be resumed,
  * We need to write the state machine info to disk */
-func (stateMachine StateMachine) writeMetadata() bool {
+func (stateMachine StateMachine) writeMetadata() error {
 	gobfile, err := os.OpenFile(stateMachine.WorkDir+"/ubuntu-image.gob", os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil && !os.IsExist(err) {
-		fmt.Printf("Error opening metadata file for writing: %s\n", stateMachine.WorkDir+"/ubuntu-image.gob")
-		return false
+		fmt.Errorf("Error opening metadata file for writing: %s\n", stateMachine.WorkDir+"/ubuntu-image.gob")
 	}
 	defer gobfile.Close()
 	enc := gob.NewEncoder(gobfile)
 
 	// no need to check errors, as it will panic if there is one
 	enc.Encode(stateMachine)
-	return true
+	return nil
 }
 
 // Step 0: generate work directory file structure
-func (stateMachine StateMachine) makeTemporaryDirectories() bool {
+func (stateMachine StateMachine) makeTemporaryDirectories() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 0] make_temporary_directories")
 	}
@@ -168,141 +163,138 @@ func (stateMachine StateMachine) makeTemporaryDirectories() bool {
 	if stateMachine.WorkDir == "" {
 		workDir, err := os.MkdirTemp(stateMachine.tempLocation, "ubuntu-image-")
 		if err != nil {
-			fmt.Println("Failed to create temporary directory")
-			return false
+			fmt.Errorf("Failed to create temporary directory")
 		}
 		stateMachine.WorkDir = workDir
 	} else {
 		err := os.Mkdir(stateMachine.WorkDir, 0755)
 		if err != nil && !os.IsExist(err) {
-			fmt.Println("Error creating work directory")
-			return false
+			fmt.Errorf("Error creating work directory")
 		}
 	}
 
-	return true
+	return nil
 }
 
 // Step 1: Prepare the gadget tree
-func (stateMachine StateMachine) prepareGadgetTree() bool {
+func (stateMachine StateMachine) prepareGadgetTree() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 1] prepare_gadget_tree")
 	}
-	return true
+	return nil
 }
 
 // Step 2: Prepare the image
-func (stateMachine StateMachine) prepareImage() bool {
+func (stateMachine StateMachine) prepareImage() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 2] prepare_image")
 	}
-	return true
+	return nil
 }
 
 // Step 3: Load the gadget yaml passed in via command line
-func (stateMachine StateMachine) loadGadgetYaml() bool {
+func (stateMachine StateMachine) loadGadgetYaml() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 3] load_gadget_yaml")
 	}
-	return true
+	return nil
 }
 
 // Step 4: Populate the image's rootfs contents
-func (stateMachine StateMachine) populateRootfsContents() bool {
+func (stateMachine StateMachine) populateRootfsContents() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 4] populate_rootfs_contents")
 	}
-	return true
+	return nil
 }
 
 // Step 5: Run hooks for populating rootfs contents
-func (stateMachine StateMachine) populateRootfsContentsHooks() bool {
+func (stateMachine StateMachine) populateRootfsContentsHooks() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 5] populate_rootfs_contents_hooks")
 	}
-	return true
+	return nil
 }
 
 // Step 6: Generate the disk info
-func (stateMachine StateMachine) generateDiskInfo() bool {
+func (stateMachine StateMachine) generateDiskInfo() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 6] generate_disk_info")
 	}
-	return true
+	return nil
 }
 
 // Step 7: Calculate the rootfs size
-func (stateMachine StateMachine) calculateRootfsSize() bool {
+func (stateMachine StateMachine) calculateRootfsSize() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 7] calculate_rootfs_size")
 	}
-	return true
+	return nil
 }
 
 // Step 8: Pre populate the bootfs contents
-func (stateMachine StateMachine) prepopulateBootfsContents() bool {
+func (stateMachine StateMachine) prepopulateBootfsContents() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 8] pre_populate_bootfs_contents")
 	}
-	return true
+	return nil
 }
 
 // Step 9: Populate the Bootfs Contents
-func (stateMachine StateMachine) populateBootfsContents() bool {
+func (stateMachine StateMachine) populateBootfsContents() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 9] populate_bootfs_contents")
 	}
-	return true
+	return nil
 }
 
 // Step 10: Populate and prepare the partitions
-func (stateMachine StateMachine) populatePreparePartitions() bool {
+func (stateMachine StateMachine) populatePreparePartitions() error {
 	if stateMachine.Debug {
 		fmt.Println("[10] populate_prepare_partitions")
 	}
-	return true
+	return nil
 }
 
 // Step 11: Make the disk
-func (stateMachine StateMachine) makeDisk() bool {
+func (stateMachine StateMachine) makeDisk() error {
 	if stateMachine.Debug {
 		fmt.Println("[11] make_disk")
 	}
-	return true
+	return nil
 }
 
 // Step 12: Generate the manifest
-func (stateMachine StateMachine) generateManifest() bool {
+func (stateMachine StateMachine) generateManifest() error {
 	if stateMachine.Debug {
 		fmt.Println("[12] generate_manifest")
 	}
-	return true
+	return nil
 }
 
 // Step 13: Clean up and organize files
-func (stateMachine StateMachine) finish() bool {
+func (stateMachine StateMachine) finish() error {
 	if stateMachine.Debug {
 		fmt.Println("[13] finish")
 	}
 	if stateMachine.CleanWorkDir {
 		os.RemoveAll(stateMachine.WorkDir)
 	}
-	return true
+	return nil
 }
 
 // Run parses the command line options and iterates through the states
-func (stateMachine StateMachine) Run() bool {
-	// ensure valid arguments/flags
-	if !stateMachine.validateInput() {
-		return false
+func (stateMachine StateMachine) Run() error {
+	if err := stateMachine.validateInput(); err != nil {
+		return err
 	}
 
 	// iterate through the states
-	for state := startingState; state < len(stateFuncs); state++ {
+	for state := stateMachine.startingStep; state < len(stateFuncs); state++ {
 		stateMachine.CurrentStep = state
 		if state < stateMachine.UntilOrdinal && state <= stateMachine.ThruOrdinal {
-			if !stateFuncs[state](stateMachine) {
-				return false
+			if err := stateFuncs[state](stateMachine); err != nil {
+				return err
 			}
 		} else {
 			break
@@ -310,9 +302,9 @@ func (stateMachine StateMachine) Run() bool {
 	}
 
 	if !stateMachine.CleanWorkDir {
-		if !stateMachine.writeMetadata() {
-			return false
+		if err := stateMachine.writeMetadata(); err != nil {
+			return err
 		}
 	}
-	return true
+	return nil
 }

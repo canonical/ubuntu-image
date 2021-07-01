@@ -100,7 +100,8 @@ func main() {
 	stateMachine.ImageType = parser.Command.Commands()[0].Name
 
 	// finally, run the state machine
-	if !stateMachine.Run() {
+	if err := stateMachine.Run(); err != nil {
+		fmt.Println(err.Error())
 		osExit(1)
 	}
 }
