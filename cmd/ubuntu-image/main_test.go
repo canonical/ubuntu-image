@@ -38,7 +38,7 @@ func TestValidCommands(t *testing.T) {
 			}
 
 			// finally, execute the command and check output
-			args, err := flags.ParseArgs(&commands.UbuntuImageCommand, args)
+			_, err := flags.ParseArgs(&commands.UbuntuImageCommand, args)
 			if err != nil {
 				t.Error("Did not expect an error but got", err)
 			}
@@ -89,7 +89,7 @@ func TestInvalidCommands(t *testing.T) {
 			}
 
 			// finally, execute the command and check output
-			args, err := flags.ParseArgs(&commands.UbuntuImageCommand, args)
+			_, err := flags.ParseArgs(&commands.UbuntuImageCommand, args)
 			if err == nil {
 				t.Error("Expected an error but none was found")
 			}
