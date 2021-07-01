@@ -12,9 +12,9 @@ type commonOpts struct {
 }
 
 type stateMachineOpts struct {
-	WorkDir string `short:"w" long:"workdir" description:"The working directory in which to download and unpack all the source files for the image. This directory can exist or not, and it is not removed after this program exits. If not given, a temporary working directory is used instead, which *is* deleted after this program exits. Use -w if you want to be able to resume a partial state machine run." value-name:"DIRECTORY" group:"State Machine Options"`
-	Until   string `short:"u" long:"until" description:"Run the state machine until the given STEP, non-inclusively. STEP can be a name or number." value-name:"STEP"`
-	Thru    string `short:"t" long:"thru" description:"Run the state machine through the given STEP, inclusively. STEP can be a name or number." value-name:"STEP"`
+	WorkDir string `short:"w" long:"workdir" description:"The working directory in which to download and unpack all the source files for the image. This directory can exist or not, and it is not removed after this program exits. If not given, a temporary working directory is used instead, which *is* deleted after this program exits. Use -w if you want to be able to resume a partial state machine run." value-name:"DIRECTORY" group:"State Machine Options" default:""`
+	Until   string `short:"u" long:"until" description:"Run the state machine until the given STEP, non-inclusively. STEP can be a name or number." value-name:"STEP" default:""`
+	Thru    string `short:"t" long:"thru" description:"Run the state machine through the given STEP, inclusively. STEP can be a name or number." value-name:"STEP" default:""`
 	Resume  bool   `short:"r" long:"resume" description:"Continue the state machine from the previously saved state. It is an error if there is no previous state."`
 }
 
@@ -29,11 +29,16 @@ type ubuntuImageCommand struct {
 	} `command:"classic"`
 }
 
-type CommonOptions struct {
+type commonOptions struct {
 	CommonOpts       commonOpts
 	StateMachineOpts stateMachineOpts
 }
 
+// StateMachineOpts will hold the state machine data parsed by go-flags
 var StateMachineOpts stateMachineOpts
+
+// CommonOpts will hold the data parsed by go-flags that is common to snap and classic commands
 var CommonOpts commonOpts
+
+// UbuntuImageCommand handles the subcommands "snap" or "classic" parsed by go-flags
 var UbuntuImageCommand ubuntuImageCommand

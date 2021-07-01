@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"io"
 	"os"
 	"testing"
 
@@ -68,11 +70,10 @@ func TestInvalidCommands(t *testing.T) {
 		flags    []string
 		expected string
 	}{
-		{"Invalid Command", []string{"test"}, nil, "invalid argument \"test\" for \"ubuntu-image\""},
-		{"No Model Assertion", []string{"snap"}, nil, "accepts 1 arg(s), received 0"},
-		{"No Gadget Tree", []string{"classic"}, nil, "accepts 1 arg(s), received 0"},
-		{"Invalid Flag", []string{"classic"}, []string{"--nonexistent"}, "unknown flag: --nonexistent"},
-		//{"Two Commands", []string{"snap", "classic", "gadget.yml"}, nil, "accepts 1 arg(s), received 2"},
+		{"invalid command", []string{"test"}, nil, "invalid argument \"test\" for \"ubuntu-image\""},
+		{"no model assertion", []string{"snap"}, nil, "accepts 1 arg(s), received 0"},
+		{"no gadget tree", []string{"classic"}, nil, "accepts 1 arg(s), received 0"},
+		{"invalid flag", []string{"classic"}, []string{"--nonexistent"}, "unknown flag: --nonexistent"},
 	}
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution
@@ -107,8 +108,11 @@ func TestExitCode(t *testing.T) {
 	}{
 		{"snap exit 0", []string{"snap", "model_assertion.yml"}, 0},
 		{"classic exit 0", []string{"classic", "gadget_tree.yml"}, 0},
+		{"workdir exit 0", []string{"classic", "gadget_tree.yml", "--workdir", "/tmp/ubuntu-image"}, 0},
 		{"exit 1", []string{"--help-me"}, 1},
 		{"help exit 0", []string{"--help"}, 0},
+		{"bad state machine args", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
+		{"no command given", []string{}, 1},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
@@ -134,6 +138,62 @@ func TestExitCode(t *testing.T) {
 			if got != tc.expected {
 				t.Errorf("Expected exit code: %d, got: %d", tc.expected, got)
 			}
+			os.RemoveAll("/tmp/ubuntu-image")
+		})
+	}
+}
+
+/* This function tests error scenarios in utility functions like capturing
+ * from stdout or stderr. It also checks the scenario where stdout and stderr
+ * are successfully captured, but a subsequent read from them fails */
+func TestFailedStdoutStderrCapture(t *testing.T) {
+	testCases := []struct {
+		name     string
+		stdCap   *os.File
+		readFrom *os.File
+		flags    []string
+	}{
+		{"error capture stdout", os.Stdout, os.Stdout, []string{}},
+		{"error capture stderr", os.Stderr, os.Stderr, []string{}},
+		{"error read stdout", os.Stdout, nil, []string{"--help"}},
+		{"error read stderr", os.Stderr, nil, []string{}},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			// Override os.Exit temporarily
+			oldOsExit := osExit
+			defer func() {
+				osExit = oldOsExit
+			}()
+
+			var got int
+			tmpExit := func(code int) {
+				got = code
+			}
+
+			osExit = tmpExit
+
+			// os.Exit will be captured. set the captureStd function
+			captureStd = func(toCap **os.File) (io.Reader, func(), error) {
+				var err error
+				if *toCap == tc.stdCap {
+					err = errors.New("Testing Error")
+				} else {
+					err = nil
+				}
+				return tc.readFrom, func() { return }, err
+			}
+
+			// set up the flags for the test cases
+			flag.CommandLine = flag.NewFlagSet(tc.name, flag.ExitOnError)
+			os.Args = append([]string{tc.name}, tc.flags...)
+
+			// run main and check the exit code
+			main()
+			if got != 1 {
+				t.Errorf("Expected error code on exit, got: %d", got)
+			}
+
 		})
 	}
 }

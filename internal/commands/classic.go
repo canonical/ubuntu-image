@@ -17,9 +17,9 @@ type classicOpts struct {
 	ExtraPPAs    []string `long:"extra-ppas" description:"Extra ppas to install. This is passed through to livecd-rootfs."`
 }
 
-type ClassicCommand struct {
+type classicCommand struct {
 	ClassicArgs classicArgs `positional-args:"true" required:"false"`
 	ClassicOpts classicOpts
 }
 
-var Classic ClassicCommand
+var classic classicCommand

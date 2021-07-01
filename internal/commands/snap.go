@@ -12,9 +12,9 @@ type snapOpts struct {
 	DisableConsoleConf bool   `long:"disable-console-conf" description:"Disable console-conf on the resulting image."`
 }
 
-type SnapCommand struct {
+type snapCommand struct {
 	SnapArgs snapArgs `positional-args:"true" required:"false"`
 	SnapOpts snapOpts
 }
 
-var Snap SnapCommand
+var snap snapCommand
