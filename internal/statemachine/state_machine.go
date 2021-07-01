@@ -58,6 +58,90 @@ type StateMachine struct {
 	tempLocation string // used for testing, "" in non test cases
 }
 
+/* Certain combinations of arguments are not allowed. Validate proper
+ * state machine arguments were provided */
+func (stateMachine StateMachine) validateInput() bool {
+	// Validate command line options
+	if stateMachine.Thru != "" && stateMachine.Until != "" {
+		fmt.Println("Cannot specify both --until and --thru!")
+		return false
+	}
+	if stateMachine.WorkDir == "" && stateMachine.Resume {
+		fmt.Println("Must specify workdir when using --resume flag!")
+		return false
+	}
+
+	if !stateMachine.getUntilThruOrdinals() {
+		return false
+	}
+
+	// handle the resume case
+	var startingState int
+	if stateMachine.Resume {
+		// open the ubuntu-image.gob file and determine the state
+		var partialStateMachine = new(StateMachine)
+		gobfile, err := os.Open(stateMachine.WorkDir + "/ubuntu-image.gob")
+		if err != nil {
+			fmt.Printf("Error reading metadata file: %s\n", err.Error())
+			return false
+		}
+		defer gobfile.Close()
+		dec := gob.NewDecoder(gobfile)
+		err = dec.Decode(&partialStateMachine)
+		if err != nil {
+			fmt.Printf("Failed to parse metadata file: %s\n", err.Error())
+			return false
+		}
+		startingState = partialStateMachine.CurrentStep
+	} else {
+		// start from the beginning
+		startingState = 0
+	}
+}
+
+func (stateMachine StateMachine) getUntilThruOrdinals() {
+	// attempt to parse thru and until
+	if stateMachine.Until != "" {
+		// first check if it is a digit
+		if val, err := strconv.Atoi(stateMachine.Until); err == nil {
+			// got a digit, make sure it's within range
+			if val >= 0 && val <= len(stateNames) {
+				stateMachine.UntilOrdinal = val
+			} else {
+				return false
+			}
+		} else if val, exists := stateNames[stateMachine.Until]; exists {
+			stateMachine.UntilOrdinal = val
+		} else {
+			fmt.Printf("Invalid value for Until: %s\n", stateMachine.Until)
+			return false
+		}
+	} else {
+		// go "until" the end
+		stateMachine.UntilOrdinal = len(stateFuncs) + 1
+	}
+
+	if stateMachine.Thru != "" {
+		// first check if it is a digit
+		if val, err := strconv.Atoi(stateMachine.Thru); err == nil {
+			// got a digit, make sure it's within range
+			if val >= 0 && val <= len(stateNames) {
+				stateMachine.ThruOrdinal = val
+			} else {
+				return false
+			}
+		} else if val, exists := stateNames[stateMachine.Thru]; exists {
+			stateMachine.ThruOrdinal = val
+		} else {
+			fmt.Printf("Invalid value for Thru: %s\n", stateMachine.Thru)
+			return false
+		}
+	} else {
+		// go "thru" the end
+		stateMachine.ThruOrdinal = len(stateFuncs)
+	}
+}
+
 /* For state machine runs that will be resumed,
  * We need to write the state machine info to disk */
 func (stateMachine StateMachine) writeMetadata() bool {
@@ -79,10 +163,21 @@ func (stateMachine StateMachine) makeTemporaryDirectories() bool {
 	if stateMachine.Debug {
 		fmt.Println("[ 0] make_temporary_directories")
 	}
-	err := os.Mkdir(stateMachine.WorkDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		fmt.Println("Error creating work directory")
-		return false
+
+	// if no workdir was specified, open a /tmp dir
+	if stateMachine.WorkDir == "" {
+		workDir, err := os.MkdirTemp(stateMachine.tempLocation, "ubuntu-image-")
+		if err != nil {
+			fmt.Println("Failed to create temporary directory")
+			return false
+		}
+		stateMachine.WorkDir = workDir
+	} else {
+		err := os.Mkdir(stateMachine.WorkDir, 0755)
+		if err != nil && !os.IsExist(err) {
+			fmt.Println("Error creating work directory")
+			return false
+		}
 	}
 
 	return true
@@ -197,88 +292,9 @@ func (stateMachine StateMachine) finish() bool {
 
 // Run parses the command line options and iterates through the states
 func (stateMachine StateMachine) Run() bool {
-	// Validate command line options
-	if stateMachine.Thru != "" && stateMachine.Until != "" {
-		fmt.Println("Cannot specify both --until and --thru!")
+	// ensure valid arguments/flags
+	if !stateMachine.validateInput() {
 		return false
-	}
-	if stateMachine.WorkDir == "" && stateMachine.Resume {
-		fmt.Println("Must specify workdir when using --resume flag!")
-		return false
-	}
-
-	// attempt to parse thru and until
-	if stateMachine.Until != "" {
-		// first check if it is a digit
-		if val, err := strconv.Atoi(stateMachine.Until); err == nil {
-			// got a digit, make sure it's within range
-			if val >= 0 && val <= len(stateNames) {
-				stateMachine.UntilOrdinal = val
-			} else {
-				return false
-			}
-		} else if val, exists := stateNames[stateMachine.Until]; exists {
-			stateMachine.UntilOrdinal = val
-		} else {
-			fmt.Printf("Invalid value for Until: %s\n", stateMachine.Until)
-			return false
-		}
-	} else {
-		// go "until" the end
-		stateMachine.UntilOrdinal = len(stateFuncs) + 1
-	}
-
-	if stateMachine.Thru != "" {
-		// first check if it is a digit
-		if val, err := strconv.Atoi(stateMachine.Thru); err == nil {
-			// got a digit, make sure it's within range
-			if val >= 0 && val <= len(stateNames) {
-				stateMachine.ThruOrdinal = val
-			} else {
-				return false
-			}
-		} else if val, exists := stateNames[stateMachine.Thru]; exists {
-			stateMachine.ThruOrdinal = val
-		} else {
-			fmt.Printf("Invalid value for Thru: %s\n", stateMachine.Thru)
-			return false
-		}
-	} else {
-		// go "thru" the end
-		stateMachine.ThruOrdinal = len(stateFuncs)
-	}
-
-	// handle the resume case
-	var startingState int
-	if stateMachine.Resume {
-		// open the ubuntu-image.gob file and determine the state
-		var partialStateMachine = new(StateMachine)
-		gobfile, err := os.Open(stateMachine.WorkDir + "/ubuntu-image.gob")
-		if err != nil {
-			fmt.Printf("Error reading metadata file: %s\n", err.Error())
-			return false
-		}
-		defer gobfile.Close()
-		dec := gob.NewDecoder(gobfile)
-		err = dec.Decode(&partialStateMachine)
-		if err != nil {
-			fmt.Printf("Failed to parse metadata file: %s\n", err.Error())
-			return false
-		}
-		startingState = partialStateMachine.CurrentStep
-	} else {
-		// start from the beginning
-		startingState = 0
-	}
-
-	// if no workdir was specified, open a /tmp dir
-	if stateMachine.WorkDir == "" {
-		workDir, err := os.MkdirTemp(stateMachine.tempLocation, "ubuntu-image-")
-		if err != nil {
-			fmt.Println("Failed to create temporary directory")
-			return false
-		}
-		stateMachine.WorkDir = workDir
 	}
 
 	// iterate through the states
