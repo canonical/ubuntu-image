@@ -108,7 +108,7 @@ func TestExitCode(t *testing.T) {
 	}{
 		{"snap exit 0", []string{"snap", "model_assertion.yml"}, 0},
 		{"classic exit 0", []string{"classic", "gadget_tree.yml"}, 0},
-		{"workdir exit 0", []string{"classic", "gadget_tree.yml", "--workdir", "/tmp/ubuntu-image"}, 0},
+		{"workdir exit 0", []string{"classic", "gadget_tree.yml", "--workdir", "/tmp/ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"}, 0},
 		{"exit 1", []string{"--help-me"}, 1},
 		{"help exit 0", []string{"--help"}, 0},
 		{"bad state machine args", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
@@ -138,7 +138,7 @@ func TestExitCode(t *testing.T) {
 			if got != tc.expected {
 				t.Errorf("Expected exit code: %d, got: %d", tc.expected, got)
 			}
-			os.RemoveAll("/tmp/ubuntu-image")
+			os.RemoveAll("/tmp/ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06")
 		})
 	}
 }
