@@ -88,10 +88,7 @@ func main() {
 	stateMachine.Thru = commands.StateMachineOpts.Thru
 	stateMachine.Resume = commands.StateMachineOpts.Resume
 	stateMachine.Debug = commands.CommonOpts.Debug
-	if commands.StateMachineOpts.WorkDir == "" {
-		// set the workdir to a /tmp directory
-		stateMachine.CleanWorkDir = true
-	} else {
+	if commands.StateMachineOpts.WorkDir != "" {
 		stateMachine.WorkDir = commands.StateMachineOpts.WorkDir
 		stateMachine.CleanWorkDir = false
 	}

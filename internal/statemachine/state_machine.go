@@ -26,21 +26,21 @@ var stateNames = map[string]int{
 }
 
 // iterated over by the state machine, and individual functions can be overridden for tests
-var stateFuncs = map[int]func(StateMachine) error{
-	0:  StateMachine.makeTemporaryDirectories,
-	1:  StateMachine.prepareGadgetTree,
-	2:  StateMachine.prepareImage,
-	3:  StateMachine.loadGadgetYaml,
-	4:  StateMachine.populateRootfsContents,
-	5:  StateMachine.populateRootfsContentsHooks,
-	6:  StateMachine.generateDiskInfo,
-	7:  StateMachine.calculateRootfsSize,
-	8:  StateMachine.prepopulateBootfsContents,
-	9:  StateMachine.populateBootfsContents,
-	10: StateMachine.populatePreparePartitions,
-	11: StateMachine.makeDisk,
-	12: StateMachine.generateManifest,
-	13: StateMachine.finish,
+var stateFuncs = map[int]func(*StateMachine) error{
+	0:  (*StateMachine).makeTemporaryDirectories,
+	1:  (*StateMachine).prepareGadgetTree,
+	2:  (*StateMachine).prepareImage,
+	3:  (*StateMachine).loadGadgetYaml,
+	4:  (*StateMachine).populateRootfsContents,
+	5:  (*StateMachine).populateRootfsContentsHooks,
+	6:  (*StateMachine).generateDiskInfo,
+	7:  (*StateMachine).calculateRootfsSize,
+	8:  (*StateMachine).prepopulateBootfsContents,
+	9:  (*StateMachine).populateBootfsContents,
+	10: (*StateMachine).populatePreparePartitions,
+	11: (*StateMachine).makeDisk,
+	12: (*StateMachine).generateManifest,
+	13: (*StateMachine).finish,
 }
 
 // StateMachine will hold the command line data, track the current state, and handle all function calls
@@ -140,10 +140,10 @@ func (stateMachine *StateMachine) getUntilThruOrdinals() error {
 
 /* For state machine runs that will be resumed,
  * We need to write the state machine info to disk */
-func (stateMachine StateMachine) writeMetadata() error {
+func (stateMachine *StateMachine) writeMetadata() error {
 	gobfile, err := os.OpenFile(stateMachine.WorkDir+"/ubuntu-image.gob", os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil && !os.IsExist(err) {
-		fmt.Errorf("Error opening metadata file for writing: %s\n", stateMachine.WorkDir+"/ubuntu-image.gob")
+		return fmt.Errorf("Error opening metadata file for writing: %s\n", stateMachine.WorkDir+"/ubuntu-image.gob")
 	}
 	defer gobfile.Close()
 	enc := gob.NewEncoder(gobfile)
@@ -153,8 +153,17 @@ func (stateMachine StateMachine) writeMetadata() error {
 	return nil
 }
 
+/* Clean up workdir. For now this is just deleting the temporary directory if necessary
+ * but will have more functionality added to it later */
+func (stateMachine *StateMachine) cleanup() error {
+	if err := os.RemoveAll(stateMachine.WorkDir); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Step 0: generate work directory file structure
-func (stateMachine StateMachine) makeTemporaryDirectories() error {
+func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 0] make_temporary_directories")
 	}
@@ -163,21 +172,21 @@ func (stateMachine StateMachine) makeTemporaryDirectories() error {
 	if stateMachine.WorkDir == "" {
 		workDir, err := os.MkdirTemp(stateMachine.tempLocation, "ubuntu-image-")
 		if err != nil {
-			fmt.Errorf("Failed to create temporary directory")
+			return fmt.Errorf("Failed to create temporary directory")
 		}
 		stateMachine.WorkDir = workDir
+		stateMachine.CleanWorkDir = true
 	} else {
 		err := os.Mkdir(stateMachine.WorkDir, 0755)
 		if err != nil && !os.IsExist(err) {
-			fmt.Errorf("Error creating work directory")
+			return fmt.Errorf("Error creating work directory")
 		}
 	}
-
 	return nil
 }
 
 // Step 1: Prepare the gadget tree
-func (stateMachine StateMachine) prepareGadgetTree() error {
+func (stateMachine *StateMachine) prepareGadgetTree() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 1] prepare_gadget_tree")
 	}
@@ -185,7 +194,7 @@ func (stateMachine StateMachine) prepareGadgetTree() error {
 }
 
 // Step 2: Prepare the image
-func (stateMachine StateMachine) prepareImage() error {
+func (stateMachine *StateMachine) prepareImage() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 2] prepare_image")
 	}
@@ -193,7 +202,7 @@ func (stateMachine StateMachine) prepareImage() error {
 }
 
 // Step 3: Load the gadget yaml passed in via command line
-func (stateMachine StateMachine) loadGadgetYaml() error {
+func (stateMachine *StateMachine) loadGadgetYaml() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 3] load_gadget_yaml")
 	}
@@ -201,7 +210,7 @@ func (stateMachine StateMachine) loadGadgetYaml() error {
 }
 
 // Step 4: Populate the image's rootfs contents
-func (stateMachine StateMachine) populateRootfsContents() error {
+func (stateMachine *StateMachine) populateRootfsContents() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 4] populate_rootfs_contents")
 	}
@@ -209,7 +218,7 @@ func (stateMachine StateMachine) populateRootfsContents() error {
 }
 
 // Step 5: Run hooks for populating rootfs contents
-func (stateMachine StateMachine) populateRootfsContentsHooks() error {
+func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 5] populate_rootfs_contents_hooks")
 	}
@@ -217,7 +226,7 @@ func (stateMachine StateMachine) populateRootfsContentsHooks() error {
 }
 
 // Step 6: Generate the disk info
-func (stateMachine StateMachine) generateDiskInfo() error {
+func (stateMachine *StateMachine) generateDiskInfo() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 6] generate_disk_info")
 	}
@@ -225,7 +234,7 @@ func (stateMachine StateMachine) generateDiskInfo() error {
 }
 
 // Step 7: Calculate the rootfs size
-func (stateMachine StateMachine) calculateRootfsSize() error {
+func (stateMachine *StateMachine) calculateRootfsSize() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 7] calculate_rootfs_size")
 	}
@@ -233,7 +242,7 @@ func (stateMachine StateMachine) calculateRootfsSize() error {
 }
 
 // Step 8: Pre populate the bootfs contents
-func (stateMachine StateMachine) prepopulateBootfsContents() error {
+func (stateMachine *StateMachine) prepopulateBootfsContents() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 8] pre_populate_bootfs_contents")
 	}
@@ -241,7 +250,7 @@ func (stateMachine StateMachine) prepopulateBootfsContents() error {
 }
 
 // Step 9: Populate the Bootfs Contents
-func (stateMachine StateMachine) populateBootfsContents() error {
+func (stateMachine *StateMachine) populateBootfsContents() error {
 	if stateMachine.Debug {
 		fmt.Println("[ 9] populate_bootfs_contents")
 	}
@@ -249,7 +258,7 @@ func (stateMachine StateMachine) populateBootfsContents() error {
 }
 
 // Step 10: Populate and prepare the partitions
-func (stateMachine StateMachine) populatePreparePartitions() error {
+func (stateMachine *StateMachine) populatePreparePartitions() error {
 	if stateMachine.Debug {
 		fmt.Println("[10] populate_prepare_partitions")
 	}
@@ -257,7 +266,7 @@ func (stateMachine StateMachine) populatePreparePartitions() error {
 }
 
 // Step 11: Make the disk
-func (stateMachine StateMachine) makeDisk() error {
+func (stateMachine *StateMachine) makeDisk() error {
 	if stateMachine.Debug {
 		fmt.Println("[11] make_disk")
 	}
@@ -265,7 +274,7 @@ func (stateMachine StateMachine) makeDisk() error {
 }
 
 // Step 12: Generate the manifest
-func (stateMachine StateMachine) generateManifest() error {
+func (stateMachine *StateMachine) generateManifest() error {
 	if stateMachine.Debug {
 		fmt.Println("[12] generate_manifest")
 	}
@@ -273,18 +282,20 @@ func (stateMachine StateMachine) generateManifest() error {
 }
 
 // Step 13: Clean up and organize files
-func (stateMachine StateMachine) finish() error {
+func (stateMachine *StateMachine) finish() error {
 	if stateMachine.Debug {
 		fmt.Println("[13] finish")
 	}
 	if stateMachine.CleanWorkDir {
-		os.RemoveAll(stateMachine.WorkDir)
+		if err := stateMachine.cleanup(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // Run parses the command line options and iterates through the states
-func (stateMachine StateMachine) Run() error {
+func (stateMachine *StateMachine) Run() error {
 	if err := stateMachine.validateInput(); err != nil {
 		return err
 	}
@@ -294,6 +305,8 @@ func (stateMachine StateMachine) Run() error {
 		stateMachine.CurrentStep = state
 		if state < stateMachine.UntilOrdinal && state <= stateMachine.ThruOrdinal {
 			if err := stateFuncs[state](stateMachine); err != nil {
+				// clean up work dir on error
+				stateMachine.cleanup()
 				return err
 			}
 		} else {

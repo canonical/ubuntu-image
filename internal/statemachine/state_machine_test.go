@@ -11,11 +11,13 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
+var nonExistentPath string = "/tmp/this/path/better/not/exist"
+
 /* This function ensures that the temporary workdir is cleaned up after the
  * state machine has finished running */
 func TestCleanup(t *testing.T) {
 	t.Run("test cleanup", func(t *testing.T) {
-		stateMachine := StateMachine{WorkDir: "", CleanWorkDir: true}
+		stateMachine := StateMachine{WorkDir: ""}
 		stateMachine.Run()
 		if _, err := os.Stat(stateMachine.WorkDir); err == nil {
 			t.Errorf("Error: temporary workdir %s was not cleaned up\n", stateMachine.WorkDir)
@@ -36,12 +38,12 @@ func TestUntilFlag(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			for stateName, stateNum := range stateNames {
-				tempDir, err := os.MkdirTemp("", "ubuntu-image-" + tc.name + "-")
+				tempDir, err := os.MkdirTemp("", "ubuntu-image-"+tc.name+"-")
 				if err != nil {
 					t.Errorf("Could not create workdir: %s\n", err.Error())
 				}
 				defer os.RemoveAll(tempDir)
-				partialStateMachine := StateMachine{WorkDir: tempDir, CleanWorkDir: false}
+				partialStateMachine := StateMachine{WorkDir: tempDir}
 				switch tc.name {
 				case "until_digit":
 					partialStateMachine.Until = strconv.Itoa(stateNum)
@@ -101,7 +103,8 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 }
 
 /* The state machine does a fair amount of file io to track state. This function tests
- * failures in these file io attempts */
+ * failures in these file io attempts by pausing the state machine, messing with
+ * files/directories by deleting them ,chanigng permissions, etc, then resuming */
 func TestFileErrors(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -113,18 +116,17 @@ func TestFileErrors(t *testing.T) {
 	}{
 		{"error_reading_metadata_file", "tmp", "5", "", func(messWith string) { os.RemoveAll(messWith) }, nil},
 		{"error_opening_metadata_file", "tmp", "5", "", func(messWith string) { os.Chmod(messWith+"/ubuntu-image.gob", 0000) }, func(messWith string) { os.Chmod(messWith+"/ubuntu-image.gob", 0777); os.RemoveAll(messWith) }},
-		{"error_creating_workdir", "/tmp/this/path/better/not/exist", "5", "", nil, nil},
+		{"error_creating_workdir", nonExistentPath, "5", "", nil, nil},
 		{"error_parsing_metadata", "tmp", "1", "", func(messWith string) { os.Truncate(messWith+"/ubuntu-image.gob", 0) }, func(messWith string) { os.RemoveAll(messWith) }},
-		{"error_creating_tmp", "", "2", "/tmp/this/path/better/not/exist", nil, nil},
+		{"error_creating_tmp", "", "2", nonExistentPath, nil, nil},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			var partialStateMachine StateMachine
 
 			partialStateMachine.tempLocation = tc.tempLocation
-			partialStateMachine.Debug = true
 			if tc.workDir == "tmp" {
-				workDir, err := os.MkdirTemp(tc.tempLocation, "ubuntu-image-" + tc.name + "-")
+				workDir, err := os.MkdirTemp(tc.tempLocation, "ubuntu-image-"+tc.name+"-")
 				if err != nil {
 					t.Errorf("Failed to create temporary directory %s\n", workDir)
 				}
@@ -134,9 +136,8 @@ func TestFileErrors(t *testing.T) {
 			}
 			partialStateMachine.Until = tc.pauseStep
 
-			if err := partialStateMachine.Run(); err != nil {
-				t.Errorf("Failed to run state machine")
-			}
+			// don't check errors as some are expected here
+			partialStateMachine.Run()
 
 			// mess with files or directories
 			if tc.causeProblems != nil {
@@ -171,10 +172,10 @@ func TestDebug(t *testing.T) {
 				t.Errorf("Failed to capture stdout: %s\n", err.Error())
 			}
 
-			stateMachine := StateMachine{Debug: true}
+			stateMachine := StateMachine{WorkDir: workDir, Debug: true}
 
 			// ignore the return value since we're just looking for the printed name
-			stateFuncs[stateNum](stateMachine)
+			stateFuncs[stateNum](&stateMachine)
 
 			// restore stdout and check that the debug info was printed
 			restoreStdout()
@@ -191,12 +192,40 @@ func TestDebug(t *testing.T) {
 	})
 }
 
-func TestFailedStep(t *testing.T) {
-	t.Run("test failed step", func(t *testing.T) {
-		stateFuncs[0] = func(stateMachine StateMachine) error { return fmt.Errorf("Test Error") }
-		stateMachine := StateMachine{}
-		if err := stateMachine.Run(); err == nil {
-			t.Errorf("Expected an error but there was none")
-		}
-	})
+/* This function overrides some of the state functions to test various error scenarios */
+func TestFunctionErrors(t *testing.T) {
+	testCases := []struct {
+		name          string
+		overrideState int
+		newStateFunc  func(stateMachine *StateMachine) error
+	}{
+		{"error_state_func", 0, func(stateMachine *StateMachine) error { return fmt.Errorf("Test Error") }},
+		{"error_write_metadata", 13, func(stateMachine *StateMachine) error { os.RemoveAll(stateMachine.WorkDir); return nil }},
+		{"error_cleanup", 12, func(stateMachine *StateMachine) error {
+			stateMachine.CleanWorkDir = true
+			stateMachine.WorkDir = "."
+			return nil
+		}},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			workDir, err := os.MkdirTemp("", "ubuntu-image-"+tc.name+"-")
+			if err != nil {
+				t.Errorf("Failed to create temporary directory %s\n", workDir)
+			}
+
+			// override the function, but save the old one
+			oldStateFunc := stateFuncs[tc.overrideState]
+			stateFuncs[tc.overrideState] = tc.newStateFunc
+			stateMachine := StateMachine{WorkDir: workDir}
+			if err := stateMachine.Run(); err == nil {
+				t.Errorf("Expected an error but there was none")
+			}
+			// restore the function
+			stateFuncs[tc.overrideState] = oldStateFunc
+
+			// clean up the workdir
+			os.RemoveAll(workDir)
+		})
+	}
 }
