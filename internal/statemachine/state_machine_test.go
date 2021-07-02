@@ -104,7 +104,7 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 
 /* The state machine does a fair amount of file io to track state. This function tests
  * failures in these file io attempts by pausing the state machine, messing with
- * files/directories by deleting them ,chanigng permissions, etc, then resuming */
+ * files/directories by deleting them ,changing permissions, etc, then resuming */
 func TestFileErrors(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -158,7 +158,7 @@ func TestFileErrors(t *testing.T) {
 	}
 }
 
-/* This test iterates through each state individually using --resume and ensures
+/* This test iterates through each state function individually and ensures
  * that the name of each state is printed when the --debug flag is in use */
 func TestDebug(t *testing.T) {
 	t.Run("test debug", func(t *testing.T) {

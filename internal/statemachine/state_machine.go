@@ -294,7 +294,7 @@ func (stateMachine *StateMachine) finish() error {
 	return nil
 }
 
-// Run parses the command line options and iterates through the states
+// Run calls functions to parsesthe command line options and iterates through the state functions
 func (stateMachine *StateMachine) Run() error {
 	if err := stateMachine.validateInput(); err != nil {
 		return err
