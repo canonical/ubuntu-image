@@ -27,6 +27,7 @@ func CaptureStd(toCap **os.File) (io.Reader, func(), error) {
 	}, nil
 }
 
+// SaveDefaults is a helper test function to clear args between test cases
 func SaveDefaults() func() {
 
 	origStateMachineOpts := commands.StateMachineOpts
