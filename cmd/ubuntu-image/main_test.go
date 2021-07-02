@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -27,6 +28,9 @@ func TestValidCommands(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution
 		t.Run("test "+tc.name, func(t *testing.T) {
+			// save default command line values to restore later
+			restoreArgs := helper.SaveDefaults()
+			defer restoreArgs()
 
 			// set up the command
 			var args []string
@@ -78,6 +82,9 @@ func TestInvalidCommands(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution
 		t.Run("test "+tc.name, func(t *testing.T) {
+			// save default command line values to restore later
+			restoreArgs := helper.SaveDefaults()
+			defer restoreArgs()
 
 			// set up the command
 			var args []string
@@ -109,13 +116,18 @@ func TestExitCode(t *testing.T) {
 		{"snap exit 0", []string{"snap", "model_assertion.yml"}, 0},
 		{"classic exit 0", []string{"classic", "gadget_tree.yml"}, 0},
 		{"workdir exit 0", []string{"classic", "gadget_tree.yml", "--workdir", "/tmp/ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"}, 0},
-		{"exit 1", []string{"--help-me"}, 1},
+		{"invalid flag exit 1", []string{"--help-me"}, 1},
 		{"help exit 0", []string{"--help"}, 0},
 		{"bad state machine args", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
 		{"no command given", []string{}, 1},
+		{"resume without workdir", []string{"--resume"}, 1},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
+			// save default command line values to restore later
+			restoreArgs := helper.SaveDefaults()
+			defer restoreArgs()
+
 			// Override os.Exit temporarily
 			oldOsExit := osExit
 			defer func() {
@@ -160,6 +172,10 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
+			// save default command line values to restore later
+			restoreArgs := helper.SaveDefaults()
+			defer restoreArgs()
+
 			// Override os.Exit temporarily
 			oldOsExit := osExit
 			defer func() {

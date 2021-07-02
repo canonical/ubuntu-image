@@ -3,6 +3,8 @@ package helper
 import (
 	"io"
 	"os"
+
+	"github.com/canonical/ubuntu-image/internal/commands"
 )
 
 // CaptureStd returns an io.Reader to read what was printed, and teardown
@@ -23,4 +25,16 @@ func CaptureStd(toCap **os.File) (io.Reader, func(), error) {
 		stdCapW.Close()
 		closed = true
 	}, nil
+}
+
+func SaveDefaults() func() {
+
+	origStateMachineOpts := commands.StateMachineOpts
+	origCommonOpts := commands.CommonOpts
+	origUbuntuImageCommand := commands.UbuntuImageCommand
+	return func() {
+		commands.StateMachineOpts = origStateMachineOpts
+		commands.CommonOpts = origCommonOpts
+		commands.UbuntuImageCommand = origUbuntuImageCommand
+	}
 }
