@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -27,31 +28,31 @@ func TestUntilFlag(t *testing.T) {
 	testCases := []struct {
 		name string
 	}{
-		{"until digit"},
-		{"thru digit"},
-		{"until name"},
-		{"thru name"},
+		{"until_digit"},
+		{"thru_digit"},
+		{"until_name"},
+		{"thru_name"},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			for stateName, stateNum := range stateNames {
-				tempDir, err := os.MkdirTemp("", "ubuntu-image-test-")
+				tempDir, err := os.MkdirTemp("", "ubuntu-image-" + tc.name + "-")
 				if err != nil {
 					t.Errorf("Could not create workdir: %s\n", err.Error())
 				}
 				defer os.RemoveAll(tempDir)
 				partialStateMachine := StateMachine{WorkDir: tempDir, CleanWorkDir: false}
 				switch tc.name {
-				case "until digit":
+				case "until_digit":
 					partialStateMachine.Until = strconv.Itoa(stateNum)
 					break
-				case "thru digit":
+				case "thru_digit":
 					partialStateMachine.Thru = strconv.Itoa(stateNum)
 					break
-				case "until name":
+				case "until_name":
 					partialStateMachine.Until = stateName
 					break
-				case "thru name":
+				case "thru_name":
 					partialStateMachine.Thru = stateName
 					break
 				}
@@ -110,20 +111,20 @@ func TestFileErrors(t *testing.T) {
 		causeProblems func(string)
 		cleanUp       func(string)
 	}{
-		{"error reading metadata file", "tmp", "5", "", func(messWith string) { os.RemoveAll(messWith) }, nil},
-		{"error opening metadata file", "tmp", "5", "", func(messWith string) { os.Chmod(messWith+"/ubuntu-image.gob", 0444) }, func(messWith string) { os.Chmod(messWith+"/ubuntu-image.gob", 0777); os.RemoveAll(messWith) }},
-		//{"error writing metadata file", "tmp", "12", "", nil, nil},
-		{"error creating workdir", "/tmp/this/path/better/not/exist", "5", "", nil, nil},
-		{"error parsing metadata", "tmp", "1", "", func(messWith string) { os.Truncate(messWith+"/ubuntu-image.gob", 0) }, func(messWith string) { os.RemoveAll(messWith) }},
-		{"error creating tmp", "", "2", "/tmp/this/path/better/not/exist", nil, nil},
+		{"error_reading_metadata_file", "tmp", "5", "", func(messWith string) { os.RemoveAll(messWith) }, nil},
+		{"error_opening_metadata_file", "tmp", "5", "", func(messWith string) { os.Chmod(messWith+"/ubuntu-image.gob", 0000) }, func(messWith string) { os.Chmod(messWith+"/ubuntu-image.gob", 0777); os.RemoveAll(messWith) }},
+		{"error_creating_workdir", "/tmp/this/path/better/not/exist", "5", "", nil, nil},
+		{"error_parsing_metadata", "tmp", "1", "", func(messWith string) { os.Truncate(messWith+"/ubuntu-image.gob", 0) }, func(messWith string) { os.RemoveAll(messWith) }},
+		{"error_creating_tmp", "", "2", "/tmp/this/path/better/not/exist", nil, nil},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			var partialStateMachine StateMachine
 
 			partialStateMachine.tempLocation = tc.tempLocation
+			partialStateMachine.Debug = true
 			if tc.workDir == "tmp" {
-				workDir, err := os.MkdirTemp(tc.tempLocation, "ubuntu-image-")
+				workDir, err := os.MkdirTemp(tc.tempLocation, "ubuntu-image-" + tc.name + "-")
 				if err != nil {
 					t.Errorf("Failed to create temporary directory %s\n", workDir)
 				}
@@ -160,7 +161,7 @@ func TestFileErrors(t *testing.T) {
  * that the name of each state is printed when the --debug flag is in use */
 func TestDebug(t *testing.T) {
 	t.Run("test debug", func(t *testing.T) {
-		workDir, err := os.MkdirTemp("", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("", "ubuntu-image-test-debug-")
 		if err != nil {
 			t.Errorf("Failed to create temporary directory %s\n", workDir)
 		}
@@ -184,6 +185,18 @@ func TestDebug(t *testing.T) {
 			if !strings.Contains(string(readStdout), stateName) {
 				t.Errorf("Expected state name %s to appear in output %s\n", stateName, string(readStdout))
 			}
+		}
+		// clean up
+		os.RemoveAll(workDir)
+	})
+}
+
+func TestFailedStep(t *testing.T) {
+	t.Run("test failed step", func(t *testing.T) {
+		stateFuncs[0] = func(stateMachine StateMachine) error { return fmt.Errorf("Test Error") }
+		stateMachine := StateMachine{}
+		if err := stateMachine.Run(); err == nil {
+			t.Errorf("Expected an error but there was none")
 		}
 	})
 }

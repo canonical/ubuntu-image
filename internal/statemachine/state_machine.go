@@ -61,7 +61,7 @@ type StateMachine struct {
 
 /* Certain combinations of arguments are not allowed. Validate proper
  * state machine arguments were provided */
-func (stateMachine StateMachine) validateInput() error {
+func (stateMachine *StateMachine) validateInput() error {
 	// Validate command line options
 	if stateMachine.Thru != "" && stateMachine.Until != "" {
 		return fmt.Errorf("Cannot specify both --until and --thru!")
@@ -96,7 +96,7 @@ func (stateMachine StateMachine) validateInput() error {
 	return nil
 }
 
-func (stateMachine StateMachine) getUntilThruOrdinals() error {
+func (stateMachine *StateMachine) getUntilThruOrdinals() error {
 	// attempt to parse thru and until
 	if stateMachine.Until != "" {
 		// first check if it is a digit
