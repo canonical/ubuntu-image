@@ -11,7 +11,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
-var nonExistentPath string = "/tmp/this/path/better/not/exist"
+var testDir = "ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"
 
 /* This function ensures that the temporary workdir is cleaned up after the
  * state machine has finished running */
@@ -116,9 +116,8 @@ func TestFileErrors(t *testing.T) {
 	}{
 		{"error_reading_metadata_file", "tmp", "5", "", func(messWith string) { os.RemoveAll(messWith) }, nil},
 		{"error_opening_metadata_file", "tmp", "5", "", func(messWith string) { os.Chmod(messWith+"/ubuntu-image.gob", 0000) }, func(messWith string) { os.Chmod(messWith+"/ubuntu-image.gob", 0777); os.RemoveAll(messWith) }},
-		{"error_creating_workdir", nonExistentPath, "5", "", nil, nil},
 		{"error_parsing_metadata", "tmp", "1", "", func(messWith string) { os.Truncate(messWith+"/ubuntu-image.gob", 0) }, func(messWith string) { os.RemoveAll(messWith) }},
-		{"error_creating_tmp", "", "2", nonExistentPath, nil, nil},
+		{"error_creating_tmp", "", "2", "/tmp/this/path/better/not/exist/" + testDir, nil, nil},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
@@ -228,4 +227,22 @@ func TestFunctionErrors(t *testing.T) {
 			os.RemoveAll(workDir)
 		})
 	}
+}
+
+/* This function tests a failure in the "MkdirAll" call that happens when --workdir is used */
+func TestFailedCreateWorkDir(t *testing.T) {
+	t.Run("test error creating workdir", func(t *testing.T) {
+		/* create the parent dir of the workdir with restrictive permissions */
+		parentDir := "/tmp/workdir_error-5c919639-b972-4265-807a-19cd23fd1936/"
+		workDir := parentDir + testDir
+		os.Mkdir(parentDir, 0000)
+
+		stateMachine := StateMachine{WorkDir: workDir, Thru: "make_temporary_directories"}
+		if err := stateMachine.Run(); err == nil {
+			t.Errorf("Expected an error but there was none")
+		}
+
+		os.Chmod(parentDir, 0777)
+		os.RemoveAll(parentDir)
+	})
 }

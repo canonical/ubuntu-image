@@ -177,7 +177,7 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 		stateMachine.WorkDir = workDir
 		stateMachine.CleanWorkDir = true
 	} else {
-		err := os.Mkdir(stateMachine.WorkDir, 0755)
+		err := os.MkdirAll(stateMachine.WorkDir, 0755)
 		if err != nil && !os.IsExist(err) {
 			return fmt.Errorf("Error creating work directory")
 		}

@@ -29,7 +29,7 @@ func TestValidCommands(t *testing.T) {
 		tc := tc // capture range variable for parallel execution
 		t.Run("test "+tc.name, func(t *testing.T) {
 			// save default command line values to restore later
-			restoreArgs := helper.SaveDefaults()
+			restoreArgs := helper.Setup()
 			defer restoreArgs()
 
 			// set up the command
@@ -83,7 +83,7 @@ func TestInvalidCommands(t *testing.T) {
 		tc := tc // capture range variable for parallel execution
 		t.Run("test "+tc.name, func(t *testing.T) {
 			// save default command line values to restore later
-			restoreArgs := helper.SaveDefaults()
+			restoreArgs := helper.Setup()
 			defer restoreArgs()
 
 			// set up the command
@@ -125,7 +125,7 @@ func TestExitCode(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			// save default command line values to restore later
-			restoreArgs := helper.SaveDefaults()
+			restoreArgs := helper.Setup()
 			defer restoreArgs()
 
 			// Override os.Exit temporarily
@@ -173,7 +173,7 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			// save default command line values to restore later
-			restoreArgs := helper.SaveDefaults()
+			restoreArgs := helper.Setup()
 			defer restoreArgs()
 
 			// Override os.Exit temporarily
