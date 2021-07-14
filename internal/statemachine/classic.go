@@ -8,20 +8,20 @@ import (
 
 // classicStates are the names and function variables to be executed by the state machine for classic images
 var classicStates = []stateFunc{
-	stateFunc{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
-	stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree},
-	stateFunc{"prepare_image", (*StateMachine).prepareImage},
-	stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
-	stateFunc{"populate_rootfs_contents", (*StateMachine).populateRootfsContents},
-	stateFunc{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
-	stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo},
-	stateFunc{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
-	stateFunc{"prepopulate_bootfs_contents", (*StateMachine).prepopulateBootfsContents},
-	stateFunc{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
-	stateFunc{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
-	stateFunc{"make_disk", (*StateMachine).makeDisk},
-	stateFunc{"generate_manifest", (*StateMachine).generateManifest},
-	stateFunc{"finish", (*StateMachine).finish},
+	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
+	{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree},
+	{"prepare_image", (*StateMachine).prepareImage},
+	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
+	{"populate_rootfs_contents", (*StateMachine).populateRootfsContents},
+	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
+	{"generate_disk_info", (*StateMachine).generateDiskInfo},
+	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
+	{"prepopulate_bootfs_contents", (*StateMachine).prepopulateBootfsContents},
+	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
+	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
+	{"make_disk", (*StateMachine).makeDisk},
+	{"generate_manifest", (*StateMachine).generateManifest},
+	{"finish", (*StateMachine).finish},
 }
 
 // classicStateMachine embeds StateMachine and adds the command line flags specific to classic images

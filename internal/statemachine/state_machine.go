@@ -1,4 +1,4 @@
-// package statemachine provides the functions and structs to set up and
+// Package statemachine provides the functions and structs to set up and
 // execute a state machine based ubuntu-image build
 package statemachine
 
@@ -45,7 +45,7 @@ func (stateMachine *StateMachine) setCommonOpts() {
 	stateMachine.stateMachineFlags = commands.StateMachineOptsPassed
 }
 
-// validateInput ensures that command line flags for the state machine are valid. These 
+// validateInput ensures that command line flags for the state machine are valid. These
 // flags are applicable to all image types
 func (stateMachine *StateMachine) validateInput() error {
 	// Validate command line options

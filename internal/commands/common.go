@@ -1,4 +1,4 @@
-// package commands defines structures and variables used to 
+// Package commands defines structures and variables used to
 // parse command line input
 package commands
 
