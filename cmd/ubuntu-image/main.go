@@ -22,9 +22,9 @@ case since the state is saved in a .ubuntu-image.gob file in the working directo
 
 func main() {
 
-	parser := flags.NewParser(&commands.UbuntuImageCommand, flags.Default)
-	parser.AddGroup("State Machine Options", stateMachineLongDesc, &commands.StateMachineOpts)
-	parser.AddGroup("Common Options", "Options common to both commands", &commands.CommonOpts)
+	parser := flags.NewParser(&commands.UICommand, flags.Default)
+	parser.AddGroup("State Machine Options", stateMachineLongDesc, &commands.StateMachineOptsPassed)
+	parser.AddGroup("Common Options", "Options common to both commands", &commands.CommonOptsPassed)
 
 	// go-flags can be overzealous about printing errors that aren't actually errors
 	// so we capture stdout/stderr while parsing and later decide whether to print
@@ -56,7 +56,7 @@ func main() {
 				osExit(0)
 			case flags.ErrCommandRequired:
 				// if --resume was given, this is not an error
-				if !commands.StateMachineOpts.Resume {
+				if !commands.StateMachineOptsPassed.Resume {
 					restoreStdout()
 					restoreStderr()
 					readStderr, err := ioutil.ReadAll(stderr)
@@ -65,14 +65,14 @@ func main() {
 						osExit(1)
 						break
 					}
-					fmt.Printf("Error: %s", string(readStderr))
+					fmt.Printf("Error: %s\n", string(readStderr))
 					osExit(1)
 				}
 				break
 			default:
 				restoreStdout()
 				restoreStderr()
-				fmt.Printf("Error: %s", err.Error())
+				fmt.Printf("Error: %s\n", err.Error())
 				osExit(1)
 			}
 		}
@@ -82,23 +82,30 @@ func main() {
 	restoreStdout()
 	restoreStderr()
 
+	// this can't be nil because go-flags has already validated the active command
+	imageType := parser.Command.Active.Name
+
+	var stateMachine statemachine.SmInterface
 	// Set up the state machine
-	var stateMachine statemachine.StateMachine
-	stateMachine.Until = commands.StateMachineOpts.Until
-	stateMachine.Thru = commands.StateMachineOpts.Thru
-	stateMachine.Resume = commands.StateMachineOpts.Resume
-	stateMachine.Debug = commands.CommonOpts.Debug
-	if commands.StateMachineOpts.WorkDir != "" {
-		stateMachine.WorkDir = commands.StateMachineOpts.WorkDir
-		stateMachine.CleanWorkDir = false
+	if imageType == "snap" {
+		stateMachine = &statemachine.SnapSM
+	} else {
+		stateMachine = &statemachine.ClassicSM
 	}
 
-	// Invalid arguments would have already caused errors, so no need to check
-	stateMachine.ImageType = parser.Command.Commands()[0].Name
+	// set up, run, and tear down the state machine
+	if err := stateMachine.Setup(); err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		osExit(1)
+	}
 
-	// finally, run the state machine
 	if err := stateMachine.Run(); err != nil {
-		fmt.Println(err.Error())
+		fmt.Printf("Error: %s\n", err.Error())
+		osExit(1)
+	}
+
+	if err := stateMachine.Teardown(); err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
 	}
 }
