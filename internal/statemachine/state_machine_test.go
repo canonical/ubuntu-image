@@ -26,7 +26,7 @@ func TestCleanup(t *testing.T) {
 }
 
 /* This function tests --until and --thru with each state for both snap and classic */
-func TestUntilFlag(t *testing.T) {
+func TestUntilThru(t *testing.T) {
 	testCases := []struct {
 		name string
 	}{
@@ -96,7 +96,7 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 /* The state machine does a fair amount of file io to track state. This function tests
  * failures in these file io attempts by pausing the state machine, messing with
  * files/directories by deleting them ,changing permissions, etc, then resuming */
-/*func TestFileErrors(t *testing.T) {
+func TestFileErrors(t *testing.T) {
 	testCases := []struct {
 		name          string
 		workDir       string
@@ -112,7 +112,8 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
-			var partialStateMachine classicStateMachine
+			var partialStateMachine StateMachine
+			var smFlags commands.StateMachineOpts
 
 			partialStateMachine.tempLocation = tc.tempLocation
 			if tc.workDir == "tmp" {
@@ -120,15 +121,18 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 				if err != nil {
 					t.Errorf("Failed to create temporary directory %s\n", workDir)
 				}
-				partialStateMachine.stateMachineFlags.WorkDir = workDir
+				smFlags.WorkDir = workDir
 			} else {
-				partialStateMachine.stateMachineFlags.WorkDir = tc.workDir
+				smFlags.WorkDir = tc.workDir
 			}
-			partialStateMachine.stateMachineFlags.Until = tc.pauseStep
+			smFlags.Until = tc.pauseStep
 
 			// don't check errors as some are expected here
-			partialStateMachine.Setup()
+			partialStateMachine.stateMachineFlags = smFlags
+			partialStateMachine.states = classicStates
+			partialStateMachine.cleanWorkDir = false
 			partialStateMachine.Run()
+			partialStateMachine.writeMetadata()
 
 			// mess with files or directories
 			if tc.causeProblems != nil {
@@ -136,12 +140,14 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 			}
 
 			// try to resume the state machine
-			smFlags := commands.StateMachineOpts{WorkDir: partialStateMachine.stateMachineFlags.WorkDir, Resume: true}
-			var resumeStateMachine classicStateMachine
-			resumeStateMachine.stateMachineFlags = smFlags
+			resumeSmFlags := commands.StateMachineOpts{WorkDir: partialStateMachine.stateMachineFlags.WorkDir, Resume: true}
+			var resumeStateMachine StateMachine
 
-			resumeStateMachine.Setup()
-			if err := resumeStateMachine.Run(); err == nil {
+			resumeStateMachine.states = classicStates
+			resumeStateMachine.stateMachineFlags = resumeSmFlags
+			readErr := resumeStateMachine.readMetadata()
+			runErr := resumeStateMachine.Run()
+			if readErr != nil && runErr != nil {
 				t.Error("Expected an error but there was none!")
 			}
 
@@ -150,7 +156,7 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 			}
 		})
 	}
-}*/
+}
 
 /* This test iterates through each state function individually and ensures
  * that the name of each state is printed when the --debug flag is in use */
@@ -213,15 +219,14 @@ func TestFunctionErrors(t *testing.T) {
 			// override the function, but save the old one
 			smFlags := commands.StateMachineOpts{WorkDir: workDir}
 			var stateMachine classicStateMachine
-			stateMachine.stateMachineFlags = smFlags
 			stateMachine.Setup()
-			oldStateFunc := stateMachine.states[tc.overrideState]
+			stateMachine.stateMachineFlags = smFlags
 			stateMachine.states[tc.overrideState] = tc.newStateFunc
 			if err := stateMachine.Run(); err == nil {
-				t.Errorf("Expected an error but there was none")
+				if err := stateMachine.Teardown(); err == nil {
+					t.Errorf("Expected an error but there was none")
+				}
 			}
-			// restore the function
-			stateMachine.states[tc.overrideState] = oldStateFunc
 
 			// clean up the workdir
 			os.RemoveAll(workDir)
@@ -239,6 +244,7 @@ func TestFailedCreateWorkDir(t *testing.T) {
 
 		smFlags := commands.StateMachineOpts{WorkDir: workDir, Thru: "make_temporary_directories"}
 		stateMachine := StateMachine{stateMachineFlags: smFlags}
+		stateMachine.states = classicStates
 		if err := stateMachine.Run(); err == nil {
 			t.Errorf("Expected an error but there was none")
 		}

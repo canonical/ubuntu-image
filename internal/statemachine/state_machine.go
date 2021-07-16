@@ -87,6 +87,7 @@ func (stateMachine *StateMachine) readMetadata() error {
 // writeMetadata writes the state machine info to disk. This will be used when resuming a
 // partial state machine run
 func (stateMachine *StateMachine) writeMetadata() error {
+	fmt.Printf("JAWN writing metadata to directory %s\n", stateMachine.stateMachineFlags.WorkDir)
 	gobfile, err := os.OpenFile(stateMachine.stateMachineFlags.WorkDir+"/ubuntu-image.gob", os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("error opening metadata file for writing: %s", stateMachine.stateMachineFlags.WorkDir+"/ubuntu-image.gob")
@@ -110,7 +111,6 @@ func (stateMachine *StateMachine) cleanup() error {
 
 // Run iterates through the state functions, stopping when appropriate based on --until and --thru
 func (stateMachine *StateMachine) Run() error {
-	fmt.Printf("JAWN until is %s\n", stateMachine.stateMachineFlags.Until)
 	// iterate through the states
 	for _, stateFunc := range stateMachine.states {
 		if stateFunc.name == stateMachine.stateMachineFlags.Until {
