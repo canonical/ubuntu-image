@@ -110,6 +110,7 @@ func (stateMachine *StateMachine) cleanup() error {
 
 // Run iterates through the state functions, stopping when appropriate based on --until and --thru
 func (stateMachine *StateMachine) Run() error {
+	fmt.Printf("JAWN until is %s\n", stateMachine.stateMachineFlags.Until)
 	// iterate through the states
 	for _, stateFunc := range stateMachine.states {
 		if stateFunc.name == stateMachine.stateMachineFlags.Until {
@@ -118,6 +119,7 @@ func (stateMachine *StateMachine) Run() error {
 		if stateMachine.commonFlags.Debug {
 			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
 		}
+		fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
 		//stateMachine.CurrentStep = stateName
 		if err := stateFunc.function(stateMachine); err != nil {
 			// clean up work dir on error

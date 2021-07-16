@@ -42,7 +42,7 @@ func TestValidCommands(t *testing.T) {
 			}
 
 			// finally, execute the command and check output
-			_, err := flags.ParseArgs(&commands.UbuntuImageCommand, args)
+			_, err := flags.ParseArgs(&commands.UICommand, args)
 			if err != nil {
 				t.Error("Did not expect an error but got", err)
 			}
@@ -50,9 +50,9 @@ func TestValidCommands(t *testing.T) {
 			// check that opts got the correct value
 			var comparison string
 			if tc.isSnap {
-				comparison = commands.UbuntuImageCommand.Snap.SnapArgs.ModelAssertion
+				comparison = commands.UICommand.Snap.SnapArgsPassed.ModelAssertion
 			} else {
-				comparison = commands.UbuntuImageCommand.Classic.ClassicArgs.GadgetTree
+				comparison = commands.UICommand.Classic.ClassicArgsPassed.GadgetTree
 			}
 			if comparison != tc.gadgetModel {
 				t.Errorf("Unexpected input file value \"%s\". Expected \"%s\"",
@@ -96,7 +96,7 @@ func TestInvalidCommands(t *testing.T) {
 			}
 
 			// finally, execute the command and check output
-			_, err := flags.ParseArgs(&commands.UbuntuImageCommand, args)
+			_, err := flags.ParseArgs(&commands.UICommand, args)
 			if err == nil {
 				t.Error("Expected an error but none was found")
 			}
@@ -113,11 +113,11 @@ func TestExitCode(t *testing.T) {
 		flags    []string
 		expected int
 	}{
-		{"snap exit 0", []string{"snap", "model_assertion.yml"}, 0},
-		{"classic exit 0", []string{"classic", "gadget_tree.yml"}, 0},
-		{"workdir exit 0", []string{"classic", "gadget_tree.yml", "--workdir", "/tmp/ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"}, 0},
-		{"invalid flag exit 1", []string{"--help-me"}, 1},
 		{"help exit 0", []string{"--help"}, 0},
+		{"snap exit 0", []string{"snap", "model_assertion.yml"}, 0},
+		{"classic exit 0", []string{"classic", "gadget_tree.yml", "--project", "ubuntu-cpc"}, 0},
+		{"workdir exit 0", []string{"classic", "gadget_tree.yml", "--project", "ubuntu-cpc", "--workdir", "/tmp/ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"}, 0},
+		{"invalid flag exit 1", []string{"--help-me"}, 1},
 		{"bad state machine args", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
 		{"no command given", []string{}, 1},
 		{"resume without workdir", []string{"--resume"}, 1},

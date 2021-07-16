@@ -29,7 +29,6 @@ func CaptureStd(toCap **os.File) (io.Reader, func(), error) {
 
 // Setup is a helper test function to clear args between test cases
 func Setup() func() {
-
 	origStateMachineOpts := commands.StateMachineOptsPassed
 	origCommonOpts := commands.CommonOptsPassed
 	origUbuntuImageCommand := commands.UICommand

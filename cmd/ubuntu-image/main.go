@@ -32,11 +32,13 @@ func main() {
 	if err != nil {
 		fmt.Printf("Failed to capture stdout: %s\n", err.Error())
 		osExit(1)
+		return
 	}
 	stderr, restoreStderr, err := captureStd(&os.Stderr)
 	if err != nil {
 		fmt.Printf("Failed to capture stderr: %s\n", err.Error())
 		osExit(1)
+		return
 	}
 
 	// Parse the options provided and handle specific errors
@@ -50,10 +52,11 @@ func main() {
 				if err != nil {
 					fmt.Printf("Error reading from stdout: %s\n", err.Error())
 					osExit(1)
-					break
+					return
 				}
 				fmt.Println(string(readStdout))
 				osExit(0)
+				return
 			case flags.ErrCommandRequired:
 				// if --resume was given, this is not an error
 				if !commands.StateMachineOptsPassed.Resume {
@@ -63,10 +66,11 @@ func main() {
 					if err != nil {
 						fmt.Printf("Error reading from stderr: %s\n", err.Error())
 						osExit(1)
-						break
+						return
 					}
 					fmt.Printf("Error: %s\n", string(readStderr))
 					osExit(1)
+					return
 				}
 				break
 			default:
@@ -74,6 +78,7 @@ func main() {
 				restoreStderr()
 				fmt.Printf("Error: %s\n", err.Error())
 				osExit(1)
+				return
 			}
 		}
 	}
@@ -82,8 +87,10 @@ func main() {
 	restoreStdout()
 	restoreStderr()
 
-	// this can't be nil because go-flags has already validated the active command
-	imageType := parser.Command.Active.Name
+	var imageType string
+	if parser.Command.Active != nil {
+		imageType = parser.Command.Active.Name
+	}
 
 	var stateMachine statemachine.SmInterface
 	// Set up the state machine
@@ -97,15 +104,18 @@ func main() {
 	if err := stateMachine.Setup(); err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
+		return
 	}
 
 	if err := stateMachine.Run(); err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
+		return
 	}
 
 	if err := stateMachine.Teardown(); err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
+		return
 	}
 }
