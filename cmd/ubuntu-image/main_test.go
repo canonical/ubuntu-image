@@ -10,7 +10,26 @@ import (
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/jessevdk/go-flags"
+	"github.com/stretchr/testify/mock"
 )
+
+type MockedStateMachine struct {
+	mock.Mock
+}
+
+func (mockSM *MockedStateMachine) Setup() error {
+	return nil
+}
+
+func (mockSM *MockedStateMachine) Run() error {
+	return nil
+}
+
+func (mockSM *MockedStateMachine) Teardown() error {
+	return errors.New("Testing Error")
+}
+
+var mockedStateMachine MockedStateMachine
 
 /* This function tests valid commands. It will need to be updated
  * when real functionality is included */
@@ -121,6 +140,7 @@ func TestExitCode(t *testing.T) {
 		{"bad state machine args", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
 		{"no command given", []string{}, 1},
 		{"resume without workdir", []string{"--resume"}, 1},
+		{"invalid workdir", []string{"snap", "model_assertion.yml", "--workdir", "."}, 1},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
@@ -146,6 +166,7 @@ func TestExitCode(t *testing.T) {
 			os.Args = append([]string{tc.name}, tc.flags...)
 
 			// os.Exit will be captured. Run the command with no flags to trigger an error
+			imageType = ""
 			main()
 			if got != tc.expected {
 				t.Errorf("Expected exit code: %d, got: %d", tc.expected, got)
@@ -192,7 +213,7 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 			// os.Exit will be captured. set the captureStd function
 			captureStd = func(toCap **os.File) (io.Reader, func(), error) {
 				var err error
-				if *toCap == tc.stdCap {
+				if *toCap == tc.readFrom {
 					err = errors.New("Testing Error")
 				} else {
 					err = nil
@@ -205,6 +226,7 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 			os.Args = append([]string{tc.name}, tc.flags...)
 
 			// run main and check the exit code
+			imageType = ""
 			main()
 			if got != 1 {
 				t.Errorf("Expected error code on exit, got: %d", got)
@@ -212,4 +234,38 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 
 		})
 	}
+}
+
+// TestFailedStateMachine tests fails for all implemented functions
+func TestFailedStateMachine(t *testing.T) {
+	t.Run("test failed_state_machine", func(t *testing.T) {
+		// save default command line values to restore later
+		restoreArgs := helper.Setup()
+		defer restoreArgs()
+
+		// Override os.Exit temporarily
+		oldOsExit := osExit
+		defer func() {
+			osExit = oldOsExit
+		}()
+
+		var got int
+		tmpExit := func(code int) {
+			got = code
+		}
+
+		osExit = tmpExit
+		stateMachine = &mockedStateMachine
+
+		flags := []string{"snap", "model_assertion"}
+		// set up the flags for the test cases
+		flag.CommandLine = flag.NewFlagSet("failed_state_machine", flag.ExitOnError)
+		os.Args = append([]string{"failed_state_machine"}, flags...)
+
+		imageType = "test"
+		main()
+		if got != 1 {
+			t.Errorf("Expected error code on exit, got: %d", got)
+		}
+	})
 }

@@ -14,6 +14,8 @@ import (
 // helper variables for unit testing
 var osExit = os.Exit
 var captureStd = helper.CaptureStd
+var stateMachine statemachine.SmInterface
+var imageType string = ""
 
 var stateMachineLongDesc = `Options for controlling the internal state machine.
 Other than -w, these options are mutually exclusive. When -u or -t is given,
@@ -87,16 +89,14 @@ func main() {
 	restoreStdout()
 	restoreStderr()
 
-	var imageType string
-	if parser.Command.Active != nil {
+	if parser.Command.Active != nil && imageType == "" {
 		imageType = parser.Command.Active.Name
 	}
 
-	var stateMachine statemachine.SmInterface
 	// Set up the state machine
 	if imageType == "snap" {
 		stateMachine = &statemachine.SnapSM
-	} else {
+	} else if imageType == "classic" {
 		stateMachine = &statemachine.ClassicSM
 	}
 
