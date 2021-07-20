@@ -56,6 +56,28 @@ func (stateMachine *StateMachine) validateInput() error {
 		return fmt.Errorf("must specify workdir when using --resume flag")
 	}
 
+	// if --until or --thru was given, make sure the specified state exists
+	var searchState string
+	var stateFound bool = false
+	if stateMachine.stateMachineFlags.Until != "" {
+		searchState = stateMachine.stateMachineFlags.Until
+	}
+	if stateMachine.stateMachineFlags.Thru != "" {
+		searchState = stateMachine.stateMachineFlags.Thru
+	}
+
+	if searchState != "" {
+		for _, state := range stateMachine.states {
+			if state.name == searchState {
+				stateFound = true
+				break
+			}
+		}
+		if !stateFound {
+			return fmt.Errorf("state %s is not a valid state name", searchState)
+		}
+	}
+
 	return nil
 }
 

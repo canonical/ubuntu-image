@@ -144,9 +144,8 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 		resume bool
 	}{
 		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false},
-		// TODO: do we want this validation? the python version seems to not have it
-		//{"invalid_until_name", "fake step", "", false},
-		//{"invalid_thru_name", "", "fake step", false},
+		{"invalid_until_name", "fake step", "", false},
+		{"invalid_thru_name", "", "fake step", false},
 		{"resume_with_no_workdir", "", "", true},
 	}
 
