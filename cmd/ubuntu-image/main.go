@@ -60,7 +60,7 @@ func executeStateMachine(commonOpts *commands.CommonOpts, stateMachineOpts *comm
 }
 
 func main() {
-	// instantiate structs for 
+	// instantiate structs for
 	commonOpts := new(commands.CommonOpts)
 	stateMachineOpts := new(commands.StateMachineOpts)
 	ubuntuImageCommand := new(commands.UbuntuImageCommand)

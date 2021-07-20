@@ -65,7 +65,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Opts.Project="ubuntu-cpc"
+		stateMachine.Opts.Project = "ubuntu-cpc"
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())

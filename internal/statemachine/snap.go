@@ -21,7 +21,7 @@ var snapStates = []stateFunc{
 	{"finish", (*StateMachine).finish},
 }
 
-// snapStateMachine embeds StateMachine and adds the command line flags specific to snap images
+// SnapStateMachine embeds StateMachine and adds the command line flags specific to snap images
 type SnapStateMachine struct {
 	StateMachine
 	Opts commands.SnapOpts
