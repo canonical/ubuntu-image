@@ -24,19 +24,19 @@ var classicStates = []stateFunc{
 	{"finish", (*StateMachine).finish},
 }
 
-// classicStateMachine embeds StateMachine and adds the command line flags specific to classic images
-type classicStateMachine struct {
+// ClassicStateMachine embeds StateMachine and adds the command line flags specific to classic images
+type ClassicStateMachine struct {
 	StateMachine
 	Opts commands.ClassicOpts
 	Args commands.ClassicArgs
 }
 
 // validateClassicInput validates command line flags specific to classic images
-func (ClassicStateMachine *classicStateMachine) validateClassicInput() error {
+func (classicStateMachine *ClassicStateMachine) validateClassicInput() error {
 	// --project or --filesystem must be specified, but not both
-	if ClassicStateMachine.Opts.Project == "" && ClassicStateMachine.Opts.Filesystem == "" {
+	if classicStateMachine.Opts.Project == "" && classicStateMachine.Opts.Filesystem == "" {
 		return fmt.Errorf("project or filesystem is required")
-	} else if ClassicStateMachine.Opts.Project != "" && ClassicStateMachine.Opts.Filesystem != "" {
+	} else if classicStateMachine.Opts.Project != "" && classicStateMachine.Opts.Filesystem != "" {
 		return fmt.Errorf("project and filesystem are mutually exclusive")
 	}
 
@@ -45,33 +45,23 @@ func (ClassicStateMachine *classicStateMachine) validateClassicInput() error {
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run()
-func (ClassicStateMachine *classicStateMachine) Setup() error {
-	// Set the struct variables specific to classic images
-	ClassicStateMachine.Opts = commands.UICommand.Classic.ClassicOptsPassed
-	ClassicStateMachine.Args = commands.UICommand.Classic.ClassicArgsPassed
-
-	// get the common options for all image types
-	ClassicStateMachine.setCommonOpts()
-
+func (classicStateMachine *ClassicStateMachine) Setup() error {
 	// set the states that will be used for this image type
-	ClassicStateMachine.states = classicStates
+	classicStateMachine.states = classicStates
 
 	// do the validation common to all image types
-	if err := ClassicStateMachine.validateInput(); err != nil {
+	if err := classicStateMachine.validateInput(); err != nil {
 		return err
 	}
 
 	// if --resume was passed, figure out where to start
-	if err := ClassicStateMachine.readMetadata(); err != nil {
+	if err := classicStateMachine.readMetadata(); err != nil {
 		return err
 	}
 
 	// do the validation specific to classic images
-	if err := ClassicStateMachine.validateClassicInput(); err != nil {
+	if err := classicStateMachine.validateClassicInput(); err != nil {
 		return err
 	}
 	return nil
 }
-
-// ClassicSM is the interface used for polymorphisms on Setup, Run And Teardown when building classic images
-var ClassicSM classicStateMachine

@@ -22,7 +22,7 @@ var snapStates = []stateFunc{
 }
 
 // snapStateMachine embeds StateMachine and adds the command line flags specific to snap images
-type snapStateMachine struct {
+type SnapStateMachine struct {
 	StateMachine
 	Opts commands.SnapOpts
 	Args commands.SnapArgs
@@ -30,30 +30,20 @@ type snapStateMachine struct {
 
 // Setup assigns variables and calls other functions that must be executed before Run(). It is
 // exported so it can be used as a polymorphism in main
-func (SnapStateMachine *snapStateMachine) Setup() error {
-	// Set the struct variables specific to snap images
-	SnapStateMachine.Opts = commands.UICommand.Snap.SnapOptsPassed
-	SnapStateMachine.Args = commands.UICommand.Snap.SnapArgsPassed
-
-	// get the common options for all image types
-	SnapStateMachine.setCommonOpts()
-
+func (snapStateMachine *SnapStateMachine) Setup() error {
 	// set the states that will be used for this image type
-	SnapStateMachine.states = snapStates
+	snapStateMachine.states = snapStates
 
 	// do the validation common to all image types
-	if err := SnapStateMachine.validateInput(); err != nil {
+	if err := snapStateMachine.validateInput(); err != nil {
 		return err
 	}
 
 	// if --resume was passed, figure out where to start
-	if err := SnapStateMachine.readMetadata(); err != nil {
+	if err := snapStateMachine.readMetadata(); err != nil {
 		return err
 	}
 
 	// TODO: is there any validation specific to snap images?
 	return nil
 }
-
-// SnapSM is the interface used for polymorphisms on Setup, Run And Teardown when building snap images
-var SnapSM snapStateMachine

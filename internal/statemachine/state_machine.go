@@ -30,8 +30,8 @@ type StateMachine struct {
 	StepsTaken   int    // counts the number of steps taken
 
 	// The flags that were passed in on the command line
-	commonFlags       commands.CommonOpts
-	stateMachineFlags commands.StateMachineOpts
+	commonFlags       *commands.CommonOpts
+	stateMachineFlags *commands.StateMachineOpts
 
 	states []stateFunc // the state functions
 
@@ -39,10 +39,10 @@ type StateMachine struct {
 	tempLocation string // parent directory of temporary workdir
 }
 
-// setCommonOpts stores the common options for all image types in the struct
-func (stateMachine *StateMachine) setCommonOpts() {
-	stateMachine.commonFlags = commands.CommonOptsPassed
-	stateMachine.stateMachineFlags = commands.StateMachineOptsPassed
+// SetCommonOpts stores the common options for all image types in the struct
+func (stateMachine *StateMachine) SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts) {
+	stateMachine.commonFlags = commonOpts
+	stateMachine.stateMachineFlags = stateMachineOpts
 }
 
 // validateInput ensures that command line flags for the state machine are valid. These

@@ -37,12 +37,3 @@ type commonOptions struct {
 	CommonOptsPassed       CommonOpts
 	StateMachineOptsPassed StateMachineOpts
 }
-
-// StateMachineOptsPassed will hold the state machine data parsed by go-flags
-var StateMachineOptsPassed StateMachineOpts
-
-// CommonOptsPassed will hold the data parsed by go-flags that is common to snap and classic commands
-var CommonOptsPassed CommonOpts
-
-// UICommand handles the subcommands "snap" or "classic" parsed by go-flags
-var UICommand UbuntuImageCommand

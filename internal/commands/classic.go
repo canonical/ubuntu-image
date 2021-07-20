@@ -21,5 +21,3 @@ type classicCommand struct {
 	ClassicArgsPassed ClassicArgs `positional-args:"true" required:"false"`
 	ClassicOptsPassed ClassicOpts
 }
-
-var classic classicCommand

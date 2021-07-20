@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
-	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/jessevdk/go-flags"
 	"github.com/stretchr/testify/mock"
 )
@@ -56,10 +55,6 @@ func TestValidCommands(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution
 		t.Run("test "+tc.name, func(t *testing.T) {
-			// save default command line values to restore later
-			restoreArgs := helper.Setup()
-			defer restoreArgs()
-
 			// set up the command
 			var args []string
 			if tc.command != "" {
@@ -70,7 +65,8 @@ func TestValidCommands(t *testing.T) {
 			}
 
 			// finally, execute the command and check output
-			_, err := flags.ParseArgs(&commands.UICommand, args)
+			ubuntuImageCommand := new(commands.UbuntuImageCommand)
+			_, err := flags.ParseArgs(ubuntuImageCommand, args)
 			if err != nil {
 				t.Error("Did not expect an error but got", err)
 			}
@@ -78,9 +74,9 @@ func TestValidCommands(t *testing.T) {
 			// check that opts got the correct value
 			var comparison string
 			if tc.isSnap {
-				comparison = commands.UICommand.Snap.SnapArgsPassed.ModelAssertion
+				comparison = ubuntuImageCommand.Snap.SnapArgsPassed.ModelAssertion
 			} else {
-				comparison = commands.UICommand.Classic.ClassicArgsPassed.GadgetTree
+				comparison = ubuntuImageCommand.Classic.ClassicArgsPassed.GadgetTree
 			}
 			if comparison != tc.gadgetModel {
 				t.Errorf("Unexpected input file value \"%s\". Expected \"%s\"",
@@ -110,10 +106,6 @@ func TestInvalidCommands(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution
 		t.Run("test "+tc.name, func(t *testing.T) {
-			// save default command line values to restore later
-			restoreArgs := helper.Setup()
-			defer restoreArgs()
-
 			// set up the command
 			var args []string
 			if tc.command != nil {
@@ -124,7 +116,8 @@ func TestInvalidCommands(t *testing.T) {
 			}
 
 			// finally, execute the command and check output
-			_, err := flags.ParseArgs(&commands.UICommand, args)
+			ubuntuImageCommand := new(commands.UbuntuImageCommand)
+			_, err := flags.ParseArgs(ubuntuImageCommand, args)
 			if err == nil {
 				t.Error("Expected an error but none was found")
 			}
@@ -148,14 +141,9 @@ func TestExitCode(t *testing.T) {
 		{"bad_state_machine_args", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
 		{"no_command_given", []string{}, 1},
 		{"resume_without_workdir", []string{"--resume"}, 1},
-		{"invalid_workdir", []string{"snap", "model_assertion.yml", "--workdir", "."}, 1},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
-			// save default command line values to restore later
-			restoreArgs := helper.Setup()
-			defer restoreArgs()
-
 			// Override os.Exit temporarily
 			oldOsExit := osExit
 			defer func() {
@@ -200,10 +188,6 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
-			// save default command line values to restore later
-			restoreArgs := helper.Setup()
-			defer restoreArgs()
-
 			// Override os.Exit temporarily
 			oldOsExit := osExit
 			defer func() {
@@ -256,10 +240,6 @@ func TestFailedStateMachine(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// save default command line values to restore later
-			restoreArgs := helper.Setup()
-			defer restoreArgs()
-
 			// Override os.Exit temporarily
 			oldOsExit := osExit
 			defer func() {
@@ -282,7 +262,7 @@ func TestFailedStateMachine(t *testing.T) {
 			imageType = "test"
 
 			mockedStateMachine.whenToFail = tc.whenToFail
-			stateMachine = &mockedStateMachine
+			stateMachineInterface = &mockedStateMachine
 			main()
 			if got != 1 {
 				t.Errorf("Expected error code on exit, got: %d", got)

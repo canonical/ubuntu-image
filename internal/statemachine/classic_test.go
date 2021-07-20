@@ -3,7 +3,6 @@ package statemachine
 import (
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
@@ -19,12 +18,10 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
-			restoreArgs := helper.Setup()
-			defer restoreArgs()
-
-			var stateMachine classicStateMachine
-			commands.UICommand.Classic.ClassicOptsPassed.Project = tc.project
-			commands.UICommand.Classic.ClassicOptsPassed.Filesystem = tc.filesystem
+			var stateMachine ClassicStateMachine
+			stateMachine.Opts.Project = tc.project
+			stateMachine.Opts.Filesystem = tc.filesystem
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 			if err := stateMachine.Setup(); err == nil {
 				t.Error("Expected an error but there was none")
@@ -36,14 +33,12 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 // TestFailedValidateInputClassic tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputClassic(t *testing.T) {
 	t.Run("test_failed_validate_input", func(t *testing.T) {
-		restoreArgs := helper.Setup()
-		defer restoreArgs()
-
 		// use both --until and --thru to trigger this failure
-		commands.StateMachineOptsPassed.Until = "until-test"
-		commands.StateMachineOptsPassed.Thru = "thru-test"
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.stateMachineFlags.Until = "until-test"
+		stateMachine.stateMachineFlags.Thru = "thru-test"
 
-		var stateMachine classicStateMachine
 		if err := stateMachine.Setup(); err == nil {
 			t.Error("Expected an error but there was none")
 		}
@@ -53,14 +48,12 @@ func TestFailedValidateInputClassic(t *testing.T) {
 // TestFailedReadMetadataClassic tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestFailedReadMetadataClassic(t *testing.T) {
 	t.Run("test_failed_read_metadata", func(t *testing.T) {
-		restoreArgs := helper.Setup()
-		defer restoreArgs()
-
 		// start a --resume with no previous SM run
-		commands.StateMachineOptsPassed.Resume = true
-		commands.StateMachineOptsPassed.WorkDir = testDir
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.stateMachineFlags.Resume = true
+		stateMachine.stateMachineFlags.WorkDir = testDir
 
-		var stateMachine classicStateMachine
 		if err := stateMachine.Setup(); err == nil {
 			t.Error("Expected an error but there was none")
 		}
@@ -70,11 +63,9 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 // TestSuccessfulClassicRun runs through all states ensuring none failed
 func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
-		restoreArgs := helper.Setup()
-		defer restoreArgs()
-
-		var stateMachine classicStateMachine
-		commands.UICommand.Classic.ClassicOptsPassed.Project = "ubuntu-cpc"
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.Opts.Project="ubuntu-cpc"
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())

@@ -27,14 +27,8 @@ func CaptureStd(toCap **os.File) (io.Reader, func(), error) {
 	}, nil
 }
 
-// Setup is a helper test function to clear args between test cases
-func Setup() func() {
-	origStateMachineOpts := commands.StateMachineOptsPassed
-	origCommonOpts := commands.CommonOptsPassed
-	origUbuntuImageCommand := commands.UICommand
-	return func() {
-		commands.StateMachineOptsPassed = origStateMachineOpts
-		commands.CommonOptsPassed = origCommonOpts
-		commands.UICommand = origUbuntuImageCommand
-	}
+// InitCommonOpts initializes default common options for state machines.
+// This is used for test scenarios to avoid nil pointer dereferences
+func InitCommonOpts() (*commands.CommonOpts, *commands.StateMachineOpts) {
+	return new(commands.CommonOpts), new(commands.StateMachineOpts)
 }

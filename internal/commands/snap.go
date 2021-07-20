@@ -16,5 +16,3 @@ type snapCommand struct {
 	SnapArgsPassed SnapArgs `positional-args:"true" required:"false"`
 	SnapOptsPassed SnapOpts
 }
-
-var snap snapCommand

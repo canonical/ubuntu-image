@@ -14,7 +14,7 @@ import (
 // helper variables for unit testing
 var osExit = os.Exit
 var captureStd = helper.CaptureStd
-var stateMachine statemachine.SmInterface
+var stateMachineInterface statemachine.SmInterface
 var imageType string = ""
 
 var stateMachineLongDesc = `Options for controlling the internal state machine.
@@ -22,28 +22,36 @@ Other than -w, these options are mutually exclusive. When -u or -t is given,
 the state machine can be resumed later with -r, but -w must be given in that
 case since the state is saved in a .ubuntu-image.gob file in the working directory.`
 
-func executeStateMachine() {
+func executeStateMachine(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts, ubuntuImageCommand *commands.UbuntuImageCommand) {
 	// Set up the state machine
 	if imageType == "snap" {
-		stateMachine = &statemachine.SnapSM
+		stateMachine := new(statemachine.SnapStateMachine)
+		stateMachine.Opts = ubuntuImageCommand.Snap.SnapOptsPassed
+		stateMachine.Args = ubuntuImageCommand.Snap.SnapArgsPassed
+		stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
+		stateMachineInterface = stateMachine
 	} else if imageType == "classic" {
-		stateMachine = &statemachine.ClassicSM
+		stateMachine := new(statemachine.ClassicStateMachine)
+		stateMachine.Opts = ubuntuImageCommand.Classic.ClassicOptsPassed
+		stateMachine.Args = ubuntuImageCommand.Classic.ClassicArgsPassed
+		stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
+		stateMachineInterface = stateMachine
 	}
 
 	// set up, run, and tear down the state machine
-	if err := stateMachine.Setup(); err != nil {
+	if err := stateMachineInterface.Setup(); err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
 		return
 	}
 
-	if err := stateMachine.Run(); err != nil {
+	if err := stateMachineInterface.Run(); err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
 		return
 	}
 
-	if err := stateMachine.Teardown(); err != nil {
+	if err := stateMachineInterface.Teardown(); err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
 		return
@@ -52,10 +60,15 @@ func executeStateMachine() {
 }
 
 func main() {
+	// instantiate structs for 
+	commonOpts := new(commands.CommonOpts)
+	stateMachineOpts := new(commands.StateMachineOpts)
+	ubuntuImageCommand := new(commands.UbuntuImageCommand)
+
 	// set up the go-flags parser for command line options
-	parser := flags.NewParser(&commands.UICommand, flags.Default)
-	parser.AddGroup("State Machine Options", stateMachineLongDesc, &commands.StateMachineOptsPassed)
-	parser.AddGroup("Common Options", "Options common to both commands", &commands.CommonOptsPassed)
+	parser := flags.NewParser(ubuntuImageCommand, flags.Default)
+	parser.AddGroup("State Machine Options", stateMachineLongDesc, stateMachineOpts)
+	parser.AddGroup("Common Options", "Options common to both commands", commonOpts)
 
 	// go-flags can be overzealous about printing errors that aren't actually errors
 	// so we capture stdout/stderr while parsing and later decide whether to print
@@ -93,7 +106,7 @@ func main() {
 				return
 			case flags.ErrCommandRequired:
 				// if --resume was given, this is not an error
-				if !commands.StateMachineOptsPassed.Resume {
+				if !stateMachineOpts.Resume {
 					restoreStdout()
 					restoreStderr()
 					readStderr, err := ioutil.ReadAll(stderr)
@@ -126,5 +139,5 @@ func main() {
 	}
 
 	// let the state machine handle the image build
-	executeStateMachine()
+	executeStateMachine(commonOpts, stateMachineOpts, ubuntuImageCommand)
 }
