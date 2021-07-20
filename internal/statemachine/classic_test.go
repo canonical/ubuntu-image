@@ -7,7 +7,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
-/* This function tests invalid command line input for classic images */
+// TestInvalidCommandLineClassic tests invalid command line input for classic images
 func TestInvalidCommandLineClassic(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -33,7 +33,7 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 	}
 }
 
-// TestFailedValidateInput tests a failure in the Setup() function when validating common input
+// TestFailedValidateInputClassic tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputClassic(t *testing.T) {
 	t.Run("test_failed_validate_input", func(t *testing.T) {
 		restoreArgs := helper.Setup()
@@ -50,7 +50,7 @@ func TestFailedValidateInputClassic(t *testing.T) {
 	})
 }
 
-// TestFailedReadMetadata tests a failed metadata read by passing --resume with no previous partial state machine run
+// TestFailedReadMetadataClassic tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestFailedReadMetadataClassic(t *testing.T) {
 	t.Run("test_failed_read_metadata", func(t *testing.T) {
 		restoreArgs := helper.Setup()
@@ -67,7 +67,7 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 	})
 }
 
-/* TestSuccessfulRun runs through all states ensuring none failed */
+// TestSuccessfulClassicRun runs through all states ensuring none failed
 func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
 		restoreArgs := helper.Setup()

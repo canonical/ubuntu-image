@@ -41,6 +41,7 @@ type testStateMachine struct {
 	StateMachine
 }
 
+// testStateMachine needs its own setup
 func (TestStateMachine *testStateMachine) Setup() error {
 	// get the common options for all image types
 	TestStateMachine.setCommonOpts()
@@ -61,10 +62,10 @@ func (TestStateMachine *testStateMachine) Setup() error {
 	return nil
 }
 
-/* This function ensures that the temporary workdir is cleaned up after the
- * state machine has finished running */
+// TestCleanup ensures that the temporary workdir is cleaned up after the
+// state machine has finished running
 func TestCleanup(t *testing.T) {
-	t.Run("test cleanup", func(t *testing.T) {
+	t.Run("test_cleanup", func(t *testing.T) {
 		stateMachine := StateMachine{}
 		stateMachine.Run()
 		if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err == nil {
@@ -73,7 +74,7 @@ func TestCleanup(t *testing.T) {
 	})
 }
 
-/* This function tests --until and --thru with each state for both snap and classic */
+// TestUntilThru tests --until and --thru with each state
 func TestUntilThru(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -96,14 +97,12 @@ func TestUntilThru(t *testing.T) {
 				defer os.RemoveAll(tempDir)
 				commands.StateMachineOptsPassed.WorkDir = tempDir
 
-				switch tc.name {
-				case "until":
+				if tc.name == "until" {
 					commands.StateMachineOptsPassed.Until = state.name
-					break
-				case "thru":
+				} else {
 					commands.StateMachineOptsPassed.Thru = state.name
-					break
 				}
+
 				if err := partialStateMachine.Setup(); err != nil {
 					t.Errorf("Failed to set up partial state machine: %s", err.Error())
 				}
@@ -136,8 +135,7 @@ func TestUntilThru(t *testing.T) {
 	}
 }
 
-/* state_machine.go validates the state machine specific args to keep main.go cleaner.
- * This function tests that validation with a number of invalid arguments and flags */
+// TestInvalidStateMachineArgs tests that invalid state machine command line arguments result in a failure
 func TestInvalidStateMachineArgs(t *testing.T) {
 	testCases := []struct {
 		name   string
@@ -145,11 +143,11 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 		thru   string
 		resume bool
 	}{
-		{"both until and thru", "1", "1", false},
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false},
 		// TODO: do we want this validation? the python version seems to not have it
-		//{"invalid until name", "fake step", "", false},
-		//{"invalid thru name", "", "fake step", false},
-		{"resume with no workdir", "", "", true},
+		//{"invalid_until_name", "fake step", "", false},
+		//{"invalid_thru_name", "", "fake step", false},
+		{"resume_with_no_workdir", "", "", true},
 	}
 
 	for _, tc := range testCases {
@@ -164,9 +162,8 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 	}
 }
 
-/* The state machine does a fair amount of file io to track state. This function tests
- * failures in these file io attempts by pausing the state machine, messing with
- * files/directories by deleting them ,changing permissions, etc, then resuming */
+// TestFileErrors tests a number of different file i/o and permissions errors to ensure
+// that the program errors cleanly
 func TestFileErrors(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -232,10 +229,9 @@ func TestFileErrors(t *testing.T) {
 	}
 }
 
-/* This test iterates through each state function individually and ensures
- * that the name of each state is printed when the --debug flag is in use */
+// TestDebug ensures that the name of the states is printed when the --debug flag is used
 func TestDebug(t *testing.T) {
-	t.Run("test debug", func(t *testing.T) {
+	t.Run("test_debug", func(t *testing.T) {
 		workDir, err := os.MkdirTemp("", "ubuntu-image-test-debug-")
 		if err != nil {
 			t.Errorf("Failed to create temporary directory %s\n", workDir)
@@ -273,7 +269,7 @@ func TestDebug(t *testing.T) {
 	})
 }
 
-/* This function overrides some of the state functions to test various error scenarios */
+// TestFunction replaces some of the stateFuncs to test various error scenarios
 func TestFunctionErrors(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -323,9 +319,9 @@ func TestFunctionErrors(t *testing.T) {
 	}
 }
 
-/* This function tests a failure in the "MkdirAll" call that happens when --workdir is used */
+// TestFailedCreateWorkdir tests a failure in the "MkdirAll" call that happens when --workdir is used
 func TestFailedCreateWorkDir(t *testing.T) {
-	t.Run("test error creating workdir", func(t *testing.T) {
+	t.Run("test_error_creating_workdir", func(t *testing.T) {
 		restoreArgs := helper.Setup()
 		defer restoreArgs()
 
@@ -350,7 +346,7 @@ func TestFailedCreateWorkDir(t *testing.T) {
 	})
 }
 
-// TestErrorCreateTmp tests the scenario where creating a temporary workdir fails
+// TestFailedCreateTmp tests the scenario where creating a temporary workdir fails
 func TestFailedCreateTmp(t *testing.T) {
 	t.Run("test_error_creating_tmp", func(t *testing.T) {
 		restoreArgs := helper.Setup()

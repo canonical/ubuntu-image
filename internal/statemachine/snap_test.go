@@ -7,7 +7,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
-// TestFailedValidateInput tests a failure in the Setup() function when validating common input
+// TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputSnap(t *testing.T) {
 	t.Run("test_failed_validate_input", func(t *testing.T) {
 		restoreArgs := helper.Setup()
@@ -24,7 +24,7 @@ func TestFailedValidateInputSnap(t *testing.T) {
 	})
 }
 
-// TestFailedReadMetadata tests a failed metadata read by passing --resume with no previous partial state machine run
+// TestFailedReadMetadataSnap tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestFailedReadMetadataSnap(t *testing.T) {
 	t.Run("test_failed_read_metadata", func(t *testing.T) {
 		restoreArgs := helper.Setup()
@@ -41,7 +41,7 @@ func TestFailedReadMetadataSnap(t *testing.T) {
 	})
 }
 
-/* TestSuccessfulRun runs through all states ensuring none failed */
+// TestSuccessfulSnapRun runs through all states ensuring none failed
 func TestSuccessfulSnapRun(t *testing.T) {
 	t.Run("test_successful_snap_run", func(t *testing.T) {
 		restoreArgs := helper.Setup()

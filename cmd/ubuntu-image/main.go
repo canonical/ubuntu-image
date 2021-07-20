@@ -22,8 +22,37 @@ Other than -w, these options are mutually exclusive. When -u or -t is given,
 the state machine can be resumed later with -r, but -w must be given in that
 case since the state is saved in a .ubuntu-image.gob file in the working directory.`
 
-func main() {
+func executeStateMachine() {
+	// Set up the state machine
+	if imageType == "snap" {
+		stateMachine = &statemachine.SnapSM
+	} else if imageType == "classic" {
+		stateMachine = &statemachine.ClassicSM
+	}
 
+	// set up, run, and tear down the state machine
+	if err := stateMachine.Setup(); err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		osExit(1)
+		return
+	}
+
+	if err := stateMachine.Run(); err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		osExit(1)
+		return
+	}
+
+	if err := stateMachine.Teardown(); err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		osExit(1)
+		return
+	}
+
+}
+
+func main() {
+	// set up the go-flags parser for command line options
 	parser := flags.NewParser(&commands.UICommand, flags.Default)
 	parser.AddGroup("State Machine Options", stateMachineLongDesc, &commands.StateMachineOptsPassed)
 	parser.AddGroup("Common Options", "Options common to both commands", &commands.CommonOptsPassed)
@@ -36,12 +65,15 @@ func main() {
 		osExit(1)
 		return
 	}
+	defer restoreStdout()
+
 	stderr, restoreStderr, err := captureStd(&os.Stderr)
 	if err != nil {
 		fmt.Printf("Failed to capture stderr: %s\n", err.Error())
 		osExit(1)
 		return
 	}
+	defer restoreStderr()
 
 	// Parse the options provided and handle specific errors
 	if _, err := parser.Parse(); err != nil {
@@ -93,29 +125,6 @@ func main() {
 		imageType = parser.Command.Active.Name
 	}
 
-	// Set up the state machine
-	if imageType == "snap" {
-		stateMachine = &statemachine.SnapSM
-	} else if imageType == "classic" {
-		stateMachine = &statemachine.ClassicSM
-	}
-
-	// set up, run, and tear down the state machine
-	if err := stateMachine.Setup(); err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		osExit(1)
-		return
-	}
-
-	if err := stateMachine.Run(); err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		osExit(1)
-		return
-	}
-
-	if err := stateMachine.Teardown(); err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		osExit(1)
-		return
-	}
+	// let the state machine handle the image build
+	executeStateMachine()
 }

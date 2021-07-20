@@ -12,8 +12,8 @@ import (
 
 // SmInterface allows different image types to implement their own setup/run/teardown functions
 type SmInterface interface {
-	Setup()    error
-	Run()      error
+	Setup() error
+	Run() error
 	Teardown() error
 }
 
