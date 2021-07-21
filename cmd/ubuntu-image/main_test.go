@@ -9,11 +9,9 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/jessevdk/go-flags"
-	"github.com/stretchr/testify/mock"
 )
 
 type MockedStateMachine struct {
-	mock.Mock
 	whenToFail string
 }
 
