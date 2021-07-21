@@ -7,7 +7,7 @@ import (
 // snapStates are the names and function variables to be executed by the state machine for snap images
 var snapStates = []stateFunc{
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
-	{"prepare_image", (*StateMachine).prepareImage},
+	{"prepare_image", (*StateMachine).prepareImageSnap},
 	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
 	{"populate_rootfs_contents", (*StateMachine).populateRootfsContents},
 	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},

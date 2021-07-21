@@ -23,11 +23,19 @@ type stateFunc struct {
 	function func(*StateMachine) error
 }
 
+// temporaryDirectories organizes the state machines, rootfs, unpack, and volumes dirs
+type temporaryDirectories struct {
+	rootfs  string
+	unpack  string
+	volumes string
+}
+
 // StateMachine will hold the command line data, track the current state, and handle all function calls
 type StateMachine struct {
 	cleanWorkDir bool   // whether or not to clean up the workDir
 	CurrentStep  string // tracks the current progress of the state machine
 	StepsTaken   int    // counts the number of steps taken
+	tempDirs     temporaryDirectories
 
 	// The flags that were passed in on the command line
 	commonFlags       *commands.CommonOpts

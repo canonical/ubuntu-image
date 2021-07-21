@@ -10,7 +10,7 @@ import (
 var classicStates = []stateFunc{
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
 	{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree},
-	{"prepare_image", (*StateMachine).prepareImage},
+	{"prepare_image", (*StateMachine).prepareImageClassic},
 	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
 	{"populate_rootfs_contents", (*StateMachine).populateRootfsContents},
 	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
