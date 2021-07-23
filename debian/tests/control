@@ -1,6 +1,7 @@
 Tests: build
+Restrictions: needs-root
 Depends: @builddeps@
 
 Tests: run-tests
+Restrictions: needs-root
 Depends: @builddeps@
-

@@ -10,7 +10,7 @@ import (
 var classicStates = []stateFunc{
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
 	{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree},
-	{"prepare_image", (*StateMachine).prepareImageClassic},
+	{"run_live_build", (*StateMachine).runLiveBuild},
 	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
 	{"populate_rootfs_contents", (*StateMachine).populateRootfsContents},
 	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
@@ -46,6 +46,9 @@ func (classicStateMachine *ClassicStateMachine) validateClassicInput() error {
 
 // Setup assigns variables and calls other functions that must be executed before Run()
 func (classicStateMachine *ClassicStateMachine) Setup() error {
+	// set the parent pointer of the embedded struct
+	classicStateMachine.parent = classicStateMachine
+
 	// set the states that will be used for this image type
 	classicStateMachine.states = classicStates
 

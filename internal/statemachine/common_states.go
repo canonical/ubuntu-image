@@ -22,10 +22,9 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 		}
 	}
 
-	// create root, unpack, and volumes directories in WorkDir
 	stateMachine.tempDirs.rootfs = stateMachine.stateMachineFlags.WorkDir + "/root"
-        stateMachine.tempDirs.unpack = stateMachine.stateMachineFlags.WorkDir + "/unpack"
-        stateMachine.tempDirs.volumes = stateMachine.stateMachineFlags.WorkDir + "/volumes"
+	stateMachine.tempDirs.unpack = stateMachine.stateMachineFlags.WorkDir + "/unpack"
+	stateMachine.tempDirs.volumes = stateMachine.stateMachineFlags.WorkDir + "/volumes"
 
 	if err := os.Mkdir(stateMachine.tempDirs.rootfs, 0755); err != nil {
 		return fmt.Errorf("Error creating temporary directory: %s", err.Error())

@@ -35,6 +35,7 @@ type StateMachine struct {
 	cleanWorkDir bool   // whether or not to clean up the workDir
 	CurrentStep  string // tracks the current progress of the state machine
 	StepsTaken   int    // counts the number of steps taken
+	yamlFilePath string // the location for the yaml file
 	tempDirs     temporaryDirectories
 
 	// The flags that were passed in on the command line
@@ -42,6 +43,9 @@ type StateMachine struct {
 	stateMachineFlags *commands.StateMachineOpts
 
 	states []stateFunc // the state functions
+
+	// used to access image type specific variables from state functions
+	parent SmInterface
 
 	// used only for testing
 	tempLocation string // parent directory of temporary workdir
@@ -132,8 +136,10 @@ func (stateMachine *StateMachine) writeMetadata() error {
 // cleanup cleans the workdir. For now this is just deleting the temporary directory if necessary
 // but will have more functionality added to it later
 func (stateMachine *StateMachine) cleanup() error {
-	if err := os.RemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
-		return err
+	if stateMachine.cleanWorkDir {
+		if err := os.RemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
+			return err
+		}
 	}
 	return nil
 }

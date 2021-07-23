@@ -31,6 +31,9 @@ type SnapStateMachine struct {
 // Setup assigns variables and calls other functions that must be executed before Run(). It is
 // exported so it can be used as a polymorphism in main
 func (snapStateMachine *SnapStateMachine) Setup() error {
+	// set the parent pointer of the embedded struct
+	snapStateMachine.parent = snapStateMachine
+
 	// set the states that will be used for this image type
 	snapStateMachine.states = snapStates
 

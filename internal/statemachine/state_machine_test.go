@@ -21,18 +21,18 @@ var testStates = []stateFunc{
 // for tests where we want to run all the states
 var allTestStates = []stateFunc{
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
-	{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree},
-	{"prepare_image", (*StateMachine).prepareImage},
-	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
-	{"populate_rootfs_contents", (*StateMachine).populateRootfsContents},
-	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
-	{"generate_disk_info", (*StateMachine).generateDiskInfo},
-	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
-	{"prepopulate_bootfs_contents", (*StateMachine).prepopulateBootfsContents},
-	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
-	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
-	{"make_disk", (*StateMachine).makeDisk},
-	{"generate_manifest", (*StateMachine).generateManifest},
+	{"prepare_gadget_tree", func(statemachine *StateMachine) error { return nil }},
+	{"prepare_image", func(statemachine *StateMachine) error { return nil }},
+	{"load_gadget_yaml", func(statemachine *StateMachine) error { return nil }},
+	{"populate_rootfs_contents", func(statemachine *StateMachine) error { return nil }},
+	{"populate_rootfs_contents_hooks", func(statemachine *StateMachine) error { return nil }},
+	{"generate_disk_info", func(statemachine *StateMachine) error { return nil }},
+	{"calculate_rootfs_size", func(statemachine *StateMachine) error { return nil }},
+	{"prepopulate_bootfs_contents", func(statemachine *StateMachine) error { return nil }},
+	{"populate_bootfs_contents", func(statemachine *StateMachine) error { return nil }},
+	{"populate_prepare_partitions", func(statemachine *StateMachine) error { return nil }},
+	{"make_disk", func(statemachine *StateMachine) error { return nil }},
+	{"generate_manifest", func(statemachine *StateMachine) error { return nil }},
 	{"finish", (*StateMachine).finish},
 }
 
@@ -323,7 +323,7 @@ func TestFailedCreateWorkDir(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.stateMachineFlags.WorkDir = workDir
 		stateMachine.stateMachineFlags.Thru = "make_temporary_directories"
-		stateMachine.states = classicStates
+		stateMachine.states = allTestStates
 
 		if err := stateMachine.makeTemporaryDirectories(); err == nil {
 			t.Errorf("Expected an error but there was none")

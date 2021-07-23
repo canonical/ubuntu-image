@@ -61,7 +61,7 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 }
 
 // TestSuccessfulClassicRun runs through all states ensuring none failed
-func TestSuccessfulClassicRun(t *testing.T) {
+/*func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -79,4 +79,4 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
 	})
-}
+}*/
