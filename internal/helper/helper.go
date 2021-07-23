@@ -39,23 +39,22 @@ func InitCommonOpts() (*commands.CommonOpts, *commands.StateMachineOpts) {
 
 // GetHostArch uses dpkg to return the host architecture of the current system
 func GetHostArch() string {
-	cmd := exec.Command("dpkg",  "--print-architecture")
+	cmd := exec.Command("dpkg", "--print-architecture")
 	outputBytes, _ := cmd.Output()
 	return strings.TrimSpace(string(outputBytes))
 }
 
 // getQemuStaticForArch returns the name of the qemu binary for the specified arch
 func getQemuStaticForArch(arch string) string {
-	archs := map[string]string {
-		"armhf": "qemu-arm-static",
-		"arm64": "qemu-aarch64-static",
+	archs := map[string]string{
+		"armhf":   "qemu-arm-static",
+		"arm64":   "qemu-aarch64-static",
 		"ppc64el": "qemu-ppc64le-static",
 	}
 	if static, exists := archs[arch]; exists {
 		return static
-	} else {
-		return ""
 	}
+	return ""
 }
 
 // RunLiveBuild creates and executes the live build commands used in classic images
@@ -72,9 +71,9 @@ func RunLiveBuild(rootfs string, env []string, enableCrossBuild bool) error {
 		autoSrc = strings.TrimSpace(string(dpkgBytes))
 	}
 	autoDst := rootfs + "/auto"
-        if err := osutil.CopySpecialFile(autoSrc, autoDst); err != nil {
-                return fmt.Errorf("Error copying livecd-rootfs/auto: %s", err.Error())
-        }
+	if err := osutil.CopySpecialFile(autoSrc, autoDst); err != nil {
+		return fmt.Errorf("Error copying livecd-rootfs/auto: %s", err.Error())
+	}
 
 	os.Chdir(rootfs)
 
@@ -117,7 +116,7 @@ func RunLiveBuild(rootfs string, env []string, enableCrossBuild bool) error {
 
 // GetHostSuite checks the release name of the host system to use as a default if --suite is not passed
 func GetHostSuite() string {
-	cmd := exec.Command("lsb_release",  "-c", "-s")
+	cmd := exec.Command("lsb_release", "-c", "-s")
 	outputBytes, _ := cmd.Output()
 	return strings.TrimSpace(string(outputBytes))
 }

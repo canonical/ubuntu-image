@@ -7,9 +7,9 @@ type SnapArgs struct {
 
 // SnapOpts holds all flags that are specific to the snap command
 type SnapOpts struct {
-	Snaps               []string `long:"snap" description:"Install extra snaps. These are passed through to \"snap prepare-image\". The snap argument can include additional information about the channel and/or risk with the following syntax: <snap>=<channel|risk>" value-name:"SNAP"`
-	Channel            string `short:"c" long:"channel" description:"The default snap channel to use" value-name:"CHANNEL"`
-	DisableConsoleConf bool   `long:"disable-console-conf" description:"Disable console-conf on the resulting image."`
+	Snaps              []string `long:"snap" description:"Install extra snaps. These are passed through to \"snap prepare-image\". The snap argument can include additional information about the channel and/or risk with the following syntax: <snap>=<channel|risk>" value-name:"SNAP"`
+	Channel            string   `short:"c" long:"channel" description:"The default snap channel to use" value-name:"CHANNEL"`
+	DisableConsoleConf bool     `long:"disable-console-conf" description:"Disable console-conf on the resulting image."`
 }
 
 type snapCommand struct {

@@ -3,8 +3,8 @@ package statemachine
 import (
 	"fmt"
 
-	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/snap"
 )
 
 // Prepare the image
@@ -26,9 +26,9 @@ func (stateMachine *StateMachine) prepareImageSnap() error {
 		imageOpts.Customizations = customizations
 	}
 
-        // plug/slot sanitization not used by snap image.Prepare, make it no-op.
-        snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
-	
+	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
+	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+
 	if err := image.Prepare(&imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
