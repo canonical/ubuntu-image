@@ -37,10 +37,11 @@ func TestFailedReadMetadataSnap(t *testing.T) {
 }
 
 // TestSuccessfulSnapRun runs through all states ensuring none failed
-/*func TestSuccessfulSnapRun(t *testing.T) {
+func TestSuccessfulSnapRun(t *testing.T) {
 	t.Run("test_successful_snap_run", func(t *testing.T) {
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.Args.ModelAssertion = "../../internal/statemachine/testdata/modelAssertion"
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -54,4 +55,4 @@ func TestFailedReadMetadataSnap(t *testing.T) {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
 	})
-}*/
+}

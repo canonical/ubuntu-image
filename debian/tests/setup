@@ -1,9 +1,0 @@
-#!/bin/sh
-set -e
-export GOPATH=/tmp:/usr/share/gocode
-export GOFLAGS=-mod=vendor
-
-rm -rf /tmp/src/github.com/canonical/
-mkdir -p /tmp/src/github.com/canonical/
-cp -a . /tmp/src/github.com/canonical/ubuntu-image
-

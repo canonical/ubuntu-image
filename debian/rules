@@ -25,6 +25,8 @@ override_dh_installman:
 	rst2man ubuntu-image.rst $(artifactsdir)/ubuntu-image.1
 	dh_installman
 
+override_dh_auto_test:
+
 override_dh_auto_build:
 	dh_auto_build -- $(BUILDFLAGS)
 
