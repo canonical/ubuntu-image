@@ -4,6 +4,8 @@ Priority: optional
 Maintainer: Lukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>
 Build-Depends: debhelper (>= 11),
                dh-golang (>= 1.17~),
+               fdisk,
+               gdisk,
                golang-go (>= 2:1.10~),
                livecd-rootfs,
                python3-docutils,
@@ -14,6 +16,8 @@ Package: ubuntu-image
 Architecture: any
 Built-Using: ${misc:Built-Using},
 Depends: ${misc:Depends},
+         fdisk,
+         gdisk,
          livecd-rootfs,
 Description: toolkit for building Ubuntu images.
  This package contains the ubuntu-image program.

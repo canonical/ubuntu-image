@@ -61,11 +61,12 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 }
 
 // TestSuccessfulClassicRun runs through all states ensuring none failed
-/*func TestSuccessfulClassicRun(t *testing.T) {
+func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
+		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -79,4 +80,33 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
 	})
-}*/
+}
+
+// TestFailedRunLiveBuild tests the scenario where calls to live build fail.
+// this is accomplished by passing invalid arguments to live-build
+func TestFailedRunLiveBuild(t *testing.T) {
+	t.Run("test_successful_classic_run", func(t *testing.T) {
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.Opts.Project = "ubuntu-cpc"
+		stateMachine.Opts.Suite="fakesuite"
+		stateMachine.Opts.Arch="fake"
+		stateMachine.Opts.Subproject="fakeproject"
+		stateMachine.Opts.Subarch="fakearch"
+		stateMachine.Opts.WithProposed = true
+		stateMachine.Opts.ExtraPPAs = []string{"ppa:fake_user/fakeppa"}
+		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
+
+		if err := stateMachine.Setup(); err != nil {
+			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+
+		if err := stateMachine.Run(); err != nil {
+			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+
+		if err := stateMachine.Teardown(); err != nil {
+			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+	})
+}

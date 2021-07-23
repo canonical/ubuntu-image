@@ -75,7 +75,8 @@ func RunLiveBuild(rootfs string, env []string, enableCrossBuild bool) error {
 		return fmt.Errorf("Error copying livecd-rootfs/auto: %s", err.Error())
 	}
 
-	os.Chdir(rootfs)
+	saveCWD := SaveCWD()
+	defer saveCWD()
 
 	//configEnv := append([]string{"config"}, env...)
 	lbConfig := *exec.Command("lb", "config")
