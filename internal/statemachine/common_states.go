@@ -3,17 +3,18 @@ package statemachine
 import (
 	"fmt"
 	"os"
+
+	"github.com/google/uuid"
 )
 
 // generate work directory file structure
 func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	// if no workdir was specified, open a /tmp dir
 	if stateMachine.stateMachineFlags.WorkDir == "" {
-		workDir, err := os.MkdirTemp(stateMachine.tempLocation, "ubuntu-image-")
-		if err != nil {
+		stateMachine.stateMachineFlags.WorkDir= "ubuntu-image-" + uuid.NewString()
+		if err := os.Mkdir(stateMachine.stateMachineFlags.WorkDir, 0755); err != nil {
 			return fmt.Errorf("Failed to create temporary directory: %s", err.Error())
 		}
-		stateMachine.stateMachineFlags.WorkDir = workDir
 		stateMachine.cleanWorkDir = true
 	} else {
 		err := os.MkdirAll(stateMachine.stateMachineFlags.WorkDir, 0755)

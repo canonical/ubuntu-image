@@ -88,8 +88,8 @@ func TestUntilThru(t *testing.T) {
 				// run a partial state machine
 				var partialStateMachine testStateMachine
 				partialStateMachine.commonFlags, partialStateMachine.stateMachineFlags = helper.InitCommonOpts()
-				tempDir, err := os.MkdirTemp("", "ubuntu-image-"+tc.name+"-")
-				if err != nil {
+				tempDir := "ubuntu-image-" + tc.name
+				if err := os.Mkdir(tempDir, 0755); err != nil {
 					t.Errorf("Could not create workdir: %s\n", err.Error())
 				}
 				defer os.RemoveAll(tempDir)
@@ -230,8 +230,8 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 // TestDebug ensures that the name of the states is printed when the --debug flag is used
 func TestDebug(t *testing.T) {
 	t.Run("test_debug", func(t *testing.T) {
-		workDir, err := os.MkdirTemp("", "ubuntu-image-test-debug-")
-		if err != nil {
+		workDir := "ubuntu-image-test-debug"
+		if err := os.Mkdir("ubuntu-image-test-debug", 0755); err != nil {
 			t.Errorf("Failed to create temporary directory %s\n", workDir)
 		}
 
@@ -285,8 +285,8 @@ func TestFunctionErrors(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
-			workDir, err := os.MkdirTemp("", "ubuntu-image-"+tc.name+"-")
-			if err != nil {
+			workDir := "ubuntu-image-" + tc.name
+			if err := os.Mkdir(workDir, 0755); err != nil {
 				t.Errorf("Failed to create temporary directory %s\n", workDir)
 			}
 
