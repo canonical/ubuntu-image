@@ -1,12 +1,12 @@
 package commands
 
-// positional arguments need their own struct
-type classicArgs struct {
+// ClassicArgs holds the gadget tree. positional arguments need their own struct
+type ClassicArgs struct {
 	GadgetTree string `positional-arg-name:"gadget_tree" description:"Gadget tree. This is a tree equivalent to an unpacked and primed gadget snap at core image build time."`
 }
 
-// set up the options that are specific to the classic command
-type classicOpts struct {
+// ClassicOpts holds all flags that are specific to the classic command
+type ClassicOpts struct {
 	Project      string   `short:"p" long:"project" description:"Project name to be specified to livecd-rootfs. Mutually exclusive with --filesystem." value-name:"PROJECT"`
 	Filesystem   string   `short:"f" long:"filesystem" description:"Unpacked Ubuntu filesystem to be copied to the system partition. Mutually exclusive with --project." value-name:"FILESYSTEM"`
 	Suite        string   `short:"s" long:"suite" description:"Distribution name to be specified to livecd-rootfs." value-name:"SUITE"`
@@ -17,9 +17,7 @@ type classicOpts struct {
 	ExtraPPAs    []string `long:"extra-ppas" description:"Extra ppas to install. This is passed through to livecd-rootfs."`
 }
 
-type ClassicCommand struct {
-	ClassicArgs classicArgs `positional-args:"true" required:"false"`
-	ClassicOpts classicOpts
+type classicCommand struct {
+	ClassicArgsPassed ClassicArgs `positional-args:"true" required:"false"`
+	ClassicOptsPassed ClassicOpts
 }
-
-var Classic ClassicCommand
