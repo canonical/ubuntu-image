@@ -1,6 +1,6 @@
 name: Ubuntu Image CI
 
-on: [push]
+on: [push, pull-request]
 
 jobs:
   build:
@@ -13,6 +13,6 @@ jobs:
         with:
           go-version: '1.16'
       - name: Run coverage
-        run: go test -race -coverprofile=coverage.out -covermode=atomic
+        run: go test ./... -coverprofile=coverage.out -covermode=atomic
       - name: Upload coverage to Codecov
         run: bash <(curl -s https://codecov.io/bash)
