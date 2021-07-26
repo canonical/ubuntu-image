@@ -16,7 +16,5 @@ jobs:
         run: sudo apt update; sudo apt install -y live-build livecd-rootfs snapd fdisk gdisk
       - name: Run coverage
         run: sudo go test ./... -coverprofile=coverage.out -covermode=atomic
-      - name: Run coverage
-        run: go test ./... -coverprofile=coverage.out -covermode=atomic
       - name: Upload coverage to Codecov
         run: bash <(curl -s https://codecov.io/bash)
