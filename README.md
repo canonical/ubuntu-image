@@ -1,6 +1,5 @@
 # Ubuntu image builder
 
-[![Build & Tests Status](https://travis-ci.org/canonical/ubuntu-image.svg?branch=master)](https://travis-ci.org/canonical/ubuntu-image)
 [![codecov](https://codecov.io/gh/canonical/ubuntu-image/branch/master/graph/badge.svg)](https://codecov.io/gh/canonical/ubuntu-image)
 [![Go Report Card](https://goreportcard.com/badge/github.com/canonical/ubuntu-image)](https://goreportcard.com/report/github.com/canonical/ubuntu-image)
 
