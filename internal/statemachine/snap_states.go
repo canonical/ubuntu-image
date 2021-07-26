@@ -16,7 +16,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 	var imageOpts image.Options
 	imageOpts.Snaps = snapStateMachine.Opts.Snaps
-	imageOpts.PrepareDir = snapStateMachine.tempDirs.rootfs
+	imageOpts.PrepareDir = snapStateMachine.tempDirs.unpack
 	imageOpts.ModelFile = snapStateMachine.Args.ModelAssertion
 	if snapStateMachine.Opts.Channel != "" {
 		imageOpts.Channel = snapStateMachine.Opts.Channel
