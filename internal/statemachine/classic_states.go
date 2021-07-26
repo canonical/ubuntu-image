@@ -36,7 +36,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 	if classicStateMachine.Opts.Filesystem == "" {
-		// -- filesystem was not provided, so we use live-build to create one
+		// --filesystem was not provided, so we use live-build to create one
 		var env []string
 		env = append(env, "PROJECT="+classicStateMachine.Opts.Project)
 		if classicStateMachine.Opts.Suite != "" {

@@ -8,7 +8,7 @@ import (
 )
 
 // Prepare the image
-func (stateMachine *StateMachine) prepareImageSnap() error {
+func (stateMachine *StateMachine) prepareImage() error {
 	// TODO: figure out what common args need to be used and how
 	fmt.Println("Doing image preparation for Snap")
 	var snapStateMachine *SnapStateMachine
@@ -32,6 +32,9 @@ func (stateMachine *StateMachine) prepareImageSnap() error {
 	if err := image.Prepare(&imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
+
+	// set the gadget yaml location
+	snapStateMachine.yamlFilePath = snapStateMachine.tempDirs.unpack + "/gadget/meta/gadget.yaml"
 
 	return nil
 }

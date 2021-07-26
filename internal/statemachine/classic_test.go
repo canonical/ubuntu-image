@@ -18,6 +18,9 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
 			var stateMachine ClassicStateMachine
 			stateMachine.Opts.Project = tc.project
 			stateMachine.Opts.Filesystem = tc.filesystem
@@ -33,6 +36,9 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 // TestFailedValidateInputClassic tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputClassic(t *testing.T) {
 	t.Run("test_failed_validate_input", func(t *testing.T) {
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
 		// use both --until and --thru to trigger this failure
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -48,6 +54,9 @@ func TestFailedValidateInputClassic(t *testing.T) {
 // TestFailedReadMetadataClassic tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestFailedReadMetadataClassic(t *testing.T) {
 	t.Run("test_failed_read_metadata", func(t *testing.T) {
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
 		// start a --resume with no previous SM run
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -63,6 +72,9 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 // TestSuccessfulClassicRun runs through all states ensuring none failed
 func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
@@ -86,6 +98,9 @@ func TestSuccessfulClassicRun(t *testing.T) {
 // this is accomplished by passing invalid arguments to live-build
 func TestFailedRunLiveBuild(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
@@ -101,8 +116,8 @@ func TestFailedRunLiveBuild(t *testing.T) {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
 
-		if err := stateMachine.Run(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		if err := stateMachine.Run(); err == nil {
+			t.Error("Expected an error but there was none")
 		}
 
 		if err := stateMachine.Teardown(); err != nil {

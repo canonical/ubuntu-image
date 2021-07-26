@@ -77,12 +77,12 @@ func RunLiveBuild(rootfs string, env []string, enableCrossBuild bool) error {
 
 	saveCWD := SaveCWD()
 	defer saveCWD()
+	os.Chdir(rootfs)
 
-	//configEnv := append([]string{"config"}, env...)
 	lbConfig := *exec.Command("lb", "config")
+	lbConfig.Env = env
 	lbConfig.Stdout = os.Stdout
 	lbConfig.Stderr = os.Stderr
-	lbConfig.Env = append(lbConfig.Env, env...)
 
 	if arch != "" && arch != GetHostArch() && enableCrossBuild {
 		// For cases where we want to cross-build, we need to pass
