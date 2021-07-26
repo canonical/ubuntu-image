@@ -98,7 +98,6 @@ func RunLiveBuild(rootfs string, env []string, enableCrossBuild bool) error {
 	}
 
 	// actually run configure
-	fmt.Println(lbConfig)
 	if err := lbConfig.Run(); err != nil {
 		return err
 	}
@@ -107,8 +106,7 @@ func RunLiveBuild(rootfs string, env []string, enableCrossBuild bool) error {
 	lbBuild := *exec.Command("lb", "build")
 	lbBuild.Stdout = os.Stdout
 	lbBuild.Stderr = os.Stderr
-	lbBuild.Env = append(lbBuild.Env, env...)
-	fmt.Println(lbBuild)
+	lbBuild.Env = env
 	if err := lbBuild.Run(); err != nil {
 		return err
 	}

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 export GOPATH=/tmp:/usr/share/gocode
-export GOFLAGS=-mod=vendor
+export GOFLAGS=-mod=readonly
 
 rm -rf /tmp/src/github.com/canonical/
 mkdir -p /tmp/src/github.com/canonical/

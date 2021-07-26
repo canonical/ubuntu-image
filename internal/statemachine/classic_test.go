@@ -78,6 +78,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
+		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
 
 		if err := stateMachine.Setup(); err != nil {

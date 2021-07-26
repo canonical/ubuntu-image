@@ -9,8 +9,6 @@ import (
 
 // Prepare the image
 func (stateMachine *StateMachine) prepareImage() error {
-	// TODO: figure out what common args need to be used and how
-	fmt.Println("Doing image preparation for Snap")
 	var snapStateMachine *SnapStateMachine
 	snapStateMachine = stateMachine.parent.(*SnapStateMachine)
 

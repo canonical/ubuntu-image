@@ -11,7 +11,6 @@ import (
 
 // Prepare the gadget tree
 func (stateMachine *StateMachine) prepareGadgetTree() error {
-	fmt.Println("Doing prepareGadgetTree, this state is only in classic builds")
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 	gadgetDir := classicStateMachine.tempDirs.unpack + "/gadget"
@@ -32,7 +31,6 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 
 // runLiveBuild runs `lb config` and `lb build` commands based on the user input
 func (stateMachine *StateMachine) runLiveBuild() error {
-	fmt.Println("Doing image preparation specific to classic")
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 	if classicStateMachine.Opts.Filesystem == "" {
