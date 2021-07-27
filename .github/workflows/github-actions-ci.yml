@@ -1,4 +1,4 @@
-name: Ubuntu Image CI
+name: Build
 
 on: [push, pull_request]
 
@@ -12,5 +12,7 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16'
+      - name: build
+        run: go build ./...
       - name: Upload coverage to Codecov
         run: bash <(curl -s https://codecov.io/bash)
