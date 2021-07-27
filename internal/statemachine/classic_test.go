@@ -70,7 +70,7 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 }
 
 // TestSuccessfulClassicRun runs through all states ensuring none failed
-/*func TestSuccessfulClassicRun(t *testing.T) {
+func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -93,7 +93,7 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
 	})
-}*/
+}
 
 // TestFailedRunLiveBuild tests the scenario where calls to live build fail.
 // this is accomplished by passing invalid arguments to live-build
