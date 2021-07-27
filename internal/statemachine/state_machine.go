@@ -50,9 +50,6 @@ type StateMachine struct {
 
 	// imported from snapd, the info parsed from gadget.yaml
 	gadgetInfo *gadget.Info
-
-	// used only for testing
-	tempLocation string // parent directory of temporary workdir
 }
 
 // getStateNumberByName returns the numeric order of a state based on its name

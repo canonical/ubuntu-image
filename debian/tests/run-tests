@@ -3,4 +3,3 @@ set -e
 . debian/tests/setup
 
 go test github.com/canonical/ubuntu-image/...
-

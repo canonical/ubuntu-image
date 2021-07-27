@@ -1,5 +1,6 @@
 # Ubuntu image builder
 
+![Build](https://github.com/canonical/ubuntu-image/actions/workflows/github-actions-ci.yml/badge.svg)
 [![codecov](https://codecov.io/gh/canonical/ubuntu-image/branch/master/graph/badge.svg)](https://codecov.io/gh/canonical/ubuntu-image)
 [![Go Report Card](https://goreportcard.com/badge/github.com/canonical/ubuntu-image)](https://goreportcard.com/report/github.com/canonical/ubuntu-image)
 
