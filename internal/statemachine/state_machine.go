@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/snapcore/snapd/gadget"
 )
 
 // SmInterface allows different image types to implement their own setup/run/teardown functions
@@ -47,8 +48,21 @@ type StateMachine struct {
 	// used to access image type specific variables from state functions
 	parent SmInterface
 
+	// imported from snapd, the info parsed from gadget.yaml
+	gadgetInfo *gadget.Info
+
 	// used only for testing
 	tempLocation string // parent directory of temporary workdir
+}
+
+// getStateNumberByName returns the numeric order of a state based on its name
+func (stateMachine *StateMachine) getStateNumberByName(name string) int {
+	for i, stateFunc := range(stateMachine.states) {
+		if name == stateFunc.name {
+			return i
+		}
+	}
+	return -1
 }
 
 // SetCommonOpts stores the common options for all image types in the struct

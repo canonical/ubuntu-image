@@ -3,6 +3,9 @@ package statemachine
 import (
 	"fmt"
 	"os"
+
+	"github.com/snapcore/snapd/gadget"
+	"github.com/snapcore/snapd/osutil"
 )
 
 // generate work directory file structure
@@ -35,6 +38,37 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 
 // Load the gadget yaml passed in via command line
 func (stateMachine *StateMachine) loadGadgetYaml() error {
+	if err := osutil.CopySpecialFile(stateMachine.yamlFilePath,
+		stateMachine.stateMachineFlags.WorkDir); err != nil {
+		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
+	}
+
+	// read in the gadget.yaml as bytes, because snapd expects it that way
+	gadgetYamlBytes, err := os.ReadFile(stateMachine.yamlFilePath)
+	if err != nil {
+		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
+	}
+
+	stateMachine.gadgetInfo, err = gadget.InfoFromGadgetYaml(gadgetYamlBytes, nil)
+	if err != nil {
+		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
+	}
+
+	for volumeName, _ := range(stateMachine.gadgetInfo.Volumes) {
+		volumeBaseDir := stateMachine.tempDirs.volumes + "/" + volumeName
+		if err := os.MkdirAll(volumeBaseDir, 0755); err != nil {
+			return fmt.Errorf("Error creating volume dir: %s", err.Error())
+		}
+	}
+
+	// check if the unpack dir should be preserved
+	envar := os.Getenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
+	if envar != "" {
+		preserveDir := envar + "/unpack"
+		if err := osutil.CopySpecialFile(stateMachine.tempDirs.unpack, preserveDir); err != nil {
+			return fmt.Errorf("Error preserving unpack dir: %s", err.Error())
+		}
+	}
 	return nil
 }
 
