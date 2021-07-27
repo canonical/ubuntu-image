@@ -9,6 +9,7 @@ Build-Depends: debhelper (>= 11),
                golang-go (>= 2:1.16~),
                livecd-rootfs,
                python3-docutils,
+               snapd,
 Standards-Version: 4.1.2
 Homepage: http://launchpad.net/ubuntu-image
 
@@ -19,5 +20,6 @@ Depends: ${misc:Depends},
          fdisk,
          gdisk,
          livecd-rootfs,
+         snapd,
 Description: toolkit for building Ubuntu images.
  This package contains the ubuntu-image program.

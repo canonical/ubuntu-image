@@ -96,7 +96,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 // TestFailedPrepareImage tests a failure in the call to image.Prepare. This is easy to achieve
 // attempting to use --disable-console-conf with a core20 image
 func TestFailedPrepareImage(t *testing.T) {
-	t.Run("test_successful_snap_run", func(t *testing.T) {
+	t.Run("test_failed_prepare_image", func(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
