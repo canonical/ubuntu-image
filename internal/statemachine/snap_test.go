@@ -119,8 +119,8 @@ func TestFailedPrepareImage(t *testing.T) {
 	})
 }
 
-// TestFailedLoadGadgetYaml tests a failure in the call to InfoFromGadgetYaml. This is achieved
-// by skipping the PrepareImage state
+// TestFailedLoadGadgetYamlSnap tests a failure in the loadGadgetYaml state while building
+// a snap image. This is achieved by skipping the PrepareImage state
 func TestFailedLoadGadgetYamlSnap(t *testing.T) {
 	t.Run("test_failed_load_gadget_yaml", func(t *testing.T) {
 		saveCWD := helper.SaveCWD()
@@ -134,10 +134,14 @@ func TestFailedLoadGadgetYamlSnap(t *testing.T) {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
 
-		stateNum := stateMachine.getStateNumberByName("load_gadget_yaml")
-		stateMachine.stateFuncs[stateNum - 1] = stateFunc{"skip_image", func(*StateMachine){ return nil }}
-		if err := stateMachine.Run(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		stateNum := stateMachine.getStateNumberByName("prepare_image")
+		oldFunc := stateMachine.states[stateNum]
+		defer func() {
+			stateMachine.states[stateNum] = oldFunc
+		}()
+		stateMachine.states[stateNum] = stateFunc{"skip_image", func(*StateMachine) error { return nil }}
+		if err := stateMachine.Run(); err == nil {
+			t.Errorf("Expected an error, but got none")
 		}
 
 		if err := stateMachine.Teardown(); err != nil {

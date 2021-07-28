@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -18,8 +19,16 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("Error creating unpack directory: %s", err.Error())
 	}
-	if err := osutil.CopySpecialFile(classicStateMachine.Args.GadgetTree, gadgetDir); err != nil {
-		return fmt.Errorf("Error copying gadget tree: %s", err.Error())
+	// recursively copy the gadget tree to unpack/gadget
+	files, err := ioutil.ReadDir(classicStateMachine.Args.GadgetTree)
+	if err != nil {
+		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
+	}
+	for _, gadgetFile := range(files) {
+			srcFile := classicStateMachine.Args.GadgetTree + "/" + gadgetFile.Name()
+			if err := osutil.CopySpecialFile(srcFile, gadgetDir); err != nil {
+			return fmt.Errorf("Error copying gadget tree: %s", err.Error())
+		}
 	}
 
 	// We assume the gadget tree was built from a gadget source tree using
