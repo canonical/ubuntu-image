@@ -80,6 +80,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
+		stateMachine.Opts.ExtraPPAs = []string{"sil2100/live-build-fix-attempt"}
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 
 		if err := stateMachine.Setup(); err != nil {
