@@ -1,9 +1,11 @@
 package statemachine
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/osutil"
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
@@ -50,7 +52,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Args.ModelAssertion = "testdata/modelAssertion20"
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -74,7 +76,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Args.ModelAssertion = "testdata/modelAssertion18"
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 		stateMachine.Opts.Channel = "stable"
 		stateMachine.Opts.Snaps = []string{"hello-world"}
 		stateMachine.Opts.DisableConsoleConf = true
@@ -102,7 +104,7 @@ func TestFailedPrepareImage(t *testing.T) {
 
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Args.ModelAssertion = "testdata/modelAssertion20"
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 		stateMachine.Opts.DisableConsoleConf = true
 
 		if err := stateMachine.Setup(); err != nil {
@@ -120,7 +122,7 @@ func TestFailedPrepareImage(t *testing.T) {
 }
 
 // TestFailedLoadGadgetYamlSnap tests a failure in the loadGadgetYaml state while building
-// a snap image. This is achieved by skipping the PrepareImage state
+// a snap image. This is achieved by providing an invalid gadget.yaml
 func TestFailedLoadGadgetYamlSnap(t *testing.T) {
 	t.Run("test_failed_load_gadget_yaml", func(t *testing.T) {
 		saveCWD := helper.SaveCWD()
@@ -128,7 +130,7 @@ func TestFailedLoadGadgetYamlSnap(t *testing.T) {
 
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Args.ModelAssertion = "testdata/modelAssertion20"
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -139,7 +141,14 @@ func TestFailedLoadGadgetYamlSnap(t *testing.T) {
 		defer func() {
 			stateMachine.states[stateNum] = oldFunc
 		}()
-		stateMachine.states[stateNum] = stateFunc{"skip_image", func(*StateMachine) error { return nil }}
+		stateMachine.states[stateNum] = stateFunc{
+			"skip_image", func(*StateMachine) error {
+				invalidGadgetYaml := filepath.Join("testdata",
+					"gadget_tree_invalid", "meta", "gadget.yaml")
+				osutil.CopyFile(invalidGadgetYaml, stateMachine.yamlFilePath, osutil.CopyFlagDefault)
+				return nil
+			},
+		}
 		if err := stateMachine.Run(); err == nil {
 			t.Errorf("Expected an error, but got none")
 		}

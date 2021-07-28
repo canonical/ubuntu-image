@@ -24,9 +24,9 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	if err != nil {
 		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 	}
-	for _, gadgetFile := range(files) {
-			srcFile := classicStateMachine.Args.GadgetTree + "/" + gadgetFile.Name()
-			if err := osutil.CopySpecialFile(srcFile, gadgetDir); err != nil {
+	for _, gadgetFile := range files {
+		srcFile := classicStateMachine.Args.GadgetTree + "/" + gadgetFile.Name()
+		if err := osutil.CopySpecialFile(srcFile, gadgetDir); err != nil {
 			return fmt.Errorf("Error copying gadget tree: %s", err.Error())
 		}
 	}

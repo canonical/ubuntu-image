@@ -54,7 +54,7 @@ type StateMachine struct {
 
 // getStateNumberByName returns the numeric order of a state based on its name
 func (stateMachine *StateMachine) getStateNumberByName(name string) int {
-	for i, stateFunc := range(stateMachine.states) {
+	for i, stateFunc := range stateMachine.states {
 		if name == stateFunc.name {
 			return i
 		}

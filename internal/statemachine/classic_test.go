@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -79,7 +80,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
-		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
+		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -111,7 +112,7 @@ func TestFailedRunLiveBuild(t *testing.T) {
 		stateMachine.Opts.Subarch = "fakearch"
 		stateMachine.Opts.WithProposed = true
 		stateMachine.Opts.ExtraPPAs = []string{"ppa:fake_user/fakeppa"}
-		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
+		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -128,7 +129,7 @@ func TestFailedRunLiveBuild(t *testing.T) {
 }
 
 // TestFailedLoadGadgetYamlClassic tests a failure in the loadGadgetYaml state while building
-// a classic image. This is achieved by skipping the PrepareGadgetTree state
+// a classic image. This is achieved by using an invalid gadget.yaml file
 func TestFailedLoadGadgetYamlClassic(t *testing.T) {
 	t.Run("test_failed_load_gadget_yaml", func(t *testing.T) {
 		saveCWD := helper.SaveCWD()
@@ -138,18 +139,11 @@ func TestFailedLoadGadgetYamlClassic(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
-		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
+		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree_invalid")
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
-
-		stateNum := stateMachine.getStateNumberByName("prepare_gadget_tree")
-		oldFunc := stateMachine.states[stateNum]
-		defer func() {
-			stateMachine.states[stateNum] = oldFunc
-		}()
-		stateMachine.states[stateNum] = stateFunc{"skip_image", func(*StateMachine) error { return nil }}
 
 		if err := stateMachine.Run(); err == nil {
 			t.Errorf("Expected an error, but got none")

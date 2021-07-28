@@ -2,11 +2,12 @@ package statemachine
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/osutil"
-	"github.com/google/uuid"
 )
 
 // generate work directory file structure
@@ -44,7 +45,7 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 	}
 
 	// read in the gadget.yaml as bytes, because snapd expects it that way
-	gadgetYamlBytes, err := os.ReadFile(stateMachine.yamlFilePath)
+	gadgetYamlBytes, err := ioutil.ReadFile(stateMachine.yamlFilePath)
 	if err != nil {
 		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
 	}
@@ -54,7 +55,7 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
 	}
 
-	for volumeName, _ := range(stateMachine.gadgetInfo.Volumes) {
+	for volumeName := range stateMachine.gadgetInfo.Volumes {
 		volumeBaseDir := stateMachine.tempDirs.volumes + "/" + volumeName
 		if err := os.MkdirAll(volumeBaseDir, 0755); err != nil {
 			return fmt.Errorf("Error creating volume dir: %s", err.Error())
