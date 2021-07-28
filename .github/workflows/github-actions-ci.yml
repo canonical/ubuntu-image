@@ -21,6 +21,6 @@ jobs:
       - name: install-test-dependencies
         run: sudo apt install -y live-build livecd-rootfs snapd fdisk gdisk
       - name: test
-        run: sudo go test -d 0 -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: sudo go test -timeout 0 -v -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage to Codecov
         run: bash <(curl -s https://codecov.io/bash)
