@@ -73,12 +73,10 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 		defer saveCWD()
 		os.Chdir(stateMachine.tempDirs.rootfs)
 
-		fmt.Println(lbConfig)
 		if err := lbConfig.Run(); err != nil {
 			return err
 		}
 
-		fmt.Println(lbBuild)
 		if err := lbBuild.Run(); err != nil {
 			return err
 		}

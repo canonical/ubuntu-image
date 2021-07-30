@@ -1,5 +1,3 @@
-// TODO: some tests are commented out. They now fail because "needs-root" was added to d/tests/control
-// they can be "mocked" similar to how os.Exit is mocked in main to reach 100% coverage
 package statemachine
 
 import (

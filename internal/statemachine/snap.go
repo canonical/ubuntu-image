@@ -47,6 +47,5 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 		return err
 	}
 
-	// TODO: is there any validation specific to snap images?
 	return nil
 }
