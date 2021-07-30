@@ -15,16 +15,13 @@ import (
 // generate work directory file structure
 func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	// if no workdir was specified, open a /tmp dir
-	fmt.Println("JAWN entered makeTemporaryDirectories")
 	if stateMachine.stateMachineFlags.WorkDir == "" {
-		fmt.Println("JAWN no workdir")
 		stateMachine.stateMachineFlags.WorkDir = filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
 		if err := osMkdir(stateMachine.stateMachineFlags.WorkDir, 0755); err != nil {
 			return fmt.Errorf("Failed to create temporary directory: %s", err.Error())
 		}
 		stateMachine.cleanWorkDir = true
 	} else {
-		fmt.Printf("JAWN workdir is %s", stateMachine.stateMachineFlags.WorkDir)
 		err := osMkdirAll(stateMachine.stateMachineFlags.WorkDir, 0755)
 		if err != nil && !os.IsExist(err) {
 			return fmt.Errorf("Error creating work directory: %s", err.Error())

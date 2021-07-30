@@ -20,6 +20,7 @@ import (
 // define some functions that can be mocked by test cases
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
+var ioutilWriteFile = ioutil.WriteFile
 var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
 var osutilCopyFile = osutil.CopyFile

@@ -94,7 +94,6 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 	}
 
 	// TODO: disable-console-conf places the "complete" file under _writable-defaults/var/lib.... Will that work?
-
 	if err := stateMachine.processCloudInit(); err != nil {
 		return err
 	}

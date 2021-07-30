@@ -39,34 +39,6 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-		/*mockFuncs := []interface{}{osMkdir, osMkdirAll}
-		for _, mockFunc := range(mockFuncs) {
-			// replace the function with a new function that just returns an error
-			origFunc := mockFunc
-			defer func() {
-				mockFunc = origFunc
-			}()
-
-			// TODO: this is kind of hacky. Investigate using interfaces 
-			// rather than a map to mock these functions
-			reflect.ValueOf(&osMkdir).Elem().Set(reflect.ValueOf(mockFuncMap[&osMkdir]))
-
-			if err := stateMachine.makeTemporaryDirectories(); err == nil {
-				// try adding a workdir to see if that triggers the failure
-				stateMachine.stateMachineFlags.WorkDir = testDir
-				if err := stateMachine.makeTemporaryDirectories(); err == nil {
-					t.Error("Expected an error, but got none")
-				}
-			}
-		}*/
-
-		/*mockableFunctions.Mkdir = mockable{
-		if err := stateMachine.makeTemporaryDirectories(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
-		// restore the original functions
-		mockableFunctions.Mkdir = os.Mkdir
-		mockableFunctions.MkdirAll = os.MkdirAll*/
 		osMkdir = mockMkdir
 		if err := stateMachine.makeTemporaryDirectories(); err == nil {
 			// try adding a workdir to see if that triggers the failure

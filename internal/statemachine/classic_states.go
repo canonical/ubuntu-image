@@ -107,12 +107,13 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 		return fmt.Errorf("Error opening fstab: %s", err.Error())
 	}
 
-	regex, err := regexpCompile("r'(LABEL=)+'")
-	if err != nil {
-		return err
+	if !strings.Contains(string(fstabBytes), "LABEL=writable") {
+		newFstab := []byte("LABEL=writable   /    ext4   defaults    0 0")
+		err := ioutilWriteFile(fstabPath, newFstab, 0644)
+		if err != nil {
+			return fmt.Errorf("Error writing to fstab: %s", err.Error())
+		}
 	}
-	//TODO: this doesn't actually handle the regex. fix
-	os.Stdout.Write(regex.ReplaceAll(fstabBytes, []byte("writable")))
 
 	if err := stateMachine.processCloudInit(); err != nil {
 		return err

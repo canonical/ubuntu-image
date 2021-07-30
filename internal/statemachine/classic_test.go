@@ -224,7 +224,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error reading fstab to check regex")
 			}
-			correctLabel := "LABEL=writable"
+			correctLabel := "LABEL=writable   /    ext4   defaults    0 0"
 			if !strings.Contains(string(fstab), correctLabel) {
 				t.Errorf("Expected fstab contents %s to contain %s",
 					string(fstab), correctLabel)
