@@ -16,7 +16,15 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16'
-      - name: Run coverage
-        run: go test -race -coverprofile=coverage.out -covermode=atomic
+      - name: build
+        run: go build ./...
+      - name: add-sil2100-ppa
+        run: sudo add-apt-repository -y ppa:sil2100/live-build-fix-attempt
+      - name: apt-update
+        run: sudo apt update
+      - name: install-test-dependencies
+        run: sudo apt install -y live-build livecd-rootfs snapd fdisk gdisk qemu-system-aarch64 qemu-user-static
+      - name: test
+        run: sudo go test -timeout 0 -v -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage to Codecov
         run: bash <(curl -s https://codecov.io/bash)

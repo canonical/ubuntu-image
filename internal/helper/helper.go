@@ -58,8 +58,7 @@ func getQemuStaticForArch(arch string) string {
 }
 
 // RunLiveBuild creates and executes the live build commands used in classic images
-func RunLiveBuild(rootfs string, env []string, enableCrossBuild bool) error {
-	arch := os.Getenv("ARCH")
+func RunLiveBuild(rootfs, arch string, env []string, enableCrossBuild bool) error {
 	autoSrc := os.Getenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH")
 	if autoSrc == "" {
 		dpkgArgs := "dpkg -L livecd-rootfs | grep \"auto$\""
@@ -79,35 +78,48 @@ func RunLiveBuild(rootfs string, env []string, enableCrossBuild bool) error {
 	defer saveCWD()
 	os.Chdir(rootfs)
 
-	lbConfig := *exec.Command("lb", "config")
-	lbConfig.Env = env
+	// set up "lb config" and "lb build" commands
+	lbConfig := *exec.Command("sudo")
+	lbBuild := *exec.Command("sudo")
+
+	lbConfig.Env = append(os.Environ(), env...)
+	lbConfig.Args = append(lbConfig.Args, env...)
+	lbConfig.Args = append(lbConfig.Args, []string{"lb", "config"}...)
 	lbConfig.Stdout = os.Stdout
 	lbConfig.Stderr = os.Stderr
 
-	if arch != "" && arch != GetHostArch() && enableCrossBuild {
+	lbBuild.Env = append(os.Environ(), env...)
+	lbBuild.Args = append(lbBuild.Args, env...)
+	lbBuild.Args = append(lbBuild.Args, []string{"lb", "build"}...)
+	lbBuild.Stdout = os.Stdout
+	lbBuild.Stderr = os.Stderr
+
+	if arch != GetHostArch() && enableCrossBuild {
 		// For cases where we want to cross-build, we need to pass
 		// additional options to live-build with the arch to use and path
 		// to the qemu static
-		qemuPath := os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
-		static := getQemuStaticForArch(arch)
-		qemuPath, err := exec.LookPath(static)
-		if err != nil {
-			return fmt.Errorf("Use UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in case of non-standard archs or custom paths")
+		var qemuPath string
+		qemuPath = os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
+		if qemuPath == "" {
+			static := getQemuStaticForArch(arch)
+			tmpQemuPath, err := exec.LookPath(static)
+			if err != nil {
+				return fmt.Errorf("Use UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in " +
+					"case of non-standard archs or custom paths")
+			}
+			qemuPath = tmpQemuPath
 		}
-		lbConfig.Args = append(lbConfig.Args, []string{"--bootstrap-qemu-arch", arch, "--bootstrap-qemu-static", qemuPath, "--architectures", arch}...)
+		qemuArgs := []string{"--bootstrap-qemu-arch", arch, "--bootstrap-qemu-static",
+			qemuPath, "--architectures", arch}
+		lbConfig.Args = append(lbConfig.Args, qemuArgs...)
 	}
 
-	// actually run configure
+	// now run the "lb config" and "lb build" commands
 	fmt.Println(lbConfig)
 	if err := lbConfig.Run(); err != nil {
 		return err
 	}
 
-	// create and run "lb build" command
-	lbBuild := *exec.Command("lb", "build")
-	lbBuild.Stdout = os.Stdout
-	lbBuild.Stderr = os.Stderr
-	lbBuild.Env = append(lbBuild.Env, env...)
 	fmt.Println(lbBuild)
 	if err := lbBuild.Run(); err != nil {
 		return err

@@ -94,6 +94,33 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	})
 }
 
+// TestSuccessfulClassicCrossArch runs through runLiveBuild with arch=arm64
+func TestSuccessfulClassicCrossArch(t *testing.T) {
+	t.Run("test_successful_classic_cross_arch", func(t *testing.T) {
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.Opts.Project = "ubuntu-cpc"
+		stateMachine.Opts.Arch = "arm64"
+		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
+		stateMachine.stateMachineFlags.Thru = "run_live_build"
+
+		if err := stateMachine.Setup(); err != nil {
+			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+
+		if err := stateMachine.Run(); err != nil {
+			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+
+		if err := stateMachine.Teardown(); err != nil {
+			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+	})
+}
+
 // TestFailedRunLiveBuild tests the scenario where calls to live build fail.
 // this is accomplished by passing invalid arguments to live-build
 func TestFailedRunLiveBuild(t *testing.T) {
