@@ -78,6 +78,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
+		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
 
 		if err := stateMachine.Setup(); err != nil {
@@ -131,10 +132,10 @@ func TestFailedRunLiveBuild(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
-		stateMachine.Opts.Suite="fakesuite"
-		stateMachine.Opts.Arch="fake"
-		stateMachine.Opts.Subproject="fakeproject"
-		stateMachine.Opts.Subarch="fakearch"
+		stateMachine.Opts.Suite = "fakesuite"
+		stateMachine.Opts.Arch = "fake"
+		stateMachine.Opts.Subproject = "fakeproject"
+		stateMachine.Opts.Subarch = "fakearch"
 		stateMachine.Opts.WithProposed = true
 		stateMachine.Opts.ExtraPPAs = []string{"ppa:fake_user/fakeppa"}
 		stateMachine.Args.GadgetTree = "testdata/gadget_tree"

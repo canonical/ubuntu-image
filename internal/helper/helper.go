@@ -120,7 +120,11 @@ func RunLiveBuild(rootfs, arch string, env []string, enableCrossBuild bool) erro
 		return err
 	}
 
-	fmt.Println(lbBuild)
+	// create and run "lb build" command
+	lbBuild := *exec.Command("lb", "build")
+	lbBuild.Stdout = os.Stdout
+	lbBuild.Stderr = os.Stderr
+	lbBuild.Env = append(os.Environ(), env...)
 	if err := lbBuild.Run(); err != nil {
 		return err
 	}

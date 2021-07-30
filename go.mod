@@ -9,6 +9,7 @@ require (
 	github.com/canonical/tcglog-parser v0.0.0-20200908165021-12a3a7bcf5a1 // indirect
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/juju/ratelimit v1.0.1 // indirect

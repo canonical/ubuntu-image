@@ -46,9 +46,6 @@ type StateMachine struct {
 
 	// used to access image type specific variables from state functions
 	parent SmInterface
-
-	// used only for testing
-	tempLocation string // parent directory of temporary workdir
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
