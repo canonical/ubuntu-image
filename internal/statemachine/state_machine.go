@@ -48,6 +48,16 @@ type StateMachine struct {
 	parent SmInterface
 }
 
+// getStateNumberByName returns the numeric order of a state based on its name
+func (stateMachine *StateMachine) getStateNumberByName(name string) int {
+	for i, stateFunc := range stateMachine.states {
+		if name == stateFunc.name {
+			return i
+		}
+	}
+	return -1
+}
+
 // SetCommonOpts stores the common options for all image types in the struct
 func (stateMachine *StateMachine) SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts) {
 	stateMachine.commonFlags = commonOpts

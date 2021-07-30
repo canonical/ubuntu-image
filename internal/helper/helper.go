@@ -57,78 +57,50 @@ func getQemuStaticForArch(arch string) string {
 	return ""
 }
 
-// RunLiveBuild creates and executes the live build commands used in classic images
-func RunLiveBuild(rootfs, arch string, env []string, enableCrossBuild bool) error {
+// SetupLiveBuildCommands creates the live build commands used in classic images
+func SetupLiveBuildCommands(rootfs, arch string, env []string, enableCrossBuild bool) (lbConfig, lbBuild exec.Cmd, err error) {
+
+	lbConfig = *exec.Command("lb", "config")
+	lbBuild = *exec.Command("lb", "build")
+
+	lbConfig.Stdout = os.Stdout
+	lbConfig.Stderr = os.Stderr
+	lbConfig.Env = append(os.Environ(), env...)
+	lbBuild.Stdout = os.Stdout
+	lbBuild.Stderr = os.Stderr
+	lbBuild.Env = append(os.Environ(), env...)
+
 	autoSrc := os.Getenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH")
 	if autoSrc == "" {
 		dpkgArgs := "dpkg -L livecd-rootfs | grep \"auto$\""
 		dpkgCommand := *exec.Command("bash", "-c", dpkgArgs)
 		dpkgBytes, err := dpkgCommand.Output()
 		if err != nil {
-			return err
+			return lbConfig, lbBuild, err
 		}
 		autoSrc = strings.TrimSpace(string(dpkgBytes))
 	}
 	autoDst := rootfs + "/auto"
 	if err := osutil.CopySpecialFile(autoSrc, autoDst); err != nil {
-		return fmt.Errorf("Error copying livecd-rootfs/auto: %s", err.Error())
+		return lbConfig, lbBuild, fmt.Errorf("Error copying livecd-rootfs/auto: %s", err.Error())
 	}
-
-	saveCWD := SaveCWD()
-	defer saveCWD()
-	os.Chdir(rootfs)
-
-	// set up "lb config" and "lb build" commands
-	lbConfig := *exec.Command("sudo")
-	lbBuild := *exec.Command("sudo")
-
-	lbConfig.Env = append(os.Environ(), env...)
-	lbConfig.Args = append(lbConfig.Args, env...)
-	lbConfig.Args = append(lbConfig.Args, []string{"lb", "config"}...)
-	lbConfig.Stdout = os.Stdout
-	lbConfig.Stderr = os.Stderr
-
-	lbBuild.Env = append(os.Environ(), env...)
-	lbBuild.Args = append(lbBuild.Args, env...)
-	lbBuild.Args = append(lbBuild.Args, []string{"lb", "build"}...)
-	lbBuild.Stdout = os.Stdout
-	lbBuild.Stderr = os.Stderr
 
 	if arch != GetHostArch() && enableCrossBuild {
 		// For cases where we want to cross-build, we need to pass
 		// additional options to live-build with the arch to use and path
 		// to the qemu static
-		var qemuPath string
-		qemuPath = os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
-		if qemuPath == "" {
-			static := getQemuStaticForArch(arch)
-			tmpQemuPath, err := exec.LookPath(static)
-			if err != nil {
-				return fmt.Errorf("Use UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in " +
-					"case of non-standard archs or custom paths")
-			}
-			qemuPath = tmpQemuPath
+		qemuPath := os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
+		static := getQemuStaticForArch(arch)
+		qemuPath, err := exec.LookPath(static)
+		if err != nil {
+			return lbConfig, lbBuild, fmt.Errorf("Use " +
+				"UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in case " +
+				"of non-standard archs or custom paths")
 		}
-		qemuArgs := []string{"--bootstrap-qemu-arch", arch, "--bootstrap-qemu-static",
-			qemuPath, "--architectures", arch}
-		lbConfig.Args = append(lbConfig.Args, qemuArgs...)
+		lbConfig.Args = append(lbConfig.Args, []string{"--bootstrap-qemu-arch", arch, "--bootstrap-qemu-static", qemuPath, "--architectures", arch}...)
 	}
 
-	// now run the "lb config" and "lb build" commands
-	fmt.Println(lbConfig)
-	if err := lbConfig.Run(); err != nil {
-		return err
-	}
-
-	// create and run "lb build" command
-	lbBuild := *exec.Command("lb", "build")
-	lbBuild.Stdout = os.Stdout
-	lbBuild.Stderr = os.Stderr
-	lbBuild.Env = append(os.Environ(), env...)
-	if err := lbBuild.Run(); err != nil {
-		return err
-	}
-	return nil
+	return lbConfig, lbBuild, nil
 }
 
 // GetHostSuite checks the release name of the host system to use as a default if --suite is not passed
