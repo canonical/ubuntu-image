@@ -2,7 +2,6 @@ package statemachine
 
 import (
 	"fmt"
-	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -18,8 +17,8 @@ import (
 var testDir = "ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"
 
 // mockReadDir is used to mock calls to ioutil.ReadDir
-var mockReadDir = func(dirname string) ([]fs.FileInfo, error) {
-	return []fs.FileInfo{}, fmt.Errorf("Test Error")
+var mockReadDir = func(dirname string) (interface{}, error) {
+	return nil, fmt.Errorf("Test Error")
 }
 
 // mockReadFile is used to mock calls to ioutil.ReadFile
@@ -28,7 +27,7 @@ var mockReadFile = func(filename string) ([]byte, error) {
 }
 
 // mockMkdir is used to mock calls to os.Mkdir and os.MkdirAll
-var mockMkdir = func(path string, mode fs.FileMode) error {
+var mockMkdir = func(path string, mode os.FileMode) error {
 	return fmt.Errorf("Test Error")
 }
 

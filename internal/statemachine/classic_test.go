@@ -109,7 +109,7 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 		stateMachine.parent = &stateMachine
 
 		failFuncs := []interface{}{osMkdirAll, ioutilReadDir, osutilCopySpecialFile}
-		for _, failFunc := range(failFuncs) {
+		for _, failFunc := range failFuncs {
 			// replace the function with a new function that just returns an error
 			origFunc := failFunc
 			failFunc = func() error { return fmt.Errorf("Test Error") }
@@ -160,7 +160,7 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.parent = &stateMachine
 
 		failFuncs := []interface{}{ioutilReadDir, osutilCopySpecialFile, ioutilReadFile, regexpCompile}
-		for _, failFunc := range(failFuncs) {
+		for _, failFunc := range failFuncs {
 			// replace the function with a new function that just returns an error
 			origFunc := failFunc
 			failFunc = func() error { return fmt.Errorf("Test Error") }
