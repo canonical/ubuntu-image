@@ -157,18 +157,3 @@ func Du(path string) (float64, error) {
 	})
 	return size, err
 }
-
-func GetFunctionSignature(function interface{}) reflect.Type {
-	functionType := reflect.TypeOf(function)
-
-	var in []reflect.Type
-	var out []reflect.Type
-	for ii := 0; ii < functionType.NumIn(); ii++ {
-		in = append(in, functionType.In(ii))
-	}
-	for ii := 0; ii < functionType.NumOut(); ii++ {
-		out = append(out, functionType.Out(ii))
-	}
-
-	return reflect.FuncOf(in, out, false)
-}

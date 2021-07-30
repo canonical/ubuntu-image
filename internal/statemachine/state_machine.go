@@ -245,15 +245,15 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 		// It's okay for hooks-directory.d to not exist, but if it does exist run all the scripts in it
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error reading hooks directory: %s", err.Error())
-		} else {
-			for _, hookScript := range hookScripts {
-				hookScriptPath := filepath.Join(hooksDirectoryd, hookScript.Name())
-				if stateMachine.commonFlags.Debug {
-					fmt.Printf("Running hook script: %s\n", hookScriptPath)
-				}
-				if err := helper.RunScript(hookScriptPath); err != nil {
-					return err
-				}
+		}
+
+		for _, hookScript := range hookScripts {
+			hookScriptPath := filepath.Join(hooksDirectoryd, hookScript.Name())
+			if stateMachine.commonFlags.Debug {
+				fmt.Printf("Running hook script: %s\n", hookScriptPath)
+			}
+			if err := helper.RunScript(hookScriptPath); err != nil {
+				return err
 			}
 		}
 
