@@ -1,11 +1,13 @@
+// This test file tests a successful snap run and success/error scenarios for all states
+// that are specific to the snap builds
 package statemachine
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/snapcore/snapd/osutil"
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
@@ -96,7 +98,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 }
 
 // TestFailedPrepareImage tests a failure in the call to image.Prepare. This is easy to achieve
-// attempting to use --disable-console-conf with a core20 image
+// by attempting to use --disable-console-conf with a core20 image
 func TestFailedPrepareImage(t *testing.T) {
 	t.Run("test_failed_prepare_image", func(t *testing.T) {
 		saveCWD := helper.SaveCWD()
@@ -121,10 +123,56 @@ func TestFailedPrepareImage(t *testing.T) {
 	})
 }
 
-// TestFailedLoadGadgetYamlSnap tests a failure in the loadGadgetYaml state while building
-// a snap image. This is achieved by providing an invalid gadget.yaml
-func TestFailedLoadGadgetYamlSnap(t *testing.T) {
-	t.Run("test_failed_load_gadget_yaml", func(t *testing.T) {
+// TestPopulateSnapRootfsContents runs the state machine through populate_rootfs_contents and examines
+// the rootfs to ensure at least some of the correct file are in place
+func TestPopulateSnapRootfsContents(t *testing.T) {
+	testCases := []struct {
+		name           string
+		modelAssertion string
+		fileList       []string
+	}{
+		{"core18", filepath.Join("testdata", "modelAssertion18"), []string{filepath.Join("system-data", "var", "lib", "snapd", "seed", "snaps"), filepath.Join("system-data", "var", "lib", "snapd", "seed", "assertions", "model"), filepath.Join("system-data", "var", "lib", "snapd", "seed", "seed.yaml"), filepath.Join("system-data", "var", "lib", "snapd", "seed", "snaps")}},
+		{"core20", filepath.Join("testdata", "modelAssertion20"), []string{"systems", "snaps", filepath.Join("EFI", "boot"), filepath.Join("EFI", "ubuntu", "grubenv"), filepath.Join("EFI", "ubuntu", "grub.cfg")}},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine SnapStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.Args.ModelAssertion = tc.modelAssertion
+			stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
+
+			if err := stateMachine.Setup(); err != nil {
+				t.Errorf("Did not expect an error, got %s\n", err.Error())
+			}
+
+			if err := stateMachine.Run(); err != nil {
+				t.Errorf("Did not expect an error, got %s\n", err.Error())
+			}
+
+			// check the files before Teardown
+			for _, file := range tc.fileList {
+				_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
+				if err != nil {
+					if os.IsNotExist(err) {
+						t.Errorf("File %s should exist, but does not", file)
+					}
+				}
+			}
+
+			if err := stateMachine.Teardown(); err != nil {
+				t.Errorf("Did not expect an error, got %s\n", err.Error())
+			}
+		})
+	}
+}
+
+// TestFailedPopulateSnapRootfsContents tests a failure in the PopulateRootfsContents state
+// while building a snap image. This is achieved by deleting the unpack dir
+func TestFailedPopulateSnapRootfsContents(t *testing.T) {
+	t.Run("test_failed_populate_snap_rootfs_contents", func(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -136,16 +184,16 @@ func TestFailedLoadGadgetYamlSnap(t *testing.T) {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
 
-		stateNum := stateMachine.getStateNumberByName("prepare_image")
+		stateNum := stateMachine.getStateNumberByName("load_gadget_yaml")
 		oldFunc := stateMachine.states[stateNum]
 		defer func() {
 			stateMachine.states[stateNum] = oldFunc
 		}()
 		stateMachine.states[stateNum] = stateFunc{
-			"skip_image", func(*StateMachine) error {
-				invalidGadgetYaml := filepath.Join("testdata",
-					"gadget_tree_invalid", "meta", "gadget.yaml")
-				osutil.CopyFile(invalidGadgetYaml, stateMachine.yamlFilePath, osutil.CopyFlagDefault)
+			"delete_unpack", func(*StateMachine) error {
+				// still run load_gadget_yaml to avoid nil pointer exception
+				oldFunc.function(&stateMachine.StateMachine)
+				os.RemoveAll(stateMachine.tempDirs.unpack)
 				return nil
 			},
 		}

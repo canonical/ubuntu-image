@@ -5,11 +5,26 @@ package statemachine
 import (
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"regexp"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/inhies/go-bytesize"
 	"github.com/snapcore/snapd/gadget"
+	"github.com/snapcore/snapd/osutil"
 )
+
+// define some functions that can be mocked by test cases
+var ioutilReadDir = ioutil.ReadDir
+var ioutilReadFile = ioutil.ReadFile
+var osMkdir = os.Mkdir
+var osMkdirAll = os.MkdirAll
+var osutilCopyFile = osutil.CopyFile
+var osutilCopySpecialFile = osutil.CopySpecialFile
+var regexpCompile = regexp.Compile
 
 // SmInterface allows different image types to implement their own setup/run/teardown functions
 type SmInterface interface {
@@ -37,6 +52,8 @@ type StateMachine struct {
 	CurrentStep  string // tracks the current progress of the state machine
 	StepsTaken   int    // counts the number of steps taken
 	yamlFilePath string // the location for the yaml file
+	hooksAllowed bool   // core 20 images can't run hooks
+	rootfsSize   bytesize.ByteSize
 	tempDirs     temporaryDirectories
 
 	// The flags that were passed in on the command line
@@ -63,7 +80,8 @@ func (stateMachine *StateMachine) getStateNumberByName(name string) int {
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
-func (stateMachine *StateMachine) SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts) {
+func (stateMachine *StateMachine) SetCommonOpts(commonOpts *commands.CommonOpts,
+	stateMachineOpts *commands.StateMachineOpts) {
 	stateMachine.commonFlags = commonOpts
 	stateMachine.stateMachineFlags = stateMachineOpts
 }
@@ -110,7 +128,8 @@ func (stateMachine *StateMachine) readMetadata() error {
 	if stateMachine.stateMachineFlags.Resume {
 		// open the ubuntu-image.gob file and determine the state
 		var partialStateMachine = new(StateMachine)
-		gobfile, err := os.Open(stateMachine.stateMachineFlags.WorkDir + "/ubuntu-image.gob")
+		gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
+		gobfile, err := os.Open(gobfilePath)
 		if err != nil {
 			return fmt.Errorf("error reading metadata file: %s", err.Error())
 		}
@@ -132,9 +151,10 @@ func (stateMachine *StateMachine) readMetadata() error {
 // writeMetadata writes the state machine info to disk. This will be used when resuming a
 // partial state machine run
 func (stateMachine *StateMachine) writeMetadata() error {
-	gobfile, err := os.OpenFile(stateMachine.stateMachineFlags.WorkDir+"/ubuntu-image.gob", os.O_CREATE|os.O_WRONLY, 0644)
+	gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
+	gobfile, err := os.OpenFile(gobfilePath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("error opening metadata file for writing: %s", stateMachine.stateMachineFlags.WorkDir+"/ubuntu-image.gob")
+		return fmt.Errorf("error opening metadata file for writing: %s", gobfilePath)
 	}
 	defer gobfile.Close()
 	enc := gob.NewEncoder(gobfile)
@@ -165,7 +185,6 @@ func (stateMachine *StateMachine) Run() error {
 		if stateMachine.commonFlags.Debug {
 			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
 		}
-		//stateMachine.CurrentStep = stateName
 		if err := stateFunc.function(stateMachine); err != nil {
 			// clean up work dir on error
 			stateMachine.cleanup()
@@ -184,6 +203,69 @@ func (stateMachine *StateMachine) Teardown() error {
 	if !stateMachine.cleanWorkDir {
 		if err := stateMachine.writeMetadata(); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// processCloudInit handles the --cloud-init flag
+func (stateMachine *StateMachine) processCloudInit() error {
+	if stateMachine.commonFlags.CloudInit != "" {
+		seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
+		cloudDir := filepath.Join(seedDir, "nocloud-net")
+		if err := osMkdirAll(cloudDir, 0755); err != nil {
+			return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
+		}
+		metadataFile := filepath.Join(cloudDir, "meta-data")
+		metadataIO, err := os.OpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
+		}
+		metadataIO.Write([]byte("instance-id: nocloud-static"))
+		metadataIO.Close()
+
+		userdataFile := filepath.Join(cloudDir, "user-data")
+		err = osutilCopyFile(stateMachine.commonFlags.CloudInit,
+			userdataFile, osutil.CopyFlagDefault)
+		if err != nil {
+			return fmt.Errorf("Error copying cloud-init: %s", err.Error())
+		}
+	}
+	return nil
+}
+
+// runHooks reads through the --hooks-directory flags and calls a helper function to execute the scripts
+func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) error {
+	os.Setenv(envKey, envVal)
+	for _, hooksDir := range stateMachine.commonFlags.HooksDirectories {
+		hooksDirectoryd := filepath.Join(hooksDir, hookName+".d")
+		hookScripts, err := ioutil.ReadDir(hooksDirectoryd)
+
+		// It's okay for hooks-directory.d to not exist, but if it does exist run all the scripts in it
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("Error reading hooks directory: %s", err.Error())
+		} else {
+			for _, hookScript := range hookScripts {
+				hookScriptPath := filepath.Join(hooksDirectoryd, hookScript.Name())
+				if stateMachine.commonFlags.Debug {
+					fmt.Printf("Running hook script: %s\n", hookScriptPath)
+				}
+				if err := helper.RunScript(hookScriptPath); err != nil {
+					return err
+				}
+			}
+		}
+
+		// if hookName exists in the hook directory, run it
+		hookScript := filepath.Join(hooksDir, hookName)
+		_, err = os.Stat(hookScript)
+		if err == nil {
+			if stateMachine.commonFlags.Debug {
+				fmt.Printf("Running hook script: %s\n", hookScript)
+			}
+			if err := helper.RunScript(hookScript); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

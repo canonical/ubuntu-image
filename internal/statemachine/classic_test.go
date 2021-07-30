@@ -1,7 +1,12 @@
+// This test file tests a successful classic run and success/error scenarios for all states
+// that are specific to the classic builds
 package statemachine
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -96,6 +101,30 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	})
 }
 
+// TestFailedPrepareGadgetTree tests failures in os, osutil, and ioutil libraries
+func TestFailedPrepareGadgetTree(t *testing.T) {
+	t.Run("test_failed_prepare_gadget_tree", func(t *testing.T) {
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		failFuncs := []interface{}{osMkdirAll, ioutilReadDir, osutilCopySpecialFile}
+		for _, failFunc := range(failFuncs) {
+			// replace the function with a new function that just returns an error
+			origFunc := failFunc
+			failFunc = func() error { return fmt.Errorf("Test Error") }
+
+			if err := stateMachine.prepareGadgetTree(); err == nil {
+				t.Error("Expected an error, but got none")
+			}
+			// restore the function
+			failFunc = origFunc
+		}
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
 // TestFailedRunLiveBuild tests the scenario where calls to live build fail.
 // this is accomplished by passing invalid arguments to live-build
 func TestFailedRunLiveBuild(t *testing.T) {
@@ -105,6 +134,7 @@ func TestFailedRunLiveBuild(t *testing.T) {
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "fakesuite"
 		stateMachine.Opts.Arch = "fake"
@@ -114,43 +144,95 @@ func TestFailedRunLiveBuild(t *testing.T) {
 		stateMachine.Opts.ExtraPPAs = []string{"ppa:fake_user/fakeppa"}
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
-
-		if err := stateMachine.Run(); err == nil {
+		if err := stateMachine.runLiveBuild(); err == nil {
 			t.Error("Expected an error but there was none")
 		}
 
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
-// TestFailedLoadGadgetYamlClassic tests a failure in the loadGadgetYaml state while building
-// a classic image. This is achieved by using an invalid gadget.yaml file
-func TestFailedLoadGadgetYamlClassic(t *testing.T) {
-	t.Run("test_failed_load_gadget_yaml", func(t *testing.T) {
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
+// TestFailedPopulateClassicRootfsContents tests failures in the PopulateRootfsContents state
+func TestFailedPopulateClassicRootfsContents(t *testing.T) {
+	t.Run("test_failed_populate_classic_rootfs_contents", func(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Opts.Project = "ubuntu-cpc"
-		stateMachine.Opts.Suite = "focal"
-		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree_invalid")
+		stateMachine.parent = &stateMachine
 
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		failFuncs := []interface{}{ioutilReadDir, osutilCopySpecialFile, ioutilReadFile, regexpCompile}
+		for _, failFunc := range(failFuncs) {
+			// replace the function with a new function that just returns an error
+			origFunc := failFunc
+			failFunc = func() error { return fmt.Errorf("Test Error") }
+
+			if err := stateMachine.prepareGadgetTree(); err == nil {
+				t.Error("Expected an error, but got none")
+			}
+			// restore the function
+			failFunc = origFunc
 		}
 
-		if err := stateMachine.Run(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
-
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}
+
+// TestPopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
+// the rootfs to ensure at least some of the correct file are in place
+func TestPopulateClassicRootfsContents(t *testing.T) {
+	testCases := []struct {
+		name     string
+		suite    string
+		fileList []string
+	}{
+		{"focal", "focal", []string{filepath.Join("etc", "shadow"), filepath.Join("boot", "vmlinuz"), filepath.Join("var", "lib")}},
+		{"impish", "impish", []string{filepath.Join("etc", "systemd"), filepath.Join("boot", "grub"), filepath.Join("usr", "lib")}},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.Opts.Project = "ubuntu-cpc"
+			stateMachine.Opts.Suite = tc.suite
+			stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+			stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
+
+			if err := stateMachine.Setup(); err != nil {
+				t.Errorf("Did not expect an error, got %s\n", err.Error())
+			}
+
+			if err := stateMachine.Run(); err != nil {
+				t.Errorf("Did not expect an error, got %s\n", err.Error())
+			}
+
+			// check the files before Teardown
+			for _, file := range tc.fileList {
+				_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
+				if err != nil {
+					if os.IsNotExist(err) {
+						t.Errorf("File %s should exist, but does not", file)
+					}
+				}
+			}
+
+			// check /etc/fstab contents to test the regex part
+			fstab, err := ioutilReadFile(filepath.Join(stateMachine.tempDirs.rootfs,
+				"etc", "fstab"))
+			if err != nil {
+				t.Errorf("Error reading fstab to check regex")
+			}
+			correctLabel := "LABEL=writable"
+			if !strings.Contains(string(fstab), correctLabel) {
+				t.Errorf("Expected fstab contents %s to contain %s",
+					string(fstab), correctLabel)
+			}
+
+			if err := stateMachine.Teardown(); err != nil {
+				t.Errorf("Did not expect an error, got %s\n", err.Error())
+			}
+		})
+	}
 }

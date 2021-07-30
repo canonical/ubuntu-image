@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
@@ -113,6 +115,19 @@ func RunLiveBuild(rootfs string, env []string, enableCrossBuild bool) error {
 	return nil
 }
 
+// RunScript sets up and runs the hookscript command
+func RunScript(hookScript string) error {
+	hookScriptCmd := exec.Command(hookScript)
+	hookScriptCmd.Env = os.Environ()
+	hookScriptCmd.Stdout = os.Stdout
+	hookScriptCmd.Stderr = os.Stderr
+	fmt.Println(hookScriptCmd)
+	if err := hookScriptCmd.Run(); err != nil {
+		return fmt.Errorf("Error running hook script %s: %s", hookScript, err.Error())
+	}
+	return nil
+}
+
 // GetHostSuite checks the release name of the host system to use as a default if --suite is not passed
 func GetHostSuite() string {
 	cmd := exec.Command("lsb_release", "-c", "-s")
@@ -126,4 +141,34 @@ func SaveCWD() func() {
 	return func() {
 		os.Chdir(wd)
 	}
+}
+
+// Du recurses through a directory similar to du and adds all the sizes of files together
+func Du(path string) (float64, error) {
+	var size float64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += float64(info.Size())
+		}
+		return err
+	})
+	return size, err
+}
+
+func GetFunctionSignature(function interface{}) reflect.Type {
+	functionType := reflect.TypeOf(function)
+
+	var in []reflect.Type
+	var out []reflect.Type
+	for ii := 0; ii < functionType.NumIn(); ii++ {
+		in = append(in, functionType.In(ii))
+	}
+	for ii := 0; ii < functionType.NumOut(); ii++ {
+		out = append(out, functionType.Out(ii))
+	}
+
+	return reflect.FuncOf(in, out, false)
 }

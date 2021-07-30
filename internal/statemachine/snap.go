@@ -9,7 +9,7 @@ var snapStates = []stateFunc{
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
 	{"prepare_image", (*StateMachine).prepareImage},
 	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
-	{"populate_rootfs_contents", (*StateMachine).populateRootfsContents},
+	{"populate_rootfs_contents", (*StateMachine).populateSnapRootfsContents},
 	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
 	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
@@ -47,6 +47,6 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 		return err
 	}
 
-	// TODO: is there any validation specific to snap images?
+	snapStateMachine.hooksAllowed = true
 	return nil
 }

@@ -2,38 +2,37 @@ package statemachine
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/snapcore/snapd/osutil"
 )
 
 // Prepare the gadget tree
 func (stateMachine *StateMachine) prepareGadgetTree() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
-	gadgetDir := classicStateMachine.tempDirs.unpack + "/gadget"
-	err := os.MkdirAll(gadgetDir, 0755)
+	gadgetDir := filepath.Join(classicStateMachine.tempDirs.unpack, "gadget")
+	err := osMkdirAll(gadgetDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("Error creating unpack directory: %s", err.Error())
 	}
 	// recursively copy the gadget tree to unpack/gadget
-	files, err := ioutil.ReadDir(classicStateMachine.Args.GadgetTree)
+	files, err := ioutilReadDir(classicStateMachine.Args.GadgetTree)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 	}
 	for _, gadgetFile := range files {
-		srcFile := classicStateMachine.Args.GadgetTree + "/" + gadgetFile.Name()
-		if err := osutil.CopySpecialFile(srcFile, gadgetDir); err != nil {
+		srcFile := filepath.Join(classicStateMachine.Args.GadgetTree, gadgetFile.Name())
+		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
 			return fmt.Errorf("Error copying gadget tree: %s", err.Error())
 		}
 	}
 
 	// We assume the gadget tree was built from a gadget source tree using
 	// snapcraft prime so the gadget.yaml file is expected in the meta directory
-	classicStateMachine.yamlFilePath = gadgetDir + "/meta/gadget.yaml"
+	classicStateMachine.yamlFilePath = filepath.Join(gadgetDir, "meta", "gadget.yaml")
 
 	return nil
 }
@@ -69,10 +68,54 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 			env = append(env, "EXTRA_PPAS="+strings.Join(classicStateMachine.Opts.ExtraPPAs, " "))
 		}
 		env = append(env, "IMAGEFORMAT=none")
-		if err := helper.RunLiveBuild(classicStateMachine.tempDirs.rootfs, env, true); err != nil {
+		if err := helper.RunLiveBuild(classicStateMachine.tempDirs.unpack, env, true); err != nil {
 			return fmt.Errorf("error running live_build: %s", err.Error())
 		}
 	}
 
+	return nil
+}
+
+// populateClassicRootfsContents takes the results of `lb` commands and copies them over
+// to rootfs. It also changes fstab and handles the --cloud-init flag
+func (stateMachine *StateMachine) populateClassicRootfsContents() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	var src string
+	if classicStateMachine.Opts.Filesystem != "" {
+		src = classicStateMachine.Opts.Filesystem
+	} else {
+		src = filepath.Join(classicStateMachine.tempDirs.unpack, "chroot")
+	}
+
+	files, err := ioutilReadDir(src)
+	if err != nil {
+		return fmt.Errorf("Error reading unpack dir: %s", err.Error())
+	}
+
+	for _, srcFile := range files {
+		srcFile := filepath.Join(src, srcFile.Name())
+		if err := osutilCopySpecialFile(srcFile, classicStateMachine.tempDirs.rootfs); err != nil {
+			return fmt.Errorf("Error copying rootfs: %s", err.Error())
+		}
+	}
+
+	fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
+	fstabBytes, err := ioutilReadFile(fstabPath)
+	if err != nil {
+		return fmt.Errorf("Error opening fstab: %s", err.Error())
+	}
+
+	regex, err := regexpCompile("r'(LABEL=)+'")
+	if err != nil {
+		return err
+	}
+	//TODO: this doesn't actually handle the regex. fix
+	os.Stdout.Write(regex.ReplaceAll(fstabBytes, []byte("writable")))
+
+	if err := stateMachine.processCloudInit(); err != nil {
+		return err
+	}
 	return nil
 }
