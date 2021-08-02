@@ -52,6 +52,8 @@ func (stateMachine *StateMachine) examineLiveBuild() error {
 				return nil
 			}
 		}
+		// bootstrap-qemu-arch not found, fail test
+		return fmt.Errorf("Error: --bootstramp-qemu-arch not found in lb config args")
 	}
 	return nil
 }
