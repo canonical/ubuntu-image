@@ -71,7 +71,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 		}
 		env = append(env, "IMAGEFORMAT=none")
 
-		lbConfig, lbBuild, err := helper.SetupLiveBuildCommands(classicStateMachine.tempDirs.rootfs,
+		lbConfig, lbBuild, err := helper.SetupLiveBuildCommands(classicStateMachine.tempDirs.unpack,
 			arch, env, true)
 		if err != nil {
 			return fmt.Errorf("error setting up live_build: %s", err.Error())
@@ -80,7 +80,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 		// now run the "lb config" and "lb build" commands
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
-		os.Chdir(stateMachine.tempDirs.rootfs)
+		os.Chdir(stateMachine.tempDirs.unpack)
 
 		if err := lbConfig.Run(); err != nil {
 			return err
@@ -109,7 +109,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 
 	files, err := ioutilReadDir(src)
 	if err != nil {
-		return fmt.Errorf("Error reading unpack dir: %s", err.Error())
+		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
 	}
 
 	for _, srcFile := range files {
