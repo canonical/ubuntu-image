@@ -44,6 +44,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 	if classicStateMachine.Opts.Filesystem == "" {
 		// --filesystem was not provided, so we use live-build to create one
 		var env []string
+		var arch string
 		env = append(env, "PROJECT="+classicStateMachine.Opts.Project)
 		if classicStateMachine.Opts.Suite != "" {
 			env = append(env, "SUITE="+classicStateMachine.Opts.Suite)
@@ -51,10 +52,11 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 			env = append(env, "SUITE="+helper.GetHostSuite())
 		}
 		if classicStateMachine.Opts.Arch == "" {
-			env = append(env, "ARCH="+helper.GetHostArch())
+			arch = helper.GetHostArch()
 		} else {
-			env = append(env, "ARCH="+classicStateMachine.Opts.Arch)
+			arch = classicStateMachine.Opts.Arch
 		}
+		env = append(env, "ARCH="+arch)
 		if classicStateMachine.Opts.Subproject != "" {
 			env = append(env, "SUBPROJECT="+classicStateMachine.Opts.Subproject)
 		}
@@ -68,8 +70,24 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 			env = append(env, "EXTRA_PPAS="+strings.Join(classicStateMachine.Opts.ExtraPPAs, " "))
 		}
 		env = append(env, "IMAGEFORMAT=none")
-		if err := helper.RunLiveBuild(classicStateMachine.tempDirs.unpack, env, true); err != nil {
-			return fmt.Errorf("error running live_build: %s", err.Error())
+
+		lbConfig, lbBuild, err := helper.SetupLiveBuildCommands(classicStateMachine.tempDirs.rootfs,
+			arch, env, true)
+		if err != nil {
+			return fmt.Errorf("error setting up live_build: %s", err.Error())
+		}
+
+		// now run the "lb config" and "lb build" commands
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+		os.Chdir(stateMachine.tempDirs.rootfs)
+
+		if err := lbConfig.Run(); err != nil {
+			return err
+		}
+
+		if err := lbBuild.Run(); err != nil {
+			return err
 		}
 	}
 
