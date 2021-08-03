@@ -98,6 +98,8 @@ model_assertion
 --disable-console-conf
     Disable console-conf on the resulting image.
 
+--factory-image
+    Hint that the image is meant to boot in a device factory.
 
 Classic command options
 -----------------------
@@ -110,12 +112,7 @@ GADGET_TREE_URI
     argument must be given for this mode of operation.  Must be a local path.
 
 -p PROJECT, --project PROJECT
-    Project name to be passed on to ``livecd-rootfs``. Mutually exclusive
-    with --filesystem
-
--f FILESYSTEM, --filesystem FILESYSTEM
-    Unpacked Ubuntu filesystem to be copied to the system partition.
-    Mutually exclusive with --project.
+    Project name to be passed on to ``livecd-rootfs``.
 
 -s SUITE, --suite SUITE
     Distribution name to be passed on to ``livecd-rootfs``.

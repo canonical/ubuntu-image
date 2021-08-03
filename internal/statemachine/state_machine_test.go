@@ -66,6 +66,7 @@ func TestCleanup(t *testing.T) {
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Run()
+		stateMachine.Teardown()
 		if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err == nil {
 			t.Errorf("Error: temporary workdir %s was not cleaned up\n", stateMachine.stateMachineFlags.WorkDir)
 		}
@@ -273,11 +274,6 @@ func TestFunctionErrors(t *testing.T) {
 		{"error_state_func", 0, stateFunc{"test_error_state_func", func(stateMachine *StateMachine) error { return fmt.Errorf("Test Error") }}},
 		{"error_write_metadata", 13, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-			return nil
-		}}},
-		{"error_cleanup", 12, stateFunc{"test_error_cleanup", func(stateMachine *StateMachine) error {
-			stateMachine.cleanWorkDir = true
-			stateMachine.stateMachineFlags.WorkDir = "."
 			return nil
 		}}},
 	}
