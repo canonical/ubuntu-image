@@ -118,12 +118,7 @@ func (stateMachine *StateMachine) generateManifest() error {
 	return nil
 }
 
-// Clean up and organize files
+// Finish step to show that the build was successful
 func (stateMachine *StateMachine) finish() error {
-	if stateMachine.cleanWorkDir {
-		if err := stateMachine.cleanup(); err != nil {
-			return err
-		}
-	}
 	return nil
 }

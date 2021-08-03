@@ -1,7 +1,10 @@
 package statemachine
 
 import (
+	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -44,7 +47,7 @@ func TestFailedReadMetadataSnap(t *testing.T) {
 	})
 }
 
-// TestSuccessfulSnapCore20 builds a core 20 image with no special options
+// TestSuccessfulSnapCore20 builds a core 20 image and makes sure the factory boot flag is set
 func TestSuccessfulSnapCore20(t *testing.T) {
 	t.Run("test_successful_snap_run", func(t *testing.T) {
 		saveCWD := helper.SaveCWD()
@@ -53,6 +56,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
+		stateMachine.Opts.FactoryImage = true
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -60,6 +64,18 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 
 		if err := stateMachine.Run(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+
+		// make sure the "factory" boot flag was set
+		grubenvFile := filepath.Join(stateMachine.tempDirs.unpack,
+			"system-seed", "EFI", "ubuntu", "grubenv")
+		grubenvBytes, err := ioutil.ReadFile(grubenvFile)
+		if err != nil {
+			t.Errorf("Failed to read file %s: %s", grubenvFile, err.Error())
+		}
+
+		if !strings.Contains(string(grubenvBytes), "snapd_boot_flags=factory") {
+			t.Errorf("grubenv file does not have factory boot flag set")
 		}
 
 		if err := stateMachine.Teardown(); err != nil {
@@ -80,6 +96,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		stateMachine.Opts.Channel = "stable"
 		stateMachine.Opts.Snaps = []string{"hello-world"}
 		stateMachine.Opts.DisableConsoleConf = true
+		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -87,6 +104,14 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 
 		if err := stateMachine.Run(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+
+		// make sure cloud-init user-data was placed correctly
+		userDataPath := filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "var", "lib", "cloud", "seed", "nocloud-net", "user-data")
+		_, err := os.Stat(userDataPath)
+		if err != nil {
+			t.Errorf("cloud-init user-data file %s does not exist", userDataPath)
 		}
 
 		if err := stateMachine.Teardown(); err != nil {
