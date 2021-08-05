@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 )
 
@@ -90,13 +91,16 @@ func SetupLiveBuildCommands(rootfs, arch string, env []string, enableCrossBuild 
 		// For cases where we want to cross-build, we need to pass
 		// additional options to live-build with the arch to use and path
 		// to the qemu static
-		qemuPath := os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
-		static := getQemuStaticForArch(arch)
-		qemuPath, err := exec.LookPath(static)
-		if err != nil {
-			return lbConfig, lbBuild, fmt.Errorf("Use " +
-				"UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in case " +
-				"of non-standard archs or custom paths")
+		var qemuPath string
+		qemuPath = os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
+		if qemuPath == "" {
+			static := getQemuStaticForArch(arch)
+			qemuPath, err = exec.LookPath(static)
+			if err != nil {
+				return lbConfig, lbBuild, fmt.Errorf("Use " +
+					"UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in case " +
+					"of non-standard archs or custom paths")
+			}
 		}
 		lbConfig.Args = append(lbConfig.Args, []string{"--bootstrap-qemu-arch", arch, "--bootstrap-qemu-static", qemuPath, "--architectures", arch}...)
 	}
@@ -133,16 +137,24 @@ func SaveCWD() func() {
 }
 
 // Du recurses through a directory similar to du and adds all the sizes of files together
-func Du(path string) (float64, error) {
-	var size float64
+func Du(path string) (quantity.Size, error) {
+	var size quantity.Size = 0
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			size += float64(info.Size())
+			size += quantity.Size(info.Size())
 		}
 		return err
 	})
 	return size, err
+}
+
+// MaxOffset returns the maximum of two quantity.Offset types
+func MaxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
+	if offset1 > offset2 {
+		return offset1
+	}
+	return offset2
 }

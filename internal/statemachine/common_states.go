@@ -7,8 +7,8 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/google/uuid"
-	"github.com/inhies/go-bytesize"
 	"github.com/snapcore/snapd/gadget"
+	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 )
 
@@ -39,10 +39,11 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	return nil
 }
 
-// Load the gadget yaml passed in via command line
+// Load gadget.yaml, do some validation, and store the relevant info in the StateMachine struct
 func (stateMachine *StateMachine) loadGadgetYaml() error {
-	if err := osutilCopySpecialFile(stateMachine.yamlFilePath,
-		stateMachine.stateMachineFlags.WorkDir); err != nil {
+	gadgetYamlDst := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "gadget.yaml")
+	if err := osutilCopyFile(stateMachine.yamlFilePath,
+		gadgetYamlDst, osutil.CopyFlagOverwrite); err != nil {
 		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
 	}
 
@@ -57,27 +58,28 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
 	}
 
-	for volumeName := range stateMachine.gadgetInfo.Volumes {
-		volumeBaseDir := filepath.Join(stateMachine.tempDirs.volumes, volumeName)
-		if err := osMkdirAll(volumeBaseDir, 0755); err != nil {
-			return fmt.Errorf("Error creating volume dir: %s", err.Error())
-		}
-	}
-
 	// check if the unpack dir should be preserved
 	envar := os.Getenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
 	if envar != "" {
-		preserveDir := filepath.Join(envar, "unpack")
-		if err := osutilCopySpecialFile(stateMachine.tempDirs.unpack, preserveDir); err != nil {
+		err := osMkdirAll(envar, 0755)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating preserve_unpack directory: %s", err.Error())
+		}
+		if err := osutilCopySpecialFile(stateMachine.tempDirs.unpack, envar); err != nil {
 			return fmt.Errorf("Error preserving unpack dir: %s", err.Error())
 		}
 	}
+
+	if err := stateMachine.postProcessGadgetYaml(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // Run hooks for populating rootfs contents
 func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
-	if !stateMachine.hooksAllowed {
+	if !stateMachine.isSeeded {
 		if stateMachine.commonFlags.Debug {
 			fmt.Println("Building from a seeded gadget - " +
 				"skipping the post-populate-rootfs hook execution: unsupported")
@@ -123,14 +125,14 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	if err != nil {
 		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
 	}
-	rootfsBytes := bytesize.New(rootfsSize)
-	rootfsPadding, _ := bytesize.Parse("8MB")
-	rootfsBytes += rootfsPadding
+	var rootfsQuantity quantity.Size = rootfsSize
+	rootfsPadding := 8 * quantity.SizeMiB
+	rootfsQuantity += rootfsPadding
 
 	// fudge factor for incidentals
-	rootfsBytes += (rootfsBytes / 2)
+	rootfsQuantity += (rootfsQuantity / 2)
 
-	stateMachine.rootfsSize = rootfsBytes
+	stateMachine.rootfsSize = rootfsQuantity
 	return nil
 }
 
@@ -159,12 +161,7 @@ func (stateMachine *StateMachine) generateManifest() error {
 	return nil
 }
 
-// Clean up and organize files
+// Finish step to show that the build was successful
 func (stateMachine *StateMachine) finish() error {
-	if stateMachine.cleanWorkDir {
-		if err := stateMachine.cleanup(); err != nil {
-			return err
-		}
-	}
 	return nil
 }

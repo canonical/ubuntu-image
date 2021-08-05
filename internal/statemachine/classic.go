@@ -40,7 +40,6 @@ func (classicStateMachine *ClassicStateMachine) validateClassicInput() error {
 		return fmt.Errorf("project and filesystem are mutually exclusive")
 	}
 
-	classicStateMachine.hooksAllowed = true
 	return nil
 }
 

@@ -2,7 +2,6 @@ package statemachine
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -22,10 +21,16 @@ func (stateMachine *StateMachine) prepareImage() error {
 	if snapStateMachine.Opts.Channel != "" {
 		imageOpts.Channel = snapStateMachine.Opts.Channel
 	}
+
+	customizations := *new(image.Customizations)
 	if snapStateMachine.Opts.DisableConsoleConf {
-		customizations := image.Customizations{ConsoleConf: "disabled"}
-		imageOpts.Customizations = customizations
+		customizations.ConsoleConf = "disabled"
 	}
+	if snapStateMachine.Opts.FactoryImage {
+		customizations.BootFlags = append(customizations.BootFlags, "factory")
+	}
+	customizations.CloudInitUserData = stateMachine.commonFlags.CloudInit
+	imageOpts.Customizations = customizations
 
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
@@ -42,26 +47,17 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 // populateSnapRootfsContents uses a NewMountedFileSystemWriter to populate the rootfs
 func (stateMachine *StateMachine) populateSnapRootfsContents() error {
-	/*if self.disable_console_conf:
-	    # For now we just touch /var/lib/console-conf/complete to disable
-	    # console-conf on core images.
-	    cc_dir = os.path.join(dst, 'var', 'lib', 'console-conf')
-	    os.makedirs(cc_dir, exist_ok=True)
-	    Path(os.path.join(cc_dir, 'complete')).touch()
-	super().populate_rootfs_contents() */
-
 	isSeeded := false
 	for _, volume := range stateMachine.gadgetInfo.Volumes {
 		for _, structure := range volume.Structure {
 			if structure.Role == "system-seed" {
-				isSeeded = true
-				stateMachine.hooksAllowed = false
+				stateMachine.isSeeded = true
 			}
 		}
 	}
 
 	var src, dst string
-	if isSeeded {
+	if stateMachine.isSeeded {
 		// For now, since we only create the system-seed partition for
 		// uc20 images, we hard-code to use this path for the rootfs
 		// seed population.  In the future we might want to consider
@@ -79,7 +75,7 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 	}
 
 	// recursively copy the src to dst, skipping /boot for non-seeded images
-	files, err := ioutil.ReadDir(src)
+	files, err := ioutilReadDir(src)
 	if err != nil {
 		return fmt.Errorf("Error reading unpack dir: %s", err.Error())
 	}
@@ -93,9 +89,5 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 		}
 	}
 
-	// TODO: disable-console-conf places the "complete" file under _writable-defaults/var/lib.... Will that work?
-	if err := stateMachine.processCloudInit(); err != nil {
-		return err
-	}
 	return nil
 }

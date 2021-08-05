@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/osutil"
 )
 
 // Prepare the gadget tree
@@ -133,8 +134,27 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 		}
 	}
 
-	if err := stateMachine.processCloudInit(); err != nil {
-		return err
+	if classicStateMachine.commonFlags.CloudInit != "" {
+		seedDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
+		cloudDir := filepath.Join(seedDir, "nocloud-net")
+		err := osMkdirAll(cloudDir, 0756)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
+		}
+		metadataFile := filepath.Join(cloudDir, "meta-data")
+		metadataIO, err := osOpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
+		}
+		metadataIO.Write([]byte("instance-id: nocloud-static"))
+		metadataIO.Close()
+
+		userdataFile := filepath.Join(cloudDir, "user-data")
+		err = osutilCopyFile(classicStateMachine.commonFlags.CloudInit,
+			userdataFile, osutil.CopyFlagDefault)
+		if err != nil {
+			return fmt.Errorf("Error copying cloud-init: %s", err.Error())
+		}
 	}
 	return nil
 }
