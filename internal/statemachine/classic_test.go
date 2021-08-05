@@ -2,10 +2,15 @@ package statemachine
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/osutil"
 )
 
 // This is a helper function that we can use to examine the lb commands without running them
@@ -81,6 +86,7 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 			if err := stateMachine.Setup(); err == nil {
 				t.Error("Expected an error but there was none")
 			}
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
 }
@@ -100,6 +106,7 @@ func TestFailedValidateInputClassic(t *testing.T) {
 		if err := stateMachine.Setup(); err == nil {
 			t.Error("Expected an error but there was none")
 		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -118,6 +125,75 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 		if err := stateMachine.Setup(); err == nil {
 			t.Error("Expected an error but there was none")
 		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestPrepareGadgetTree runs prepareGadgetTree() and ensures the gadget_tree files
+// are placed in the correct locations
+func TestPrepareGadgetTree(t *testing.T) {
+	t.Run("test_prepare_gadget_tree", func(t *testing.T) {
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+		stateMachine.parent = &stateMachine
+
+		if err := stateMachine.prepareGadgetTree(); err != nil {
+			t.Errorf("Did not expect an error, but got %s", err.Error())
+		}
+		gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
+		for _, file := range gadgetTreeFiles {
+			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
+			if err != nil {
+				t.Errorf("File %s should be in unpack, but is missing", file)
+			}
+		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestFailedPrepareGadgetTree tests failures in os, osutil, and ioutil libraries
+func TestFailedPrepareGadgetTree(t *testing.T) {
+	t.Run("test_failed_prepare_gadget_tree", func(t *testing.T) {
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+		stateMachine.parent = &stateMachine
+
+		// mock os.Mkdir and test with and without a WorkDir
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		if err := stateMachine.prepareGadgetTree(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		// restore the function
+		osMkdirAll = os.MkdirAll
+
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		if err := stateMachine.prepareGadgetTree(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		// restore the function
+		ioutilReadDir = ioutil.ReadDir
+
+		// mock osutil.CopySpecialFile
+		osutilCopySpecialFile = mockCopySpecialFile
+		defer func() {
+			osutilCopySpecialFile = osutil.CopySpecialFile
+		}()
+		if err := stateMachine.prepareGadgetTree(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		// restore the function
+		osutilCopySpecialFile = osutil.CopySpecialFile
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -132,6 +208,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
+		stateMachine.parent = &stateMachine
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -144,6 +221,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		if err := stateMachine.Teardown(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -163,9 +241,9 @@ func TestSuccessfulClassicCrossArch(t *testing.T) {
 		} else {
 			stateMachine.Opts.Arch = "armhf"
 		}
-
 		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
 		stateMachine.stateMachineFlags.Thru = "run_live_build"
+		stateMachine.parent = &stateMachine
 
 		if err := stateMachine.Setup(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
@@ -182,41 +260,103 @@ func TestSuccessfulClassicCrossArch(t *testing.T) {
 		if err := stateMachine.Run(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
-
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
-// TestFailedRunLiveBuild tests the scenario where calls to live build fail.
-// this is accomplished by passing invalid arguments to live-build
-func TestFailedRunLiveBuild(t *testing.T) {
-	t.Run("test_successful_classic_run", func(t *testing.T) {
+// TestFailedLiveBuildCommands tests the scenario where calls to `lb` fail
+// this is accomplished by temporarily replacing lb on disk with a test script
+func TestFailedLiveBuildCommands(t *testing.T) {
+	testCases := []struct {
+		name       string
+		testScript string
+	}{
+		{"failed_lb_config", "lb_config_fail"},
+		{"failed_lb_build", "lb_build_fail"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_"+tc.name, func(t *testing.T) {
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.Opts.Project = "ubuntu-cpc"
+			stateMachine.Opts.Subproject = "fakeproject"
+			stateMachine.Opts.Subarch = "fakearch"
+			stateMachine.Opts.WithProposed = true
+			stateMachine.Opts.ExtraPPAs = []string{"ppa:fake_user/fakeppa"}
+			stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+			stateMachine.parent = &stateMachine
+
+			// TODO: write a helper function for "mv"
+			scriptPath := filepath.Join("testscripts", tc.testScript)
+			// save the original lb
+			whichLb := *exec.Command("which", "lb")
+			lbLocationBytes, _ := whichLb.Output()
+			lbLocation := strings.TrimSpace(string(lbLocationBytes))
+			// ensure the backup doesn't exist
+			os.Remove(lbLocation + ".bak")
+			err := osutil.CopyFile(lbLocation, lbLocation + ".bak", 0)
+			if err != nil {
+				t.Errorf("Failed back up lb: %s", err.Error())
+			}
+
+			// copy testscript to lb
+			os.Remove(lbLocation)
+			err = osutil.CopyFile(scriptPath, lbLocation, 0)
+			if err != nil {
+				t.Errorf("Failed to copy testscript %s: %s", tc.testScript, err.Error())
+			}
+			defer func() {
+				os.Remove(lbLocation)
+				osutil.CopyFile(lbLocation + ".bak", lbLocation, 0)
+			}()
+
+			// need workdir set up for this
+			if err := stateMachine.makeTemporaryDirectories(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+
+			// also need unpack set up
+			if err := os.Mkdir(stateMachine.tempDirs.unpack, 0755); err != nil {
+				t.Error("Failed to create unpack directory")
+			}
+			if err := stateMachine.runLiveBuild(); err == nil {
+				t.Error("Expected an error but there was none")
+			}
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		})
+	}
+}
+
+// TestNoStatic tests that the helper function to prepare lb commands
+// returns an error if the qemu-static binary is missing. This is accomplished
+// by passing an architecture for which there is no qemu-static binary
+func TestNoStatic(t *testing.T) {
+	t.Run("test_no_qemu_static", func(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
-		stateMachine.Opts.Suite = "fakesuite"
-		stateMachine.Opts.Arch = "fake"
-		stateMachine.Opts.Subproject = "fakeproject"
-		stateMachine.Opts.Subarch = "fakearch"
-		stateMachine.Opts.WithProposed = true
-		stateMachine.Opts.ExtraPPAs = []string{"ppa:fake_user/fakeppa"}
-		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
+		stateMachine.Opts.Arch = "fakearch"
+		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+		stateMachine.parent = &stateMachine
 
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
 		}
 
-		if err := stateMachine.Run(); err == nil {
+		// also need unpack set up
+		if err := os.Mkdir(stateMachine.tempDirs.unpack, 0755); err != nil {
+			t.Error("Failed to create unpack directory")
+		}
+		if err := stateMachine.runLiveBuild(); err == nil {
 			t.Error("Expected an error but there was none")
 		}
-
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

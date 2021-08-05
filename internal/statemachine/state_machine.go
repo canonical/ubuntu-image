@@ -5,10 +5,22 @@ package statemachine
 import (
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/snapcore/snapd/osutil"
 )
+
+// define some functions that can be mocked by test cases
+var ioutilReadDir = ioutil.ReadDir
+var ioutilReadFile = ioutil.ReadFile
+var ioutilWriteFile = ioutil.WriteFile
+var osMkdir = os.Mkdir
+var osMkdirAll = os.MkdirAll
+var osRemoveAll = os.RemoveAll
+var osutilCopyFile = osutil.CopyFile
+var osutilCopySpecialFile = osutil.CopySpecialFile
 
 // SmInterface allows different image types to implement their own setup/run/teardown functions
 type SmInterface interface {
@@ -46,16 +58,6 @@ type StateMachine struct {
 
 	// used to access image type specific variables from state functions
 	parent SmInterface
-}
-
-// getStateNumberByName returns the numeric order of a state based on its name
-func (stateMachine *StateMachine) getStateNumberByName(name string) int {
-	for i, stateFunc := range stateMachine.states {
-		if name == stateFunc.name {
-			return i
-		}
-	}
-	return -1
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -144,7 +146,7 @@ func (stateMachine *StateMachine) writeMetadata() error {
 // but will have more functionality added to it later
 func (stateMachine *StateMachine) cleanup() error {
 	if stateMachine.cleanWorkDir {
-		if err := os.RemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
+		if err := osRemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
 			return err
 		}
 	}

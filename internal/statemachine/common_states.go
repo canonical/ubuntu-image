@@ -12,12 +12,12 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	// if no workdir was specified, open a /tmp dir
 	if stateMachine.stateMachineFlags.WorkDir == "" {
 		stateMachine.stateMachineFlags.WorkDir = "/tmp/ubuntu-image-" + uuid.NewString()
-		if err := os.Mkdir(stateMachine.stateMachineFlags.WorkDir, 0755); err != nil {
+		if err := osMkdir(stateMachine.stateMachineFlags.WorkDir, 0755); err != nil {
 			return fmt.Errorf("Failed to create temporary directory: %s", err.Error())
 		}
 		stateMachine.cleanWorkDir = true
 	} else {
-		err := os.MkdirAll(stateMachine.stateMachineFlags.WorkDir, 0755)
+		err := osMkdirAll(stateMachine.stateMachineFlags.WorkDir, 0755)
 		if err != nil && !os.IsExist(err) {
 			return fmt.Errorf("Error creating work directory: %s", err.Error())
 		}
@@ -27,7 +27,7 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	stateMachine.tempDirs.unpack = stateMachine.stateMachineFlags.WorkDir + "/unpack"
 	stateMachine.tempDirs.volumes = stateMachine.stateMachineFlags.WorkDir + "/volumes"
 
-	if err := os.Mkdir(stateMachine.tempDirs.rootfs, 0755); err != nil {
+	if err := osMkdir(stateMachine.tempDirs.rootfs, 0755); err != nil {
 		return fmt.Errorf("Error creating temporary directory: %s", err.Error())
 	}
 
