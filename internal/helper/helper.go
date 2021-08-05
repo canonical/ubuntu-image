@@ -123,7 +123,6 @@ func SaveCWD() func() {
 func MaxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	if offset1 > offset2 {
 		return offset1
-	} else {
-		return offset2
 	}
+	return offset2
 }
