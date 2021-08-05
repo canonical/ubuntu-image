@@ -112,7 +112,12 @@ GADGET_TREE_URI
     argument must be given for this mode of operation.  Must be a local path.
 
 -p PROJECT, --project PROJECT
-    Project name to be passed on to ``livecd-rootfs``.
+    Project name to be passed on to ``livecd-rootfs``. Mutually exclusive
+    with --filesystem
+
+-f FILESYSTEM, --filesystem FILESYSTEM
+    Unpacked Ubuntu filesystem to be copied to the system partition.
+    Mutually exclusive with --project.
 
 -s SUITE, --suite SUITE
     Distribution name to be passed on to ``livecd-rootfs``.

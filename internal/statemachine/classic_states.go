@@ -2,38 +2,37 @@ package statemachine
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/snapcore/snapd/osutil"
 )
 
 // Prepare the gadget tree
 func (stateMachine *StateMachine) prepareGadgetTree() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
-	gadgetDir := classicStateMachine.tempDirs.unpack + "/gadget"
-	err := os.MkdirAll(gadgetDir, 0755)
+	gadgetDir := filepath.Join(classicStateMachine.tempDirs.unpack, "gadget")
+	err := osMkdirAll(gadgetDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("Error creating unpack directory: %s", err.Error())
 	}
 	// recursively copy the gadget tree to unpack/gadget
-	files, err := ioutil.ReadDir(classicStateMachine.Args.GadgetTree)
+	files, err := ioutilReadDir(classicStateMachine.Args.GadgetTree)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 	}
 	for _, gadgetFile := range files {
-		srcFile := classicStateMachine.Args.GadgetTree + "/" + gadgetFile.Name()
-		if err := osutil.CopySpecialFile(srcFile, gadgetDir); err != nil {
+		srcFile := filepath.Join(classicStateMachine.Args.GadgetTree, gadgetFile.Name())
+		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
 			return fmt.Errorf("Error copying gadget tree: %s", err.Error())
 		}
 	}
 
 	// We assume the gadget tree was built from a gadget source tree using
 	// snapcraft prime so the gadget.yaml file is expected in the meta directory
-	classicStateMachine.yamlFilePath = gadgetDir + "/meta/gadget.yaml"
+	classicStateMachine.yamlFilePath = filepath.Join(gadgetDir, "meta", "gadget.yaml")
 
 	return nil
 }
@@ -71,7 +70,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 			env = append(env, "EXTRA_PPAS="+strings.Join(classicStateMachine.Opts.ExtraPPAs, " "))
 		}
 		env = append(env, "IMAGEFORMAT=none")
-		lbConfig, lbBuild, err := helper.SetupLiveBuildCommands(classicStateMachine.tempDirs.rootfs,
+		lbConfig, lbBuild, err := helper.SetupLiveBuildCommands(classicStateMachine.tempDirs.unpack,
 			arch, env, true)
 		if err != nil {
 			return fmt.Errorf("error setting up live_build: %s", err.Error())
@@ -80,7 +79,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 		// now run the "lb config" and "lb build" commands
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
-		os.Chdir(stateMachine.tempDirs.rootfs)
+		os.Chdir(stateMachine.tempDirs.unpack)
 
 		if err := lbConfig.Run(); err != nil {
 			return err
