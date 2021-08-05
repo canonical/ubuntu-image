@@ -360,30 +360,3 @@ func TestNoStatic(t *testing.T) {
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
-
-// TestFailedLoadGadgetYamlClassic tests a failure in the loadGadgetYaml state while building
-// a classic image. This is achieved by using an invalid gadget.yaml file
-func TestFailedLoadGadgetYamlClassic(t *testing.T) {
-	t.Run("test_failed_load_gadget_yaml", func(t *testing.T) {
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Opts.Project = "ubuntu-cpc"
-		stateMachine.Opts.Suite = "focal"
-		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree_invalid")
-
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
-
-		if err := stateMachine.Run(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
-
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
-	})
-}

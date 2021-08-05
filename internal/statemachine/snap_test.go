@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/snapcore/snapd/osutil"
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
@@ -136,44 +135,6 @@ func TestFailedPrepareImage(t *testing.T) {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
 
-		if err := stateMachine.Run(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
-
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
-	})
-}
-
-// TestFailedLoadGadgetYamlSnap tests a failure in the loadGadgetYaml state while building
-// a snap image. This is achieved by providing an invalid gadget.yaml
-func TestFailedLoadGadgetYamlSnap(t *testing.T) {
-	t.Run("test_failed_load_gadget_yaml", func(t *testing.T) {
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine SnapStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
-
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
-
-		stateNum := stateMachine.getStateNumberByName("prepare_image")
-		oldFunc := stateMachine.states[stateNum]
-		defer func() {
-			stateMachine.states[stateNum] = oldFunc
-		}()
-		stateMachine.states[stateNum] = stateFunc{
-			"skip_image", func(*StateMachine) error {
-				invalidGadgetYaml := filepath.Join("testdata",
-					"gadget_tree_invalid", "meta", "gadget.yaml")
-				osutil.CopyFile(invalidGadgetYaml, stateMachine.yamlFilePath, osutil.CopyFlagDefault)
-				return nil
-			},
-		}
 		if err := stateMachine.Run(); err == nil {
 			t.Errorf("Expected an error, but got none")
 		}
