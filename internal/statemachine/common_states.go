@@ -37,40 +37,101 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	return nil
 }
 
-// Load the gadget yaml passed in via command line
+// Load gadget.yaml, do some validation, and store the relevant info in the StateMachine struct
 func (stateMachine *StateMachine) loadGadgetYaml() error {
-	if err := osutil.CopySpecialFile(stateMachine.yamlFilePath,
-		stateMachine.stateMachineFlags.WorkDir); err != nil {
-		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
-	}
+        if err := osutilCopySpecialFile(stateMachine.yamlFilePath,
+                stateMachine.stateMachineFlags.WorkDir); err != nil {
+                return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
+        }
 
-	// read in the gadget.yaml as bytes, because snapd expects it that way
-	gadgetYamlBytes, err := ioutil.ReadFile(stateMachine.yamlFilePath)
-	if err != nil {
-		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
-	}
+        // read in the gadget.yaml as bytes, because snapd expects it that way
+        gadgetYamlBytes, err := ioutilReadFile(stateMachine.yamlFilePath)
+        if err != nil {
+                return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
+        }
 
-	stateMachine.gadgetInfo, err = gadget.InfoFromGadgetYaml(gadgetYamlBytes, nil)
-	if err != nil {
-		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
-	}
+        stateMachine.gadgetInfo, err = gadget.InfoFromGadgetYaml(gadgetYamlBytes, nil)
+        if err != nil {
+                return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
+        }
 
-	for volumeName := range stateMachine.gadgetInfo.Volumes {
-		volumeBaseDir := stateMachine.tempDirs.volumes + "/" + volumeName
-		if err := os.MkdirAll(volumeBaseDir, 0755); err != nil {
-			return fmt.Errorf("Error creating volume dir: %s", err.Error())
-		}
-	}
+        var rootfsSeen bool = false
+        var farthestOffset quantity.Offset = 0
+        var lastOffset quantity.Offset = 0
+        for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
+                volumeBaseDir := filepath.Join(stateMachine.tempDirs.volumes, volumeName)
+                if err := osMkdirAll(volumeBaseDir, 0755); err != nil {
+                        return fmt.Errorf("Error creating volume dir: %s", err.Error())
+                }
+                // look for the rootfs and check if the image is seeded
+                for ii, structure := range volume.Structure {
+                        if structure.Role == "" && structure.Label == gadget.SystemBoot {
+                                fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
+                                        "used for defining partition roles; use role instead\n",
+                                        volumeName, ii)
+                        } else if structure.Role == gadget.SystemData {
+                                rootfsSeen = true
+                        } else if structure.Role == gadget.SystemSeed {
+                                stateMachine.isSeeded = true
+                                stateMachine.hooksAllowed = false
+                        }
 
-	// check if the unpack dir should be preserved
-	envar := os.Getenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
-	if envar != "" {
-		preserveDir := envar + "/unpack"
-		if err := osutil.CopySpecialFile(stateMachine.tempDirs.unpack, preserveDir); err != nil {
-			return fmt.Errorf("Error preserving unpack dir: %s", err.Error())
-		}
-	}
-	return nil
+                        fmt.Println(structure)
+                        // update farthestOffset if needed
+                        var offset quantity.Offset
+                        if structure.Offset == nil {
+                                if structure.Role != "mbr" && lastOffset < quantity.OffsetMiB {
+                                        offset = quantity.OffsetMiB
+                                } else {
+                                        offset = lastOffset
+                                }
+                        } else {
+                                offset = *structure.Offset
+                        }
+                        lastOffset = offset + quantity.Offset(structure.Size)
+                        if lastOffset > farthestOffset {
+                                farthestOffset = lastOffset
+                                fmt.Printf("JAWN setting farthestOffset to %s. offset is %s and size is %s\n", strconv.FormatUint(uint64(farthestOffset), 10), strconv.FormatUint(uint64(offset), 10), strconv.FormatUint(uint64(structure.Size), 10))
+                        }
+                }
+        }
+
+        if !rootfsSeen && len(stateMachine.gadgetInfo.Volumes) == 1 {
+                // We still need to handle the case of unspecified system-data
+                // partition where we simply attach the rootfs at the end of the
+                // partition list.
+                //
+                // Since so far we have no knowledge of the rootfs contents, the
+                // size is set to 0, and will be calculated later
+                rootfsStructure := gadget.VolumeStructure{
+                        Name:        "",
+                        Label:       "writable",
+                        Offset:      &farthestOffset,
+                        OffsetWrite: new(gadget.RelativeOffset),
+                        Size:        quantity.Size(0),
+                        Type:        "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+                        Role:        gadget.SystemData,
+                        ID:          "",
+                        Filesystem:  "ext4",
+                        Content:     []gadget.VolumeContent{},
+                        Update:      gadget.VolumeUpdate{},
+                }
+
+                // TODO: un-hardcode this
+                stateMachine.gadgetInfo.Volumes["pc"].Structure =
+                        append(stateMachine.gadgetInfo.Volumes["pc"].Structure, rootfsStructure)
+        }
+
+        // check if the unpack dir should be preserved
+        envar := os.Getenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
+        if envar != "" {
+                preserveDir := filepath.Join(envar, "unpack")
+                if err := osutilCopySpecialFile(stateMachine.tempDirs.unpack, preserveDir); err != nil {
+                        return fmt.Errorf("Error preserving unpack dir: %s", err.Error())
+                }
+        }
+
+        return nil
 }
 
 // Populate the image's rootfs contents
