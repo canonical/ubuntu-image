@@ -3,29 +3,34 @@ package statemachine
 import (
 	"fmt"
 	"os"
+
+	"github.com/google/uuid"
 )
 
 // generate work directory file structure
 func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	// if no workdir was specified, open a /tmp dir
 	if stateMachine.stateMachineFlags.WorkDir == "" {
-		workDir, err := os.MkdirTemp(stateMachine.tempLocation, "ubuntu-image-")
-		if err != nil {
-			return fmt.Errorf("Failed to create temporary directory")
+		stateMachine.stateMachineFlags.WorkDir = "/tmp/ubuntu-image-" + uuid.NewString()
+		if err := osMkdir(stateMachine.stateMachineFlags.WorkDir, 0755); err != nil {
+			return fmt.Errorf("Failed to create temporary directory: %s", err.Error())
 		}
-		stateMachine.stateMachineFlags.WorkDir = workDir
 		stateMachine.cleanWorkDir = true
 	} else {
-		err := os.MkdirAll(stateMachine.stateMachineFlags.WorkDir, 0755)
+		err := osMkdirAll(stateMachine.stateMachineFlags.WorkDir, 0755)
 		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating work directory")
+			return fmt.Errorf("Error creating work directory: %s", err.Error())
 		}
 	}
-	return nil
-}
 
-// Prepare the image
-func (stateMachine *StateMachine) prepareImage() error {
+	stateMachine.tempDirs.rootfs = stateMachine.stateMachineFlags.WorkDir + "/root"
+	stateMachine.tempDirs.unpack = stateMachine.stateMachineFlags.WorkDir + "/unpack"
+	stateMachine.tempDirs.volumes = stateMachine.stateMachineFlags.WorkDir + "/volumes"
+
+	if err := osMkdir(stateMachine.tempDirs.rootfs, 0755); err != nil {
+		return fmt.Errorf("Error creating temporary directory: %s", err.Error())
+	}
+
 	return nil
 }
 
@@ -79,12 +84,7 @@ func (stateMachine *StateMachine) generateManifest() error {
 	return nil
 }
 
-// Clean up and organize files
+// Finish step to show that the build was successful
 func (stateMachine *StateMachine) finish() error {
-	if stateMachine.cleanWorkDir {
-		if err := stateMachine.cleanup(); err != nil {
-			return err
-		}
-	}
 	return nil
 }

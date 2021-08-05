@@ -1,7 +1,0 @@
-#!/bin/sh
-set -e
-. debian/tests/setup
-
-go build github.com/canonical/ubuntu-image/...
-go generate github.com/canonical/ubuntu-image/...
-

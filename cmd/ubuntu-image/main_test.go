@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -132,16 +133,16 @@ func TestExitCode(t *testing.T) {
 		expected int
 	}{
 		{"help_exit_0", []string{"--help"}, 0},
-		{"snap_exit_0", []string{"snap", "model_assertion.yml"}, 0},
-		{"classic_exit_0", []string{"classic", "gadget_tree.yml", "--project", "ubuntu-cpc"}, 0},
-		{"workdir_exit_0", []string{"classic", "gadget_tree.yml", "--project", "ubuntu-cpc", "--workdir", "/tmp/ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"}, 0},
 		{"invalid_flag_exit_1", []string{"--help-me"}, 1},
-		{"bad_state_machine_args", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
+		{"bad_state_machine_args_classic", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
+		{"bad_state_machine_args_snap", []string{"snap", "model_assertion.yaml", "-u", "5", "-t", "6"}, 1},
 		{"no_command_given", []string{}, 1},
 		{"resume_without_workdir", []string{"--resume"}, 1},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
 			// Override os.Exit temporarily
 			oldOsExit := osExit
 			defer func() {

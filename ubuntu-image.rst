@@ -98,6 +98,8 @@ model_assertion
 --disable-console-conf
     Disable console-conf on the resulting image.
 
+--factory-image
+    Hint that the image is meant to boot in a device factory.
 
 Classic command options
 -----------------------

@@ -5,10 +5,22 @@ package statemachine
 import (
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/snapcore/snapd/osutil"
 )
+
+// define some functions that can be mocked by test cases
+var ioutilReadDir = ioutil.ReadDir
+var ioutilReadFile = ioutil.ReadFile
+var ioutilWriteFile = ioutil.WriteFile
+var osMkdir = os.Mkdir
+var osMkdirAll = os.MkdirAll
+var osRemoveAll = os.RemoveAll
+var osutilCopyFile = osutil.CopyFile
+var osutilCopySpecialFile = osutil.CopySpecialFile
 
 // SmInterface allows different image types to implement their own setup/run/teardown functions
 type SmInterface interface {
@@ -23,11 +35,20 @@ type stateFunc struct {
 	function func(*StateMachine) error
 }
 
+// temporaryDirectories organizes the state machines, rootfs, unpack, and volumes dirs
+type temporaryDirectories struct {
+	rootfs  string
+	unpack  string
+	volumes string
+}
+
 // StateMachine will hold the command line data, track the current state, and handle all function calls
 type StateMachine struct {
 	cleanWorkDir bool   // whether or not to clean up the workDir
 	CurrentStep  string // tracks the current progress of the state machine
 	StepsTaken   int    // counts the number of steps taken
+	yamlFilePath string // the location for the yaml file
+	tempDirs     temporaryDirectories
 
 	// The flags that were passed in on the command line
 	commonFlags       *commands.CommonOpts
@@ -35,8 +56,8 @@ type StateMachine struct {
 
 	states []stateFunc // the state functions
 
-	// used only for testing
-	tempLocation string // parent directory of temporary workdir
+	// used to access image type specific variables from state functions
+	parent SmInterface
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -124,8 +145,10 @@ func (stateMachine *StateMachine) writeMetadata() error {
 // cleanup cleans the workdir. For now this is just deleting the temporary directory if necessary
 // but will have more functionality added to it later
 func (stateMachine *StateMachine) cleanup() error {
-	if err := os.RemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
-		return err
+	if stateMachine.cleanWorkDir {
+		if err := osRemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
+			return err
+		}
 	}
 	return nil
 }
