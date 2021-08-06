@@ -207,7 +207,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
-		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
+		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 		stateMachine.parent = &stateMachine
 
 		if err := stateMachine.Setup(); err != nil {
@@ -297,7 +297,7 @@ func TestFailedLiveBuildCommands(t *testing.T) {
 			lbLocation := strings.TrimSpace(string(lbLocationBytes))
 			// ensure the backup doesn't exist
 			os.Remove(lbLocation + ".bak")
-			err := osutil.CopyFile(lbLocation, lbLocation + ".bak", 0)
+			err := osutil.CopyFile(lbLocation, lbLocation+".bak", 0)
 			if err != nil {
 				t.Errorf("Failed back up lb: %s", err.Error())
 			}
@@ -310,7 +310,7 @@ func TestFailedLiveBuildCommands(t *testing.T) {
 			}
 			defer func() {
 				os.Remove(lbLocation)
-				osutil.CopyFile(lbLocation + ".bak", lbLocation, 0)
+				osutil.CopyFile(lbLocation+".bak", lbLocation, 0)
 			}()
 
 			// need workdir set up for this

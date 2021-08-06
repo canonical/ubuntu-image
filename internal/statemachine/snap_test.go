@@ -128,7 +128,7 @@ func TestFailedPrepareImage(t *testing.T) {
 
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Args.ModelAssertion = "testdata/modelAssertion20"
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 		stateMachine.Opts.DisableConsoleConf = true
 
 		if err := stateMachine.Setup(); err != nil {
