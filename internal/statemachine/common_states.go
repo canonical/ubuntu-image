@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/google/uuid"
@@ -74,6 +75,10 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 		return err
 	}
 
+	if err := stateMachine.parseImageSizes(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -136,18 +141,95 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	return nil
 }
 
-// Pre populate the bootfs contents
-func (stateMachine *StateMachine) prepopulateBootfsContents() error {
-	return nil
-}
-
 // Populate the Bootfs Contents
 func (stateMachine *StateMachine) populateBootfsContents() error {
+	// find the name of the system volume. snapd functions have already verified it exists
+	var systemVolumeName string
+	var systemVolume *gadget.Volume
+	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
+		for _, structure := range volume.Structure {
+			// use the system-boot role to identify the system volume
+			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+				systemVolumeName = volumeName
+				systemVolume = volume
+			}
+		}
+	}
+
+	// now call LayoutVolume to get a LaidOutVolume we can use
+	// with a mountedFilesystemWriter
+	layoutConstraints := gadget.LayoutConstraints{SkipResolveContent: false}
+	laidOutVolume, err := gadgetLayoutVolume(
+		filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
+		filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
+		systemVolume, layoutConstraints)
+	if err != nil {
+		return fmt.Errorf("Error laying out bootfs contents: %s", err.Error())
+	}
+
+	for ii, laidOutStructure := range laidOutVolume.LaidOutStructure {
+		if laidOutStructure.HasFilesystem() {
+			mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(&laidOutStructure, nil)
+			if err != nil {
+				return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
+			}
+
+			var targetDir string
+			if laidOutStructure.Role == "system-seed" {
+				targetDir = stateMachine.tempDirs.rootfs
+			} else {
+				targetDir = filepath.Join(stateMachine.tempDirs.volumes,
+					systemVolumeName,
+					"part"+strconv.Itoa(ii))
+			}
+			err = mountedFilesystemWriter.Write(targetDir, []string{})
+			if err != nil {
+				return fmt.Errorf("Error in mountedFilesystem.Write(): %s", err.Error())
+			}
+		}
+	}
 	return nil
 }
 
 // Populate and prepare the partitions
 func (stateMachine *StateMachine) populatePreparePartitions() error {
+	// iterate through all the volumes
+	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
+		if err := stateMachine.handleLkBootloader(volume); err != nil {
+			return err
+		}
+		var farthestOffset quantity.Offset = 0
+		for structureNumber, structure := range volume.Structure {
+			var contentRoot string
+			if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
+				contentRoot = stateMachine.tempDirs.rootfs
+			} else {
+				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
+					"part"+strconv.Itoa(structureNumber))
+			}
+			var offset quantity.Offset
+			if structure.Offset != nil {
+				offset = *structure.Offset
+			} else {
+				offset = 0
+			}
+			farthestOffset = helper.MaxOffset(farthestOffset,
+				quantity.Offset(structure.Size)+offset)
+			if stateMachine.shouldSkipStructure(structure) {
+				continue
+			}
+
+			// copy the data
+			partImg := filepath.Join(stateMachine.tempDirs.volumes, volumeName,
+				"part"+strconv.Itoa(structureNumber)+".img")
+			if err := stateMachine.copyStructureContent(structure,
+				contentRoot, partImg); err != nil {
+				return err
+			}
+		}
+		// set the image size values to be used by make_disk
+		stateMachine.handleContentSizes(farthestOffset, volumeName)
+	}
 	return nil
 }
 

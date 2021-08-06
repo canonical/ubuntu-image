@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -17,6 +19,9 @@ import (
 )
 
 // define some functions that can be mocked by test cases
+var gadgetLayoutVolume = gadget.LayoutVolume
+var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
+var helperCopyBlob = helper.CopyBlob
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
 var ioutilWriteFile = ioutil.WriteFile
@@ -68,6 +73,9 @@ type StateMachine struct {
 
 	// imported from snapd, the info parsed from gadget.yaml
 	gadgetInfo *gadget.Info
+
+	// image sizes for parsing the --image-size flags
+	imageSizes map[string]quantity.Size
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -110,6 +118,58 @@ func (stateMachine *StateMachine) validateInput() error {
 		}
 	}
 
+	return nil
+}
+
+// parseImageSizes handles the flag --image-size, which is a string in the format
+// <volumeName>:<volumeSize>,<volumeName2>:<volumeSize2>. It can also be in the
+// format <volumeSize> to signify one size to rule them all
+func (stateMachine *StateMachine) parseImageSizes() error {
+	// initialize the size map
+	stateMachine.imageSizes = make(map[string]quantity.Size)
+
+	if stateMachine.commonFlags.Size == "" {
+		return nil
+	}
+
+	if !strings.Contains(stateMachine.commonFlags.Size, ":") {
+		// handle the "one size to rule them all" case
+		parsedSize, err := quantity.ParseSize(stateMachine.commonFlags.Size)
+		if err != nil {
+			return fmt.Errorf("Failed to parse argument to --image-size: %s", err.Error())
+		}
+		for volumeName := range stateMachine.gadgetInfo.Volumes {
+			stateMachine.imageSizes[volumeName] = parsedSize
+		}
+	} else {
+		allSizes := strings.Split(stateMachine.commonFlags.Size, ",")
+		for _, size := range allSizes {
+			// each of these should be of the form "<name|number>:<size>"
+			splitSize := strings.Split(size, ":")
+			if len(splitSize) != 2 {
+				return fmt.Errorf("Argument to --image-size %s is not "+
+					"in the correct format", size)
+			}
+			parsedSize, err := quantity.ParseSize(splitSize[1])
+			if err != nil {
+				return fmt.Errorf("Failed to parse argument to --image-size: %s",
+					err.Error())
+			}
+			// the image size parsed successfully, now find which volume to associate it with
+			volumeNumber, err := strconv.Atoi(splitSize[0])
+			if err == nil {
+				// argument passed was numeric.
+				//TODO
+				fmt.Printf("JAWN handle numerics for %d\n", volumeNumber)
+			} else {
+				if _, found := stateMachine.gadgetInfo.Volumes[splitSize[0]]; !found {
+					return fmt.Errorf("Volume %s does not exist in gadget.yaml",
+						splitSize[0])
+				}
+				stateMachine.imageSizes[splitSize[0]] = parsedSize
+			}
+		}
+	}
 	return nil
 }
 
@@ -235,39 +295,6 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	return nil
 }
 
-// Run iterates through the state functions, stopping when appropriate based on --until and --thru
-func (stateMachine *StateMachine) Run() error {
-	// iterate through the states
-	for _, stateFunc := range stateMachine.states {
-		if stateFunc.name == stateMachine.stateMachineFlags.Until {
-			break
-		}
-		if stateMachine.commonFlags.Debug {
-			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
-		}
-		if err := stateFunc.function(stateMachine); err != nil {
-			// clean up work dir on error
-			stateMachine.cleanup()
-			return err
-		}
-		stateMachine.StepsTaken++
-		if stateFunc.name == stateMachine.stateMachineFlags.Thru {
-			break
-		}
-	}
-	return nil
-}
-
-// Teardown handles anything else that needs to happen after the states have finished running
-func (stateMachine *StateMachine) Teardown() error {
-	if !stateMachine.cleanWorkDir {
-		if err := stateMachine.writeMetadata(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // runHooks reads through the --hooks-directory flags and calls a helper function to execute the scripts
 func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) error {
 	os.Setenv(envKey, envVal)
@@ -300,6 +327,171 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 			if err := helper.RunScript(hookScript); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+// handleLkBootloader handles the special "lk" bootloader case where some extra
+// files need to be added to the bootfs
+func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) error {
+	if volume.Bootloader != "lk" {
+		return nil
+	}
+	// For the LK bootloader we need to copy boot.img and snapbootsel.bin to
+	// the gadget folder so they can be used as partition content. The first
+	// one comes from the kernel snap, while the second one is modified by
+	// the prepare_image step to set the right core and kernel for the kernel
+	// command line.
+	bootDir := filepath.Join(stateMachine.tempDirs.unpack,
+		"image", "boot", "lk")
+	gadgetDir := filepath.Join(stateMachine.tempDirs.unpack, "gadget")
+	if _, err := os.Stat(bootDir); err != nil {
+		return fmt.Errorf("got lk bootloader but directory %s does not exist", bootDir)
+	}
+	err := osMkdir(gadgetDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Failed to create gadget dir: %s", err.Error())
+	}
+	files, err := ioutilReadDir(bootDir)
+	if err != nil {
+		return fmt.Errorf("Error reading lk bootloader dir: %s", err.Error())
+	}
+	for _, lkFile := range files {
+		srcFile := filepath.Join(bootDir, lkFile.Name())
+		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
+			return fmt.Errorf("Error copying lk bootloader dir: %s", err.Error())
+		}
+	}
+	return nil
+}
+
+// handleContentSizes ensures that the sizes of the partitions are large enough and stores
+// safe values in the stateMachine struct for use during make_image
+func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
+	// store volume sizes in the stateMachineStruct. These will be used during
+	// the make_image step
+	// TODO: check the value of calculated is accurate
+	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
+	volumeSize, found := stateMachine.imageSizes[volumeName]
+	if !found {
+		stateMachine.imageSizes[volumeName] = calculated
+	} else {
+		if volumeSize < calculated {
+			fmt.Printf("WARNING: ignoring image size smaller than "+
+				"minimum required size: vol:%s %d < %d",
+				volumeName, uint64(volumeSize), uint64(calculated))
+			stateMachine.imageSizes[volumeName] = calculated
+		} else {
+			stateMachine.imageSizes[volumeName] = volumeSize
+		}
+	}
+}
+
+// shouldSkipStructure returns whether a structure should be skipped during certain processing
+func (stateMachine *StateMachine) shouldSkipStructure(structure gadget.VolumeStructure) bool {
+	if stateMachine.isSeeded &&
+		(structure.Role == gadget.SystemBoot ||
+			structure.Role == gadget.SystemData ||
+			structure.Role == gadget.SystemSave ||
+			structure.Label == gadget.SystemBoot) {
+		return true
+	}
+	return false
+}
+
+// copyStructureContent handles copying raw blobs or creating formatted filesystems
+func (stateMachine *StateMachine) copyStructureContent(structure gadget.VolumeStructure,
+	contentRoot, partImg string) error {
+	if structure.Filesystem == "" {
+		// copy the contents to the new location
+		var runningOffset quantity.Offset = 0
+		for _, content := range structure.Content {
+			if content.Offset != nil {
+				runningOffset = *content.Offset
+			}
+			// first zero it out
+			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
+				"bs=" + strconv.FormatUint(uint64(structure.Size), 10),
+				"seek=1"}
+			if err := helperCopyBlob(ddArgs); err != nil {
+				return fmt.Errorf("Error zeroing partition: %s",
+					err.Error())
+			}
+
+			// now write the real value
+			inFile := filepath.Join(stateMachine.tempDirs.unpack,
+				"gadget", content.Image)
+			ddArgs = []string{"if=" + inFile, "of=" + partImg, "bs=1",
+				"seek=" + strconv.FormatUint(uint64(runningOffset), 10),
+				"conv=sparse,notrunc"}
+			if err := helperCopyBlob(ddArgs); err != nil {
+				return fmt.Errorf("Error copying image blob: %s",
+					err.Error())
+			}
+			runningOffset += quantity.Offset(content.Size)
+		}
+	} else {
+		var blockSize quantity.Size
+		if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
+			// system-data and system-seed structures are not required to have
+			// an explicit size set in the yaml file
+			if structure.Size < stateMachine.rootfsSize {
+				fmt.Printf("WARNING: rootfs structure size %s smaller "+
+					"than actual rootfs contents %s\n",
+					structure.Size.IECString(),
+					stateMachine.rootfsSize.IECString())
+				blockSize = stateMachine.rootfsSize
+			} else {
+				blockSize = structure.Size
+			}
+		} else {
+			blockSize = structure.Size
+		}
+		// use mkfs funcitons from snapd to create the filesystems
+		ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
+			"bs=" + strconv.FormatUint(uint64(blockSize), 10), "seek=1"}
+		if err := helperCopyBlob(ddArgs); err != nil {
+			return fmt.Errorf("Error zeroing image file %s: %s",
+				partImg, err.Error())
+		}
+		err := helper.MkfsWithContent(structure.Filesystem, partImg, structure.Label,
+			contentRoot, structure.Size, quantity.Size(512))
+		if err != nil {
+			return fmt.Errorf("Error running mkfs: %s", err.Error())
+		}
+	}
+	return nil
+}
+
+// Run iterates through the state functions, stopping when appropriate based on --until and --thru
+func (stateMachine *StateMachine) Run() error {
+	// iterate through the states
+	for _, stateFunc := range stateMachine.states {
+		if stateFunc.name == stateMachine.stateMachineFlags.Until {
+			break
+		}
+		if stateMachine.commonFlags.Debug {
+			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
+		}
+		if err := stateFunc.function(stateMachine); err != nil {
+			// clean up work dir on error
+			stateMachine.cleanup()
+			return err
+		}
+		stateMachine.StepsTaken++
+		if stateFunc.name == stateMachine.stateMachineFlags.Thru {
+			break
+		}
+	}
+	return nil
+}
+
+// Teardown handles anything else that needs to happen after the states have finished running
+func (stateMachine *StateMachine) Teardown() error {
+	if !stateMachine.cleanWorkDir {
+		if err := stateMachine.writeMetadata(); err != nil {
+			return err
 		}
 	}
 	return nil

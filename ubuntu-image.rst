@@ -199,8 +199,11 @@ in more detail below.
     images created by the command, if any.
 
 --hooks-directory DIRECTORY
-    Path or comma-separated list of paths of directories in which scripts for
-    build-time hooks will be located.
+    Directories in which scripts for build-time hooks will be located. This
+    flag must be specified once for each hook directory. ``ubuntu-image``
+    will look for hooks in ``hooks_directory/name_of_hooks_step.d`` and
+    a script with the name ``hooks_directory/name_of_hooks_step``. Currently
+    the only supported hooks step is ``populate_rootfs_contents``.
 
 --disk-info DISK-INFO-CONTENTS
     File to be used as .disk/info on the image's rootfs.  This file can

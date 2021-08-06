@@ -16,7 +16,6 @@ var classicStates = []stateFunc{
 	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
 	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
-	{"prepopulate_bootfs_contents", (*StateMachine).prepopulateBootfsContents},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
 	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
 	{"make_disk", (*StateMachine).makeDisk},
