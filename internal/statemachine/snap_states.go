@@ -71,7 +71,7 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 		return fmt.Errorf("Error reading unpack dir: %s", err.Error())
 	}
 	for _, srcFile := range files {
-		if !isSeeded && srcFile.Name() == "boot" {
+		if !stateMachine.isSeeded && srcFile.Name() == "boot" {
 			continue
 		}
 		srcFile := filepath.Join(src, srcFile.Name())
