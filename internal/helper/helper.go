@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"io/ioutil"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/snapcore/snapd/osutil"
@@ -116,4 +117,25 @@ func SaveCWD() func() {
 	return func() {
 		os.Chdir(wd)
 	}
+}
+
+func WriteSnapManifest(snapsDir string, outputPath string) error {
+	files, err := ioutil.ReadDir(snapsDir)
+	if err != nil {
+		return fmt.Errorf("Error reading snaps directory: %s", err.Error())
+	}
+	
+	manifest, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("Error creating manifest file: %s", err.Error())
+	}
+	defer manifest.Close()
+
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".snap") {
+			split := strings.SplitN(file.Name(), "_", 2)
+			fmt.Fprintf(manifest, "%s %s\n", split[0], split[1])
+		}
+	}
+	return nil
 }

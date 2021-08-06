@@ -48,6 +48,7 @@ type StateMachine struct {
 	CurrentStep  string // tracks the current progress of the state machine
 	StepsTaken   int    // counts the number of steps taken
 	yamlFilePath string // the location for the yaml file
+	isSeeded     bool   // whether the image is seeded (UC20+) or not
 	tempDirs     temporaryDirectories
 
 	// The flags that were passed in on the command line

@@ -36,6 +36,8 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 
 // Load the gadget yaml passed in via command line
 func (stateMachine *StateMachine) loadGadgetYaml() error {
+	// ...to be implemented by a separate PR
+	stateMachine.isSeeded = false
 	return nil
 }
 
@@ -76,11 +78,6 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 
 // Make the disk
 func (stateMachine *StateMachine) makeDisk() error {
-	return nil
-}
-
-// Generate the manifest
-func (stateMachine *StateMachine) generateManifest() error {
 	return nil
 }
 
