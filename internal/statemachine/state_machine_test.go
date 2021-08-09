@@ -10,6 +10,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
@@ -51,6 +52,9 @@ func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure,
 	gadget.ContentObserver) (*gadget.MountedFilesystemWriter, error) {
 	return nil, fmt.Errorf("Test Error")
 }
+func mockMkfsWithContent(typ, img, label, contentRootDir string, deviceSize, sectorSize quantity.Size) error {
+	return fmt.Errorf("Test Error")
+}
 func mockReadDir(string) ([]os.FileInfo, error) {
 	return []os.FileInfo{}, fmt.Errorf("Test Error")
 }
@@ -77,6 +81,16 @@ func mockCopyFile(string, string, osutil.CopyFlag) error {
 }
 func mockCopySpecialFile(string, string) error {
 	return fmt.Errorf("Test error")
+}
+
+// define a struct that can mock MountedFilesystem.Write()
+type mockableMountedFilesystemWriter struct{}
+
+func (m mockableMountedFilesystemWriter) Write(whereDir string, preserve []string) error {
+	return fmt.Errorf("Test Error")
+}
+func mockMountedFilesystemWriter(ps *gadget.LaidOutStructure, observer gadget.ContentObserver) (*mockableMountedFilesystemWriter, error) {
+	return new(mockableMountedFilesystemWriter), nil
 }
 
 // getStateNumberByName returns the numeric order of a state based on its name
@@ -402,17 +416,18 @@ func TestParseImageSizes(t *testing.T) {
 			"second": 2 * quantity.SizeGiB,
 			"third":  3 * quantity.SizeGiB,
 			"fourth": 4 * quantity.SizeGiB}},
-		//TODO{"size_per_image_number", "0:1G,1:2G,2:3G,3:4G", map[string]quantity.Size{
-		//	"first":  1 * quantity.SizeGiB,
-		//	"second": 2 * quantity.SizeGiB,
-		//	"third":  3 * quantity.SizeGiB,
-		//	"fourth": 4 * quantity.SizeGiB}},
+		{"size_per_image_number", "0:1G,1:2G,2:3G,3:4G", map[string]quantity.Size{
+			"first":  1 * quantity.SizeGiB,
+			"second": 2 * quantity.SizeGiB,
+			"third":  3 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
 	}
 	for _, tc := range testCases {
 		t.Run("test_parse_image_sizes_"+tc.name, func(t *testing.T) {
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-multi.yaml")
+			stateMachine.commonFlags.Size = tc.size
 
 			// need workdir and loaded gadget.yaml set up for this
 			if err := stateMachine.makeTemporaryDirectories(); err != nil {
@@ -422,7 +437,6 @@ func TestParseImageSizes(t *testing.T) {
 				t.Errorf("Did not expect an error, got %s", err.Error())
 			}
 
-			stateMachine.commonFlags.Size = tc.size
 			if err := stateMachine.parseImageSizes(); err != nil {
 				t.Errorf("Did not expect an error, got %s", err.Error())
 			}
@@ -448,6 +462,7 @@ func TestFailedParseImageSizes(t *testing.T) {
 		{"too_many_args", "first:1G:2G"},
 		{"multiple_invalid", "first:1test"},
 		{"volume_not_exist", "fifth:1G"},
+		{"index_out_of_range", "9:1G"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_failed_parse_image_sizes_"+tc.name, func(t *testing.T) {
@@ -565,5 +580,122 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 			t.Errorf("Expected an error, but got none")
 		}
 		osutilCopySpecialFile = osutil.CopySpecialFile
+	})
+}
+
+// TestHandleContentSizes ensures that using --image-size with a few different values
+// results in the correct sizes in stateMachine.imageSizes
+func TestHandleContentSizes(t *testing.T) {
+	testCases := []struct {
+		name   string
+		size   string
+		result map[string]quantity.Size
+	}{
+		{"size_not_specified", "", map[string]quantity.Size{"pc": 17825792}},
+		{"size_smaller_than_content", "pc:123", map[string]quantity.Size{"pc": 17825792}},
+		{"size_bigger_than_content", "pc:4G", map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
+	}
+	for _, tc := range testCases {
+		t.Run("test_handle_content_sizes_"+tc.name, func(t *testing.T) {
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.commonFlags.Size = tc.size
+			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget_tree",
+				"meta", "gadget.yaml")
+
+			// need workdir and loaded gadget.yaml set up for this
+			if err := stateMachine.makeTemporaryDirectories(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+			if err := stateMachine.loadGadgetYaml(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+
+			stateMachine.handleContentSizes(0, "pc")
+			// ensure the correct size was set
+			for volumeName := range stateMachine.gadgetInfo.Volumes {
+				setSize := stateMachine.imageSizes[volumeName]
+				if setSize != tc.result[volumeName] {
+					t.Errorf("Volume %s has the wrong size set: %d. "+
+						"Should be %d", volumeName, setSize, tc.result[volumeName])
+				}
+			}
+		})
+	}
+}
+
+// TestFailedCopyStructureContent tests failures in the copyStructureContent function by mocking
+// functions and setting invalid bs= arguments in dd
+func TestFailedCopyStructureContent(t *testing.T) {
+	t.Run("test_failed_copy_structure_content", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.yamlFilePath = filepath.Join("testdata", "gadget_tree",
+			"meta", "gadget.yaml")
+
+		// need workdir and loaded gadget.yaml set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		if err := stateMachine.loadGadgetYaml(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// separate out the volumeStructures to test different scenarios
+		var mbrStruct gadget.VolumeStructure
+		var rootfsStruct gadget.VolumeStructure
+		for _, volume := range stateMachine.gadgetInfo.Volumes {
+			for _, structure := range volume.Structure {
+				if structure.Name == "mbr" {
+					mbrStruct = structure
+				} else if structure.Name == "EFI System" {
+					rootfsStruct = structure
+				}
+			}
+		}
+
+		// mock helper.CopyBlob and test with no filesystem specified
+		helperCopyBlob = mockCopyBlob
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
+		if err := stateMachine.copyStructureContent(mbrStruct, "",
+			filepath.Join("/tmp", uuid.NewString()+".img")); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		helperCopyBlob = helper.CopyBlob
+
+		// set an invalid blocksize to mock the binary copy blob
+		mockableBlockSize = "0"
+		defer func() {
+			mockableBlockSize = "1"
+		}()
+		if err := stateMachine.copyStructureContent(mbrStruct, "",
+			filepath.Join("/tmp", uuid.NewString()+".img")); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		mockableBlockSize = "1"
+
+		// mock helper.CopyBlob and test with filesystem: vfat
+		helperCopyBlob = mockCopyBlob
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
+		if err := stateMachine.copyStructureContent(rootfsStruct, "",
+			filepath.Join("/tmp", uuid.NewString()+".img")); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		helperCopyBlob = helper.CopyBlob
+
+		// mock gadget.MkfsWithContent
+		gadgetMkfsWithContent = mockMkfsWithContent
+		defer func() {
+			gadgetMkfsWithContent = helper.MkfsWithContent //TODO
+		}()
+		if err := stateMachine.copyStructureContent(rootfsStruct, "",
+			filepath.Join("/tmp", uuid.NewString()+".img")); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		gadgetMkfsWithContent = helper.MkfsWithContent //TODO: after snapd PR merged
 	})
 }

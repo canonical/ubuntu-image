@@ -164,6 +164,7 @@ func MaxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 func CopyBlob(ddArgs []string) error {
 	ddCommand := *exec.Command("dd")
 	ddCommand.Args = ddArgs
+	fmt.Println(ddCommand)
 
 	if err := ddCommand.Run(); err != nil {
 		return err

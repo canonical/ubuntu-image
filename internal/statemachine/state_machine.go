@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -21,6 +22,7 @@ import (
 // define some functions that can be mocked by test cases
 var gadgetLayoutVolume = gadget.LayoutVolume
 var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
+var gadgetMkfsWithContent = helper.MkfsWithContent //TODO once snapd PR is merged fix this
 var helperCopyBlob = helper.CopyBlob
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
@@ -31,6 +33,8 @@ var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
+
+var mockableBlockSize string = "1" //used for mocking dd calls
 
 // SmInterface allows different image types to implement their own setup/run/teardown functions
 type SmInterface interface {
@@ -75,7 +79,8 @@ type StateMachine struct {
 	gadgetInfo *gadget.Info
 
 	// image sizes for parsing the --image-size flags
-	imageSizes map[string]quantity.Size
+	imageSizes  map[string]quantity.Size
+	volumeOrder []string
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -128,6 +133,7 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 	// initialize the size map
 	stateMachine.imageSizes = make(map[string]quantity.Size)
 
+	// If --image-size was not used, simply return
 	if stateMachine.commonFlags.Size == "" {
 		return nil
 	}
@@ -159,8 +165,12 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 			volumeNumber, err := strconv.Atoi(splitSize[0])
 			if err == nil {
 				// argument passed was numeric.
-				//TODO
-				fmt.Printf("JAWN handle numerics for %d\n", volumeNumber)
+				if volumeNumber < len(stateMachine.volumeOrder) {
+					stateName := stateMachine.volumeOrder[volumeNumber]
+					stateMachine.imageSizes[stateName] = parsedSize
+				} else {
+					return fmt.Errorf("Volume index %d is out of range", volumeNumber)
+				}
 			} else {
 				if _, found := stateMachine.gadgetInfo.Volumes[splitSize[0]]; !found {
 					return fmt.Errorf("Volume %s does not exist in gadget.yaml",
@@ -171,6 +181,44 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 		}
 	}
 	return nil
+}
+
+// saveVolumeOrder records the order that the volumes appear in gadget.yaml. This is necessary
+// to preserve backwards compatibility of the command line syntax --image-size <volume_number>:<size>
+func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
+	// don't bother doing this if --image-size was not used
+	if stateMachine.commonFlags.Size == "" {
+		return
+	}
+
+	indexMap := make(map[string]int)
+	for volumeName := range stateMachine.gadgetInfo.Volumes {
+		searchString := volumeName + ":"
+		index := strings.Index(gadgetYamlContents, searchString)
+		indexMap[volumeName] = index
+	}
+
+	// now sort based on the index
+	type volumeNameIndex struct {
+		VolumeName string
+		Index      int
+	}
+
+	var sortable []volumeNameIndex
+	for volumeName, volumeIndex := range indexMap {
+		sortable = append(sortable, volumeNameIndex{volumeName, volumeIndex})
+	}
+
+	sort.Slice(sortable, func(i, j int) bool {
+		return sortable[i].Index < sortable[j].Index
+	})
+
+	var sortedVolumes []string
+	for _, volume := range sortable {
+		sortedVolumes = append(sortedVolumes, volume.VolumeName)
+	}
+
+	stateMachine.volumeOrder = sortedVolumes
 }
 
 // readMetadata reads info about a partial state machine from disk
@@ -226,8 +274,7 @@ func (stateMachine *StateMachine) cleanup() error {
 	return nil
 }
 
-// postProcessGadgetYaml does some additional validation on gadget.yaml beyond what
-// snapd does, and adds the rootfs to the partitions list if needed
+// postProcessGadgetYaml adds the rootfs to the partitions list if needed
 func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var rootfsSeen bool = false
 	var farthestOffset quantity.Offset = 0
@@ -288,7 +335,8 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			Update:      gadget.VolumeUpdate{},
 		}
 
-		// get the name of the volume
+		// There is only one volume, so lastVolumeName is its name
+		// we now add the rootfs structure to the volume
 		stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure =
 			append(stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure, rootfsStructure)
 	}
@@ -369,9 +417,8 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 // handleContentSizes ensures that the sizes of the partitions are large enough and stores
 // safe values in the stateMachine struct for use during make_image
 func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
-	// store volume sizes in the stateMachineStruct. These will be used during
+	// store volume sizes in the stateMachine Struct. These will be used during
 	// the make_image step
-	// TODO: check the value of calculated is accurate
 	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
 	volumeSize, found := stateMachine.imageSizes[volumeName]
 	if !found {
@@ -410,7 +457,8 @@ func (stateMachine *StateMachine) copyStructureContent(structure gadget.VolumeSt
 			if content.Offset != nil {
 				runningOffset = *content.Offset
 			}
-			// first zero it out
+			// first zero it out. Structures without filesystem specified in the gadget
+			// yaml must have the size specified, so the bs= argument below is valid
 			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
 				"bs=" + strconv.FormatUint(uint64(structure.Size), 10),
 				"seek=1"}
@@ -419,10 +467,10 @@ func (stateMachine *StateMachine) copyStructureContent(structure gadget.VolumeSt
 					err.Error())
 			}
 
-			// now write the real value
+			// now copy the raw content file specified in gadget.yaml
 			inFile := filepath.Join(stateMachine.tempDirs.unpack,
 				"gadget", content.Image)
-			ddArgs = []string{"if=" + inFile, "of=" + partImg, "bs=1",
+			ddArgs = []string{"if=" + inFile, "of=" + partImg, "bs=" + mockableBlockSize,
 				"seek=" + strconv.FormatUint(uint64(runningOffset), 10),
 				"conv=sparse,notrunc"}
 			if err := helperCopyBlob(ddArgs); err != nil {
@@ -448,14 +496,14 @@ func (stateMachine *StateMachine) copyStructureContent(structure gadget.VolumeSt
 		} else {
 			blockSize = structure.Size
 		}
-		// use mkfs funcitons from snapd to create the filesystems
+		// use mkfs functions from snapd to create the filesystems
 		ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
 			"bs=" + strconv.FormatUint(uint64(blockSize), 10), "seek=1"}
 		if err := helperCopyBlob(ddArgs); err != nil {
 			return fmt.Errorf("Error zeroing image file %s: %s",
 				partImg, err.Error())
 		}
-		err := helper.MkfsWithContent(structure.Filesystem, partImg, structure.Label,
+		err := gadgetMkfsWithContent(structure.Filesystem, partImg, structure.Label,
 			contentRoot, structure.Size, quantity.Size(512))
 		if err != nil {
 			return fmt.Errorf("Error running mkfs: %s", err.Error())
@@ -493,6 +541,8 @@ func (stateMachine *StateMachine) Teardown() error {
 		if err := stateMachine.writeMetadata(); err != nil {
 			return err
 		}
+	} else {
+		stateMachine.cleanup()
 	}
 	return nil
 }

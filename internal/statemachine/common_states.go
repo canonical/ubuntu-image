@@ -75,6 +75,12 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 		return err
 	}
 
+	// for the --image-size argument, the order of the volumes specified in gadget.yaml
+	// must be preserved. However, since gadget.Info stores the volumes as a map, the
+	// order is not preserved. We use the already read-in gadget.yaml file to store the
+	// order of the volumes as an array in the StateMachine struct
+	stateMachine.saveVolumeOrder(string(gadgetYamlBytes))
+
 	if err := stateMachine.parseImageSizes(); err != nil {
 		return err
 	}
@@ -82,7 +88,7 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 	return nil
 }
 
-// Run hooks for populating rootfs contents
+// Run hooks specified by --hooks-directory after populating rootfs contents
 func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
 	if !stateMachine.isSeeded {
 		if stateMachine.commonFlags.Debug {
@@ -106,7 +112,7 @@ func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
 	return nil
 }
 
-// Generate the disk info
+// If --disk-info was used, copy the provided file to the correct location
 func (stateMachine *StateMachine) generateDiskInfo() error {
 	if stateMachine.commonFlags.DiskInfo != "" {
 		diskInfoDir := filepath.Join(stateMachine.tempDirs.rootfs, ".disk")
@@ -141,7 +147,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	return nil
 }
 
-// Populate the Bootfs Contents
+// Populate the Bootfs Contents by using snapd's MountedFilesystemWriter
 func (stateMachine *StateMachine) populateBootfsContents() error {
 	// find the name of the system volume. snapd functions have already verified it exists
 	var systemVolumeName string
@@ -175,7 +181,7 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 			}
 
 			var targetDir string
-			if laidOutStructure.Role == "system-seed" {
+			if laidOutStructure.Role == gadget.SystemSeed {
 				targetDir = stateMachine.tempDirs.rootfs
 			} else {
 				targetDir = filepath.Join(stateMachine.tempDirs.volumes,
@@ -191,7 +197,10 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 	return nil
 }
 
-// Populate and prepare the partitions
+// Populate and prepare the partitions. For partitions without filesystem: specified in
+// gadget.yaml, this involves using dd to copy the content blobs into a .img file. For
+// partitions that do have filesystem: specified, we use the Mkfs functions from snapd.
+// Throughout this process, the offset is tracked to ensure partitions are not overlapping.
 func (stateMachine *StateMachine) populatePreparePartitions() error {
 	// iterate through all the volumes
 	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {

@@ -76,7 +76,7 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 	})
 }
 
-// TestLoadGadgetYaml tests a succesful load of gadget.yaml. It also tests that the unpack
+// TestLoadGadgetYaml tests a successful load of gadget.yaml. It also tests that the unpack
 // directory is preserved if the relevant environment variable is set
 func TestLoadGadgetYaml(t *testing.T) {
 	t.Run("test_load_gadget_yaml", func(t *testing.T) {
@@ -183,14 +183,15 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 			t.Error("Expected an error, but got none")
 		}
 		osutilCopySpecialFile = osutil.CopySpecialFile
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
 
 		// set an invalid --image-size argument to cause a failure
 		stateMachine.commonFlags.Size = "test"
 		if err := stateMachine.loadGadgetYaml(); err == nil {
 			t.Error("Expected an error, but got none")
 		}
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -459,8 +460,7 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 		// set a valid yaml file and load it in
-		stateMachine.yamlFilePath = filepath.Join("testdata",
-			"gadget_tree", "meta", "gadget.yaml")
+		stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-seed.yaml")
 		// ensure unpack exists
 		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
 		if err := stateMachine.loadGadgetYaml(); err != nil {
@@ -496,6 +496,12 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 			t.Errorf("Expected an error, but got none")
 		}
 		gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
+
+		// set rootfs to an empty string in order to trigger a failure in Write()
+		stateMachine.tempDirs.rootfs = ""
+		if err := stateMachine.populateBootfsContents(); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
 	})
 }
 
@@ -593,6 +599,16 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 			t.Errorf("Did not expect an error, got %s", err.Error())
 		}
 
+		// now mock helper.CopyBlob to cause an error in copyStructureContent
+		helperCopyBlob = mockCopyBlob
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
+		if err := stateMachine.populatePreparePartitions(); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		helperCopyBlob = helper.CopyBlob
+
 		// set a bootloader to lk and mock mkdir to cause a failure in that function
 		for _, volume := range stateMachine.gadgetInfo.Volumes {
 			volume.Bootloader = "lk"
@@ -605,15 +621,5 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 			t.Errorf("Expected an error, but got none")
 		}
 		osMkdir = os.Mkdir
-
-		// now mock helper.CopyBlob to cause an error in copyStructureContent
-		helperCopyBlob = mockCopyBlob
-		defer func() {
-			helperCopyBlob = helper.CopyBlob
-		}()
-		if err := stateMachine.populatePreparePartitions(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
-		helperCopyBlob = helper.CopyBlob
 	})
 }
