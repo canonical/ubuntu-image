@@ -115,7 +115,6 @@ func RunScript(hookScript string) error {
 	hookScriptCmd.Env = os.Environ()
 	hookScriptCmd.Stdout = os.Stdout
 	hookScriptCmd.Stderr = os.Stderr
-	fmt.Println(hookScriptCmd)
 	if err := hookScriptCmd.Run(); err != nil {
 		return fmt.Errorf("Error running hook script %s: %s", hookScript, err.Error())
 	}
@@ -164,7 +163,6 @@ func MaxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 func CopyBlob(ddArgs []string) error {
 	ddCommand := *exec.Command("dd")
 	ddCommand.Args = ddArgs
-	fmt.Println(ddCommand)
 
 	if err := ddCommand.Run(); err != nil {
 		return err
@@ -288,7 +286,6 @@ func mkfsVfat(img, label, contentsRootDir string, deviceSize, sectorSize quantit
 	mkfsArgs = append(mkfsArgs, img)
 
 	cmd := exec.Command("mkfs.vfat", mkfsArgs...)
-	fmt.Println(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return osutil.OutputErr(out, err)
