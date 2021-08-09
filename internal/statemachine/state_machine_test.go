@@ -421,6 +421,11 @@ func TestParseImageSizes(t *testing.T) {
 			"second": 2 * quantity.SizeGiB,
 			"third":  3 * quantity.SizeGiB,
 			"fourth": 4 * quantity.SizeGiB}},
+		{"mixed_size_syntax", "0:1G,second:2G,2:3G,fourth:4G", map[string]quantity.Size{
+			"first":  1 * quantity.SizeGiB,
+			"second": 2 * quantity.SizeGiB,
+			"third":  3 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
 	}
 	for _, tc := range testCases {
 		t.Run("test_parse_image_sizes_"+tc.name, func(t *testing.T) {
