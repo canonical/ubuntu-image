@@ -19,7 +19,7 @@ jobs:
       - name: install-golint
         run: go get -u golang.org/x/lint/golint
       - name: golint
-        run: LINT=`golint ./...` && [ -z "$LINT" ]
+        run: LINT=`golint ./... | grep -v vendor` && [ -z "$LINT" ]
       - name: build
         run: go build ./...
       - name: apt-update
