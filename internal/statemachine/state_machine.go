@@ -8,8 +8,12 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/gadget"
+	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 )
 
@@ -50,7 +54,7 @@ type StateMachine struct {
 	CurrentStep  string // tracks the current progress of the state machine
 	StepsTaken   int    // counts the number of steps taken
 	yamlFilePath string // the location for the yaml file
-	isSeeded     bool   // whether the image is seeded (UC20+) or not
+	isSeeded     bool   // core 20 images are seeded
 	tempDirs     temporaryDirectories
 
 	// The flags that were passed in on the command line
@@ -61,6 +65,9 @@ type StateMachine struct {
 
 	// used to access image type specific variables from state functions
 	parent SmInterface
+
+	// imported from snapd, the info parsed from gadget.yaml
+	gadgetInfo *gadget.Info
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -152,6 +159,75 @@ func (stateMachine *StateMachine) cleanup() error {
 		if err := osRemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// postProcessGadgetYaml does some additional validation on gadget.yaml beyond what
+// snapd does, and adds the rootfs to the partitions list if needed
+func (stateMachine *StateMachine) postProcessGadgetYaml() error {
+	var rootfsSeen bool = false
+	var farthestOffset quantity.Offset = 0
+	var lastOffset quantity.Offset = 0
+	var lastVolumeName string
+	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
+		lastVolumeName = volumeName
+		volumeBaseDir := filepath.Join(stateMachine.tempDirs.volumes, volumeName)
+		if err := osMkdirAll(volumeBaseDir, 0755); err != nil {
+			return fmt.Errorf("Error creating volume dir: %s", err.Error())
+		}
+		// look for the rootfs and check if the image is seeded
+		for ii, structure := range volume.Structure {
+			if structure.Role == "" && structure.Label == gadget.SystemBoot {
+				fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
+					"used for defining partition roles; use role instead\n",
+					volumeName, ii)
+			} else if structure.Role == gadget.SystemData {
+				rootfsSeen = true
+			} else if structure.Role == gadget.SystemSeed {
+				stateMachine.isSeeded = true
+			}
+
+			// update farthestOffset if needed
+			var offset quantity.Offset
+			if structure.Offset == nil {
+				if structure.Role != "mbr" && lastOffset < quantity.OffsetMiB {
+					offset = quantity.OffsetMiB
+				} else {
+					offset = lastOffset
+				}
+			} else {
+				offset = *structure.Offset
+			}
+			lastOffset = offset + quantity.Offset(structure.Size)
+			farthestOffset = helper.MaxOffset(lastOffset, farthestOffset)
+		}
+	}
+
+	if !rootfsSeen && len(stateMachine.gadgetInfo.Volumes) == 1 {
+		// We still need to handle the case of unspecified system-data
+		// partition where we simply attach the rootfs at the end of the
+		// partition list.
+		//
+		// Since so far we have no knowledge of the rootfs contents, the
+		// size is set to 0, and will be calculated later
+		rootfsStructure := gadget.VolumeStructure{
+			Name:        "",
+			Label:       "writable",
+			Offset:      &farthestOffset,
+			OffsetWrite: new(gadget.RelativeOffset),
+			Size:        quantity.Size(0),
+			Type:        "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+			Role:        gadget.SystemData,
+			ID:          "",
+			Filesystem:  "ext4",
+			Content:     []gadget.VolumeContent{},
+			Update:      gadget.VolumeUpdate{},
+		}
+
+		// get the name of the volume
+		stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure =
+			append(stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure, rootfsStructure)
 	}
 	return nil
 }

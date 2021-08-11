@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 )
 
@@ -117,6 +118,14 @@ func SaveCWD() func() {
 	return func() {
 		os.Chdir(wd)
 	}
+}
+
+// MaxOffset returns the maximum of two quantity.Offset types
+func MaxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
+	if offset1 > offset2 {
+		return offset1
+	}
+	return offset2
 }
 
 func WriteSnapManifest(snapsDir string, outputPath string) error {
