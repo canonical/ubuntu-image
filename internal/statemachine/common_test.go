@@ -2,6 +2,7 @@
 package statemachine
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -443,7 +444,6 @@ func TestPopulateBootfsContents(t *testing.T) {
 				t.Errorf("Expected %s to exist, but it does not", fullPath)
 			}
 		}
-
 	})
 }
 
@@ -559,6 +559,18 @@ func TestPopulatePreparePartitions(t *testing.T) {
 			if _, err := os.Stat(partImg); err != nil {
 				t.Errorf("File %s should exist, but does not", partImg)
 			}
+		}
+
+		// check the contents of part0.img
+		partImg := filepath.Join(stateMachine.tempDirs.volumes,
+			"pc", "part0.img")
+		partImgBytes, _ := ioutil.ReadFile(partImg)
+		dataBytes := make([]byte, 440)
+		// partImg should consist of these 11 bytes and 429 null bytes
+		copy(dataBytes[:11], []byte{68, 85, 77, 77, 89, 32, 70, 73, 76, 69, 10})
+		if !bytes.Equal(partImgBytes, dataBytes) {
+			t.Errorf("Expected part0.img to contain %v, instead got %v %d",
+				dataBytes, partImgBytes, len(partImgBytes))
 		}
 	})
 }
