@@ -12,10 +12,14 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: '1.16'
+      - name: go-vet
+        run: go vet ./...
+      - name: go-fmt
+        run: FMT=`go fmt ./...` && [ -z "$FMT" ]
+      - name: go-lint
+        run: LINT=`go lint ./...` && [ -z "$LINT" ]
       - name: build
         run: go build ./...
-      - name: add-sil2100-ppa
-        run: sudo add-apt-repository -y ppa:sil2100/live-build-fix-attempt
       - name: apt-update
         run: sudo apt update
       - name: install-test-dependencies
