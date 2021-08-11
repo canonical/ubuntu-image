@@ -16,7 +16,8 @@ Homepage: http://launchpad.net/ubuntu-image
 Package: ubuntu-image
 Architecture: any
 Built-Using: ${misc:Built-Using},
-Depends: ${misc:Depends},
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
          fdisk,
          gdisk,
          livecd-rootfs,
