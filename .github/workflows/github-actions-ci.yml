@@ -17,7 +17,7 @@ jobs:
       - name: go-fmt
         run: FMT=`go fmt ./...` && [ -z "$FMT" ]
       - name: go-lint
-        run: LINT=`go lint ./...` && [ -z "$LINT" ]
+        run: LINT=`golint ./...` && [ -z "$LINT" ]
       - name: build
         run: go build ./...
       - name: apt-update
