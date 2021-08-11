@@ -47,15 +47,6 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 // populateSnapRootfsContents uses a NewMountedFileSystemWriter to populate the rootfs
 func (stateMachine *StateMachine) populateSnapRootfsContents() error {
-	isSeeded := false
-	for _, volume := range stateMachine.gadgetInfo.Volumes {
-		for _, structure := range volume.Structure {
-			if structure.Role == "system-seed" {
-				stateMachine.isSeeded = true
-			}
-		}
-	}
-
 	var src, dst string
 	if stateMachine.isSeeded {
 		// For now, since we only create the system-seed partition for
@@ -80,7 +71,7 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 		return fmt.Errorf("Error reading unpack dir: %s", err.Error())
 	}
 	for _, srcFile := range files {
-		if !isSeeded && srcFile.Name() == "boot" {
+		if !stateMachine.isSeeded && srcFile.Name() == "boot" {
 			continue
 		}
 		srcFile := filepath.Join(src, srcFile.Name())
