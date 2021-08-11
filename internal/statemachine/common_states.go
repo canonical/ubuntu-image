@@ -174,20 +174,32 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 	}
 
 	for ii, laidOutStructure := range laidOutVolume.LaidOutStructure {
+		var targetDir string
+		if laidOutStructure.Role == gadget.SystemSeed {
+			targetDir = stateMachine.tempDirs.rootfs
+		} else {
+			targetDir = filepath.Join(stateMachine.tempDirs.volumes,
+				systemVolumeName,
+				"part"+strconv.Itoa(ii))
+		}
+		    // Bad special-casing.  snapd's image.Prepare currently
+                    // installs to /boot/grub, but we need to map this to
+                    // /EFI/ubuntu.  This is because we are using a SecureBoot
+                    // signed bootloader image which has this path embedded, so
+                    // we need to install our files to there.
+		if !stateMachine.isSeeded &&
+			(laidOutStructure.Role == gadget.SystemBoot ||
+			laidOutStructure.Label == gadget.SystemBoot) {
+			if err := stateMachine.handleSecureBoot(systemVolume, targetDir); err != nil {
+				return err
+			}
+		}
 		if laidOutStructure.HasFilesystem() {
 			mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(&laidOutStructure, nil)
 			if err != nil {
 				return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
 			}
 
-			var targetDir string
-			if laidOutStructure.Role == gadget.SystemSeed {
-				targetDir = stateMachine.tempDirs.rootfs
-			} else {
-				targetDir = filepath.Join(stateMachine.tempDirs.volumes,
-					systemVolumeName,
-					"part"+strconv.Itoa(ii))
-			}
 			err = mountedFilesystemWriter.Write(targetDir, []string{})
 			if err != nil {
 				return fmt.Errorf("Error in mountedFilesystem.Write(): %s", err.Error())

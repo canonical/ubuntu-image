@@ -512,6 +512,39 @@ func (stateMachine *StateMachine) copyStructureContent(structure gadget.VolumeSt
 	return nil
 }
 
+// handleSecureBoot handles a special case where files need to be moved from /boot/ to
+// /EFI/ubuntu/ so that SecureBoot can still be used
+func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, targetDir string) error {
+	var bootDir, ubuntuDir string
+	if volume.Bootloader == "u-boot" {
+		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "uboot")
+		ubuntuDir = targetDir
+	} else if volume.Bootloader == "grub" {
+		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "grub")
+		ubuntuDir = filepath.Join(targetDir, "EFI", "ubuntu")
+	}
+
+	// copy the files from bootDir to ubuntuDir
+	if err := osMkdirAll(ubuntuDir, 0755); err != nil {
+		return fmt.Errorf("Error creating ubuntu dir: %s", err.Error())
+	}
+
+	files, err := ioutilReadDir(bootDir)
+	if err != nil {
+		return fmt.Errorf("Error reading boot dir: %s", err.Error())
+	}
+	for _, bootFile := range files {
+		srcFile := filepath.Join(bootDir, bootFile.Name())
+		if err := osutilCopySpecialFile(srcFile, ubuntuDir); err != nil {
+			return fmt.Errorf("Error copying boot dir: %s", err.Error())
+		}
+	}
+
+	return nil
+}
+
 // Run iterates through the state functions, stopping when appropriate based on --until and --thru
 func (stateMachine *StateMachine) Run() error {
 	// iterate through the states
