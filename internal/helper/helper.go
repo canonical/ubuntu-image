@@ -162,7 +162,7 @@ func MaxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 // CopyBlob runs `dd` to copy a blob to an image file
 func CopyBlob(ddArgs []string) error {
 	ddCommand := *exec.Command("dd")
-	ddCommand.Args = ddArgs
+	ddCommand.Args = append(ddCommand.Args, ddArgs...)
 
 	if err := ddCommand.Run(); err != nil {
 		return err
