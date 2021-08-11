@@ -16,7 +16,9 @@ jobs:
         run: go vet ./...
       - name: go-fmt
         run: FMT=`go fmt ./...` && [ -z "$FMT" ]
-      - name: go-lint
+      - name: install-golint
+        run: go get -u golang.org/x/lint/golint
+      - name: golint
         run: LINT=`golint ./...` && [ -z "$LINT" ]
       - name: build
         run: go build ./...
