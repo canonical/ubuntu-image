@@ -48,7 +48,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 // Generate the manifest
 func (stateMachine *StateMachine) generateSnapManifest() error {
 	// We could use snapd's seed.Open() to generate the manifest here, but
-	// actually it doesn't make things much easier than doing it manually
+	// actually it doesn't make things much easier than doing it manually -
 	// like we did in the past. So let's just go with this.
 
 	// snaps.manifest

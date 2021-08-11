@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/snapcore/snapd/osutil"
@@ -21,6 +22,7 @@ var osMkdirAll = os.MkdirAll
 var osRemoveAll = os.RemoveAll
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
+var execCommand = exec.Command
 
 // SmInterface allows different image types to implement their own setup/run/teardown functions
 type SmInterface interface {

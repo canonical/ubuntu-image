@@ -3,7 +3,6 @@ package statemachine
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -99,7 +98,7 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	// This is basically just a wrapper around dpkg-query
 
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
-	cmd := exec.Command("sudo", "chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
+	cmd := execCommand("sudo", "chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
 	manifest, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("Error creating manifest file: %s", err.Error())
