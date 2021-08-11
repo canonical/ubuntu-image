@@ -79,7 +79,7 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 
 // Run hooks for populating rootfs contents
 func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
-	if !stateMachine.isSeeded {
+	if stateMachine.isSeeded {
 		if stateMachine.commonFlags.Debug {
 			fmt.Println("Building from a seeded gadget - " +
 				"skipping the post-populate-rootfs hook execution: unsupported")
