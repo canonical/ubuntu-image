@@ -191,11 +191,11 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 func TestPopulateRootfsContentsHooks(t *testing.T) {
 	testCases := []struct {
 		name         string
-		hooksAllowed bool
+		isSeeded     bool
 		hooksCreated []string
 	}{
-		{"hooks_succeed", true, []string{"post-populate-rootfs-hookfile", "post-populate-rootfs-hookfile.d1", "post-populate-rootfs-hookfile.d2"}},
-		{"hooks_not_allowed", false, []string{}},
+		{"hooks_succeed", false, []string{"post-populate-rootfs-hookfile", "post-populate-rootfs-hookfile.d1", "post-populate-rootfs-hookfile.d2"}},
+		{"hooks_not_allowed", true, []string{}},
 	}
 	for _, tc := range testCases {
 		t.Run("test_"+tc.name, func(t *testing.T) {
@@ -206,7 +206,7 @@ func TestPopulateRootfsContentsHooks(t *testing.T) {
 				filepath.Join("testdata", "good_hooksd"),
 				filepath.Join("testdata", "good_hookscript"),
 			}
-			stateMachine.isSeeded = tc.hooksAllowed
+			stateMachine.isSeeded = tc.isSeeded
 
 			// need workdir set up for this
 			if err := stateMachine.makeTemporaryDirectories(); err != nil {
@@ -246,7 +246,7 @@ func TestFailedPopulateRootfsContentsHooks(t *testing.T) {
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.commonFlags.HooksDirectories = tc.hooksDirs
-			stateMachine.isSeeded = true
+			stateMachine.isSeeded = false
 
 			// need workdir set up for this
 			if err := stateMachine.makeTemporaryDirectories(); err != nil {
