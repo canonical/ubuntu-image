@@ -106,6 +106,6 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	defer manifest.Close()
 
 	cmd.Stdout = manifest
-	err = cmd.Run();
+	err = cmd.Run()
 	return err
 }

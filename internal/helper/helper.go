@@ -3,10 +3,10 @@ package helper
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
-	"io/ioutil"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -128,12 +128,13 @@ func MaxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	return offset2
 }
 
+// WriteSnapManifest generates a snap manifest based on the contents of the selected snapsDir
 func WriteSnapManifest(snapsDir string, outputPath string) error {
 	files, err := ioutil.ReadDir(snapsDir)
 	if err != nil {
 		return fmt.Errorf("Error reading snaps directory: %s", err.Error())
 	}
-	
+
 	manifest, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("Error creating manifest file: %s", err.Error())

@@ -148,8 +148,8 @@ func TestFailedPrepareImage(t *testing.T) {
 // TestGenerateSnapManifest tests if snap-based image manifest generation works
 func TestGenerateSnapManifest(t *testing.T) {
 	testCases := []struct {
-		name       string
-		seeded     bool
+		name   string
+		seeded bool
 	}{
 		{"snap_manifest_regular", false},
 		{"snap_manifest_seeded", true},
@@ -174,8 +174,8 @@ func TestGenerateSnapManifest(t *testing.T) {
 
 			// Prepare direcory structure for installed and seeded snaps
 			snapsDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "snaps")
-			seedDir  := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "seed", "snaps")
-			uc20Dir  := filepath.Join(stateMachine.tempDirs.rootfs, "snaps")
+			seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "seed", "snaps")
+			uc20Dir := filepath.Join(stateMachine.tempDirs.rootfs, "snaps")
 			osMkdirAll(snapsDir, 0755)
 			osMkdirAll(seedDir, 0755)
 			osMkdirAll(uc20Dir, 0755)

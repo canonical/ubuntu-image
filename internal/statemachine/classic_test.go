@@ -17,10 +17,10 @@ var testCaseName string
 
 // Fake exec command helper
 func fakeExecCommand(command string, args ...string) *exec.Cmd {
-	cs  := []string{"-test.run=TestExecHelperProcess", "--", command}
-	cs   = append(cs, args...)
+	cs := []string{"-test.run=TestExecHelperProcess", "--", command}
+	cs = append(cs, args...)
 	cmd := exec.Command(os.Args[0], cs...)
-	tc  := "TEST_CASE=" + testCaseName
+	tc := "TEST_CASE=" + testCaseName
 	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", tc}
 	return cmd
 }
