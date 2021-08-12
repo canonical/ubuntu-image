@@ -179,10 +179,16 @@ func TestGenerateSnapManifest(t *testing.T) {
 			osMkdirAll(snapsDir, 0755)
 			osMkdirAll(seedDir, 0755)
 			osMkdirAll(uc20Dir, 0755)
-			testEnvMap := map[string][]string{
-				snapsDir: {"foo_1.23.snap", "bar_1.23_version.snap", "baz_234.snap", "dummy_file"},
-				seedDir:  {"foo_1.23.snap", "dummy_file_2.txt", "test_1234.snap"},
-				uc20Dir:  {"foo_1.23.snap", "uc20specific_345.snap"},
+			var testEnvMap map[string][]string
+			if tc.seeded {
+				testEnvMap = map[string][]string{
+					uc20Dir: {"foo_1.23.snap", "uc20specific_345.snap"},
+				}
+			} else {
+				testEnvMap = map[string][]string{
+					snapsDir: {"foo_1.23.snap", "bar_1.23_version.snap", "baz_234.snap", "dummy_file"},
+					seedDir:  {"foo_1.23.snap", "dummy_file_2.txt", "test_1234.snap"},
+				}
 			}
 			for dir, fileList := range testEnvMap {
 				for _, file := range fileList {
@@ -203,8 +209,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 			var testResultMap map[string][]string
 			if tc.seeded {
 				testResultMap = map[string][]string{
-					"snaps.manifest": {"foo 1.23", "bar 1.23_version", "baz 234"},
-					"seed.manifest":  {"foo 1.23", "uc20specific 345"},
+					"seed.manifest": {"foo 1.23", "uc20specific 345"},
 				}
 			} else {
 				testResultMap = map[string][]string{

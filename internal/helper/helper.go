@@ -132,7 +132,9 @@ func MaxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 func WriteSnapManifest(snapsDir string, outputPath string) error {
 	files, err := ioutil.ReadDir(snapsDir)
 	if err != nil {
-		return fmt.Errorf("Error reading snaps directory: %s", err.Error())
+		// As per previous ubuntu-image manifest generation, we skip generating
+		// manifests for non-existent/invalid paths
+		return nil
 	}
 
 	manifest, err := os.Create(outputPath)
