@@ -156,11 +156,6 @@ func (stateMachine *StateMachine) makeDisk() error {
 	return nil
 }
 
-// Generate the manifest
-func (stateMachine *StateMachine) generateManifest() error {
-	return nil
-}
-
 // Finish step to show that the build was successful
 func (stateMachine *StateMachine) finish() error {
 	return nil
