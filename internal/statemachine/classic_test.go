@@ -566,10 +566,10 @@ func TestFilesystemFlag(t *testing.T) {
 		// check that the specified filesystem was copied over
 		if _, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, "testfile")); err != nil {
 			t.Errorf("Failed to copy --filesystem to rootfs")
- 		}
+		}
 	})
 }
-      
+
 // TestGeneratePackageManifest tests if classic image manifest generation works
 func TestGeneratePackageManifest(t *testing.T) {
 	t.Run("test_generate_package_manifest", func(t *testing.T) {
