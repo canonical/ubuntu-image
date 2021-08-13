@@ -24,6 +24,7 @@ var ioutilWriteFile = ioutil.WriteFile
 var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
 var osRemoveAll = os.RemoveAll
+var osCreate = os.Create
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
 var execCommand = exec.Command

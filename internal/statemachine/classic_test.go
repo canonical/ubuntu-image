@@ -442,3 +442,30 @@ func TestGeneratePackageManifest(t *testing.T) {
 		}
 	})
 }
+
+// TestFailedGeneratePackageManifest tests if classic manifest generation failures are reported
+func TestFailedGeneratePackageManifest(t *testing.T) {
+	t.Run("test_failed_generate_package_manifest", func(t *testing.T) {
+
+		// Setup the exec.Command mock - version from the success test
+		testCaseName = "TestGeneratePackageManifest"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		// Setup the mock for os.Create, making those fail
+		osCreate = mockCreate
+		defer func() {
+			osCreate = os.Create
+		}()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.commonFlags.OutputDir = "/dummy/path"
+
+		if err := stateMachine.generatePackageManifest(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+	})
+}

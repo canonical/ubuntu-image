@@ -233,3 +233,34 @@ func TestGenerateSnapManifest(t *testing.T) {
 		})
 	}
 }
+
+// TestFailedGenerateSnapManifest tests if snap-based image manifest generation failures are catched
+func TestFailedGenerateSnapManifest(t *testing.T) {
+	t.Run("test_failed_generate_snap_manifest", func(t *testing.T) {
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		ioutilReadDir = func(string) ([]os.FileInfo, error) {
+			return []os.FileInfo{}, nil
+		}
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		// Setup the mock for os.Create, making those fail
+		osCreate = mockCreate
+		defer func() {
+			osCreate = os.Create
+		}()
+
+		var stateMachine SnapStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.stateMachineFlags.WorkDir = "/dummy/path"
+		stateMachine.tempDirs.rootfs = "/dummy/path"
+		stateMachine.isSeeded = false
+		stateMachine.commonFlags.OutputDir = "/dummy/path"
+
+		if err := stateMachine.generateSnapManifest(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+	})
+}

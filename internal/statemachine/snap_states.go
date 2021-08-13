@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/snap"
 )
@@ -54,7 +53,7 @@ func (stateMachine *StateMachine) generateSnapManifest() error {
 	// snaps.manifest
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "snaps.manifest")
 	snapsDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "snaps")
-	err := helper.WriteSnapManifest(snapsDir, outputPath)
+	err := WriteSnapManifest(snapsDir, outputPath)
 	if err != nil {
 		return err
 	}
@@ -66,7 +65,7 @@ func (stateMachine *StateMachine) generateSnapManifest() error {
 	} else {
 		snapsDir = filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "seed", "snaps")
 	}
-	err = helper.WriteSnapManifest(snapsDir, outputPath)
+	err = WriteSnapManifest(snapsDir, outputPath)
 
 	return err
 }

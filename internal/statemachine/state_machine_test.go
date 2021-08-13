@@ -53,6 +53,9 @@ func mockMkdirAll(string, os.FileMode) error {
 func mockRemoveAll(string) error {
 	return fmt.Errorf("Test error")
 }
+func mockCreate(string) (*os.File, error) {
+	return nil, fmt.Errorf("Test error")
+}
 func mockCopyFile(string, string, osutil.CopyFlag) error {
 	return fmt.Errorf("Test error")
 }
