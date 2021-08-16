@@ -526,6 +526,11 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 		ubuntuDir = filepath.Join(targetDir, "EFI", "ubuntu")
 	}
 
+	if _, err := os.Stat(bootDir); err != nil {
+		// this won't always exist, and that's fine
+		return nil
+	}
+
 	// copy the files from bootDir to ubuntuDir
 	if err := osMkdirAll(ubuntuDir, 0755); err != nil {
 		return fmt.Errorf("Error creating ubuntu dir: %s", err.Error())

@@ -704,3 +704,55 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		gadgetMkfsWithContent = helper.MkfsWithContent //TODO: after snapd PR merged
 	})
 }
+
+// TestFailedHandleSecureBoot tests failures in the handleSecureBoot function by mocking functions
+func TestFailedHandleSecureBoot(t *testing.T) {
+	t.Run("test_failed_handle_secure_boot", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// create a volume
+		volume := new(gadget.Volume)
+		volume.Bootloader = "u-boot"
+		// make the u-boot directory and add a file
+		bootDir := filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "uboot")
+		os.MkdirAll(bootDir, 0755)
+		osutil.CopySpecialFile(filepath.Join("testdata", "grubenv"), bootDir)
+
+		// mock os.Mkdir
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		if err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		osMkdirAll = os.MkdirAll
+
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		if err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		ioutilReadDir = ioutil.ReadDir
+
+		// mock osutil.CopySpecialFile
+		osutilCopySpecialFile = mockCopySpecialFile
+		defer func() {
+			osutilCopySpecialFile = osutil.CopySpecialFile
+		}()
+		if err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		osutilCopySpecialFile = osutil.CopySpecialFile
+	})
+}

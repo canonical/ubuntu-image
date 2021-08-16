@@ -502,6 +502,27 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		if err := stateMachine.populateBootfsContents(); err == nil {
 			t.Errorf("Expected an error, but got none")
 		}
+
+		// cause a failure in handleSecureBoot. First change to un-seeded yaml file and load it in
+		stateMachine.yamlFilePath = filepath.Join("testdata",
+			"gadget_tree", "meta", "gadget.yaml")
+		// ensure unpack exists
+		if err := stateMachine.loadGadgetYaml(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		stateMachine.isSeeded = false
+		// now ensure grub dir exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "grub"), 0755)
+		// mock os.MkdirAll
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		if err := stateMachine.populateBootfsContents(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		osMkdirAll = os.MkdirAll
 	})
 }
 
