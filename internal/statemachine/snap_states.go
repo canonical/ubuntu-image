@@ -82,3 +82,29 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 
 	return nil
 }
+
+// Generate the manifest
+func (stateMachine *StateMachine) generateSnapManifest() error {
+	// We could use snapd's seed.Open() to generate the manifest here, but
+	// actually it doesn't make things much easier than doing it manually -
+	// like we did in the past. So let's just go with this.
+
+	// snaps.manifest
+	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "snaps.manifest")
+	snapsDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "snaps")
+	err := WriteSnapManifest(snapsDir, outputPath)
+	if err != nil {
+		return err
+	}
+
+	// seed.manifest
+	outputPath = filepath.Join(stateMachine.commonFlags.OutputDir, "seed.manifest")
+	if stateMachine.isSeeded {
+		snapsDir = filepath.Join(stateMachine.tempDirs.rootfs, "snaps")
+	} else {
+		snapsDir = filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "seed", "snaps")
+	}
+	err = WriteSnapManifest(snapsDir, outputPath)
+
+	return err
+}

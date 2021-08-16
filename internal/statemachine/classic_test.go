@@ -15,6 +15,45 @@ import (
 	"github.com/snapcore/snapd/osutil"
 )
 
+var testCaseName string
+
+// Fake exec command helper
+func fakeExecCommand(command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestExecHelperProcess", "--", command}
+	cs = append(cs, args...)
+	cmd := exec.Command(os.Args[0], cs...)
+	tc := "TEST_CASE=" + testCaseName
+	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", tc}
+	return cmd
+}
+
+// This is a helper that mocks out any exec calls performed in this package
+func TestExecHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+	defer os.Exit(0)
+	args := os.Args
+
+	// We need to get rid of the trailing 'mock' call of our test binary, so
+	// that args has the actual command arguments. We can then check their
+	// correctness etc.
+	for len(args) > 0 {
+		if args[0] == "--" {
+			args = args[1:]
+			break
+		}
+		args = args[1:]
+	}
+
+	// I think the best idea I saw from people is to switch this on test case
+	// instead on the actual arguments. And this makes sense to me
+	switch os.Getenv("TEST_CASE") {
+	case "TestGeneratePackageManifest":
+		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
+	}
+}
+
 // This is a helper function that we can use to examine the lb commands without running them
 func (stateMachine *StateMachine) examineLiveBuild() error {
 	var classicStateMachine *ClassicStateMachine
@@ -527,6 +566,76 @@ func TestFilesystemFlag(t *testing.T) {
 		// check that the specified filesystem was copied over
 		if _, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, "testfile")); err != nil {
 			t.Errorf("Failed to copy --filesystem to rootfs")
+		}
+	})
+}
+
+// TestGeneratePackageManifest tests if classic image manifest generation works
+func TestGeneratePackageManifest(t *testing.T) {
+	t.Run("test_generate_package_manifest", func(t *testing.T) {
+
+		// Setup the exec.Command mock
+		testCaseName = "TestGeneratePackageManifest"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		// We need the output directory set for this
+		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		if err != nil {
+			t.Errorf("Failed to create output directory")
+		}
+		defer os.RemoveAll(outputDir)
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.commonFlags.OutputDir = outputDir
+		osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+
+		if err := stateMachine.generatePackageManifest(); err != nil {
+			t.Errorf("Did not expect an error, but got %s", err.Error())
+		}
+
+		// Check if manifest file got generated and if it has expected contents
+		manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
+		manifestBytes, err := ioutil.ReadFile(manifestPath)
+		if err != nil {
+			t.Errorf("Failed to read file %s: %s", manifestPath, err.Error())
+		}
+		// The order of packages shouldn't matter
+		examplePackages := []string{"foo 1.2", "bar 1.4-1ubuntu4.1", "libbaz 0.1.3ubuntu2"}
+		for _, pkg := range examplePackages {
+			if !strings.Contains(string(manifestBytes), pkg) {
+				t.Errorf("filesystem.manifest does not contain expected package: %s", pkg)
+			}
+		}
+	})
+}
+
+// TestFailedGeneratePackageManifest tests if classic manifest generation failures are reported
+func TestFailedGeneratePackageManifest(t *testing.T) {
+	t.Run("test_failed_generate_package_manifest", func(t *testing.T) {
+
+		// Setup the exec.Command mock - version from the success test
+		testCaseName = "TestGeneratePackageManifest"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		// Setup the mock for os.Create, making those fail
+		osCreate = mockCreate
+		defer func() {
+			osCreate = os.Create
+		}()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.commonFlags.OutputDir = "/dummy/path"
+
+		if err := stateMachine.generatePackageManifest(); err == nil {
+			t.Error("Expected an error, but got none")
 		}
 	})
 }

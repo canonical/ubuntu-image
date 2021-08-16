@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -31,8 +32,10 @@ var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
 var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
+var osCreate = os.Create
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
+var execCommand = exec.Command
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 

@@ -16,7 +16,7 @@ var snapStates = []stateFunc{
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
 	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
 	{"make_disk", (*StateMachine).makeDisk},
-	{"generate_manifest", (*StateMachine).generateManifest},
+	{"generate_manifest", (*StateMachine).generateSnapManifest},
 	{"finish", (*StateMachine).finish},
 }
 
