@@ -3,7 +3,6 @@
 package statemachine
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -14,95 +13,6 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/snapcore/snapd/osutil"
 )
-
-var testCaseName string
-
-// Fake exec command helper
-func fakeExecCommand(command string, args ...string) *exec.Cmd {
-	cs := []string{"-test.run=TestExecHelperProcess", "--", command}
-	cs = append(cs, args...)
-	cmd := exec.Command(os.Args[0], cs...)
-	tc := "TEST_CASE=" + testCaseName
-	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", tc}
-	return cmd
-}
-
-// This is a helper that mocks out any exec calls performed in this package
-func TestExecHelperProcess(t *testing.T) {
-	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
-		return
-	}
-	defer os.Exit(0)
-	args := os.Args
-
-	// We need to get rid of the trailing 'mock' call of our test binary, so
-	// that args has the actual command arguments. We can then check their
-	// correctness etc.
-	for len(args) > 0 {
-		if args[0] == "--" {
-			args = args[1:]
-			break
-		}
-		args = args[1:]
-	}
-
-	// I think the best idea I saw from people is to switch this on test case
-	// instead on the actual arguments. And this makes sense to me
-	switch os.Getenv("TEST_CASE") {
-	case "TestGeneratePackageManifest":
-		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
-	}
-}
-
-// This is a helper function that we can use to examine the lb commands without running them
-func (stateMachine *StateMachine) examineLiveBuild() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
-	if classicStateMachine.Opts.Filesystem == "" {
-		// --filesystem was not provided, so we use live-build to create one
-		var env []string
-		var arch string
-		env = append(env, "PROJECT="+classicStateMachine.Opts.Project)
-		if classicStateMachine.Opts.Suite != "" {
-			env = append(env, "SUITE="+classicStateMachine.Opts.Suite)
-		} else {
-			env = append(env, "SUITE="+helper.GetHostSuite())
-		}
-		if classicStateMachine.Opts.Arch == "" {
-			arch = helper.GetHostArch()
-		} else {
-			arch = classicStateMachine.Opts.Arch
-		}
-		env = append(env, "ARCH="+arch)
-		if classicStateMachine.Opts.Subproject != "" {
-			env = append(env, "SUBPROJECT="+classicStateMachine.Opts.Subproject)
-		}
-		if classicStateMachine.Opts.Subarch != "" {
-			env = append(env, "SUBARCH="+classicStateMachine.Opts.Subarch)
-		}
-		if classicStateMachine.Opts.WithProposed {
-			env = append(env, "PROPOSED=1")
-		}
-		if len(classicStateMachine.Opts.ExtraPPAs) > 0 {
-			env = append(env, "EXTRA_PPAS="+strings.Join(classicStateMachine.Opts.ExtraPPAs, " "))
-		}
-		env = append(env, "IMAGEFORMAT=none")
-		lbConfig, _, err := helper.SetupLiveBuildCommands(classicStateMachine.tempDirs.rootfs,
-			arch, env, true)
-		if err != nil {
-			return fmt.Errorf("error setting up live_build: %s", err.Error())
-		}
-
-		for _, arg := range lbConfig.Args {
-			if arg == "--bootstrap-qemu-arch" {
-				return nil
-			}
-		}
-		// bootstrap-qemu-arch not found, fail test
-		return fmt.Errorf("Error: --bootstramp-qemu-arch not found in lb config args")
-	}
-	return nil
-}
 
 // TestInvalidCommandLineClassic tests invalid command line input for classic images
 func TestInvalidCommandLineClassic(t *testing.T) {
@@ -260,45 +170,6 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		}
 
 		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}
-
-// TestCrossArch uses a different arch than the host arch and ensures lb commands are set up correctly.
-// These tend to be flakey or fail in different environments, so we don't actually run lb commands
-func TestSuccessfulClassicCrossArch(t *testing.T) {
-	t.Run("test_successful_classic_cross_arch", func(t *testing.T) {
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Opts.Project = "ubuntu-cpc"
-		stateMachine.stateMachineFlags.Thru = "run_live_build"
-		if helper.GetHostArch() != "arm64" {
-			stateMachine.Opts.Arch = "arm64"
-		} else {
-			stateMachine.Opts.Arch = "armhf"
-		}
-		stateMachine.Args.GadgetTree = "testdata/gadget_tree"
-		stateMachine.stateMachineFlags.Thru = "run_live_build"
-		stateMachine.parent = &stateMachine
-
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
-
-		// change the runLiveBuild function to not run the live build commands but inspect their args
-		stateNum := stateMachine.getStateNumberByName("run_live_build")
-		oldFunc := stateMachine.states[stateNum]
-		defer func() {
-			stateMachine.states[stateNum] = oldFunc
-		}()
-		stateMachine.states[stateNum] = stateFunc{"run_live_build", (*StateMachine).examineLiveBuild}
-
-		if err := stateMachine.Run(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)

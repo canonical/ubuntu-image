@@ -1,5 +1,4 @@
 Tests: run-tests
 Restrictions: needs-root, isolation-machine, allow-stderr
 Depends: @builddeps@,
-         qemu-system-aarch64,
          qemu-user-static

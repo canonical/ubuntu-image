@@ -23,8 +23,6 @@ import (
 // define some functions that can be mocked by test cases
 var gadgetLayoutVolume = gadget.LayoutVolume
 var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
-var gadgetMkfsWithContent = helper.MkfsWithContent //TODO once snapd PR is merged fix this
-var helperCopyBlob = helper.CopyBlob
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
 var ioutilWriteFile = ioutil.WriteFile
@@ -313,7 +311,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				offset = *structure.Offset
 			}
 			lastOffset = offset + quantity.Offset(structure.Size)
-			farthestOffset = helper.MaxOffset(lastOffset, farthestOffset)
+			farthestOffset = maxOffset(lastOffset, farthestOffset)
 		}
 	}
 
@@ -378,138 +376,6 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 			if err := helper.RunScript(hookScript); err != nil {
 				return err
 			}
-		}
-	}
-	return nil
-}
-
-// handleLkBootloader handles the special "lk" bootloader case where some extra
-// files need to be added to the bootfs
-func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) error {
-	if volume.Bootloader != "lk" {
-		return nil
-	}
-	// For the LK bootloader we need to copy boot.img and snapbootsel.bin to
-	// the gadget folder so they can be used as partition content. The first
-	// one comes from the kernel snap, while the second one is modified by
-	// the prepare_image step to set the right core and kernel for the kernel
-	// command line.
-	bootDir := filepath.Join(stateMachine.tempDirs.unpack,
-		"image", "boot", "lk")
-	gadgetDir := filepath.Join(stateMachine.tempDirs.unpack, "gadget")
-	if _, err := os.Stat(bootDir); err != nil {
-		return fmt.Errorf("got lk bootloader but directory %s does not exist", bootDir)
-	}
-	err := osMkdir(gadgetDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("Failed to create gadget dir: %s", err.Error())
-	}
-	files, err := ioutilReadDir(bootDir)
-	if err != nil {
-		return fmt.Errorf("Error reading lk bootloader dir: %s", err.Error())
-	}
-	for _, lkFile := range files {
-		srcFile := filepath.Join(bootDir, lkFile.Name())
-		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
-			return fmt.Errorf("Error copying lk bootloader dir: %s", err.Error())
-		}
-	}
-	return nil
-}
-
-// handleContentSizes ensures that the sizes of the partitions are large enough and stores
-// safe values in the stateMachine struct for use during make_image
-func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
-	// store volume sizes in the stateMachine Struct. These will be used during
-	// the make_image step
-	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
-	volumeSize, found := stateMachine.imageSizes[volumeName]
-	if !found {
-		stateMachine.imageSizes[volumeName] = calculated
-	} else {
-		if volumeSize < calculated {
-			fmt.Printf("WARNING: ignoring image size smaller than "+
-				"minimum required size: vol:%s %d < %d",
-				volumeName, uint64(volumeSize), uint64(calculated))
-			stateMachine.imageSizes[volumeName] = calculated
-		} else {
-			stateMachine.imageSizes[volumeName] = volumeSize
-		}
-	}
-}
-
-// shouldSkipStructure returns whether a structure should be skipped during certain processing
-func (stateMachine *StateMachine) shouldSkipStructure(structure gadget.VolumeStructure) bool {
-	if stateMachine.isSeeded &&
-		(structure.Role == gadget.SystemBoot ||
-			structure.Role == gadget.SystemData ||
-			structure.Role == gadget.SystemSave ||
-			structure.Label == gadget.SystemBoot) {
-		return true
-	}
-	return false
-}
-
-// copyStructureContent handles copying raw blobs or creating formatted filesystems
-func (stateMachine *StateMachine) copyStructureContent(structure gadget.VolumeStructure,
-	contentRoot, partImg string) error {
-	if structure.Filesystem == "" {
-		// copy the contents to the new location
-		var runningOffset quantity.Offset = 0
-		for _, content := range structure.Content {
-			if content.Offset != nil {
-				runningOffset = *content.Offset
-			}
-			// first zero it out. Structures without filesystem specified in the gadget
-			// yaml must have the size specified, so the bs= argument below is valid
-			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
-				"bs=" + strconv.FormatUint(uint64(structure.Size), 10),
-				"seek=1"}
-			if err := helperCopyBlob(ddArgs); err != nil {
-				return fmt.Errorf("Error zeroing partition: %s",
-					err.Error())
-			}
-
-			// now copy the raw content file specified in gadget.yaml
-			inFile := filepath.Join(stateMachine.tempDirs.unpack,
-				"gadget", content.Image)
-			ddArgs = []string{"if=" + inFile, "of=" + partImg, "bs=" + mockableBlockSize,
-				"seek=" + strconv.FormatUint(uint64(runningOffset), 10),
-				"conv=sparse,notrunc"}
-			if err := helperCopyBlob(ddArgs); err != nil {
-				return fmt.Errorf("Error copying image blob: %s",
-					err.Error())
-			}
-			runningOffset += quantity.Offset(content.Size)
-		}
-	} else {
-		var blockSize quantity.Size
-		if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
-			// system-data and system-seed structures are not required to have
-			// an explicit size set in the yaml file
-			if structure.Size < stateMachine.rootfsSize {
-				fmt.Printf("WARNING: rootfs structure size %s smaller "+
-					"than actual rootfs contents %s\n",
-					structure.Size.IECString(),
-					stateMachine.rootfsSize.IECString())
-				blockSize = stateMachine.rootfsSize
-			} else {
-				blockSize = structure.Size
-			}
-		} else {
-			blockSize = structure.Size
-		}
-		// use mkfs functions from snapd to create the filesystems
-		ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
-			"bs=" + strconv.FormatUint(uint64(blockSize), 10), "seek=1"}
-		if err := helperCopyBlob(ddArgs); err != nil {
-			return fmt.Errorf("Error zeroing image file %s: %s",
-				partImg, err.Error())
-		}
-		err := gadgetMkfsWithContent(structure.Filesystem, partImg, structure.Label,
-			contentRoot, structure.Size, quantity.Size(512))
-		if err != nil {
-			return fmt.Errorf("Error running mkfs: %s", err.Error())
 		}
 	}
 	return nil

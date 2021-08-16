@@ -182,14 +182,14 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 				systemVolumeName,
 				"part"+strconv.Itoa(ii))
 		}
-		    // Bad special-casing.  snapd's image.Prepare currently
-                    // installs to /boot/grub, but we need to map this to
-                    // /EFI/ubuntu.  This is because we are using a SecureBoot
-                    // signed bootloader image which has this path embedded, so
-                    // we need to install our files to there.
+		// Bad special-casing.  snapd's image.Prepare currently
+		// installs to /boot/grub, but we need to map this to
+		// /EFI/ubuntu.  This is because we are using a SecureBoot
+		// signed bootloader image which has this path embedded, so
+		// we need to install our files to there.
 		if !stateMachine.isSeeded &&
 			(laidOutStructure.Role == gadget.SystemBoot ||
-			laidOutStructure.Label == gadget.SystemBoot) {
+				laidOutStructure.Label == gadget.SystemBoot) {
 			if err := stateMachine.handleSecureBoot(systemVolume, targetDir); err != nil {
 				return err
 			}
@@ -214,43 +214,6 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 // partitions that do have filesystem: specified, we use the Mkfs functions from snapd.
 // Throughout this process, the offset is tracked to ensure partitions are not overlapping.
 func (stateMachine *StateMachine) populatePreparePartitions() error {
-	// iterate through all the volumes
-	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
-		if err := stateMachine.handleLkBootloader(volume); err != nil {
-			return err
-		}
-		var farthestOffset quantity.Offset = 0
-		for structureNumber, structure := range volume.Structure {
-			var contentRoot string
-			if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
-				contentRoot = stateMachine.tempDirs.rootfs
-			} else {
-				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
-					"part"+strconv.Itoa(structureNumber))
-			}
-			var offset quantity.Offset
-			if structure.Offset != nil {
-				offset = *structure.Offset
-			} else {
-				offset = 0
-			}
-			farthestOffset = helper.MaxOffset(farthestOffset,
-				quantity.Offset(structure.Size)+offset)
-			if stateMachine.shouldSkipStructure(structure) {
-				continue
-			}
-
-			// copy the data
-			partImg := filepath.Join(stateMachine.tempDirs.volumes, volumeName,
-				"part"+strconv.Itoa(structureNumber)+".img")
-			if err := stateMachine.copyStructureContent(structure,
-				contentRoot, partImg); err != nil {
-				return err
-			}
-		}
-		// set the image size values to be used by make_disk
-		stateMachine.handleContentSizes(farthestOffset, volumeName)
-	}
 	return nil
 }
 
