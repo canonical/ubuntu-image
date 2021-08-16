@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
@@ -90,18 +91,34 @@ func SetupLiveBuildCommands(rootfs, arch string, env []string, enableCrossBuild 
 		// For cases where we want to cross-build, we need to pass
 		// additional options to live-build with the arch to use and path
 		// to the qemu static
-		qemuPath := os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
-		static := getQemuStaticForArch(arch)
-		qemuPath, err := exec.LookPath(static)
-		if err != nil {
-			return lbConfig, lbBuild, fmt.Errorf("Use " +
-				"UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in case " +
-				"of non-standard archs or custom paths")
+		var qemuPath string
+		qemuPath = os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
+		if qemuPath == "" {
+			static := getQemuStaticForArch(arch)
+			qemuPath, err = exec.LookPath(static)
+			if err != nil {
+				return lbConfig, lbBuild, fmt.Errorf("Use " +
+					"UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in case " +
+					"of non-standard archs or custom paths")
+			}
 		}
 		lbConfig.Args = append(lbConfig.Args, []string{"--bootstrap-qemu-arch", arch, "--bootstrap-qemu-static", qemuPath, "--architectures", arch}...)
 	}
 
 	return lbConfig, lbBuild, nil
+}
+
+// RunScript sets up and runs the hookscript command
+func RunScript(hookScript string) error {
+	hookScriptCmd := exec.Command(hookScript)
+	hookScriptCmd.Env = os.Environ()
+	hookScriptCmd.Stdout = os.Stdout
+	hookScriptCmd.Stderr = os.Stderr
+	fmt.Println(hookScriptCmd)
+	if err := hookScriptCmd.Run(); err != nil {
+		return fmt.Errorf("Error running hook script %s: %s", hookScript, err.Error())
+	}
+	return nil
 }
 
 // GetHostSuite checks the release name of the host system to use as a default if --suite is not passed
@@ -117,6 +134,21 @@ func SaveCWD() func() {
 	return func() {
 		os.Chdir(wd)
 	}
+}
+
+// Du recurses through a directory similar to du and adds all the sizes of files together
+func Du(path string) (quantity.Size, error) {
+	var size quantity.Size = 0
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += quantity.Size(info.Size())
+		}
+		return err
+	})
+	return size, err
 }
 
 // MaxOffset returns the maximum of two quantity.Offset types

@@ -1,3 +1,5 @@
+// This test file tests a successful classic run and success/error scenarios for all states
+// that are specific to the classic builds
 package statemachine
 
 import (
@@ -397,6 +399,174 @@ func TestNoStatic(t *testing.T) {
 			t.Error("Expected an error but there was none")
 		}
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestPopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
+// the rootfs to ensure at least some of the correct file are in place
+func TestPopulateClassicRootfsContents(t *testing.T) {
+	t.Run("test_populate_classic_rootfs_contents", func(t *testing.T) {
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Opts.Project = "ubuntu-cpc"
+		stateMachine.Opts.Suite = "focal"
+		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+		stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
+
+		if err := stateMachine.Setup(); err != nil {
+			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+
+		if err := stateMachine.Run(); err != nil {
+			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+
+		// check the files before Teardown
+		fileList := []string{filepath.Join("etc", "shadow"),
+			filepath.Join("etc", "systemd"),
+			filepath.Join("boot", "vmlinuz"),
+			filepath.Join("boot", "grub"),
+			filepath.Join("usr", "lib")}
+		for _, file := range fileList {
+			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
+			if err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("File %s should exist, but does not", file)
+				}
+			}
+		}
+
+		// check /etc/fstab contents to test the regex part
+		fstab, err := ioutilReadFile(filepath.Join(stateMachine.tempDirs.rootfs,
+			"etc", "fstab"))
+		if err != nil {
+			t.Errorf("Error reading fstab to check regex")
+		}
+		correctLabel := "LABEL=writable   /    ext4   defaults    0 0"
+		if !strings.Contains(string(fstab), correctLabel) {
+			t.Errorf("Expected fstab contents %s to contain %s",
+				string(fstab), correctLabel)
+		}
+
+		if err := stateMachine.Teardown(); err != nil {
+			t.Errorf("Did not expect an error, got %s\n", err.Error())
+		}
+	})
+}
+
+// TestFailedPopulateClassicRootfsContents tests failed scenarios in populateClassicRootfsContents
+// this is accomplished by mocking functions
+func TestFailedPopulateClassicRootfsContents(t *testing.T) {
+	t.Run("test_failed_populate_classic_rootfs_contents", func(t *testing.T) {
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Opts.Filesystem = filepath.Join("testdata", "filesystem")
+		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
+
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		if err := stateMachine.populateClassicRootfsContents(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		ioutilReadDir = ioutil.ReadDir
+
+		// mock osutil.CopySpecialFile
+		osutilCopySpecialFile = mockCopySpecialFile
+		defer func() {
+			osutilCopySpecialFile = osutil.CopySpecialFile
+		}()
+		if err := stateMachine.populateClassicRootfsContents(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		osutilCopySpecialFile = osutil.CopySpecialFile
+
+		// mock ioutil.ReadFile
+		ioutilReadFile = mockReadFile
+		defer func() {
+			ioutilReadFile = ioutil.ReadFile
+		}()
+		if err := stateMachine.populateClassicRootfsContents(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		ioutilReadFile = ioutil.ReadFile
+
+		// mock ioutil.WriteFile
+		ioutilWriteFile = mockWriteFile
+		defer func() {
+			ioutilWriteFile = ioutil.WriteFile
+		}()
+		if err := stateMachine.populateClassicRootfsContents(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		ioutilWriteFile = ioutil.WriteFile
+
+		// mock os.MkdirAll
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		if err := stateMachine.populateClassicRootfsContents(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		osMkdirAll = os.MkdirAll
+
+		// mock os.OpenFile
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		if err := stateMachine.populateClassicRootfsContents(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		osOpenFile = os.OpenFile
+
+		// mock osutil.CopyFile
+		osutilCopyFile = mockCopyFile
+		defer func() {
+			osutilCopyFile = osutil.CopyFile
+		}()
+		if err := stateMachine.populateClassicRootfsContents(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		osutilCopyFile = osutil.CopyFile
+	})
+}
+
+// TestFilesystemFlag makes sure that with the --filesystem flag the specified filesystem is copied
+// to the rootfs directory
+func TestFilesystemFlag(t *testing.T) {
+	t.Run("test_filesystem_flag", func(t *testing.T) {
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Opts.Filesystem = filepath.Join("testdata", "filesystem")
+
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		if err := stateMachine.populateClassicRootfsContents(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// check that the specified filesystem was copied over
+		if _, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, "testfile")); err != nil {
+			t.Errorf("Failed to copy --filesystem to rootfs")
+		}
 	})
 }
 

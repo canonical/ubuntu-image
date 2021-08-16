@@ -12,7 +12,7 @@ var classicStates = []stateFunc{
 	{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree},
 	{"run_live_build", (*StateMachine).runLiveBuild},
 	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
-	{"populate_rootfs_contents", (*StateMachine).populateRootfsContents},
+	{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents},
 	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
 	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},

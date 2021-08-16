@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -44,11 +45,17 @@ func mockReadDir(string) ([]os.FileInfo, error) {
 func mockReadFile(string) ([]byte, error) {
 	return []byte{}, fmt.Errorf("Test Error")
 }
+func mockWriteFile(string, []byte, os.FileMode) error {
+	return fmt.Errorf("Test Error")
+}
 func mockMkdir(string, os.FileMode) error {
 	return fmt.Errorf("Test error")
 }
 func mockMkdirAll(string, os.FileMode) error {
 	return fmt.Errorf("Test error")
+}
+func mockOpenFile(string, int, os.FileMode) (*os.File, error) {
+	return nil, fmt.Errorf("Test error")
 }
 func mockRemoveAll(string) error {
 	return fmt.Errorf("Test error")
@@ -105,7 +112,8 @@ func TestCleanup(t *testing.T) {
 		stateMachine.Run()
 		stateMachine.Teardown()
 		if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err == nil {
-			t.Errorf("Error: temporary workdir %s was not cleaned up\n", stateMachine.stateMachineFlags.WorkDir)
+			t.Errorf("Error: temporary workdir %s was not cleaned up\n",
+				stateMachine.stateMachineFlags.WorkDir)
 		}
 	})
 }
@@ -141,7 +149,7 @@ func TestUntilThru(t *testing.T) {
 				// run a partial state machine
 				var partialStateMachine testStateMachine
 				partialStateMachine.commonFlags, partialStateMachine.stateMachineFlags = helper.InitCommonOpts()
-				tempDir := "ubuntu-image-" + tc.name
+				tempDir := filepath.Join("/tmp", "ubuntu-image-"+tc.name)
 				if err := os.Mkdir(tempDir, 0755); err != nil {
 					t.Errorf("Could not create workdir: %s\n", err.Error())
 				}
@@ -267,7 +275,7 @@ func TestFunctionErrors(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
-			workDir := "ubuntu-image-" + tc.name
+			workDir := filepath.Join("/tmp", "ubuntu-image-"+tc.name)
 			if err := os.Mkdir(workDir, 0755); err != nil {
 				t.Errorf("Failed to create temporary directory %s\n", workDir)
 			}
@@ -324,5 +332,46 @@ func TestFailedMetadataParse(t *testing.T) {
 		if err := stateMachine.readMetadata(); err == nil {
 			t.Errorf("Expected an error but there was none")
 		}
+	})
+}
+
+// TestFailedRunHooks tests failures in the runHooks function. This is accomplished by mocking
+// functions and calling hook scripts that intentionally return errors
+func TestFailedRunHooks(t *testing.T) {
+	t.Run("test_failed_run_hooks", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.commonFlags.Debug = true // for coverage!
+
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// first set a good hooks directory
+		stateMachine.commonFlags.HooksDirectories = []string{filepath.Join(
+			"testdata", "good_hookscript")}
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		err := stateMachine.runHooks("post-populate-rootfs",
+			"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
+		if err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		// restore the function
+		ioutilReadDir = ioutil.ReadDir
+
+		// now set a hooks directory that will fail
+		stateMachine.commonFlags.HooksDirectories = []string{filepath.Join(
+			"testdata", "hooks_return_error")}
+		err = stateMachine.runHooks("post-populate-rootfs",
+			"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
+		if err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

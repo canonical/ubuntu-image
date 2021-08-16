@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo $UBUNTU_IMAGE_HOOK_ROOTFS

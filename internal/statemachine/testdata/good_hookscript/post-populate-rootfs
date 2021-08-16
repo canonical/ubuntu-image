@@ -1,0 +1,3 @@
+#!/bin/bash
+
+touch ${UBUNTU_IMAGE_HOOK_ROOTFS}/post-populate-rootfs-hookfile

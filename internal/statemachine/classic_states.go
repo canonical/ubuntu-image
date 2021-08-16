@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/osutil"
 )
 
 // Prepare the gadget tree
@@ -70,6 +71,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 			env = append(env, "EXTRA_PPAS="+strings.Join(classicStateMachine.Opts.ExtraPPAs, " "))
 		}
 		env = append(env, "IMAGEFORMAT=none")
+
 		lbConfig, lbBuild, err := helper.SetupLiveBuildCommands(classicStateMachine.tempDirs.unpack,
 			arch, env, true)
 		if err != nil {
@@ -90,6 +92,70 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 		}
 	}
 
+	return nil
+}
+
+// populateClassicRootfsContents takes the results of `lb` commands and copies them over
+// to rootfs. It also changes fstab and handles the --cloud-init flag
+func (stateMachine *StateMachine) populateClassicRootfsContents() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	var src string
+	if classicStateMachine.Opts.Filesystem != "" {
+		src = classicStateMachine.Opts.Filesystem
+	} else {
+		src = filepath.Join(classicStateMachine.tempDirs.unpack, "chroot")
+	}
+
+	files, err := ioutilReadDir(src)
+	if err != nil {
+		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
+	}
+
+	for _, srcFile := range files {
+		srcFile := filepath.Join(src, srcFile.Name())
+		if err := osutilCopySpecialFile(srcFile, classicStateMachine.tempDirs.rootfs); err != nil {
+			return fmt.Errorf("Error copying rootfs: %s", err.Error())
+		}
+	}
+
+	fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
+	fstabBytes, err := ioutilReadFile(fstabPath)
+	if err != nil {
+		return fmt.Errorf("Error opening fstab: %s", err.Error())
+	}
+
+	if !strings.Contains(string(fstabBytes), "LABEL=writable") {
+		newFstab := []byte("LABEL=writable   /    ext4   defaults    0 0")
+		err := ioutilWriteFile(fstabPath, newFstab, 0644)
+		if err != nil {
+			return fmt.Errorf("Error writing to fstab: %s", err.Error())
+		}
+	}
+
+	if classicStateMachine.commonFlags.CloudInit != "" {
+		seedDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
+		cloudDir := filepath.Join(seedDir, "nocloud-net")
+		err := osMkdirAll(cloudDir, 0756)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
+		}
+		metadataFile := filepath.Join(cloudDir, "meta-data")
+		metadataIO, err := osOpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
+		}
+		metadataIO.Write([]byte("instance-id: nocloud-static"))
+		metadataIO.Close()
+
+		userdataFile := filepath.Join(cloudDir, "user-data")
+		err = osutilCopyFile(classicStateMachine.commonFlags.CloudInit,
+			userdataFile, osutil.CopyFlagDefault)
+		if err != nil {
+			return fmt.Errorf("Error copying cloud-init: %s", err.Error())
+		}
+	}
 	return nil
 }
 

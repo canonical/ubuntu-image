@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/snapcore/snapd/image"
@@ -39,7 +40,45 @@ func (stateMachine *StateMachine) prepareImage() error {
 	}
 
 	// set the gadget yaml location
-	snapStateMachine.yamlFilePath = snapStateMachine.tempDirs.unpack + "/gadget/meta/gadget.yaml"
+	snapStateMachine.yamlFilePath = filepath.Join(stateMachine.tempDirs.unpack, "gadget", "meta", "gadget.yaml")
+
+	return nil
+}
+
+// populateSnapRootfsContents uses a NewMountedFileSystemWriter to populate the rootfs
+func (stateMachine *StateMachine) populateSnapRootfsContents() error {
+	var src, dst string
+	if stateMachine.isSeeded {
+		// For now, since we only create the system-seed partition for
+		// uc20 images, we hard-code to use this path for the rootfs
+		// seed population.  In the future we might want to consider
+		// populating other partitions from `snap prepare-image` output
+		// as well, so looking into directories like system-data/ etc.
+		src = filepath.Join(stateMachine.tempDirs.unpack, "system-seed")
+		dst = stateMachine.tempDirs.rootfs
+	} else {
+		src = filepath.Join(stateMachine.tempDirs.unpack, "image")
+		dst = filepath.Join(stateMachine.tempDirs.rootfs, "system-data")
+		err := osMkdirAll(filepath.Join(dst, "boot"), 0755)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating boot dir: %s", err.Error())
+		}
+	}
+
+	// recursively copy the src to dst, skipping /boot for non-seeded images
+	files, err := ioutilReadDir(src)
+	if err != nil {
+		return fmt.Errorf("Error reading unpack dir: %s", err.Error())
+	}
+	for _, srcFile := range files {
+		if !stateMachine.isSeeded && srcFile.Name() == "boot" {
+			continue
+		}
+		srcFile := filepath.Join(src, srcFile.Name())
+		if err := osutilCopySpecialFile(srcFile, dst); err != nil {
+			return fmt.Errorf("Error copying rootfs: %s", err.Error())
+		}
+	}
 
 	return nil
 }
