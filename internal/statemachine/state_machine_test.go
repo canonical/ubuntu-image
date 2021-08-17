@@ -11,6 +11,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
@@ -568,5 +569,218 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 			t.Errorf("Expected an error, but got none")
 		}
 		osutilCopySpecialFile = osutil.CopySpecialFile
+	})
+}
+
+// TestHandleLkBootloader tests that the handleLkBootloader function runs successfully
+func TestHandleLkBootloader(t *testing.T) {
+	t.Run("test_handle_lk_bootloader", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.yamlFilePath = filepath.Join("testdata", "gadget_tree",
+			"meta", "gadget.yaml")
+
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		// create image/boot/lk and place a test file there
+		bootDir := filepath.Join(stateMachine.tempDirs.unpack, "image", "boot", "lk")
+		if err := os.MkdirAll(bootDir, 0755); err != nil {
+			t.Errorf("Error setting up lk boot dir: %s", err.Error())
+		}
+		if err := osutil.CopyFile(filepath.Join("testdata", "disk_info"),
+			filepath.Join(bootDir, "disk_info"), 0); err != nil {
+			t.Errorf("Error setting up lk boot dir: %s", err.Error())
+		}
+
+		// set up the volume
+		volume := new(gadget.Volume)
+		volume.Bootloader = "lk"
+
+		if err := stateMachine.handleLkBootloader(volume); err != nil {
+			t.Errorf("Did not expect an error in handleLkBootloader, got %s", err.Error())
+		}
+
+		// ensure the test file was moved
+		movedFile := filepath.Join(stateMachine.tempDirs.unpack, "gadget", "disk_info")
+		if _, err := os.Stat(movedFile); err != nil {
+			t.Errorf("File %s should exist but it does not", movedFile)
+		}
+	})
+}
+
+// TestFailedHandleLkBootloader tests failures in handleLkBootloader by mocking functions
+func TestFailedHandleLkBootloader(t *testing.T) {
+	t.Run("test_failed_handle_lk_bootloader", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.yamlFilePath = filepath.Join("testdata", "gadget_tree",
+			"meta", "gadget.yaml")
+
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		// create image/boot/lk and place a test file there
+		bootDir := filepath.Join(stateMachine.tempDirs.unpack, "image", "boot", "lk")
+		if err := os.MkdirAll(bootDir, 0755); err != nil {
+			t.Errorf("Error setting up lk boot dir: %s", err.Error())
+		}
+		if err := osutil.CopyFile(filepath.Join("testdata", "disk_info"),
+			filepath.Join(bootDir, "disk_info"), 0); err != nil {
+			t.Errorf("Error setting up lk boot dir: %s", err.Error())
+		}
+
+		// set up the volume
+		volume := new(gadget.Volume)
+		volume.Bootloader = "lk"
+
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		if err := stateMachine.handleLkBootloader(volume); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		osMkdir = os.Mkdir
+
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		if err := stateMachine.handleLkBootloader(volume); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		ioutilReadDir = ioutil.ReadDir
+
+		// mock osutil.CopySpecialFile
+		osutilCopySpecialFile = mockCopySpecialFile
+		defer func() {
+			osutilCopySpecialFile = osutil.CopySpecialFile
+		}()
+		if err := stateMachine.handleLkBootloader(volume); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		osutilCopySpecialFile = osutil.CopySpecialFile
+	})
+}
+
+// TestHandleContentSizes ensures that using --image-size with a few different values
+// results in the correct sizes in stateMachine.imageSizes
+func TestHandleContentSizes(t *testing.T) {
+	testCases := []struct {
+		name   string
+		size   string
+		result map[string]quantity.Size
+	}{
+		{"size_not_specified", "", map[string]quantity.Size{"pc": 17825792}},
+		{"size_smaller_than_content", "pc:123", map[string]quantity.Size{"pc": 17825792}},
+		{"size_bigger_than_content", "pc:4G", map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
+	}
+	for _, tc := range testCases {
+		t.Run("test_handle_content_sizes_"+tc.name, func(t *testing.T) {
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.commonFlags.Size = tc.size
+			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget_tree",
+				"meta", "gadget.yaml")
+
+			// need workdir and loaded gadget.yaml set up for this
+			if err := stateMachine.makeTemporaryDirectories(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+			if err := stateMachine.loadGadgetYaml(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+
+			stateMachine.handleContentSizes(0, "pc")
+			// ensure the correct size was set
+			for volumeName := range stateMachine.gadgetInfo.Volumes {
+				setSize := stateMachine.imageSizes[volumeName]
+				if setSize != tc.result[volumeName] {
+					t.Errorf("Volume %s has the wrong size set: %d. "+
+						"Should be %d", volumeName, setSize, tc.result[volumeName])
+				}
+			}
+		})
+	}
+}
+
+// TestFailedCopyStructureContent tests failures in the copyStructureContent function by mocking
+// functions and setting invalid bs= arguments in dd
+func TestFailedCopyStructureContent(t *testing.T) {
+	t.Run("test_failed_copy_structure_content", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.yamlFilePath = filepath.Join("testdata", "gadget_tree",
+			"meta", "gadget.yaml")
+
+		// need workdir and loaded gadget.yaml set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		if err := stateMachine.loadGadgetYaml(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// separate out the volumeStructures to test different scenarios
+		var mbrStruct gadget.VolumeStructure
+		var rootfsStruct gadget.VolumeStructure
+		for _, volume := range stateMachine.gadgetInfo.Volumes {
+			for _, structure := range volume.Structure {
+				if structure.Name == "mbr" {
+					mbrStruct = structure
+				} else if structure.Name == "EFI System" {
+					rootfsStruct = structure
+				}
+			}
+		}
+
+		// mock helper.CopyBlob and test with no filesystem specified
+		helperCopyBlob = mockCopyBlob
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
+		if err := stateMachine.copyStructureContent(mbrStruct, "",
+			filepath.Join("/tmp", uuid.NewString()+".img")); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		helperCopyBlob = helper.CopyBlob
+
+		// set an invalid blocksize to mock the binary copy blob
+		mockableBlockSize = "0"
+		defer func() {
+			mockableBlockSize = "1"
+		}()
+		if err := stateMachine.copyStructureContent(mbrStruct, "",
+			filepath.Join("/tmp", uuid.NewString()+".img")); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		mockableBlockSize = "1"
+
+		// mock helper.CopyBlob and test with filesystem: vfat
+		helperCopyBlob = mockCopyBlob
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
+		if err := stateMachine.copyStructureContent(rootfsStruct, "",
+			filepath.Join("/tmp", uuid.NewString()+".img")); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		helperCopyBlob = helper.CopyBlob
+
+		// mock gadget.MkfsWithContent
+		gadgetMkfsWithContent = mockMkfsWithContent
+		defer func() {
+			gadgetMkfsWithContent = helper.MkfsWithContent //TODO
+		}()
+		if err := stateMachine.copyStructureContent(rootfsStruct, "",
+			filepath.Join("/tmp", uuid.NewString()+".img")); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		gadgetMkfsWithContent = helper.MkfsWithContent //TODO: after snapd PR merged
 	})
 }
