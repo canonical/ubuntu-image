@@ -120,6 +120,14 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 			t.Errorf("cloud-init user-data file %s does not exist", userDataPath)
 		}
 
+		// check that the grubenv file is in EFI/ubuntu
+		grubenvFile := filepath.Join(stateMachine.tempDirs.volumes,
+			"pc", "part2", "EFI", "ubuntu", "grubenv")
+		_, err = os.Stat(grubenvFile)
+		if err != nil {
+			t.Errorf("Expected file %s to exist, but it does not", grubenvFile)
+		}
+
 		if err := stateMachine.Teardown(); err != nil {
 			t.Errorf("Did not expect an error, got %s\n", err.Error())
 		}

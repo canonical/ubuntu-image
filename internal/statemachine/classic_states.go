@@ -50,10 +50,10 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 		if classicStateMachine.Opts.Suite != "" {
 			env = append(env, "SUITE="+classicStateMachine.Opts.Suite)
 		} else {
-			env = append(env, "SUITE="+helper.GetHostSuite())
+			env = append(env, "SUITE="+getHostSuite())
 		}
 		if classicStateMachine.Opts.Arch == "" {
-			arch = helper.GetHostArch()
+			arch = getHostArch()
 		} else {
 			arch = classicStateMachine.Opts.Arch
 		}
@@ -72,7 +72,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 		}
 		env = append(env, "IMAGEFORMAT=none")
 
-		lbConfig, lbBuild, err := helper.SetupLiveBuildCommands(classicStateMachine.tempDirs.unpack,
+		lbConfig, lbBuild, err := setupLiveBuildCommands(classicStateMachine.tempDirs.unpack,
 			arch, env, true)
 		if err != nil {
 			return fmt.Errorf("error setting up live_build: %s", err.Error())

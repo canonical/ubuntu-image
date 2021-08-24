@@ -7,6 +7,7 @@ volumes:
         size: 440
         content:
           - image: pc-boot.img
+            offset: 0
       - name: BIOS Boot
         type: DA,21686148-6449-6E6F-744E-656564454649
         size: 1M

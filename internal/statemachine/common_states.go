@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/google/uuid"
@@ -74,10 +75,20 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 		return err
 	}
 
+	// for the --image-size argument, the order of the volumes specified in gadget.yaml
+	// must be preserved. However, since gadget.Info stores the volumes as a map, the
+	// order is not preserved. We use the already read-in gadget.yaml file to store the
+	// order of the volumes as an array in the StateMachine struct
+	stateMachine.saveVolumeOrder(string(gadgetYamlBytes))
+
+	if err := stateMachine.parseImageSizes(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// Run hooks for populating rootfs contents
+// Run hooks specified by --hooks-directory after populating rootfs contents
 func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
 	if stateMachine.isSeeded {
 		if stateMachine.commonFlags.Debug {
@@ -101,7 +112,7 @@ func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
 	return nil
 }
 
-// Generate the disk info
+// If --disk-info was used, copy the provided file to the correct location
 func (stateMachine *StateMachine) generateDiskInfo() error {
 	if stateMachine.commonFlags.DiskInfo != "" {
 		diskInfoDir := filepath.Join(stateMachine.tempDirs.rootfs, ".disk")
@@ -136,17 +147,72 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	return nil
 }
 
-// Pre populate the bootfs contents
-func (stateMachine *StateMachine) prepopulateBootfsContents() error {
-	return nil
-}
-
-// Populate the Bootfs Contents
+// Populate the Bootfs Contents by using snapd's MountedFilesystemWriter
 func (stateMachine *StateMachine) populateBootfsContents() error {
+	// find the name of the system volume. snapd functions have already verified it exists
+	var systemVolumeName string
+	var systemVolume *gadget.Volume
+	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
+		for _, structure := range volume.Structure {
+			// use the system-boot role to identify the system volume
+			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+				systemVolumeName = volumeName
+				systemVolume = volume
+			}
+		}
+	}
+
+	// now call LayoutVolume to get a LaidOutVolume we can use
+	// with a mountedFilesystemWriter
+	layoutConstraints := gadget.LayoutConstraints{SkipResolveContent: false}
+	laidOutVolume, err := gadgetLayoutVolume(
+		filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
+		filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
+		systemVolume, layoutConstraints)
+	if err != nil {
+		return fmt.Errorf("Error laying out bootfs contents: %s", err.Error())
+	}
+
+	for ii, laidOutStructure := range laidOutVolume.LaidOutStructure {
+		var targetDir string
+		if laidOutStructure.Role == gadget.SystemSeed {
+			targetDir = stateMachine.tempDirs.rootfs
+		} else {
+			targetDir = filepath.Join(stateMachine.tempDirs.volumes,
+				systemVolumeName,
+				"part"+strconv.Itoa(ii))
+		}
+		// Bad special-casing.  snapd's image.Prepare currently
+		// installs to /boot/grub, but we need to map this to
+		// /EFI/ubuntu.  This is because we are using a SecureBoot
+		// signed bootloader image which has this path embedded, so
+		// we need to install our files to there.
+		if !stateMachine.isSeeded &&
+			(laidOutStructure.Role == gadget.SystemBoot ||
+				laidOutStructure.Label == gadget.SystemBoot) {
+			if err := stateMachine.handleSecureBoot(systemVolume, targetDir); err != nil {
+				return err
+			}
+		}
+		if laidOutStructure.HasFilesystem() {
+			mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(&laidOutStructure, nil)
+			if err != nil {
+				return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
+			}
+
+			err = mountedFilesystemWriter.Write(targetDir, []string{})
+			if err != nil {
+				return fmt.Errorf("Error in mountedFilesystem.Write(): %s", err.Error())
+			}
+		}
+	}
 	return nil
 }
 
-// Populate and prepare the partitions
+// Populate and prepare the partitions. For partitions without filesystem: specified in
+// gadget.yaml, this involves using dd to copy the content blobs into a .img file. For
+// partitions that do have filesystem: specified, we use the Mkfs functions from snapd.
+// Throughout this process, the offset is tracked to ensure partitions are not overlapping.
 func (stateMachine *StateMachine) populatePreparePartitions() error {
 	return nil
 }

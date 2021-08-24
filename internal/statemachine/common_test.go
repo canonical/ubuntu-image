@@ -9,6 +9,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/google/uuid"
+	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/osutil"
 )
 
@@ -74,7 +75,7 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 	})
 }
 
-// TestLoadGadgetYaml tests a succesful load of gadget.yaml. It also tests that the unpack
+// TestLoadGadgetYaml tests a successful load of gadget.yaml. It also tests that the unpack
 // directory is preserved if the relevant environment variable is set
 func TestLoadGadgetYaml(t *testing.T) {
 	t.Run("test_load_gadget_yaml", func(t *testing.T) {
@@ -181,6 +182,13 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 			t.Error("Expected an error, but got none")
 		}
 		osutilCopySpecialFile = osutil.CopySpecialFile
+		os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
+
+		// set an invalid --image-size argument to cause a failure
+		stateMachine.commonFlags.Size = "test"
+		if err := stateMachine.loadGadgetYaml(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
@@ -332,7 +340,6 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 	t.Run("test_failed_post_process_gadget_yaml", func(t *testing.T) {
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		// set a valid yaml file and load it in
 		stateMachine.yamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
@@ -389,5 +396,130 @@ func TestFailedCalculateRootfsSize(t *testing.T) {
 			t.Errorf("Expected an error, but got none")
 		}
 
+	})
+}
+
+// TestPopulateBootfsContents tests a successful run of the populateBootfsContents state
+// and ensures that the appropriate files are placed in the bootfs
+func TestPopulateBootfsContents(t *testing.T) {
+	t.Run("test_populate_bootfs_contents", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+		// set a valid yaml file and load it in
+		stateMachine.yamlFilePath = filepath.Join("testdata",
+			"gadget_tree", "meta", "gadget.yaml")
+		// ensure unpack exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		if err := stateMachine.loadGadgetYaml(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// populate unpack
+		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		for _, srcFile := range files {
+			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
+			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+		}
+
+		// ensure volumes exists
+		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		if err := stateMachine.populateBootfsContents(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		bootFiles := []string{"boot", "ubuntu"}
+		for _, file := range bootFiles {
+			fullPath := filepath.Join(stateMachine.tempDirs.volumes,
+				"pc", "part2", "EFI", file)
+			if _, err := os.Stat(fullPath); err != nil {
+				t.Errorf("Expected %s to exist, but it does not", fullPath)
+			}
+		}
+	})
+}
+
+// TestFailedPopulateBootfsContents tests failures in the populateBootfsContents state
+func TestFailedPopulateBootfsContents(t *testing.T) {
+	t.Run("test_failed_populate_bootfs_contents", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+		// set a valid yaml file and load it in
+		stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-seed.yaml")
+		// ensure unpack exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		if err := stateMachine.loadGadgetYaml(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// ensure volumes exists
+		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+
+		// populate unpack
+		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		for _, srcFile := range files {
+			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
+			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+		}
+
+		// mock gadget.LayoutVolume
+		gadgetLayoutVolume = mockLayoutVolume
+		defer func() {
+			gadgetLayoutVolume = gadget.LayoutVolume
+		}()
+		if err := stateMachine.populateBootfsContents(); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		gadgetLayoutVolume = gadget.LayoutVolume
+
+		// mock gadget.NewMountedFilesystemWriter
+		gadgetNewMountedFilesystemWriter = mockNewMountedFilesystemWriter
+		defer func() {
+			gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
+		}()
+		if err := stateMachine.populateBootfsContents(); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
+
+		// set rootfs to an empty string in order to trigger a failure in Write()
+		stateMachine.tempDirs.rootfs = ""
+		if err := stateMachine.populateBootfsContents(); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+
+		// cause a failure in handleSecureBoot. First change to un-seeded yaml file and load it in
+		stateMachine.yamlFilePath = filepath.Join("testdata",
+			"gadget_tree", "meta", "gadget.yaml")
+		// ensure unpack exists
+		if err := stateMachine.loadGadgetYaml(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		stateMachine.isSeeded = false
+		// now ensure grub dir exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "grub"), 0755)
+		// mock os.MkdirAll
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		if err := stateMachine.populateBootfsContents(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		osMkdirAll = os.MkdirAll
 	})
 }

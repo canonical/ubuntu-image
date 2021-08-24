@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -18,6 +21,8 @@ import (
 )
 
 // define some functions that can be mocked by test cases
+var gadgetLayoutVolume = gadget.LayoutVolume
+var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
 var ioutilWriteFile = ioutil.WriteFile
@@ -29,6 +34,8 @@ var osCreate = os.Create
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
 var execCommand = exec.Command
+
+var mockableBlockSize string = "1" //used for mocking dd calls
 
 // SmInterface allows different image types to implement their own setup/run/teardown functions
 type SmInterface interface {
@@ -71,6 +78,10 @@ type StateMachine struct {
 
 	// imported from snapd, the info parsed from gadget.yaml
 	gadgetInfo *gadget.Info
+
+	// image sizes for parsing the --image-size flags
+	imageSizes  map[string]quantity.Size
+	volumeOrder []string
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -114,6 +125,101 @@ func (stateMachine *StateMachine) validateInput() error {
 	}
 
 	return nil
+}
+
+// parseImageSizes handles the flag --image-size, which is a string in the format
+// <volumeName>:<volumeSize>,<volumeName2>:<volumeSize2>. It can also be in the
+// format <volumeSize> to signify one size to rule them all
+func (stateMachine *StateMachine) parseImageSizes() error {
+	// initialize the size map
+	stateMachine.imageSizes = make(map[string]quantity.Size)
+
+	// If --image-size was not used, simply return
+	if stateMachine.commonFlags.Size == "" {
+		return nil
+	}
+
+	if !strings.Contains(stateMachine.commonFlags.Size, ":") {
+		// handle the "one size to rule them all" case
+		parsedSize, err := quantity.ParseSize(stateMachine.commonFlags.Size)
+		if err != nil {
+			return fmt.Errorf("Failed to parse argument to --image-size: %s", err.Error())
+		}
+		for volumeName := range stateMachine.gadgetInfo.Volumes {
+			stateMachine.imageSizes[volumeName] = parsedSize
+		}
+	} else {
+		allSizes := strings.Split(stateMachine.commonFlags.Size, ",")
+		for _, size := range allSizes {
+			// each of these should be of the form "<name|number>:<size>"
+			splitSize := strings.Split(size, ":")
+			if len(splitSize) != 2 {
+				return fmt.Errorf("Argument to --image-size %s is not "+
+					"in the correct format", size)
+			}
+			parsedSize, err := quantity.ParseSize(splitSize[1])
+			if err != nil {
+				return fmt.Errorf("Failed to parse argument to --image-size: %s",
+					err.Error())
+			}
+			// the image size parsed successfully, now find which volume to associate it with
+			volumeNumber, err := strconv.Atoi(splitSize[0])
+			if err == nil {
+				// argument passed was numeric.
+				if volumeNumber < len(stateMachine.volumeOrder) {
+					stateName := stateMachine.volumeOrder[volumeNumber]
+					stateMachine.imageSizes[stateName] = parsedSize
+				} else {
+					return fmt.Errorf("Volume index %d is out of range", volumeNumber)
+				}
+			} else {
+				if _, found := stateMachine.gadgetInfo.Volumes[splitSize[0]]; !found {
+					return fmt.Errorf("Volume %s does not exist in gadget.yaml",
+						splitSize[0])
+				}
+				stateMachine.imageSizes[splitSize[0]] = parsedSize
+			}
+		}
+	}
+	return nil
+}
+
+// saveVolumeOrder records the order that the volumes appear in gadget.yaml. This is necessary
+// to preserve backwards compatibility of the command line syntax --image-size <volume_number>:<size>
+func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
+	// don't bother doing this if --image-size was not used
+	if stateMachine.commonFlags.Size == "" {
+		return
+	}
+
+	indexMap := make(map[string]int)
+	for volumeName := range stateMachine.gadgetInfo.Volumes {
+		searchString := volumeName + ":"
+		index := strings.Index(gadgetYamlContents, searchString)
+		indexMap[volumeName] = index
+	}
+
+	// now sort based on the index
+	type volumeNameIndex struct {
+		VolumeName string
+		Index      int
+	}
+
+	var sortable []volumeNameIndex
+	for volumeName, volumeIndex := range indexMap {
+		sortable = append(sortable, volumeNameIndex{volumeName, volumeIndex})
+	}
+
+	sort.Slice(sortable, func(i, j int) bool {
+		return sortable[i].Index < sortable[j].Index
+	})
+
+	var sortedVolumes []string
+	for _, volume := range sortable {
+		sortedVolumes = append(sortedVolumes, volume.VolumeName)
+	}
+
+	stateMachine.volumeOrder = sortedVolumes
 }
 
 // readMetadata reads info about a partial state machine from disk
@@ -169,8 +275,7 @@ func (stateMachine *StateMachine) cleanup() error {
 	return nil
 }
 
-// postProcessGadgetYaml does some additional validation on gadget.yaml beyond what
-// snapd does, and adds the rootfs to the partitions list if needed
+// postProcessGadgetYaml adds the rootfs to the partitions list if needed
 func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var rootfsSeen bool = false
 	var farthestOffset quantity.Offset = 0
@@ -206,7 +311,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				offset = *structure.Offset
 			}
 			lastOffset = offset + quantity.Offset(structure.Size)
-			farthestOffset = helper.MaxOffset(lastOffset, farthestOffset)
+			farthestOffset = maxOffset(lastOffset, farthestOffset)
 		}
 	}
 
@@ -231,42 +336,10 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			Update:      gadget.VolumeUpdate{},
 		}
 
-		// get the name of the volume
+		// There is only one volume, so lastVolumeName is its name
+		// we now add the rootfs structure to the volume
 		stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure =
 			append(stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure, rootfsStructure)
-	}
-	return nil
-}
-
-// Run iterates through the state functions, stopping when appropriate based on --until and --thru
-func (stateMachine *StateMachine) Run() error {
-	// iterate through the states
-	for _, stateFunc := range stateMachine.states {
-		if stateFunc.name == stateMachine.stateMachineFlags.Until {
-			break
-		}
-		if stateMachine.commonFlags.Debug {
-			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
-		}
-		if err := stateFunc.function(stateMachine); err != nil {
-			// clean up work dir on error
-			stateMachine.cleanup()
-			return err
-		}
-		stateMachine.StepsTaken++
-		if stateFunc.name == stateMachine.stateMachineFlags.Thru {
-			break
-		}
-	}
-	return nil
-}
-
-// Teardown handles anything else that needs to happen after the states have finished running
-func (stateMachine *StateMachine) Teardown() error {
-	if !stateMachine.cleanWorkDir {
-		if err := stateMachine.writeMetadata(); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -304,6 +377,79 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// handleSecureBoot handles a special case where files need to be moved from /boot/ to
+// /EFI/ubuntu/ so that SecureBoot can still be used
+func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, targetDir string) error {
+	var bootDir, ubuntuDir string
+	if volume.Bootloader == "u-boot" {
+		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "uboot")
+		ubuntuDir = targetDir
+	} else if volume.Bootloader == "grub" {
+		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "grub")
+		ubuntuDir = filepath.Join(targetDir, "EFI", "ubuntu")
+	}
+
+	if _, err := os.Stat(bootDir); err != nil {
+		// this won't always exist, and that's fine
+		return nil
+	}
+
+	// copy the files from bootDir to ubuntuDir
+	if err := osMkdirAll(ubuntuDir, 0755); err != nil {
+		return fmt.Errorf("Error creating ubuntu dir: %s", err.Error())
+	}
+
+	files, err := ioutilReadDir(bootDir)
+	if err != nil {
+		return fmt.Errorf("Error reading boot dir: %s", err.Error())
+	}
+	for _, bootFile := range files {
+		srcFile := filepath.Join(bootDir, bootFile.Name())
+		if err := osutilCopySpecialFile(srcFile, ubuntuDir); err != nil {
+			return fmt.Errorf("Error copying boot dir: %s", err.Error())
+		}
+	}
+
+	return nil
+}
+
+// Run iterates through the state functions, stopping when appropriate based on --until and --thru
+func (stateMachine *StateMachine) Run() error {
+	// iterate through the states
+	for _, stateFunc := range stateMachine.states {
+		if stateFunc.name == stateMachine.stateMachineFlags.Until {
+			break
+		}
+		if stateMachine.commonFlags.Debug {
+			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
+		}
+		if err := stateFunc.function(stateMachine); err != nil {
+			// clean up work dir on error
+			stateMachine.cleanup()
+			return err
+		}
+		stateMachine.StepsTaken++
+		if stateFunc.name == stateMachine.stateMachineFlags.Thru {
+			break
+		}
+	}
+	return nil
+}
+
+// Teardown handles anything else that needs to happen after the states have finished running
+func (stateMachine *StateMachine) Teardown() error {
+	if !stateMachine.cleanWorkDir {
+		if err := stateMachine.writeMetadata(); err != nil {
+			return err
+		}
+	} else {
+		stateMachine.cleanup()
 	}
 	return nil
 }

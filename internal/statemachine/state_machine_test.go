@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/gadget"
+	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 )
 
@@ -39,6 +42,19 @@ var allTestStates = []stateFunc{
 }
 
 // define some mocked versions of go package functions
+func mockCopyBlob([]string) error {
+	return fmt.Errorf("Test Error")
+}
+func mockLayoutVolume(string, string, *gadget.Volume, gadget.LayoutConstraints) (*gadget.LaidOutVolume, error) {
+	return nil, fmt.Errorf("Test Error")
+}
+func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure,
+	gadget.ContentObserver) (*gadget.MountedFilesystemWriter, error) {
+	return nil, fmt.Errorf("Test Error")
+}
+func mockMkfsWithContent(typ, img, label, contentRootDir string, deviceSize, sectorSize quantity.Size) error {
+	return fmt.Errorf("Test Error")
+}
 func mockReadDir(string) ([]os.FileInfo, error) {
 	return []os.FileInfo{}, fmt.Errorf("Test Error")
 }
@@ -70,14 +86,48 @@ func mockCopySpecialFile(string, string) error {
 	return fmt.Errorf("Test error")
 }
 
-// getStateNumberByName returns the numeric order of a state based on its name
-func (stateMachine *StateMachine) getStateNumberByName(name string) int {
-	for i, stateFunc := range stateMachine.states {
-		if name == stateFunc.name {
-			return i
-		}
+// Fake exec command helper
+var testCaseName string
+
+func fakeExecCommand(command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestExecHelperProcess", "--", command}
+	cs = append(cs, args...)
+	cmd := exec.Command(os.Args[0], cs...)
+	tc := "TEST_CASE=" + testCaseName
+	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", tc}
+	return cmd
+}
+
+// This is a helper that mocks out any exec calls performed in this package
+func TestExecHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
 	}
-	return -1
+	defer os.Exit(0)
+	args := os.Args
+
+	// We need to get rid of the trailing 'mock' call of our test binary, so
+	// that args has the actual command arguments. We can then check their
+	// correctness etc.
+	for len(args) > 0 {
+		if args[0] == "--" {
+			args = args[1:]
+			break
+		}
+		args = args[1:]
+	}
+
+	// I think the best idea I saw from people is to switch this on test case
+	// instead on the actual arguments. And this makes sense to me
+	switch os.Getenv("TEST_CASE") {
+	case "TestGeneratePackageManifest":
+		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
+		break
+	case "TestFailedSetupLiveBuildCommands":
+		// throwing an error here simulates the "command" having an error
+		os.Exit(1)
+		break
+	}
 }
 
 // testStateMachine implements Setup, Run, and Teardown() for testing purposes
@@ -373,5 +423,150 @@ func TestFailedRunHooks(t *testing.T) {
 			t.Error("Expected an error, but got none")
 		}
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestParseImageSizes tests a successful image size parse with all of the different allowed syntaxes
+func TestParseImageSizes(t *testing.T) {
+	testCases := []struct {
+		name   string
+		size   string
+		result map[string]quantity.Size
+	}{
+		{"one_size", "4G", map[string]quantity.Size{
+			"first":  4 * quantity.SizeGiB,
+			"second": 4 * quantity.SizeGiB,
+			"third":  4 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
+		{"size_per_image_name", "first:1G,second:2G,third:3G,fourth:4G", map[string]quantity.Size{
+			"first":  1 * quantity.SizeGiB,
+			"second": 2 * quantity.SizeGiB,
+			"third":  3 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
+		{"size_per_image_number", "0:1G,1:2G,2:3G,3:4G", map[string]quantity.Size{
+			"first":  1 * quantity.SizeGiB,
+			"second": 2 * quantity.SizeGiB,
+			"third":  3 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
+		{"mixed_size_syntax", "0:1G,second:2G,2:3G,fourth:4G", map[string]quantity.Size{
+			"first":  1 * quantity.SizeGiB,
+			"second": 2 * quantity.SizeGiB,
+			"third":  3 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
+	}
+	for _, tc := range testCases {
+		t.Run("test_parse_image_sizes_"+tc.name, func(t *testing.T) {
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-multi.yaml")
+			stateMachine.commonFlags.Size = tc.size
+
+			// need workdir and loaded gadget.yaml set up for this
+			if err := stateMachine.makeTemporaryDirectories(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+			if err := stateMachine.loadGadgetYaml(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+
+			if err := stateMachine.parseImageSizes(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+			// ensure the correct size was set
+			for volumeName := range stateMachine.gadgetInfo.Volumes {
+				setSize := stateMachine.imageSizes[volumeName]
+				if setSize != tc.result[volumeName] {
+					t.Errorf("Volume %s has the wrong size set: %d", volumeName, setSize)
+				}
+			}
+
+		})
+	}
+}
+
+// TestFailedParseImageSizes tests failures in parsing the image sizes
+func TestFailedParseImageSizes(t *testing.T) {
+	testCases := []struct {
+		name string
+		size string
+	}{
+		{"invalid_size", "4test"},
+		{"too_many_args", "first:1G:2G"},
+		{"multiple_invalid", "first:1test"},
+		{"volume_not_exist", "fifth:1G"},
+		{"index_out_of_range", "9:1G"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_failed_parse_image_sizes_"+tc.name, func(t *testing.T) {
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-multi.yaml")
+
+			// need workdir and loaded gadget.yaml set up for this
+			if err := stateMachine.makeTemporaryDirectories(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+			if err := stateMachine.loadGadgetYaml(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+
+			// run parseImage size and make sure it failed
+			stateMachine.commonFlags.Size = tc.size
+			if err := stateMachine.parseImageSizes(); err == nil {
+				t.Errorf("Expected an error, but got none")
+			}
+		})
+	}
+}
+
+// TestFailedHandleSecureBoot tests failures in the handleSecureBoot function by mocking functions
+func TestFailedHandleSecureBoot(t *testing.T) {
+	t.Run("test_failed_handle_secure_boot", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// create a volume
+		volume := new(gadget.Volume)
+		volume.Bootloader = "u-boot"
+		// make the u-boot directory and add a file
+		bootDir := filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "uboot")
+		os.MkdirAll(bootDir, 0755)
+		osutil.CopySpecialFile(filepath.Join("testdata", "grubenv"), bootDir)
+
+		// mock os.Mkdir
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		if err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		osMkdirAll = os.MkdirAll
+
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		if err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		ioutilReadDir = ioutil.ReadDir
+
+		// mock osutil.CopySpecialFile
+		osutilCopySpecialFile = mockCopySpecialFile
+		defer func() {
+			osutilCopySpecialFile = osutil.CopySpecialFile
+		}()
+		if err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		osutilCopySpecialFile = osutil.CopySpecialFile
 	})
 }
