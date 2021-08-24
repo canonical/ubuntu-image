@@ -13,12 +13,12 @@ import (
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
+	"github.com/snapcore/snapd/osutil/mkfs"
 )
 
 // define some functions that can be mocked by test cases
 var gadgetLayoutVolume = gadget.LayoutVolume
 var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
-var gadgetMkfsWithContent = helper.MkfsWithContent //TODO once snapd PR is merged fix this
 var helperCopyBlob = helper.CopyBlob
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
@@ -31,6 +31,7 @@ var osCreate = os.Create
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
 var execCommand = exec.Command
+var mkfsMakeWithContent = mkfs.MakeWithContent
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 

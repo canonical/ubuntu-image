@@ -436,7 +436,7 @@ func (stateMachine *StateMachine) copyStructureContent(structure gadget.VolumeSt
 			return fmt.Errorf("Error zeroing image file %s: %s",
 				partImg, err.Error())
 		}
-		err := gadgetMkfsWithContent(structure.Filesystem, partImg, structure.Label,
+		err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
 			contentRoot, structure.Size, quantity.Size(512))
 		if err != nil {
 			return fmt.Errorf("Error running mkfs: %s", err.Error())

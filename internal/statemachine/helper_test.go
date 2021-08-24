@@ -13,6 +13,7 @@ import (
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
+	"github.com/snapcore/snapd/osutil/mkfs"
 )
 
 // TestSetupCrossArch tests that the lb commands are set up correctly for cross arch compilation
@@ -525,14 +526,14 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		helperCopyBlob = helper.CopyBlob
 
 		// mock gadget.MkfsWithContent
-		gadgetMkfsWithContent = mockMkfsWithContent
+		mkfsMakeWithContent = mockMkfsWithContent
 		defer func() {
-			gadgetMkfsWithContent = helper.MkfsWithContent //TODO
+			mkfsMakeWithContent = mkfs.MakeWithContent
 		}()
 		if err := stateMachine.copyStructureContent(rootfsStruct, "",
 			filepath.Join("/tmp", uuid.NewString()+".img")); err == nil {
 			t.Errorf("Expected an error, but got none")
 		}
-		gadgetMkfsWithContent = helper.MkfsWithContent //TODO: after snapd PR merged
+		mkfsMakeWithContent = mkfs.MakeWithContent
 	})
 }
