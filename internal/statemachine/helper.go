@@ -1,27 +1,17 @@
 package statemachine
 
 import (
-	"encoding/gob"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 )
-
-// SetCommonOpts stores the common options for all image types in the struct
-func (stateMachine *StateMachine) SetCommonOpts(commonOpts *commands.CommonOpts,
-	stateMachineOpts *commands.StateMachineOpts) {
-	stateMachine.commonFlags = commonOpts
-	stateMachine.stateMachineFlags = stateMachineOpts
-}
 
 // validateInput ensures that command line flags for the state machine are valid. These
 // flags are applicable to all image types
@@ -59,143 +49,6 @@ func (stateMachine *StateMachine) validateInput() error {
 	return nil
 }
 
-// parseImageSizes handles the flag --image-size, which is a string in the format
-// <volumeName>:<volumeSize>,<volumeName2>:<volumeSize2>. It can also be in the
-// format <volumeSize> to signify one size to rule them all
-func (stateMachine *StateMachine) parseImageSizes() error {
-	// initialize the size map
-	stateMachine.imageSizes = make(map[string]quantity.Size)
-
-	// If --image-size was not used, simply return
-	if stateMachine.commonFlags.Size == "" {
-		return nil
-	}
-
-	if !strings.Contains(stateMachine.commonFlags.Size, ":") {
-		// handle the "one size to rule them all" case
-		parsedSize, err := quantity.ParseSize(stateMachine.commonFlags.Size)
-		if err != nil {
-			return fmt.Errorf("Failed to parse argument to --image-size: %s", err.Error())
-		}
-		for volumeName := range stateMachine.gadgetInfo.Volumes {
-			stateMachine.imageSizes[volumeName] = parsedSize
-		}
-	} else {
-		allSizes := strings.Split(stateMachine.commonFlags.Size, ",")
-		for _, size := range allSizes {
-			// each of these should be of the form "<name|number>:<size>"
-			splitSize := strings.Split(size, ":")
-			if len(splitSize) != 2 {
-				return fmt.Errorf("Argument to --image-size %s is not "+
-					"in the correct format", size)
-			}
-			parsedSize, err := quantity.ParseSize(splitSize[1])
-			if err != nil {
-				return fmt.Errorf("Failed to parse argument to --image-size: %s",
-					err.Error())
-			}
-			// the image size parsed successfully, now find which volume to associate it with
-			volumeNumber, err := strconv.Atoi(splitSize[0])
-			if err == nil {
-				// argument passed was numeric.
-				if volumeNumber < len(stateMachine.volumeOrder) {
-					stateName := stateMachine.volumeOrder[volumeNumber]
-					stateMachine.imageSizes[stateName] = parsedSize
-				} else {
-					return fmt.Errorf("Volume index %d is out of range", volumeNumber)
-				}
-			} else {
-				if _, found := stateMachine.gadgetInfo.Volumes[splitSize[0]]; !found {
-					return fmt.Errorf("Volume %s does not exist in gadget.yaml",
-						splitSize[0])
-				}
-				stateMachine.imageSizes[splitSize[0]] = parsedSize
-			}
-		}
-	}
-	return nil
-}
-
-// saveVolumeOrder records the order that the volumes appear in gadget.yaml. This is necessary
-// to preserve backwards compatibility of the command line syntax --image-size <volume_number>:<size>
-func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
-	// don't bother doing this if --image-size was not used
-	if stateMachine.commonFlags.Size == "" {
-		return
-	}
-
-	indexMap := make(map[string]int)
-	for volumeName := range stateMachine.gadgetInfo.Volumes {
-		searchString := volumeName + ":"
-		index := strings.Index(gadgetYamlContents, searchString)
-		indexMap[volumeName] = index
-	}
-
-	// now sort based on the index
-	type volumeNameIndex struct {
-		VolumeName string
-		Index      int
-	}
-
-	var sortable []volumeNameIndex
-	for volumeName, volumeIndex := range indexMap {
-		sortable = append(sortable, volumeNameIndex{volumeName, volumeIndex})
-	}
-
-	sort.Slice(sortable, func(i, j int) bool {
-		return sortable[i].Index < sortable[j].Index
-	})
-
-	var sortedVolumes []string
-	for _, volume := range sortable {
-		sortedVolumes = append(sortedVolumes, volume.VolumeName)
-	}
-
-	stateMachine.volumeOrder = sortedVolumes
-}
-
-// readMetadata reads info about a partial state machine from disk
-func (stateMachine *StateMachine) readMetadata() error {
-	// handle the resume case
-	if stateMachine.stateMachineFlags.Resume {
-		// open the ubuntu-image.gob file and determine the state
-		var partialStateMachine = new(StateMachine)
-		gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
-		gobfile, err := os.Open(gobfilePath)
-		if err != nil {
-			return fmt.Errorf("error reading metadata file: %s", err.Error())
-		}
-		defer gobfile.Close()
-		dec := gob.NewDecoder(gobfile)
-		err = dec.Decode(&partialStateMachine)
-		if err != nil {
-			return fmt.Errorf("failed to parse metadata file: %s", err.Error())
-		}
-		stateMachine.CurrentStep = partialStateMachine.CurrentStep
-		stateMachine.StepsTaken = partialStateMachine.StepsTaken
-
-		// delete all of the stateFuncs that have already run
-		stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
-	}
-	return nil
-}
-
-// writeMetadata writes the state machine info to disk. This will be used when resuming a
-// partial state machine run
-func (stateMachine *StateMachine) writeMetadata() error {
-	gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
-	gobfile, err := os.OpenFile(gobfilePath, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("error opening metadata file for writing: %s", gobfilePath)
-	}
-	defer gobfile.Close()
-	enc := gob.NewEncoder(gobfile)
-
-	// no need to check errors, as it will panic if there is one
-	enc.Encode(stateMachine)
-	return nil
-}
-
 // cleanup cleans the workdir. For now this is just deleting the temporary directory if necessary
 // but will have more functionality added to it later
 func (stateMachine *StateMachine) cleanup() error {
@@ -203,75 +56,6 @@ func (stateMachine *StateMachine) cleanup() error {
 		if err := osRemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-// postProcessGadgetYaml adds the rootfs to the partitions list if needed
-func (stateMachine *StateMachine) postProcessGadgetYaml() error {
-	var rootfsSeen bool = false
-	var farthestOffset quantity.Offset = 0
-	var lastOffset quantity.Offset = 0
-	var lastVolumeName string
-	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
-		lastVolumeName = volumeName
-		volumeBaseDir := filepath.Join(stateMachine.tempDirs.volumes, volumeName)
-		if err := osMkdirAll(volumeBaseDir, 0755); err != nil {
-			return fmt.Errorf("Error creating volume dir: %s", err.Error())
-		}
-		// look for the rootfs and check if the image is seeded
-		for ii, structure := range volume.Structure {
-			if structure.Role == "" && structure.Label == gadget.SystemBoot {
-				fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
-					"used for defining partition roles; use role instead\n",
-					volumeName, ii)
-			} else if structure.Role == gadget.SystemData {
-				rootfsSeen = true
-			} else if structure.Role == gadget.SystemSeed {
-				stateMachine.isSeeded = true
-			}
-
-			// update farthestOffset if needed
-			var offset quantity.Offset
-			if structure.Offset == nil {
-				if structure.Role != "mbr" && lastOffset < quantity.OffsetMiB {
-					offset = quantity.OffsetMiB
-				} else {
-					offset = lastOffset
-				}
-			} else {
-				offset = *structure.Offset
-			}
-			lastOffset = offset + quantity.Offset(structure.Size)
-			farthestOffset = maxOffset(lastOffset, farthestOffset)
-		}
-	}
-
-	if !rootfsSeen && len(stateMachine.gadgetInfo.Volumes) == 1 {
-		// We still need to handle the case of unspecified system-data
-		// partition where we simply attach the rootfs at the end of the
-		// partition list.
-		//
-		// Since so far we have no knowledge of the rootfs contents, the
-		// size is set to 0, and will be calculated later
-		rootfsStructure := gadget.VolumeStructure{
-			Name:        "",
-			Label:       "writable",
-			Offset:      &farthestOffset,
-			OffsetWrite: new(gadget.RelativeOffset),
-			Size:        quantity.Size(0),
-			Type:        "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
-			Role:        gadget.SystemData,
-			ID:          "",
-			Filesystem:  "ext4",
-			Content:     []gadget.VolumeContent{},
-			Update:      gadget.VolumeUpdate{},
-		}
-
-		// There is only one volume, so lastVolumeName is its name
-		// we now add the rootfs structure to the volume
-		stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure =
-			append(stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure, rootfsStructure)
 	}
 	return nil
 }
@@ -347,30 +131,9 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 	return nil
 }
 
-// handleContentSizes ensures that the sizes of the partitions are large enough and stores
-// safe values in the stateMachine struct for use during make_image
-func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
-	// store volume sizes in the stateMachine Struct. These will be used during
-	// the make_image step
-	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
-	volumeSize, found := stateMachine.imageSizes[volumeName]
-	if !found {
-		stateMachine.imageSizes[volumeName] = calculated
-	} else {
-		if volumeSize < calculated {
-			fmt.Printf("WARNING: ignoring image size smaller than "+
-				"minimum required size: vol:%s %d < %d",
-				volumeName, uint64(volumeSize), uint64(calculated))
-			stateMachine.imageSizes[volumeName] = calculated
-		} else {
-			stateMachine.imageSizes[volumeName] = volumeSize
-		}
-	}
-}
-
 // shouldSkipStructure returns whether a structure should be skipped during certain processing
-func (stateMachine *StateMachine) shouldSkipStructure(structure gadget.VolumeStructure) bool {
-	if stateMachine.isSeeded &&
+func shouldSkipStructure(structure gadget.VolumeStructure, isSeeded bool) bool {
+	if isSeeded &&
 		(structure.Role == gadget.SystemBoot ||
 			structure.Role == gadget.SystemData ||
 			structure.Role == gadget.SystemSave ||

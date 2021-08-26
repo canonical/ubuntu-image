@@ -236,7 +236,7 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 			}
 			farthestOffset = maxOffset(farthestOffset,
 				quantity.Offset(structure.Size)+offset)
-			if stateMachine.shouldSkipStructure(structure) {
+			if shouldSkipStructure(structure, stateMachine.isSeeded) {
 				continue
 			}
 

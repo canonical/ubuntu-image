@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -150,38 +151,6 @@ func (TestStateMachine *testStateMachine) Setup() error {
 	}
 
 	return nil
-}
-
-// TestCleanup ensures that the temporary workdir is cleaned up after the
-// state machine has finished running
-func TestCleanup(t *testing.T) {
-	t.Run("test_cleanup", func(t *testing.T) {
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Run()
-		stateMachine.Teardown()
-		if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err == nil {
-			t.Errorf("Error: temporary workdir %s was not cleaned up\n",
-				stateMachine.stateMachineFlags.WorkDir)
-		}
-	})
-}
-
-// TestFailedCleanup tests a failure in os.RemoveAll while deleting the temporary directory
-func TestFailedCleanup(t *testing.T) {
-	t.Run("test_failed_cleanup", func(t *testing.T) {
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.cleanWorkDir = true
-
-		osRemoveAll = mockRemoveAll
-		defer func() {
-			osRemoveAll = os.RemoveAll
-		}()
-		if err := stateMachine.cleanup(); err == nil {
-			t.Error("Expected an error, but there was none!")
-		}
-	})
 }
 
 // TestUntilThru tests --until and --thru with each state
@@ -350,4 +319,198 @@ func TestFunctionErrors(t *testing.T) {
 			os.RemoveAll(workDir)
 		})
 	}
+}
+
+// TestSetCommonOpts ensures that the function actually sets the correct values in the struct
+func TestSetCommonOpts(t *testing.T) {
+	t.Run("test_set_common_opts", func(t *testing.T) {
+		commonOpts := new(commands.CommonOpts)
+		stateMachineOpts := new(commands.StateMachineOpts)
+		commonOpts.Debug = true
+		stateMachineOpts.WorkDir = testDir
+
+		var stateMachine testStateMachine
+		stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
+
+		if !stateMachine.commonFlags.Debug || stateMachine.stateMachineFlags.WorkDir != testDir {
+			t.Error("SetCommonOpts failed to set the correct options")
+		}
+	})
+}
+
+// TestFailedMetadataParse tests a failure in parsing the metadata file. This is accomplished
+// by giving the state machine a syntactically invalid metadata file to parse
+func TestFailedMetadataParse(t *testing.T) {
+	t.Run("test_failed_metadata_parse", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.stateMachineFlags.Resume = true
+		stateMachine.stateMachineFlags.WorkDir = "testdata"
+
+		if err := stateMachine.readMetadata(); err == nil {
+			t.Errorf("Expected an error but there was none")
+		}
+	})
+}
+
+// TestParseImageSizes tests a successful image size parse with all of the different allowed syntaxes
+func TestParseImageSizes(t *testing.T) {
+	testCases := []struct {
+		name   string
+		size   string
+		result map[string]quantity.Size
+	}{
+		{"one_size", "4G", map[string]quantity.Size{
+			"first":  4 * quantity.SizeGiB,
+			"second": 4 * quantity.SizeGiB,
+			"third":  4 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
+		{"size_per_image_name", "first:1G,second:2G,third:3G,fourth:4G", map[string]quantity.Size{
+			"first":  1 * quantity.SizeGiB,
+			"second": 2 * quantity.SizeGiB,
+			"third":  3 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
+		{"size_per_image_number", "0:1G,1:2G,2:3G,3:4G", map[string]quantity.Size{
+			"first":  1 * quantity.SizeGiB,
+			"second": 2 * quantity.SizeGiB,
+			"third":  3 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
+		{"mixed_size_syntax", "0:1G,second:2G,2:3G,fourth:4G", map[string]quantity.Size{
+			"first":  1 * quantity.SizeGiB,
+			"second": 2 * quantity.SizeGiB,
+			"third":  3 * quantity.SizeGiB,
+			"fourth": 4 * quantity.SizeGiB}},
+	}
+	for _, tc := range testCases {
+		t.Run("test_parse_image_sizes_"+tc.name, func(t *testing.T) {
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-multi.yaml")
+			stateMachine.commonFlags.Size = tc.size
+
+			// need workdir and loaded gadget.yaml set up for this
+			if err := stateMachine.makeTemporaryDirectories(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+			if err := stateMachine.loadGadgetYaml(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+
+			if err := stateMachine.parseImageSizes(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+			// ensure the correct size was set
+			for volumeName := range stateMachine.gadgetInfo.Volumes {
+				setSize := stateMachine.imageSizes[volumeName]
+				if setSize != tc.result[volumeName] {
+					t.Errorf("Volume %s has the wrong size set: %d", volumeName, setSize)
+				}
+			}
+
+		})
+	}
+}
+
+// TestFailedParseImageSizes tests failures in parsing the image sizes
+func TestFailedParseImageSizes(t *testing.T) {
+	testCases := []struct {
+		name string
+		size string
+	}{
+		{"invalid_size", "4test"},
+		{"too_many_args", "first:1G:2G"},
+		{"multiple_invalid", "first:1test"},
+		{"volume_not_exist", "fifth:1G"},
+		{"index_out_of_range", "9:1G"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_failed_parse_image_sizes_"+tc.name, func(t *testing.T) {
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-multi.yaml")
+
+			// need workdir and loaded gadget.yaml set up for this
+			if err := stateMachine.makeTemporaryDirectories(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+			if err := stateMachine.loadGadgetYaml(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+
+			// run parseImage size and make sure it failed
+			stateMachine.commonFlags.Size = tc.size
+			if err := stateMachine.parseImageSizes(); err == nil {
+				t.Errorf("Expected an error, but got none")
+			}
+		})
+	}
+}
+
+// TestHandleContentSizes ensures that using --image-size with a few different values
+// results in the correct sizes in stateMachine.imageSizes
+func TestHandleContentSizes(t *testing.T) {
+	testCases := []struct {
+		name   string
+		size   string
+		result map[string]quantity.Size
+	}{
+		{"size_not_specified", "", map[string]quantity.Size{"pc": 17825792}},
+		{"size_smaller_than_content", "pc:123", map[string]quantity.Size{"pc": 17825792}},
+		{"size_bigger_than_content", "pc:4G", map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
+	}
+	for _, tc := range testCases {
+		t.Run("test_handle_content_sizes_"+tc.name, func(t *testing.T) {
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.commonFlags.Size = tc.size
+			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget_tree",
+				"meta", "gadget.yaml")
+
+			// need workdir and loaded gadget.yaml set up for this
+			if err := stateMachine.makeTemporaryDirectories(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+			if err := stateMachine.loadGadgetYaml(); err != nil {
+				t.Errorf("Did not expect an error, got %s", err.Error())
+			}
+
+			stateMachine.handleContentSizes(0, "pc")
+			// ensure the correct size was set
+			for volumeName := range stateMachine.gadgetInfo.Volumes {
+				setSize := stateMachine.imageSizes[volumeName]
+				if setSize != tc.result[volumeName] {
+					t.Errorf("Volume %s has the wrong size set: %d. "+
+						"Should be %d", volumeName, setSize, tc.result[volumeName])
+				}
+			}
+		})
+	}
+}
+
+// TestFailedPostProcessGadgetYaml tests failues in the post processing of
+// the gadget.yaml file after loading it in. This is accomplished by mocking
+// os.MkdirAll
+func TestFailedPostProcessGadgetYaml(t *testing.T) {
+	t.Run("test_failed_post_process_gadget_yaml", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		// set a valid yaml file and load it in
+		stateMachine.yamlFilePath = filepath.Join("testdata",
+			"gadget_tree", "meta", "gadget.yaml")
+		// ensure unpack exists
+		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+		if err := stateMachine.loadGadgetYaml(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// mock os.MkdirAll
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		if err := stateMachine.postProcessGadgetYaml(); err == nil {
+			t.Error("Expected an error, but got none")
+		}
+		osMkdirAll = os.MkdirAll
+	})
 }

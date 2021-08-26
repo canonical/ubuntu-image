@@ -335,34 +335,6 @@ func TestFailedGenerateDiskInfo(t *testing.T) {
 	})
 }
 
-// TestFailedPostProcessGadgetYaml tests failues in the post processing of
-// the gadget.yaml file after loading it in. This is accomplished by mocking
-// os.MkdirAll
-func TestFailedPostProcessGadgetYaml(t *testing.T) {
-	t.Run("test_failed_post_process_gadget_yaml", func(t *testing.T) {
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		// set a valid yaml file and load it in
-		stateMachine.yamlFilePath = filepath.Join("testdata",
-			"gadget_tree", "meta", "gadget.yaml")
-		// ensure unpack exists
-		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
-
-		// mock os.MkdirAll
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		if err := stateMachine.postProcessGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
-		osMkdirAll = os.MkdirAll
-	})
-}
-
 // TestCalculateRootfsSize tests that the rootfs size can be calculated
 // this is accomplished by setting the test gadget tree as rootfs and
 // verifying that the size is calculated correctly
