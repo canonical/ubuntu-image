@@ -2,9 +2,11 @@
 package statemachine
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -333,34 +335,6 @@ func TestFailedGenerateDiskInfo(t *testing.T) {
 	})
 }
 
-// TestFailedPostProcessGadgetYaml tests failues in the post processing of
-// the gadget.yaml file after loading it in. This is accomplished by mocking
-// os.MkdirAll
-func TestFailedPostProcessGadgetYaml(t *testing.T) {
-	t.Run("test_failed_post_process_gadget_yaml", func(t *testing.T) {
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		// set a valid yaml file and load it in
-		stateMachine.yamlFilePath = filepath.Join("testdata",
-			"gadget_tree", "meta", "gadget.yaml")
-		// ensure unpack exists
-		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
-
-		// mock os.MkdirAll
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		if err := stateMachine.postProcessGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
-		osMkdirAll = os.MkdirAll
-	})
-}
-
 // TestCalculateRootfsSize tests that the rootfs size can be calculated
 // this is accomplished by setting the test gadget tree as rootfs and
 // verifying that the size is calculated correctly
@@ -521,5 +495,136 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 			t.Error("Expected an error, but got none")
 		}
 		osMkdirAll = os.MkdirAll
+	})
+}
+
+// TestPopulatePreparePartitions tests a successful run of the populatePreparePartitions state
+// and ensures that the appropriate .img files are created. It also tests that sizes smaller than
+// the rootfs size are corrected
+func TestPopulatePreparePartitions(t *testing.T) {
+	t.Run("test_populate_prepare_partitions", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+		// set a valid yaml file and load it in
+		stateMachine.yamlFilePath = filepath.Join("testdata",
+			"gadget_tree", "meta", "gadget.yaml")
+		// ensure unpack exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		if err := stateMachine.loadGadgetYaml(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// ensure volumes exists
+		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+
+		// populate unpack
+		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		for _, srcFile := range files {
+			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
+			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+		}
+
+		// populate bootfs contents to ensure no failures there
+		if err := stateMachine.populateBootfsContents(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// calculate rootfs size so the partition sizes can be set correctly
+		if err := stateMachine.calculateRootfsSize(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		if err := stateMachine.populatePreparePartitions(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// ensure the .img files were created
+		for ii := 0; ii < 4; ii++ {
+			partImg := filepath.Join(stateMachine.tempDirs.volumes,
+				"pc", "part"+strconv.Itoa(ii)+".img")
+			if _, err := os.Stat(partImg); err != nil {
+				t.Errorf("File %s should exist, but does not", partImg)
+			}
+		}
+
+		// check the contents of part0.img
+		partImg := filepath.Join(stateMachine.tempDirs.volumes,
+			"pc", "part0.img")
+		partImgBytes, _ := ioutil.ReadFile(partImg)
+		dataBytes := make([]byte, 440)
+		// partImg should consist of these 11 bytes and 429 null bytes
+		copy(dataBytes[:11], []byte{68, 85, 77, 77, 89, 32, 70, 73, 76, 69, 10})
+		if !bytes.Equal(partImgBytes, dataBytes) {
+			t.Errorf("Expected part0.img to contain %v, instead got %v %d",
+				dataBytes, partImgBytes, len(partImgBytes))
+		}
+	})
+}
+
+// TestFailedPopulatePreparePartitions tests failures in the populatePreparePartitions state
+func TestFailedPopulatePreparePartitions(t *testing.T) {
+	t.Run("test_failed_populate_prepare_partitions", func(t *testing.T) {
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+		// set a valid yaml file and load it in
+		stateMachine.yamlFilePath = filepath.Join("testdata",
+			"gadget_tree", "meta", "gadget.yaml")
+		// ensure unpack exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		if err := stateMachine.loadGadgetYaml(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// ensure volumes exists
+		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+
+		// populate unpack
+		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		for _, srcFile := range files {
+			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
+			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+		}
+
+		// populate bootfs contents to ensure no failures there
+		if err := stateMachine.populateBootfsContents(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// now mock helper.CopyBlob to cause an error in copyStructureContent
+		helperCopyBlob = mockCopyBlob
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
+		if err := stateMachine.populatePreparePartitions(); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		helperCopyBlob = helper.CopyBlob
+
+		// set a bootloader to lk and mock mkdir to cause a failure in that function
+		for _, volume := range stateMachine.gadgetInfo.Volumes {
+			volume.Bootloader = "lk"
+		}
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		if err := stateMachine.populatePreparePartitions(); err == nil {
+			t.Errorf("Expected an error, but got none")
+		}
+		osMkdir = os.Mkdir
 	})
 }

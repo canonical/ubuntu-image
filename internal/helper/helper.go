@@ -71,3 +71,14 @@ func Du(path string) (quantity.Size, error) {
 	})
 	return size, err
 }
+
+// CopyBlob runs `dd` to copy a blob to an image file
+func CopyBlob(ddArgs []string) error {
+	ddCommand := *exec.Command("dd")
+	ddCommand.Args = append(ddCommand.Args, ddArgs...)
+
+	if err := ddCommand.Run(); err != nil {
+		return err
+	}
+	return nil
+}

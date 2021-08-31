@@ -16,14 +16,13 @@ require (
 	github.com/mvo5/goconfigparser v0.0.0-20201015074339-50f22f44deb5 // indirect
 	github.com/snapcore/bolt v1.3.1 // indirect
 	github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2 // indirect
-	github.com/snapcore/secboot v0.0.0-20210426124600-b643c6666df5 // indirect
-	github.com/snapcore/snapd v0.0.0-20210722151255-a8fa4ce8b916
+	github.com/snapcore/secboot v0.0.0-20210805184555-c9f2139ee92b // indirect
+	github.com/snapcore/snapd v0.0.0-20210824074111-a3fe6b7e2554
 	github.com/snapcore/snapd/osutil/udev v0.0.0-00010101000000-000000000000 // indirect
 	github.com/snapcore/squashfuse v0.0.0-20171220165323-319f6d41a041 // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
-	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
-	golang.org/x/tools v0.1.5 // indirect
+	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect
 	gopkg.in/macaroon.v1 v1.0.0 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	gopkg.in/retry.v1 v1.0.3 // indirect

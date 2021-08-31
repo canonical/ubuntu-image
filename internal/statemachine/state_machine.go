@@ -18,11 +18,13 @@ import (
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
+	"github.com/snapcore/snapd/osutil/mkfs"
 )
 
 // define some functions that can be mocked by test cases
 var gadgetLayoutVolume = gadget.LayoutVolume
 var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
+var helperCopyBlob = helper.CopyBlob
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
 var ioutilWriteFile = ioutil.WriteFile
@@ -34,6 +36,7 @@ var osCreate = os.Create
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
 var execCommand = exec.Command
+var mkfsMakeWithContent = mkfs.MakeWithContent
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 
@@ -89,42 +92,6 @@ func (stateMachine *StateMachine) SetCommonOpts(commonOpts *commands.CommonOpts,
 	stateMachineOpts *commands.StateMachineOpts) {
 	stateMachine.commonFlags = commonOpts
 	stateMachine.stateMachineFlags = stateMachineOpts
-}
-
-// validateInput ensures that command line flags for the state machine are valid. These
-// flags are applicable to all image types
-func (stateMachine *StateMachine) validateInput() error {
-	// Validate command line options
-	if stateMachine.stateMachineFlags.Thru != "" && stateMachine.stateMachineFlags.Until != "" {
-		return fmt.Errorf("cannot specify both --until and --thru")
-	}
-	if stateMachine.stateMachineFlags.WorkDir == "" && stateMachine.stateMachineFlags.Resume {
-		return fmt.Errorf("must specify workdir when using --resume flag")
-	}
-
-	// if --until or --thru was given, make sure the specified state exists
-	var searchState string
-	var stateFound bool = false
-	if stateMachine.stateMachineFlags.Until != "" {
-		searchState = stateMachine.stateMachineFlags.Until
-	}
-	if stateMachine.stateMachineFlags.Thru != "" {
-		searchState = stateMachine.stateMachineFlags.Thru
-	}
-
-	if searchState != "" {
-		for _, state := range stateMachine.states {
-			if state.name == searchState {
-				stateFound = true
-				break
-			}
-		}
-		if !stateFound {
-			return fmt.Errorf("state %s is not a valid state name", searchState)
-		}
-	}
-
-	return nil
 }
 
 // parseImageSizes handles the flag --image-size, which is a string in the format
@@ -222,59 +189,6 @@ func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
 	stateMachine.volumeOrder = sortedVolumes
 }
 
-// readMetadata reads info about a partial state machine from disk
-func (stateMachine *StateMachine) readMetadata() error {
-	// handle the resume case
-	if stateMachine.stateMachineFlags.Resume {
-		// open the ubuntu-image.gob file and determine the state
-		var partialStateMachine = new(StateMachine)
-		gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
-		gobfile, err := os.Open(gobfilePath)
-		if err != nil {
-			return fmt.Errorf("error reading metadata file: %s", err.Error())
-		}
-		defer gobfile.Close()
-		dec := gob.NewDecoder(gobfile)
-		err = dec.Decode(&partialStateMachine)
-		if err != nil {
-			return fmt.Errorf("failed to parse metadata file: %s", err.Error())
-		}
-		stateMachine.CurrentStep = partialStateMachine.CurrentStep
-		stateMachine.StepsTaken = partialStateMachine.StepsTaken
-
-		// delete all of the stateFuncs that have already run
-		stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
-	}
-	return nil
-}
-
-// writeMetadata writes the state machine info to disk. This will be used when resuming a
-// partial state machine run
-func (stateMachine *StateMachine) writeMetadata() error {
-	gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
-	gobfile, err := os.OpenFile(gobfilePath, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("error opening metadata file for writing: %s", gobfilePath)
-	}
-	defer gobfile.Close()
-	enc := gob.NewEncoder(gobfile)
-
-	// no need to check errors, as it will panic if there is one
-	enc.Encode(stateMachine)
-	return nil
-}
-
-// cleanup cleans the workdir. For now this is just deleting the temporary directory if necessary
-// but will have more functionality added to it later
-func (stateMachine *StateMachine) cleanup() error {
-	if stateMachine.cleanWorkDir {
-		if err := osRemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // postProcessGadgetYaml adds the rootfs to the partitions list if needed
 func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var rootfsSeen bool = false
@@ -344,79 +258,67 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	return nil
 }
 
-// runHooks reads through the --hooks-directory flags and calls a helper function to execute the scripts
-func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) error {
-	os.Setenv(envKey, envVal)
-	for _, hooksDir := range stateMachine.commonFlags.HooksDirectories {
-		hooksDirectoryd := filepath.Join(hooksDir, hookName+".d")
-		hookScripts, err := ioutilReadDir(hooksDirectoryd)
-
-		// It's okay for hooks-directory.d to not exist, but if it does exist run all the scripts in it
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("Error reading hooks directory: %s", err.Error())
+// readMetadata reads info about a partial state machine from disk
+func (stateMachine *StateMachine) readMetadata() error {
+	// handle the resume case
+	if stateMachine.stateMachineFlags.Resume {
+		// open the ubuntu-image.gob file and determine the state
+		var partialStateMachine = new(StateMachine)
+		gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
+		gobfile, err := os.Open(gobfilePath)
+		if err != nil {
+			return fmt.Errorf("error reading metadata file: %s", err.Error())
 		}
-
-		for _, hookScript := range hookScripts {
-			hookScriptPath := filepath.Join(hooksDirectoryd, hookScript.Name())
-			if stateMachine.commonFlags.Debug {
-				fmt.Printf("Running hook script: %s\n", hookScriptPath)
-			}
-			if err := helper.RunScript(hookScriptPath); err != nil {
-				return err
-			}
+		defer gobfile.Close()
+		dec := gob.NewDecoder(gobfile)
+		err = dec.Decode(&partialStateMachine)
+		if err != nil {
+			return fmt.Errorf("failed to parse metadata file: %s", err.Error())
 		}
+		stateMachine.CurrentStep = partialStateMachine.CurrentStep
+		stateMachine.StepsTaken = partialStateMachine.StepsTaken
 
-		// if hookName exists in the hook directory, run it
-		hookScript := filepath.Join(hooksDir, hookName)
-		_, err = os.Stat(hookScript)
-		if err == nil {
-			if stateMachine.commonFlags.Debug {
-				fmt.Printf("Running hook script: %s\n", hookScript)
-			}
-			if err := helper.RunScript(hookScript); err != nil {
-				return err
-			}
-		}
+		// delete all of the stateFuncs that have already run
+		stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
 	}
 	return nil
 }
 
-// handleSecureBoot handles a special case where files need to be moved from /boot/ to
-// /EFI/ubuntu/ so that SecureBoot can still be used
-func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, targetDir string) error {
-	var bootDir, ubuntuDir string
-	if volume.Bootloader == "u-boot" {
-		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
-			"image", "boot", "uboot")
-		ubuntuDir = targetDir
-	} else if volume.Bootloader == "grub" {
-		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
-			"image", "boot", "grub")
-		ubuntuDir = filepath.Join(targetDir, "EFI", "ubuntu")
+// writeMetadata writes the state machine info to disk. This will be used when resuming a
+// partial state machine run
+func (stateMachine *StateMachine) writeMetadata() error {
+	gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
+	gobfile, err := os.OpenFile(gobfilePath, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("error opening metadata file for writing: %s", gobfilePath)
 	}
+	defer gobfile.Close()
+	enc := gob.NewEncoder(gobfile)
 
-	if _, err := os.Stat(bootDir); err != nil {
-		// this won't always exist, and that's fine
-		return nil
-	}
+	// no need to check errors, as it will panic if there is one
+	enc.Encode(stateMachine)
+	return nil
+}
 
-	// copy the files from bootDir to ubuntuDir
-	if err := osMkdirAll(ubuntuDir, 0755); err != nil {
-		return fmt.Errorf("Error creating ubuntu dir: %s", err.Error())
-	}
-
-	files, err := ioutilReadDir(bootDir)
-	if err != nil {
-		return fmt.Errorf("Error reading boot dir: %s", err.Error())
-	}
-	for _, bootFile := range files {
-		srcFile := filepath.Join(bootDir, bootFile.Name())
-		if err := osutilCopySpecialFile(srcFile, ubuntuDir); err != nil {
-			return fmt.Errorf("Error copying boot dir: %s", err.Error())
+// handleContentSizes ensures that the sizes of the partitions are large enough and stores
+// safe values in the stateMachine struct for use during make_image
+func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
+	// store volume sizes in the stateMachine Struct. These will be used during
+	// the make_image step
+	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
+	volumeSize, found := stateMachine.imageSizes[volumeName]
+	if !found {
+		stateMachine.imageSizes[volumeName] = calculated
+	} else {
+		if volumeSize < calculated {
+			fmt.Printf("WARNING: ignoring image size smaller than "+
+				"minimum required size: vol:%s %d < %d",
+				volumeName, uint64(volumeSize), uint64(calculated))
+			stateMachine.imageSizes[volumeName] = calculated
+		} else {
+			stateMachine.imageSizes[volumeName] = volumeSize
 		}
 	}
-
-	return nil
 }
 
 // Run iterates through the state functions, stopping when appropriate based on --until and --thru
