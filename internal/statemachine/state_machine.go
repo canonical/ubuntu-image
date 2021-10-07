@@ -282,15 +282,14 @@ func (stateMachine *StateMachine) readMetadata() error {
 		if err != nil {
 			return fmt.Errorf("failed to parse metadata file: %s", err.Error())
 		}
-		/*stateMachine.CurrentStep = partialStateMachine.CurrentStep
+		stateMachine.CurrentStep = partialStateMachine.CurrentStep
 		stateMachine.StepsTaken = partialStateMachine.StepsTaken
 		stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
 		stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
 		stateMachine.ImageSizes = partialStateMachine.ImageSizes
 		stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
 		stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
-		stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")*/
-		stateMachine = partialStateMachine
+		stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
 
 		// delete all of the stateFuncs that have already run
 		stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]

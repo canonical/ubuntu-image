@@ -436,7 +436,7 @@ func TestFailedWriteOffsetValues(t *testing.T) {
 // for the rootfs specified in gadget.yaml is smaller than the calculated rootfs size.
 // It also ensures that the size is corrected in the structure struct
 func TestWarningRootfsSizeTooSmall(t *testing.T) {
-	t.Run("test_warning_rootfs_size_too_small", func (t *testing.T) {
+	t.Run("test_warning_rootfs_size_too_small", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -456,7 +456,6 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 
 		// ensure volumes exists
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
-		err = stateMachine.populateBootfsContents()
 
 		// calculate the size of the rootfs
 		err = stateMachine.calculateRootfsSize()
@@ -512,9 +511,9 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 func TestGetStructureOffset(t *testing.T) {
 	var testOffset quantity.Offset = 1
 	testCases := []struct {
-		name    string
+		name      string
 		structure gadget.VolumeStructure
-		expected quantity.Offset
+		expected  quantity.Offset
 	}{
 		{"nil", gadget.VolumeStructure{Offset: nil}, 0},
 		{"with_value", gadget.VolumeStructure{Offset: &testOffset}, 1},
