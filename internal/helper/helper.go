@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	//"path/filepath"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
