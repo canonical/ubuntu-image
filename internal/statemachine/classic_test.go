@@ -20,12 +20,14 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 		name       string
 		project    string
 		filesystem string
+		errMsg     string
 	}{
-		{"neither_project_nor_filesystem", "", ""},
-		{"both_project_and_filesystem", "ubuntu-cpc", "/tmp"},
+		{"neither_project_nor_filesystem", "", "", "project or filesystem is required"},
+		{"both_project_and_filesystem", "ubuntu-cpc", "/tmp", "project and filesystem are mutually exclusive"},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
 
@@ -34,9 +36,8 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 			stateMachine.Opts.Filesystem = tc.filesystem
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-			if err := stateMachine.Setup(); err == nil {
-				t.Error("Expected an error but there was none")
-			}
+			err := stateMachine.Setup()
+			asserter.AssertContains(err, tc.errMsg)
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
@@ -45,6 +46,7 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 // TestFailedValidateInputClassic tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputClassic(t *testing.T) {
 	t.Run("test_failed_validate_input", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -54,9 +56,8 @@ func TestFailedValidateInputClassic(t *testing.T) {
 		stateMachine.stateMachineFlags.Until = "until-test"
 		stateMachine.stateMachineFlags.Thru = "thru-test"
 
-		if err := stateMachine.Setup(); err == nil {
-			t.Error("Expected an error but there was none")
-		}
+		err := stateMachine.Setup()
+		asserter.AssertContains(err, "cannot specify both --until and --thru")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
@@ -64,6 +65,7 @@ func TestFailedValidateInputClassic(t *testing.T) {
 // TestFailedReadMetadataClassic tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestFailedReadMetadataClassic(t *testing.T) {
 	t.Run("test_failed_read_metadata", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -73,9 +75,8 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 		stateMachine.stateMachineFlags.Resume = true
 		stateMachine.stateMachineFlags.WorkDir = testDir
 
-		if err := stateMachine.Setup(); err == nil {
-			t.Error("Expected an error but there was none")
-		}
+		err := stateMachine.Setup()
+		asserter.AssertContains(err, "error reading metadata file")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
@@ -84,14 +85,15 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 // are placed in the correct locations
 func TestPrepareGadgetTree(t *testing.T) {
 	t.Run("test_prepare_gadget_tree", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 		stateMachine.parent = &stateMachine
 
-		if err := stateMachine.prepareGadgetTree(); err != nil {
-			t.Errorf("Did not expect an error, but got %s", err.Error())
-		}
+		err := stateMachine.prepareGadgetTree()
+		asserter.AssertErrNil(err, true)
+
 		gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
 		for _, file := range gadgetTreeFiles {
 			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
@@ -106,20 +108,19 @@ func TestPrepareGadgetTree(t *testing.T) {
 // TestFailedPrepareGadgetTree tests failures in os, osutil, and ioutil libraries
 func TestFailedPrepareGadgetTree(t *testing.T) {
 	t.Run("test_failed_prepare_gadget_tree", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 		stateMachine.parent = &stateMachine
 
-		// mock os.Mkdir and test with and without a WorkDir
+		// mock os.Mkdir
 		osMkdirAll = mockMkdirAll
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		if err := stateMachine.prepareGadgetTree(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
-		// restore the function
+		err := stateMachine.prepareGadgetTree()
+		asserter.AssertContains(err, "Error creating unpack directory")
 		osMkdirAll = os.MkdirAll
 
 		// mock ioutil.ReadDir
@@ -127,10 +128,8 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 		defer func() {
 			ioutilReadDir = ioutil.ReadDir
 		}()
-		if err := stateMachine.prepareGadgetTree(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
-		// restore the function
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertContains(err, "Error reading gadget tree")
 		ioutilReadDir = ioutil.ReadDir
 
 		// mock osutil.CopySpecialFile
@@ -138,10 +137,8 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 		defer func() {
 			osutilCopySpecialFile = osutil.CopySpecialFile
 		}()
-		if err := stateMachine.prepareGadgetTree(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
-		// restore the function
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertContains(err, "Error copying gadget tree")
 		osutilCopySpecialFile = osutil.CopySpecialFile
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
@@ -151,6 +148,7 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 // TestSuccessfulClassicRun runs through all states ensuring none failed
 func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -160,22 +158,26 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 		stateMachine.parent = &stateMachine
+		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
+		stateMachine.stateMachineFlags.WorkDir = workDir
 
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		// Setup, Run, and Teardown the state machine and assert no errors
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, false)
 
-		if err := stateMachine.Run(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, false)
 
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, false)
+
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
+// TODO replace this with fakeExecCommand that sil2100 wrote
 // TestFailedLiveBuildCommands tests the scenario where calls to `lb` fail
 // this is accomplished by temporarily replacing lb on disk with a test script
 func TestFailedLiveBuildCommands(t *testing.T) {
@@ -188,6 +190,7 @@ func TestFailedLiveBuildCommands(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
 
@@ -201,7 +204,6 @@ func TestFailedLiveBuildCommands(t *testing.T) {
 			stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 			stateMachine.parent = &stateMachine
 
-			// TODO: write a helper function for "mv"
 			scriptPath := filepath.Join("testscripts", tc.testScript)
 			// save the original lb
 			whichLb := *exec.Command("which", "lb")
@@ -209,34 +211,26 @@ func TestFailedLiveBuildCommands(t *testing.T) {
 			lbLocation := strings.TrimSpace(string(lbLocationBytes))
 			// ensure the backup doesn't exist
 			os.Remove(lbLocation + ".bak")
-			err := osutil.CopyFile(lbLocation, lbLocation+".bak", 0)
-			if err != nil {
-				t.Errorf("Failed back up lb: %s", err.Error())
-			}
+			err := os.Rename(lbLocation, lbLocation+".bak")
+			asserter.AssertErrNil(err, true)
 
-			// copy testscript to lb
-			os.Remove(lbLocation)
 			err = osutil.CopyFile(scriptPath, lbLocation, 0)
-			if err != nil {
-				t.Errorf("Failed to copy testscript %s: %s", tc.testScript, err.Error())
-			}
+			asserter.AssertErrNil(err, true)
 			defer func() {
 				os.Remove(lbLocation)
-				osutil.CopyFile(lbLocation+".bak", lbLocation, 0)
+				os.Rename(lbLocation+".bak", lbLocation)
 			}()
 
 			// need workdir set up for this
-			if err := stateMachine.makeTemporaryDirectories(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
 
 			// also need unpack set up
-			if err := os.Mkdir(stateMachine.tempDirs.unpack, 0755); err != nil {
-				t.Error("Failed to create unpack directory")
-			}
-			if err := stateMachine.runLiveBuild(); err == nil {
-				t.Error("Expected an error but there was none")
-			}
+			err = os.Mkdir(stateMachine.tempDirs.unpack, 0755)
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.runLiveBuild()
+			asserter.AssertContains(err, "Error running command")
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
@@ -247,6 +241,7 @@ func TestFailedLiveBuildCommands(t *testing.T) {
 // by passing an architecture for which there is no qemu-static binary
 func TestNoStatic(t *testing.T) {
 	t.Run("test_no_qemu_static", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -258,17 +253,15 @@ func TestNoStatic(t *testing.T) {
 		stateMachine.parent = &stateMachine
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
 		// also need unpack set up
-		if err := os.Mkdir(stateMachine.tempDirs.unpack, 0755); err != nil {
-			t.Error("Failed to create unpack directory")
-		}
-		if err := stateMachine.runLiveBuild(); err == nil {
-			t.Error("Expected an error but there was none")
-		}
+		err = os.Mkdir(stateMachine.tempDirs.unpack, 0755)
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.runLiveBuild()
+		asserter.AssertContains(err, "in case of non-standard archs or custom paths")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
@@ -277,6 +270,7 @@ func TestNoStatic(t *testing.T) {
 // the rootfs to ensure at least some of the correct file are in place
 func TestPopulateClassicRootfsContents(t *testing.T) {
 	t.Run("test_populate_classic_rootfs_contents", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -288,13 +282,11 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 		stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
 
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err := stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
 
-		if err := stateMachine.Run(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
 
 		// check the files before Teardown
 		fileList := []string{filepath.Join("etc", "shadow"),
@@ -323,9 +315,8 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 				string(fstab), correctLabel)
 		}
 
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, false)
 	})
 }
 
@@ -333,6 +324,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 // this is accomplished by mocking functions
 func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_classic_rootfs_contents", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
@@ -340,18 +332,16 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
 		// mock ioutil.ReadDir
 		ioutilReadDir = mockReadDir
 		defer func() {
 			ioutilReadDir = ioutil.ReadDir
 		}()
-		if err := stateMachine.populateClassicRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertContains(err, "Error reading unpack/chroot dir")
 		ioutilReadDir = ioutil.ReadDir
 
 		// mock osutil.CopySpecialFile
@@ -359,9 +349,8 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		defer func() {
 			osutilCopySpecialFile = osutil.CopySpecialFile
 		}()
-		if err := stateMachine.populateClassicRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertContains(err, "Error copying rootfs")
 		osutilCopySpecialFile = osutil.CopySpecialFile
 
 		// mock ioutil.ReadFile
@@ -369,9 +358,8 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		defer func() {
 			ioutilReadFile = ioutil.ReadFile
 		}()
-		if err := stateMachine.populateClassicRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertContains(err, "Error opening fstab")
 		ioutilReadFile = ioutil.ReadFile
 
 		// mock ioutil.WriteFile
@@ -379,9 +367,8 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		defer func() {
 			ioutilWriteFile = ioutil.WriteFile
 		}()
-		if err := stateMachine.populateClassicRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertContains(err, "Error writing to fstab")
 		ioutilWriteFile = ioutil.WriteFile
 
 		// mock os.MkdirAll
@@ -389,9 +376,8 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		if err := stateMachine.populateClassicRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertContains(err, "Error creating cloud-init dir")
 		osMkdirAll = os.MkdirAll
 
 		// mock os.OpenFile
@@ -399,9 +385,8 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		defer func() {
 			osOpenFile = os.OpenFile
 		}()
-		if err := stateMachine.populateClassicRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertContains(err, "Error opening cloud-init meta-data file")
 		osOpenFile = os.OpenFile
 
 		// mock osutil.CopyFile
@@ -409,9 +394,8 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		defer func() {
 			osutilCopyFile = osutil.CopyFile
 		}()
-		if err := stateMachine.populateClassicRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertContains(err, "Error copying cloud-init")
 		osutilCopyFile = osutil.CopyFile
 	})
 }
@@ -420,19 +404,18 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 // to the rootfs directory
 func TestFilesystemFlag(t *testing.T) {
 	t.Run("test_filesystem_flag", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Opts.Filesystem = filepath.Join("testdata", "filesystem")
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
-		if err := stateMachine.populateClassicRootfsContents(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
 
 		// check that the specified filesystem was copied over
 		if _, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, "testfile")); err != nil {
@@ -444,6 +427,7 @@ func TestFilesystemFlag(t *testing.T) {
 // TestGeneratePackageManifest tests if classic image manifest generation works
 func TestGeneratePackageManifest(t *testing.T) {
 	t.Run("test_generate_package_manifest", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 
 		// Setup the exec.Command mock
 		testCaseName = "TestGeneratePackageManifest"
@@ -453,9 +437,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 		}()
 		// We need the output directory set for this
 		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
-		if err != nil {
-			t.Errorf("Failed to create output directory")
-		}
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(outputDir)
 
 		var stateMachine ClassicStateMachine
@@ -464,16 +446,13 @@ func TestGeneratePackageManifest(t *testing.T) {
 		stateMachine.commonFlags.OutputDir = outputDir
 		osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
 
-		if err := stateMachine.generatePackageManifest(); err != nil {
-			t.Errorf("Did not expect an error, but got %s", err.Error())
-		}
+		err = stateMachine.generatePackageManifest()
+		asserter.AssertErrNil(err, true)
 
 		// Check if manifest file got generated and if it has expected contents
 		manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
 		manifestBytes, err := ioutil.ReadFile(manifestPath)
-		if err != nil {
-			t.Errorf("Failed to read file %s: %s", manifestPath, err.Error())
-		}
+		asserter.AssertErrNil(err, true)
 		// The order of packages shouldn't matter
 		examplePackages := []string{"foo 1.2", "bar 1.4-1ubuntu4.1", "libbaz 0.1.3ubuntu2"}
 		for _, pkg := range examplePackages {
@@ -487,6 +466,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 // TestFailedGeneratePackageManifest tests if classic manifest generation failures are reported
 func TestFailedGeneratePackageManifest(t *testing.T) {
 	t.Run("test_failed_generate_package_manifest", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 
 		// Setup the exec.Command mock - version from the success test
 		testCaseName = "TestGeneratePackageManifest"
@@ -505,8 +485,7 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.OutputDir = "/dummy/path"
 
-		if err := stateMachine.generatePackageManifest(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err := stateMachine.generatePackageManifest()
+		asserter.AssertContains(err, "Error creating manifest file")
 	})
 }

@@ -5,7 +5,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
+	//"path/filepath"
+	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -59,16 +60,15 @@ func SaveCWD() func() {
 
 // Du recurses through a directory similar to du and adds all the sizes of files together
 func Du(path string) (quantity.Size, error) {
-	var size quantity.Size = 0
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			size += quantity.Size(info.Size())
-		}
-		return err
-	})
+	duCommand := *exec.Command("du", "-s", "-B1")
+	duCommand.Args = append(duCommand.Args, path)
+
+	duBytes, err := duCommand.Output()
+	if err != nil {
+		return quantity.Size(0), err
+	}
+	sizeString := strings.Split(string(duBytes), "\t")[0]
+	size, err := quantity.ParseSize(sizeString)
 	return size, err
 }
 
@@ -78,7 +78,7 @@ func CopyBlob(ddArgs []string) error {
 	ddCommand.Args = append(ddCommand.Args, ddArgs...)
 
 	if err := ddCommand.Run(); err != nil {
-		return err
+		return fmt.Errorf("Command \"%s\" returned with %s", ddCommand.String(), err.Error())
 	}
 	return nil
 }

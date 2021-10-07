@@ -15,6 +15,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
@@ -32,11 +33,13 @@ var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
 var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
+var osRename = os.Rename
 var osCreate = os.Create
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
 var execCommand = exec.Command
 var mkfsMakeWithContent = mkfs.MakeWithContent
+var diskfsCreate = diskfs.Create
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 
@@ -65,7 +68,7 @@ type StateMachine struct {
 	cleanWorkDir bool   // whether or not to clean up the workDir
 	CurrentStep  string // tracks the current progress of the state machine
 	StepsTaken   int    // counts the number of steps taken
-	yamlFilePath string // the location for the yaml file
+	YamlFilePath string // the location for the yaml file
 	isSeeded     bool   // core 20 images are seeded
 	rootfsSize   quantity.Size
 	tempDirs     temporaryDirectories
@@ -80,10 +83,10 @@ type StateMachine struct {
 	parent SmInterface
 
 	// imported from snapd, the info parsed from gadget.yaml
-	gadgetInfo *gadget.Info
+	GadgetInfo *gadget.Info
 
 	// image sizes for parsing the --image-size flags
-	imageSizes  map[string]quantity.Size
+	ImageSizes  map[string]quantity.Size
 	volumeOrder []string
 }
 
@@ -99,7 +102,7 @@ func (stateMachine *StateMachine) SetCommonOpts(commonOpts *commands.CommonOpts,
 // format <volumeSize> to signify one size to rule them all
 func (stateMachine *StateMachine) parseImageSizes() error {
 	// initialize the size map
-	stateMachine.imageSizes = make(map[string]quantity.Size)
+	stateMachine.ImageSizes = make(map[string]quantity.Size)
 
 	// If --image-size was not used, simply return
 	if stateMachine.commonFlags.Size == "" {
@@ -112,8 +115,8 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 		if err != nil {
 			return fmt.Errorf("Failed to parse argument to --image-size: %s", err.Error())
 		}
-		for volumeName := range stateMachine.gadgetInfo.Volumes {
-			stateMachine.imageSizes[volumeName] = parsedSize
+		for volumeName := range stateMachine.GadgetInfo.Volumes {
+			stateMachine.ImageSizes[volumeName] = parsedSize
 		}
 	} else {
 		allSizes := strings.Split(stateMachine.commonFlags.Size, ",")
@@ -135,16 +138,16 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 				// argument passed was numeric.
 				if volumeNumber < len(stateMachine.volumeOrder) {
 					stateName := stateMachine.volumeOrder[volumeNumber]
-					stateMachine.imageSizes[stateName] = parsedSize
+					stateMachine.ImageSizes[stateName] = parsedSize
 				} else {
 					return fmt.Errorf("Volume index %d is out of range", volumeNumber)
 				}
 			} else {
-				if _, found := stateMachine.gadgetInfo.Volumes[splitSize[0]]; !found {
+				if _, found := stateMachine.GadgetInfo.Volumes[splitSize[0]]; !found {
 					return fmt.Errorf("Volume %s does not exist in gadget.yaml",
 						splitSize[0])
 				}
-				stateMachine.imageSizes[splitSize[0]] = parsedSize
+				stateMachine.ImageSizes[splitSize[0]] = parsedSize
 			}
 		}
 	}
@@ -160,7 +163,7 @@ func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
 	}
 
 	indexMap := make(map[string]int)
-	for volumeName := range stateMachine.gadgetInfo.Volumes {
+	for volumeName := range stateMachine.GadgetInfo.Volumes {
 		searchString := volumeName + ":"
 		index := strings.Index(gadgetYamlContents, searchString)
 		indexMap[volumeName] = index
@@ -195,7 +198,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var farthestOffset quantity.Offset = 0
 	var lastOffset quantity.Offset = 0
 	var lastVolumeName string
-	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
+	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		lastVolumeName = volumeName
 		volumeBaseDir := filepath.Join(stateMachine.tempDirs.volumes, volumeName)
 		if err := osMkdirAll(volumeBaseDir, 0755); err != nil {
@@ -226,10 +229,14 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			}
 			lastOffset = offset + quantity.Offset(structure.Size)
 			farthestOffset = maxOffset(lastOffset, farthestOffset)
+			structure.Offset = &offset
+			// we've manually updated the offset, but since structure is
+			// not a pointer we need to overwrite the value in volume.Structure
+			volume.Structure[ii] = structure
 		}
 	}
 
-	if !rootfsSeen && len(stateMachine.gadgetInfo.Volumes) == 1 {
+	if !rootfsSeen && len(stateMachine.GadgetInfo.Volumes) == 1 {
 		// We still need to handle the case of unspecified system-data
 		// partition where we simply attach the rootfs at the end of the
 		// partition list.
@@ -252,8 +259,8 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 
 		// There is only one volume, so lastVolumeName is its name
 		// we now add the rootfs structure to the volume
-		stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure =
-			append(stateMachine.gadgetInfo.Volumes[lastVolumeName].Structure, rootfsStructure)
+		stateMachine.GadgetInfo.Volumes[lastVolumeName].Structure =
+			append(stateMachine.GadgetInfo.Volumes[lastVolumeName].Structure, rootfsStructure)
 	}
 	return nil
 }
@@ -275,8 +282,15 @@ func (stateMachine *StateMachine) readMetadata() error {
 		if err != nil {
 			return fmt.Errorf("failed to parse metadata file: %s", err.Error())
 		}
-		stateMachine.CurrentStep = partialStateMachine.CurrentStep
+		/*stateMachine.CurrentStep = partialStateMachine.CurrentStep
 		stateMachine.StepsTaken = partialStateMachine.StepsTaken
+		stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
+		stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
+		stateMachine.ImageSizes = partialStateMachine.ImageSizes
+		stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
+		stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
+		stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")*/
+		stateMachine = partialStateMachine
 
 		// delete all of the stateFuncs that have already run
 		stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
@@ -306,17 +320,17 @@ func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Off
 	// store volume sizes in the stateMachine Struct. These will be used during
 	// the make_image step
 	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
-	volumeSize, found := stateMachine.imageSizes[volumeName]
+	volumeSize, found := stateMachine.ImageSizes[volumeName]
 	if !found {
-		stateMachine.imageSizes[volumeName] = calculated
+		stateMachine.ImageSizes[volumeName] = calculated
 	} else {
 		if volumeSize < calculated {
 			fmt.Printf("WARNING: ignoring image size smaller than "+
 				"minimum required size: vol:%s %d < %d",
 				volumeName, uint64(volumeSize), uint64(calculated))
-			stateMachine.imageSizes[volumeName] = calculated
+			stateMachine.ImageSizes[volumeName] = calculated
 		} else {
-			stateMachine.imageSizes[volumeName] = volumeSize
+			stateMachine.ImageSizes[volumeName] = volumeSize
 		}
 	}
 }

@@ -1,7 +1,9 @@
 package statemachine
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +11,11 @@ import (
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/diskfs/go-diskfs/disk"
+	"github.com/diskfs/go-diskfs/partition"
+	"github.com/diskfs/go-diskfs/partition/gpt"
+	"github.com/diskfs/go-diskfs/partition/mbr"
+
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 )
@@ -54,7 +61,7 @@ func (stateMachine *StateMachine) validateInput() error {
 func (stateMachine *StateMachine) cleanup() error {
 	if stateMachine.cleanWorkDir {
 		if err := osRemoveAll(stateMachine.stateMachineFlags.WorkDir); err != nil {
-			return err
+			return fmt.Errorf("Error cleaning up workDir: %s", err.Error())
 		}
 	}
 	return nil
@@ -78,7 +85,7 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 				fmt.Printf("Running hook script: %s\n", hookScriptPath)
 			}
 			if err := helper.RunScript(hookScriptPath); err != nil {
-				return err
+				return fmt.Errorf("Error running hook %s: %s", hookScriptPath, err.Error())
 			}
 		}
 
@@ -90,7 +97,7 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 				fmt.Printf("Running hook script: %s\n", hookScript)
 			}
 			if err := helper.RunScript(hookScript); err != nil {
-				return err
+				return fmt.Errorf("Error running hook %s: %s", hookScript, err.Error())
 			}
 		}
 	}
@@ -124,7 +131,8 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 	}
 	for _, lkFile := range files {
 		srcFile := filepath.Join(bootDir, lkFile.Name())
-		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
+		dstFile := filepath.Join(gadgetDir, lkFile.Name())
+		if err := osRename(srcFile, dstFile); err != nil {
 			return fmt.Errorf("Error copying lk bootloader dir: %s", err.Error())
 		}
 	}
@@ -144,7 +152,8 @@ func shouldSkipStructure(structure gadget.VolumeStructure, isSeeded bool) bool {
 }
 
 // copyStructureContent handles copying raw blobs or creating formatted filesystems
-func (stateMachine *StateMachine) copyStructureContent(structure gadget.VolumeStructure,
+func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
+	structure gadget.VolumeStructure, structureNumber int,
 	contentRoot, partImg string) error {
 	if structure.Filesystem == "" {
 		// copy the contents to the new location
@@ -186,18 +195,25 @@ func (stateMachine *StateMachine) copyStructureContent(structure gadget.VolumeSt
 					structure.Size.IECString(),
 					stateMachine.rootfsSize.IECString())
 				blockSize = stateMachine.rootfsSize
+				structure.Size = stateMachine.rootfsSize
+				volume.Structure[structureNumber] = structure
 			} else {
 				blockSize = structure.Size
 			}
 		} else {
 			blockSize = structure.Size
 		}
-		// use mkfs functions from snapd to create the filesystems
-		ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
-			"bs=" + strconv.FormatUint(uint64(blockSize), 10), "seek=1"}
-		if err := helperCopyBlob(ddArgs); err != nil {
-			return fmt.Errorf("Error zeroing image file %s: %s",
-				partImg, err.Error())
+		if structure.Role == gadget.SystemData {
+			os.Create(partImg)
+			os.Truncate(partImg, int64(stateMachine.rootfsSize))
+		} else {
+			// use mkfs functions from snapd to create the filesystems
+			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
+				"bs=" + strconv.FormatUint(uint64(blockSize), 10), "seek=1"}
+			if err := helperCopyBlob(ddArgs); err != nil {
+				return fmt.Errorf("Error zeroing image file %s: %s",
+					partImg, err.Error())
+			}
 		}
 		err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
 			contentRoot, structure.Size, quantity.Size(512))
@@ -238,7 +254,8 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 	}
 	for _, bootFile := range files {
 		srcFile := filepath.Join(bootDir, bootFile.Name())
-		if err := osutilCopySpecialFile(srcFile, ubuntuDir); err != nil {
+		dstFile := filepath.Join(ubuntuDir, bootFile.Name())
+		if err := osRename(srcFile, dstFile); err != nil {
 			return fmt.Errorf("Error copying boot dir: %s", err.Error())
 		}
 	}
@@ -353,4 +370,151 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 		return offset1
 	}
 	return offset2
+}
+
+// createPartitionTable creates a disk image file and writes the partition table to it
+func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize uint64, isSeeded bool) *partition.Table {
+	var gptPartitions = make([]*gpt.Partition, 0)
+	var mbrPartitions = make([]*mbr.Partition, 0)
+	var partitionTable partition.Table
+
+	for _, structure := range volume.Structure {
+		if structure.Role == "mbr" || structure.Type == "bare" ||
+			shouldSkipStructure(structure, isSeeded) {
+			continue
+		}
+
+		var structureType string
+		// Check for hybrid MBR/GPT
+		if strings.Contains(structure.Type, ",") {
+			types := strings.Split(structure.Type, ",")
+			if volume.Schema == "gpt" {
+				structureType = types[1]
+			} else {
+				structureType = types[0]
+			}
+		} else {
+			structureType = structure.Type
+		}
+
+		if volume.Schema == "mbr" {
+			bootable := false
+			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+				bootable = true
+			}
+			// mbr.Type is a byte. snapd has already verified that this string
+			// is exactly two chars, so we can parse those two chars to a byte
+			partitionType, _ := strconv.ParseUint(structureType, 16, 8)
+			mbrPartition := &mbr.Partition{
+				Start:    uint32(*structure.Offset) / uint32(sectorSize),
+				Size:     uint32(structure.Size),
+				Type:     mbr.Type(partitionType),
+				Bootable: bootable,
+			}
+			mbrPartitions = append(mbrPartitions, mbrPartition)
+		} else {
+			partitionType := gpt.Type(structureType)
+			gptPartition := &gpt.Partition{
+				Start: uint64(*structure.Offset) / sectorSize,
+				Size:  uint64(structure.Size),
+				Type:  partitionType,
+				Name:  structure.Name,
+			}
+			gptPartitions = append(gptPartitions, gptPartition)
+		}
+	}
+
+	if volume.Schema == "mbr" {
+		mbrTable := &mbr.Table{
+			Partitions:         mbrPartitions,
+			LogicalSectorSize:  int(sectorSize),
+			PhysicalSectorSize: int(sectorSize),
+		}
+		partitionTable = mbrTable
+	} else {
+		gptTable := &gpt.Table{
+			Partitions:         gptPartitions,
+			LogicalSectorSize:  int(sectorSize),
+			PhysicalSectorSize: int(sectorSize),
+			ProtectiveMBR:      true,
+		}
+		partitionTable = gptTable
+	}
+	return &partitionTable
+}
+
+// calculateImageSize calculates the total sum of all partition sizes in an image
+func (stateMachine *StateMachine) calculateImageSize() (int64, error) {
+	if stateMachine.GadgetInfo == nil {
+		return 0, fmt.Errorf("Cannot calculate image size before initializing GadgetInfo")
+	}
+	var imgSize int64 = 0
+	for _, volume := range stateMachine.GadgetInfo.Volumes {
+		for _, structure := range volume.Structure {
+			imgSize += int64(structure.Size)
+		}
+	}
+	return imgSize, nil
+}
+
+// copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
+func (stateMachine *StateMachine) copyDataToImage(volumeName string, volume *gadget.Volume, diskImg *disk.Disk) error {
+	for structureNumber, structure := range volume.Structure {
+		if shouldSkipStructure(structure, stateMachine.isSeeded) {
+			continue
+		}
+		sectorSize := diskImg.LogicalBlocksize
+		// set up the arguments to dd the structures into an image
+		partImg := filepath.Join(stateMachine.tempDirs.volumes, volumeName,
+			"part"+strconv.Itoa(structureNumber)+".img")
+		seek := strconv.FormatInt(int64(getStructureOffset(structure))/sectorSize, 10)
+		count := strconv.FormatFloat(math.Ceil(float64(structure.Size)/float64(sectorSize)), 'f', 0, 64)
+		ddArgs := []string{
+			"if=" + partImg,
+			"of=" + diskImg.File.Name(),
+			"bs=" + strconv.FormatInt(sectorSize, 10),
+			"seek=" + seek,
+			"count=" + count,
+			"conv=notrunc",
+			"conv=sparse",
+		}
+		if err := helperCopyBlob(ddArgs); err != nil {
+			return fmt.Errorf("Error writing disk image: %s",
+				err.Error())
+		}
+	}
+	return nil
+}
+
+// writeOffsetValues handles any OffsetWrite values present in the volume structures.
+func writeOffsetValues(volume *gadget.Volume, imgName string, sectorSize, imgSize uint64) error {
+	imgFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
+	if err != nil {
+		return fmt.Errorf("Error opening image file to write offsets: %s", err.Error())
+	}
+	defer imgFile.Close()
+	for _, structure := range volume.Structure {
+		if structure.OffsetWrite != nil {
+			offset := uint64(*structure.Offset) / sectorSize
+			if imgSize-4 < offset {
+				return fmt.Errorf("write offset beyond end of file")
+			}
+			offsetBytes := make([]byte, 4)
+			binary.LittleEndian.PutUint32(offsetBytes, uint32(offset))
+			_, err := imgFile.WriteAt(offsetBytes, int64(structure.OffsetWrite.Offset))
+			if err != nil {
+				return fmt.Errorf("Failed to write offset to disk at %d: %s",
+					structure.OffsetWrite.Offset, err.Error())
+			}
+		}
+	}
+	return nil
+}
+
+// getStructureOffset returns 0 if structure.Offset is nil, otherwise the value stored there
+func getStructureOffset(structure gadget.VolumeStructure) quantity.Offset {
+	if structure.Offset == nil {
+		return 0
+	}
+	return *structure.Offset
 }
