@@ -405,8 +405,8 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 			// is exactly two chars, so we can parse those two chars to a byte
 			partitionType, _ := strconv.ParseUint(structureType, 16, 8)
 			mbrPartition := &mbr.Partition{
-				Start:    uint32(*structure.Offset) / uint32(sectorSize),
-				Size:     uint32(structure.Size),
+				Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
+				Size:     uint32(math.Ceil(float64(structure.Size) / float64(sectorSize))),
 				Type:     mbr.Type(partitionType),
 				Bootable: bootable,
 			}
@@ -414,7 +414,7 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 		} else {
 			partitionType := gpt.Type(structureType)
 			gptPartition := &gpt.Partition{
-				Start: uint64(*structure.Offset) / sectorSize,
+				Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
 				Size:  uint64(structure.Size),
 				Type:  partitionType,
 				Name:  structure.Name,
