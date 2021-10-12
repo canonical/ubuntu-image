@@ -1,9 +1,10 @@
 name: ubuntu-image
 summary: Create Ubuntu images
 description: |
-  Use this tool to create Ubuntu images.
+  Official tool for building Ubuntu images, currently supporing Ubuntu Core
+  snap-based images and preinstalled Ubuntu classic images.
 version: 2.0+snap1
-grade: devel
+grade: stable
 confinement: classic
 base: core20
 
@@ -26,3 +27,5 @@ parts:
       - mtools
       - fdisk
       - gdisk
+      - e2fsprogs
+      - fakeroot
