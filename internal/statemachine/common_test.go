@@ -806,6 +806,12 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.populatePreparePartitions()
+		asserter.AssertErrNil(err, true)
+
 		// mock os.OpenFile to simulate a failure in writeOffsetValues
 		osOpenFile = mockOpenFile
 		defer func() {
@@ -822,10 +828,15 @@ func TestFailedMakeDisk(t *testing.T) {
 		helperCopyBlob = helper.CopyBlob
 		os.Remove(filepath.Join(outDir, "pc.img"))
 
+		helperCopyBlob = mockCopyBlob
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
 		stateMachine.cleanWorkDir = true // for coverage!
 		stateMachine.commonFlags.OutputDir = ""
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error writing disk image")
 		os.Remove(filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img"))
+		helperCopyBlob = helper.CopyBlob
 	})
 }

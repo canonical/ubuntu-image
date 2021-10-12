@@ -131,8 +131,7 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 	}
 	for _, lkFile := range files {
 		srcFile := filepath.Join(bootDir, lkFile.Name())
-		dstFile := filepath.Join(gadgetDir, lkFile.Name())
-		if err := osRename(srcFile, dstFile); err != nil {
+		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
 			return fmt.Errorf("Error copying lk bootloader dir: %s", err.Error())
 		}
 	}
