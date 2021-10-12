@@ -24,9 +24,9 @@ func (asserter *Asserter) AssertErrNil(err error, fatal bool) {
 	}
 }
 
-// AssertContains asserts that an error is non-nil, and that the error
+// AssertErrContains asserts that an error is non-nil, and that the error
 // message string contains a sub-string that is passed in
-func (asserter *Asserter) AssertContains(err error, errString string) {
+func (asserter *Asserter) AssertErrContains(err error, errString string) {
 	if err == nil {
 		debug.PrintStack()
 		asserter.Error("Expected an error, but got none")

@@ -27,7 +27,7 @@ func TestFailedValidateInputSnap(t *testing.T) {
 		stateMachine.stateMachineFlags.Thru = "thru-test"
 
 		err := stateMachine.Setup()
-		asserter.AssertContains(err, "cannot specify both --until and --thru")
+		asserter.AssertErrContains(err, "cannot specify both --until and --thru")
 	})
 }
 
@@ -46,7 +46,7 @@ func TestFailedReadMetadataSnap(t *testing.T) {
 		stateMachine.stateMachineFlags.WorkDir = testDir
 
 		err := stateMachine.Setup()
-		asserter.AssertContains(err, "error reading metadata file")
+		asserter.AssertErrContains(err, "error reading metadata file")
 	})
 }
 
@@ -153,7 +153,7 @@ func TestFailedPrepareImage(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.Run()
-		asserter.AssertContains(err, "Error preparing image")
+		asserter.AssertErrContains(err, "Error preparing image")
 
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
@@ -314,7 +314,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 			osMkdirAll = os.MkdirAll
 		}()
 		err = stateMachine.populateSnapRootfsContents()
-		asserter.AssertContains(err, "Error creating boot dir")
+		asserter.AssertErrContains(err, "Error creating boot dir")
 		osMkdirAll = os.MkdirAll
 
 		// mock ioutil.ReadDir
@@ -323,7 +323,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 			ioutilReadDir = ioutil.ReadDir
 		}()
 		err = stateMachine.populateSnapRootfsContents()
-		asserter.AssertContains(err, "Error reading unpack dir")
+		asserter.AssertErrContains(err, "Error reading unpack dir")
 		ioutilReadDir = ioutil.ReadDir
 
 		// mock osutil.CopySpecialFile
@@ -332,7 +332,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 			osRename = os.Rename
 		}()
 		err = stateMachine.populateSnapRootfsContents()
-		asserter.AssertContains(err, "Error moving rootfs")
+		asserter.AssertErrContains(err, "Error moving rootfs")
 		osRename = os.Rename
 	})
 }
@@ -364,6 +364,6 @@ func TestFailedGenerateSnapManifest(t *testing.T) {
 		stateMachine.commonFlags.OutputDir = "/dummy/path"
 
 		err := stateMachine.generateSnapManifest()
-		asserter.AssertContains(err, "Error creating manifest file")
+		asserter.AssertErrContains(err, "Error creating manifest file")
 	})
 }

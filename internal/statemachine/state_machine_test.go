@@ -258,7 +258,7 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 			stateMachine.stateMachineFlags.Resume = tc.resume
 
 			err := stateMachine.validateInput()
-			asserter.AssertContains(err, tc.errMsg)
+			asserter.AssertErrContains(err, tc.errMsg)
 		})
 	}
 }
@@ -370,7 +370,7 @@ func TestFailedMetadataParse(t *testing.T) {
 		stateMachine.stateMachineFlags.WorkDir = "testdata"
 
 		err := stateMachine.readMetadata()
-		asserter.AssertContains(err, "failed to parse metadata file")
+		asserter.AssertErrContains(err, "failed to parse metadata file")
 	})
 }
 
@@ -462,7 +462,7 @@ func TestFailedParseImageSizes(t *testing.T) {
 			// run parseImage size and make sure it failed
 			stateMachine.commonFlags.Size = tc.size
 			err = stateMachine.parseImageSizes()
-			asserter.AssertContains(err, tc.errMsg)
+			asserter.AssertErrContains(err, tc.errMsg)
 		})
 	}
 }
@@ -530,7 +530,7 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 			osMkdirAll = os.MkdirAll
 		}()
 		err = stateMachine.postProcessGadgetYaml()
-		asserter.AssertContains(err, "Error creating volume dir")
+		asserter.AssertErrContains(err, "Error creating volume dir")
 		osMkdirAll = os.MkdirAll
 	})
 }

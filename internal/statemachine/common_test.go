@@ -61,11 +61,11 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 			osMkdir = os.Mkdir
 		}()
 		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertContains(err, "Failed to create temporary directory")
+		asserter.AssertErrContains(err, "Failed to create temporary directory")
 
 		stateMachine.stateMachineFlags.WorkDir = testDir
 		err = stateMachine.makeTemporaryDirectories()
-		asserter.AssertContains(err, "Error creating temporary directory")
+		asserter.AssertErrContains(err, "Error creating temporary directory")
 
 		// mock os.MkdirAll and only test with a WorkDir
 		osMkdirAll = mockMkdirAll
@@ -77,7 +77,7 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 			// try adding a workdir to see if that triggers the failure
 			stateMachine.stateMachineFlags.WorkDir = testDir
 			err = stateMachine.makeTemporaryDirectories()
-			asserter.AssertContains(err, "Error creating temporary directory")
+			asserter.AssertErrContains(err, "Error creating temporary directory")
 		}
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
@@ -137,7 +137,7 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 			osutilCopyFile = osutil.CopyFile
 		}()
 		err = stateMachine.loadGadgetYaml()
-		asserter.AssertContains(err, "Error copying gadget.yaml")
+		asserter.AssertErrContains(err, "Error copying gadget.yaml")
 		osutilCopyFile = osutil.CopyFile
 
 		// mock ioutilReadFile
@@ -146,14 +146,14 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 			ioutilReadFile = ioutil.ReadFile
 		}()
 		err = stateMachine.loadGadgetYaml()
-		asserter.AssertContains(err, "Error reading gadget.yaml bytes")
+		asserter.AssertErrContains(err, "Error reading gadget.yaml bytes")
 		ioutilReadFile = ioutil.ReadFile
 
 		// now test with the invalid yaml file
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree_invalid", "meta", "gadget.yaml")
 		err = stateMachine.loadGadgetYaml()
-		asserter.AssertContains(err, "Error running InfoFromGadgetYaml")
+		asserter.AssertErrContains(err, "Error running InfoFromGadgetYaml")
 
 		// set a valid yaml file and preserveDir
 		stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -166,7 +166,7 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 		}()
 		// run with and without the environment variable set
 		err = stateMachine.loadGadgetYaml()
-		asserter.AssertContains(err, "Error creating volume dir")
+		asserter.AssertErrContains(err, "Error creating volume dir")
 
 		preserveDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
 		os.Setenv("UBUNTU_IMAGE_PRESERVE_UNPACK", preserveDir)
@@ -175,7 +175,7 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 		}()
 		defer os.RemoveAll(preserveDir)
 		err = stateMachine.loadGadgetYaml()
-		asserter.AssertContains(err, "Error creating preserve_unpack directory")
+		asserter.AssertErrContains(err, "Error creating preserve_unpack directory")
 		osMkdirAll = os.MkdirAll
 
 		// mock osutil.CopySpecialFile
@@ -184,14 +184,14 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 			osutilCopySpecialFile = osutil.CopySpecialFile
 		}()
 		err = stateMachine.loadGadgetYaml()
-		asserter.AssertContains(err, "Error preserving unpack dir")
+		asserter.AssertErrContains(err, "Error preserving unpack dir")
 		osutilCopySpecialFile = osutil.CopySpecialFile
 		os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
 
 		// set an invalid --image-size argument to cause a failure
 		stateMachine.commonFlags.Size = "test"
 		err = stateMachine.loadGadgetYaml()
-		asserter.AssertContains(err, "Failed to parse argument to --image-size")
+		asserter.AssertErrContains(err, "Failed to parse argument to --image-size")
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
@@ -265,7 +265,7 @@ func TestFailedPopulateRootfsContentsHooks(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			err = stateMachine.populateRootfsContentsHooks()
-			asserter.AssertContains(err, "Error running hook")
+			asserter.AssertErrContains(err, "Error running hook")
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
@@ -316,7 +316,7 @@ func TestFailedGenerateDiskInfo(t *testing.T) {
 			osMkdir = os.Mkdir
 		}()
 		err = stateMachine.generateDiskInfo()
-		asserter.AssertContains(err, "Failed to create disk info directory")
+		asserter.AssertErrContains(err, "Failed to create disk info directory")
 		osMkdir = os.Mkdir
 
 		// mock osutil.CopyFile
@@ -325,7 +325,7 @@ func TestFailedGenerateDiskInfo(t *testing.T) {
 			osutilCopyFile = osutil.CopyFile
 		}()
 		err = stateMachine.generateDiskInfo()
-		asserter.AssertContains(err, "Failed to copy Disk Info file")
+		asserter.AssertErrContains(err, "Failed to copy Disk Info file")
 		osutilCopyFile = osutil.CopyFile
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
@@ -378,7 +378,7 @@ func TestFailedCalculateRootfsSize(t *testing.T) {
 		stateMachine.tempDirs.rootfs = filepath.Join("testdata", uuid.NewString())
 
 		err := stateMachine.calculateRootfsSize()
-		asserter.AssertContains(err, "Error getting rootfs size")
+		asserter.AssertErrContains(err, "Error getting rootfs size")
 	})
 }
 
@@ -462,7 +462,7 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 			gadgetLayoutVolume = gadget.LayoutVolume
 		}()
 		err = stateMachine.populateBootfsContents()
-		asserter.AssertContains(err, "Error laying out bootfs contents")
+		asserter.AssertErrContains(err, "Error laying out bootfs contents")
 		gadgetLayoutVolume = gadget.LayoutVolume
 
 		// mock gadget.NewMountedFilesystemWriter
@@ -471,13 +471,13 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 			gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 		}()
 		err = stateMachine.populateBootfsContents()
-		asserter.AssertContains(err, "Error creating NewMountedFilesystemWriter")
+		asserter.AssertErrContains(err, "Error creating NewMountedFilesystemWriter")
 		gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 
 		// set rootfs to an empty string in order to trigger a failure in Write()
 		stateMachine.tempDirs.rootfs = ""
 		err = stateMachine.populateBootfsContents()
-		asserter.AssertContains(err, "Error in mountedFilesystem.Write")
+		asserter.AssertErrContains(err, "Error in mountedFilesystem.Write")
 
 		// cause a failure in handleSecureBoot. First change to un-seeded yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -495,7 +495,7 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 			osMkdirAll = os.MkdirAll
 		}()
 		err = stateMachine.populateBootfsContents()
-		asserter.AssertContains(err, "Error creating ubuntu dir")
+		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 	})
 }
@@ -606,7 +606,7 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 			helperCopyBlob = helper.CopyBlob
 		}()
 		err = stateMachine.populatePreparePartitions()
-		asserter.AssertContains(err, "Error zeroing partition")
+		asserter.AssertErrContains(err, "Error zeroing partition")
 		helperCopyBlob = helper.CopyBlob
 
 		// set a bootloader to lk and mock mkdir to cause a failure in that function
@@ -618,7 +618,7 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 			osMkdir = os.Mkdir
 		}()
 		err = stateMachine.populatePreparePartitions()
-		asserter.AssertContains(err, "got lk bootloader but directory")
+		asserter.AssertErrContains(err, "got lk bootloader but directory")
 		osMkdir = os.Mkdir
 	})
 }
@@ -720,8 +720,7 @@ func TestFailedMakeDisk(t *testing.T) {
 		stateMachine.commonFlags.OutputDir = outDir
 
 		// set a valid yaml file and load it in
-		stateMachine.YamlFilePath = filepath.Join("testdata",
-			"gadget_tree", "meta", "gadget.yaml")
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-mbr.yaml")
 		// ensure unpack exists
 		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
 		err = stateMachine.loadGadgetYaml()
@@ -747,7 +746,7 @@ func TestFailedMakeDisk(t *testing.T) {
 			osMkdirAll = os.MkdirAll
 		}()
 		err = stateMachine.makeDisk()
-		asserter.AssertContains(err, "Error creating OutputDir")
+		asserter.AssertErrContains(err, "Error creating OutputDir")
 		osMkdirAll = os.MkdirAll
 
 		// mock diskfs.Create
@@ -756,7 +755,7 @@ func TestFailedMakeDisk(t *testing.T) {
 			diskfsCreate = diskfs.Create
 		}()
 		err = stateMachine.makeDisk()
-		asserter.AssertContains(err, "Error creating disk image")
+		asserter.AssertErrContains(err, "Error creating disk image")
 		diskfsCreate = diskfs.Create
 		os.Remove(filepath.Join(outDir, "pc.img")) // clean up for the next test run
 
@@ -766,8 +765,30 @@ func TestFailedMakeDisk(t *testing.T) {
 			diskfsCreate = diskfs.Create
 		}()
 		err = stateMachine.makeDisk()
-		asserter.AssertContains(err, "Error partitioning image file")
+		asserter.AssertErrContains(err, "Error partitioning image file")
 		diskfsCreate = diskfs.Create
+		os.Remove(filepath.Join(outDir, "pc.img"))
+
+		// mock os.OpenFile
+		// errors in file.WriteAt()
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error opening disk to write MBR disk identifier")
+		osOpenFile = os.OpenFile
+		os.Remove(filepath.Join(outDir, "pc.img"))
+
+		// mock os.OpenFile to force it to use os.O_APPEND, which causes
+		// errors in file.WriteAt()
+		osOpenFile = mockOpenFileAppend
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error writing MBR disk identifier")
+		osOpenFile = os.OpenFile
 		os.Remove(filepath.Join(outDir, "pc.img"))
 
 		// mock helper.CopyBlob to simulate a failure in copyDataToImage
@@ -776,22 +797,27 @@ func TestFailedMakeDisk(t *testing.T) {
 			helperCopyBlob = helper.CopyBlob
 		}()
 		err = stateMachine.makeDisk()
-		asserter.AssertContains(err, "Error writing disk image")
+		asserter.AssertErrContains(err, "Error writing disk image")
 		helperCopyBlob = helper.CopyBlob
 		os.Remove(filepath.Join(outDir, "pc.img"))
+
+		// Change to GPT for these next tests
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-gpt.yaml")
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
 
 		// mock os.OpenFile to simulate a failure in writeOffsetValues
 		osOpenFile = mockOpenFile
 		defer func() {
 			osOpenFile = os.OpenFile
 		}()
+		// also mock helperCopyBlob to ignore missing files and return success
 		helperCopyBlob = mockCopyBlobSuccess
 		defer func() {
 			helperCopyBlob = helper.CopyBlob
 		}()
-		// also mock helperCopyBlob to ignore missing files and return success
 		err = stateMachine.makeDisk()
-		asserter.AssertContains(err, "Error opening image file")
+		asserter.AssertErrContains(err, "Error opening image file")
 		osOpenFile = os.OpenFile
 		helperCopyBlob = helper.CopyBlob
 		os.Remove(filepath.Join(outDir, "pc.img"))
@@ -799,7 +825,7 @@ func TestFailedMakeDisk(t *testing.T) {
 		stateMachine.cleanWorkDir = true // for coverage!
 		stateMachine.commonFlags.OutputDir = ""
 		err = stateMachine.makeDisk()
-		asserter.AssertContains(err, "Error writing disk image")
+		asserter.AssertErrContains(err, "Error writing disk image")
 		os.Remove(filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img"))
 	})
 }

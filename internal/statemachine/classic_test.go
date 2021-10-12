@@ -37,7 +37,7 @@ func TestInvalidCommandLineClassic(t *testing.T) {
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 			err := stateMachine.Setup()
-			asserter.AssertContains(err, tc.errMsg)
+			asserter.AssertErrContains(err, tc.errMsg)
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
@@ -57,7 +57,7 @@ func TestFailedValidateInputClassic(t *testing.T) {
 		stateMachine.stateMachineFlags.Thru = "thru-test"
 
 		err := stateMachine.Setup()
-		asserter.AssertContains(err, "cannot specify both --until and --thru")
+		asserter.AssertErrContains(err, "cannot specify both --until and --thru")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
@@ -76,7 +76,7 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 		stateMachine.stateMachineFlags.WorkDir = testDir
 
 		err := stateMachine.Setup()
-		asserter.AssertContains(err, "error reading metadata file")
+		asserter.AssertErrContains(err, "error reading metadata file")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
@@ -120,7 +120,7 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 			osMkdirAll = os.MkdirAll
 		}()
 		err := stateMachine.prepareGadgetTree()
-		asserter.AssertContains(err, "Error creating unpack directory")
+		asserter.AssertErrContains(err, "Error creating unpack directory")
 		osMkdirAll = os.MkdirAll
 
 		// mock ioutil.ReadDir
@@ -129,7 +129,7 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 			ioutilReadDir = ioutil.ReadDir
 		}()
 		err = stateMachine.prepareGadgetTree()
-		asserter.AssertContains(err, "Error reading gadget tree")
+		asserter.AssertErrContains(err, "Error reading gadget tree")
 		ioutilReadDir = ioutil.ReadDir
 
 		// mock osutil.CopySpecialFile
@@ -138,7 +138,7 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 			osutilCopySpecialFile = osutil.CopySpecialFile
 		}()
 		err = stateMachine.prepareGadgetTree()
-		asserter.AssertContains(err, "Error copying gadget tree")
+		asserter.AssertErrContains(err, "Error copying gadget tree")
 		osutilCopySpecialFile = osutil.CopySpecialFile
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
@@ -230,7 +230,7 @@ func TestFailedLiveBuildCommands(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			err = stateMachine.runLiveBuild()
-			asserter.AssertContains(err, "Error running command")
+			asserter.AssertErrContains(err, "Error running command")
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
@@ -261,7 +261,7 @@ func TestNoStatic(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.runLiveBuild()
-		asserter.AssertContains(err, "in case of non-standard archs or custom paths")
+		asserter.AssertErrContains(err, "in case of non-standard archs or custom paths")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
@@ -341,7 +341,7 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 			ioutilReadDir = ioutil.ReadDir
 		}()
 		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertContains(err, "Error reading unpack/chroot dir")
+		asserter.AssertErrContains(err, "Error reading unpack/chroot dir")
 		ioutilReadDir = ioutil.ReadDir
 
 		// mock osutil.CopySpecialFile
@@ -350,7 +350,7 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 			osutilCopySpecialFile = osutil.CopySpecialFile
 		}()
 		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertContains(err, "Error copying rootfs")
+		asserter.AssertErrContains(err, "Error copying rootfs")
 		osutilCopySpecialFile = osutil.CopySpecialFile
 
 		// mock ioutil.ReadFile
@@ -359,7 +359,7 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 			ioutilReadFile = ioutil.ReadFile
 		}()
 		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertContains(err, "Error opening fstab")
+		asserter.AssertErrContains(err, "Error opening fstab")
 		ioutilReadFile = ioutil.ReadFile
 
 		// mock ioutil.WriteFile
@@ -368,7 +368,7 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 			ioutilWriteFile = ioutil.WriteFile
 		}()
 		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertContains(err, "Error writing to fstab")
+		asserter.AssertErrContains(err, "Error writing to fstab")
 		ioutilWriteFile = ioutil.WriteFile
 
 		// mock os.MkdirAll
@@ -377,7 +377,7 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 			osMkdirAll = os.MkdirAll
 		}()
 		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertContains(err, "Error creating cloud-init dir")
+		asserter.AssertErrContains(err, "Error creating cloud-init dir")
 		osMkdirAll = os.MkdirAll
 
 		// mock os.OpenFile
@@ -386,7 +386,7 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 			osOpenFile = os.OpenFile
 		}()
 		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertContains(err, "Error opening cloud-init meta-data file")
+		asserter.AssertErrContains(err, "Error opening cloud-init meta-data file")
 		osOpenFile = os.OpenFile
 
 		// mock osutil.CopyFile
@@ -395,7 +395,7 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 			osutilCopyFile = osutil.CopyFile
 		}()
 		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertContains(err, "Error copying cloud-init")
+		asserter.AssertErrContains(err, "Error copying cloud-init")
 		osutilCopyFile = osutil.CopyFile
 	})
 }
@@ -486,6 +486,6 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 		stateMachine.commonFlags.OutputDir = "/dummy/path"
 
 		err := stateMachine.generatePackageManifest()
-		asserter.AssertContains(err, "Error creating manifest file")
+		asserter.AssertErrContains(err, "Error creating manifest file")
 	})
 }

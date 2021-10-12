@@ -214,6 +214,10 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				rootfsSeen = true
 			} else if structure.Role == gadget.SystemSeed {
 				stateMachine.isSeeded = true
+				if structure.Label == "" {
+					structure.Label = "ubuntu-seed"
+					volume.Structure[ii] = structure
+				}
 			}
 
 			// update farthestOffset if needed

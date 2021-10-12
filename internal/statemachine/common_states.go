@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math"
 	"os"
@@ -297,6 +298,24 @@ func (stateMachine *StateMachine) makeDisk() error {
 		// Write the partition table to disk
 		if err := diskImg.Partition(*partitionTable); err != nil {
 			return fmt.Errorf("Error partitioning image file: %s", err.Error())
+		}
+
+		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
+		// this function is a temporary workaround, but we should change upstream go-diskfs
+		if volume.Schema == "mbr" {
+			randomBytes := make([]byte, 4)
+			rand.Read(randomBytes)
+			diskFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
+			defer diskFile.Close()
+			if err != nil {
+				return fmt.Errorf("Error opening disk to write MBR disk identifier: %s",
+					err.Error())
+			}
+			_, err = diskFile.WriteAt(randomBytes, 440)
+			if err != nil {
+				return fmt.Errorf("Error writing MBR disk identifier: %s", err.Error())
+			}
+			diskFile.Close()
 		}
 
 		// After the partitions have been created, copy the data into the correct locations

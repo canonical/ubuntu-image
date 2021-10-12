@@ -65,7 +65,7 @@ func TestFailedSetupLiveBuildCommands(t *testing.T) {
 			execCommand = exec.Command
 		}()
 		_, _, err := setupLiveBuildCommands(testDir, "amd64", []string{}, true)
-		asserter.AssertContains(err, "exit status 1")
+		asserter.AssertErrContains(err, "exit status 1")
 		execCommand = exec.Command
 
 		// mock osutil.CopySpecialFile
@@ -74,13 +74,13 @@ func TestFailedSetupLiveBuildCommands(t *testing.T) {
 			osutilCopySpecialFile = osutil.CopySpecialFile
 		}()
 		_, _, err = setupLiveBuildCommands(testDir, "amd64", []string{}, true)
-		asserter.AssertContains(err, "Error copying livecd-rootfs/auto")
+		asserter.AssertErrContains(err, "Error copying livecd-rootfs/auto")
 		osutilCopySpecialFile = osutil.CopySpecialFile
 
 		// use an arch with no qemu-static binary
 		os.Unsetenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
 		_, _, err = setupLiveBuildCommands(testDir, "fake64", []string{}, true)
-		asserter.AssertContains(err, "in case of non-standard archs or custom paths")
+		asserter.AssertErrContains(err, "in case of non-standard archs or custom paths")
 	})
 }
 
@@ -124,7 +124,7 @@ func TestFailedRunHooks(t *testing.T) {
 		}()
 		err = stateMachine.runHooks("post-populate-rootfs",
 			"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
-		asserter.AssertContains(err, "Error reading hooks directory")
+		asserter.AssertErrContains(err, "Error reading hooks directory")
 		ioutilReadDir = ioutil.ReadDir
 
 		// now set a hooks directory that will fail
@@ -132,7 +132,7 @@ func TestFailedRunHooks(t *testing.T) {
 			"testdata", "hooks_return_error")}
 		err = stateMachine.runHooks("post-populate-rootfs",
 			"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
-		asserter.AssertContains(err, "Error running hook")
+		asserter.AssertErrContains(err, "Error running hook")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
@@ -164,7 +164,7 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 			osMkdirAll = os.MkdirAll
 		}()
 		err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
-		asserter.AssertContains(err, "Error creating ubuntu dir")
+		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 
 		// mock ioutil.ReadDir
@@ -173,7 +173,7 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 			ioutilReadDir = ioutil.ReadDir
 		}()
 		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
-		asserter.AssertContains(err, "Error reading boot dir")
+		asserter.AssertErrContains(err, "Error reading boot dir")
 		ioutilReadDir = ioutil.ReadDir
 
 		// mock os.Rename
@@ -182,7 +182,7 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 			osRename = os.Rename
 		}()
 		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
-		asserter.AssertContains(err, "Error copying boot dir")
+		asserter.AssertErrContains(err, "Error copying boot dir")
 		osRename = os.Rename
 	})
 }
@@ -255,7 +255,7 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 			osMkdir = os.Mkdir
 		}()
 		err = stateMachine.handleLkBootloader(volume)
-		asserter.AssertContains(err, "Failed to create gadget dir")
+		asserter.AssertErrContains(err, "Failed to create gadget dir")
 		osMkdir = os.Mkdir
 
 		// mock ioutil.ReadDir
@@ -264,17 +264,17 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 			ioutilReadDir = ioutil.ReadDir
 		}()
 		err = stateMachine.handleLkBootloader(volume)
-		asserter.AssertContains(err, "Error reading lk bootloader dir")
+		asserter.AssertErrContains(err, "Error reading lk bootloader dir")
 		ioutilReadDir = ioutil.ReadDir
 
 		// mock osutil.CopySpecialFile
-		osRename = mockRename
+		osutilCopySpecialFile = mockCopySpecialFile
 		defer func() {
-			osRename = os.Rename
+			osutilCopySpecialFile = osutil.CopySpecialFile
 		}()
 		err = stateMachine.handleLkBootloader(volume)
-		asserter.AssertContains(err, "Error copying lk bootloader dir")
-		osRename = os.Rename
+		asserter.AssertErrContains(err, "Error copying lk bootloader dir")
+		osutilCopySpecialFile = osutil.CopySpecialFile
 	})
 }
 
@@ -313,7 +313,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		}()
 		err = stateMachine.copyStructureContent(volume, mbrStruct, 0, "",
 			filepath.Join("/tmp", uuid.NewString()+".img"))
-		asserter.AssertContains(err, "Error zeroing partition")
+		asserter.AssertErrContains(err, "Error zeroing partition")
 		helperCopyBlob = helper.CopyBlob
 
 		// set an invalid blocksize to mock the binary copy blob
@@ -323,7 +323,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		}()
 		err = stateMachine.copyStructureContent(volume, mbrStruct, 0, "",
 			filepath.Join("/tmp", uuid.NewString()+".img"))
-		asserter.AssertContains(err, "Error copying image blob")
+		asserter.AssertErrContains(err, "Error copying image blob")
 		mockableBlockSize = "1"
 
 		// mock helper.CopyBlob and test with filesystem: vfat
@@ -333,7 +333,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		}()
 		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
 			filepath.Join("/tmp", uuid.NewString()+".img"))
-		asserter.AssertContains(err, "Error zeroing image file")
+		asserter.AssertErrContains(err, "Error zeroing image file")
 		helperCopyBlob = helper.CopyBlob
 
 		// mock gadget.MkfsWithContent
@@ -343,7 +343,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		}()
 		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
 			filepath.Join("/tmp", uuid.NewString()+".img"))
-		asserter.AssertContains(err, "Error running mkfs")
+		asserter.AssertErrContains(err, "Error running mkfs")
 		mkfsMakeWithContent = mkfs.MakeWithContent
 	})
 }
@@ -376,7 +376,7 @@ func TestFailedCleanup(t *testing.T) {
 			osRemoveAll = os.RemoveAll
 		}()
 		err := stateMachine.cleanup()
-		asserter.AssertContains(err, "Error cleaning up workDir")
+		asserter.AssertErrContains(err, "Error cleaning up workDir")
 	})
 }
 
@@ -388,7 +388,7 @@ func TestFailedCalculateImageSize(t *testing.T) {
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		_, err := stateMachine.calculateImageSize()
-		asserter.AssertContains(err, "Cannot calculate image size before initializing GadgetInfo")
+		asserter.AssertErrContains(err, "Cannot calculate image size before initializing GadgetInfo")
 	})
 }
 
@@ -418,7 +418,7 @@ func TestFailedWriteOffsetValues(t *testing.T) {
 		}
 		// pass an image size that's too small
 		err = writeOffsetValues(volume, imgPath, 512, 4)
-		asserter.AssertContains(err, "write offset beyond end of file")
+		asserter.AssertErrContains(err, "write offset beyond end of file")
 
 		// mock os.Open file to force it to use os.O_APPEND, which causes
 		// errors in file.WriteAt()
@@ -427,7 +427,7 @@ func TestFailedWriteOffsetValues(t *testing.T) {
 			osOpenFile = os.OpenFile
 		}()
 		err = writeOffsetValues(volume, imgPath, 512, 0)
-		asserter.AssertContains(err, "Failed to write offset to disk")
+		asserter.AssertErrContains(err, "Failed to write offset to disk")
 		osOpenFile = os.OpenFile
 	})
 }

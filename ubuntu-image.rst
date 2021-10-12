@@ -162,13 +162,6 @@ in more detail below.
     option replaces, and cannot be used with, the deprecated ``--output``
     option.
 
--o FILENAME, --output FILENAME
-    **DEPRECATED** (Use ``--output-dir`` instead.)  The generated disk image
-    file.  If not given, the image will be put in a file called ``disk.img``
-    in the working directory, in which case, you probably want to specify
-    ``--workdir``.  If ``--workdir`` is not given, the image will be written
-    to the current working directory.
-
 -i SIZE, --image-size SIZE
     The size of the generated disk image files.  If this size is smaller than
     the minimum calculated size of the volume, a warning will be issued and
