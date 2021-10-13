@@ -69,8 +69,8 @@ type StateMachine struct {
 	CurrentStep  string // tracks the current progress of the state machine
 	StepsTaken   int    // counts the number of steps taken
 	YamlFilePath string // the location for the yaml file
-	isSeeded     bool   // core 20 images are seeded
-	rootfsSize   quantity.Size
+	IsSeeded     bool   // core 20 images are seeded
+	RootfsSize   quantity.Size
 	tempDirs     temporaryDirectories
 
 	// The flags that were passed in on the command line
@@ -87,7 +87,7 @@ type StateMachine struct {
 
 	// image sizes for parsing the --image-size flags
 	ImageSizes  map[string]quantity.Size
-	volumeOrder []string
+	VolumeOrder []string
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -136,8 +136,8 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 			volumeNumber, err := strconv.Atoi(splitSize[0])
 			if err == nil {
 				// argument passed was numeric.
-				if volumeNumber < len(stateMachine.volumeOrder) {
-					stateName := stateMachine.volumeOrder[volumeNumber]
+				if volumeNumber < len(stateMachine.VolumeOrder) {
+					stateName := stateMachine.VolumeOrder[volumeNumber]
 					stateMachine.ImageSizes[stateName] = parsedSize
 				} else {
 					return fmt.Errorf("Volume index %d is out of range", volumeNumber)
@@ -189,7 +189,7 @@ func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
 		sortedVolumes = append(sortedVolumes, volume.VolumeName)
 	}
 
-	stateMachine.volumeOrder = sortedVolumes
+	stateMachine.VolumeOrder = sortedVolumes
 }
 
 // postProcessGadgetYaml adds the rootfs to the partitions list if needed
@@ -213,7 +213,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			} else if structure.Role == gadget.SystemData {
 				rootfsSeen = true
 			} else if structure.Role == gadget.SystemSeed {
-				stateMachine.isSeeded = true
+				stateMachine.IsSeeded = true
 				if structure.Label == "" {
 					structure.Label = "ubuntu-seed"
 					volume.Structure[ii] = structure
@@ -291,6 +291,9 @@ func (stateMachine *StateMachine) readMetadata() error {
 		stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
 		stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
 		stateMachine.ImageSizes = partialStateMachine.ImageSizes
+		stateMachine.RootfsSize = partialStateMachine.RootfsSize
+		stateMachine.IsSeeded = partialStateMachine.IsSeeded
+		stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
 		stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
 		stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
 		stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")

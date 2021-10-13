@@ -218,7 +218,7 @@ func TestPopulateRootfsContentsHooks(t *testing.T) {
 				filepath.Join("testdata", "good_hooksd"),
 				filepath.Join("testdata", "good_hookscript"),
 			}
-			stateMachine.isSeeded = tc.isSeeded
+			stateMachine.IsSeeded = tc.isSeeded
 
 			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
@@ -258,7 +258,7 @@ func TestFailedPopulateRootfsContentsHooks(t *testing.T) {
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.commonFlags.HooksDirectories = tc.hooksDirs
-			stateMachine.isSeeded = false
+			stateMachine.IsSeeded = false
 
 			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
@@ -356,12 +356,12 @@ func TestCalculateRootfsSize(t *testing.T) {
 		// rootfs size will be slightly different in different environments
 		correctSizeLower, _ := quantity.ParseSize("8M")
 		correctSizeUpper := correctSizeLower + 100000 // 0.1 MB range
-		if stateMachine.rootfsSize > correctSizeUpper ||
-			stateMachine.rootfsSize < correctSizeLower {
-			t.Errorf("expected rootfsSize between %s and %s, got %s",
+		if stateMachine.RootfsSize > correctSizeUpper ||
+			stateMachine.RootfsSize < correctSizeLower {
+			t.Errorf("expected RootfsSize between %s and %s, got %s",
 				correctSizeLower.IECString(),
 				correctSizeUpper.IECString(),
-				stateMachine.rootfsSize.IECString())
+				stateMachine.RootfsSize.IECString())
 		}
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
@@ -485,7 +485,7 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		// ensure unpack exists
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
-		stateMachine.isSeeded = false
+		stateMachine.IsSeeded = false
 		// now ensure grub dir exists
 		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "grub"), 0755)

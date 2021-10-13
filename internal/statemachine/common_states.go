@@ -93,7 +93,7 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 
 // Run hooks specified by --hooks-directory after populating rootfs contents
 func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
-	if stateMachine.isSeeded {
+	if stateMachine.IsSeeded {
 		if stateMachine.commonFlags.Debug {
 			fmt.Println("Building from a seeded gadget - " +
 				"skipping the post-populate-rootfs hook execution: unsupported")
@@ -135,18 +135,18 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 // on a 100MiB filesystem, ext4 takes a little over 7MiB for the
 // metadata. Use 8MB as a minimum padding here
 func (stateMachine *StateMachine) calculateRootfsSize() error {
-	rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
+	RootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
 	if err != nil {
 		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
 	}
-	var rootfsQuantity quantity.Size = rootfsSize
+	var rootfsQuantity quantity.Size = RootfsSize
 	rootfsPadding := 8 * quantity.SizeMiB
 
 	// fudge factor for incidentals
 	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity) * 1.5))
 	rootfsQuantity += rootfsPadding
 
-	stateMachine.rootfsSize = rootfsQuantity
+	stateMachine.RootfsSize = rootfsQuantity
 
 	// we have already saved the rootfs size in the state machine struct, but we
 	// should also set it in the gadget.Structure that represents the rootfs
@@ -201,7 +201,7 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 		// /EFI/ubuntu.  This is because we are using a SecureBoot
 		// signed bootloader image which has this path embedded, so
 		// we need to install our files to there.
-		if !stateMachine.isSeeded &&
+		if !stateMachine.IsSeeded &&
 			(laidOutStructure.Role == gadget.SystemBoot ||
 				laidOutStructure.Label == gadget.SystemBoot) {
 			if err := stateMachine.handleSecureBoot(systemVolume, targetDir); err != nil {
@@ -245,7 +245,7 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 			}
 			farthestOffset = maxOffset(farthestOffset,
 				quantity.Offset(structure.Size)+getStructureOffset(structure))
-			if shouldSkipStructure(structure, stateMachine.isSeeded) {
+			if shouldSkipStructure(structure, stateMachine.IsSeeded) {
 				continue
 			}
 
@@ -293,7 +293,7 @@ func (stateMachine *StateMachine) makeDisk() error {
 		sectorSize := uint64(diskImg.LogicalBlocksize)
 
 		// set up the partitions on the device
-		partitionTable := createPartitionTable(volumeName, volume, sectorSize, stateMachine.isSeeded)
+		partitionTable := createPartitionTable(volumeName, volume, sectorSize, stateMachine.IsSeeded)
 
 		// Write the partition table to disk
 		if err := diskImg.Partition(*partitionTable); err != nil {

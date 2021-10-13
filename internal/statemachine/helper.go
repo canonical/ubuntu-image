@@ -188,13 +188,13 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 		if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
 			// system-data and system-seed structures are not required to have
 			// an explicit size set in the yaml file
-			if structure.Size < stateMachine.rootfsSize {
+			if structure.Size < stateMachine.RootfsSize {
 				fmt.Printf("WARNING: rootfs structure size %s smaller "+
 					"than actual rootfs contents %s\n",
 					structure.Size.IECString(),
-					stateMachine.rootfsSize.IECString())
-				blockSize = stateMachine.rootfsSize
-				structure.Size = stateMachine.rootfsSize
+					stateMachine.RootfsSize.IECString())
+				blockSize = stateMachine.RootfsSize
+				structure.Size = stateMachine.RootfsSize
 				volume.Structure[structureNumber] = structure
 			} else {
 				blockSize = structure.Size
@@ -204,7 +204,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 		}
 		if structure.Role == gadget.SystemData {
 			os.Create(partImg)
-			os.Truncate(partImg, int64(stateMachine.rootfsSize))
+			os.Truncate(partImg, int64(stateMachine.RootfsSize))
 		} else {
 			// use mkfs functions from snapd to create the filesystems
 			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
@@ -459,7 +459,7 @@ func (stateMachine *StateMachine) calculateImageSize() (int64, error) {
 // copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
 func (stateMachine *StateMachine) copyDataToImage(volumeName string, volume *gadget.Volume, diskImg *disk.Disk) error {
 	for structureNumber, structure := range volume.Structure {
-		if shouldSkipStructure(structure, stateMachine.isSeeded) {
+		if shouldSkipStructure(structure, stateMachine.IsSeeded) {
 			continue
 		}
 		sectorSize := diskImg.LogicalBlocksize

@@ -497,10 +497,10 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 		// check that the size was correctly updated in the volume
 		for _, structure := range volume.Structure {
 			if structure.Role == gadget.SystemData {
-				if structure.Size != stateMachine.rootfsSize {
+				if structure.Size != stateMachine.RootfsSize {
 					t.Errorf("rootfs structure size %s is not equal to calculated size %s",
 						structure.Size.IECString(),
-						stateMachine.rootfsSize.IECString())
+						stateMachine.RootfsSize.IECString())
 				}
 			}
 		}
