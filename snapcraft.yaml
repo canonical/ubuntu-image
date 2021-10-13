@@ -1,0 +1,31 @@
+name: ubuntu-image
+summary: Create Ubuntu images
+description: |
+  Official tool for building Ubuntu images, currently supporing Ubuntu Core
+  snap-based images and preinstalled Ubuntu classic images.
+version: 2.0+snap1
+grade: stable
+confinement: classic
+base: core20
+
+apps:
+  ubuntu-image:
+    command: bin/ubuntu-image
+
+parts:
+  ubuntu-image:
+    plugin: go
+    source: .
+    source-type: git
+    build-packages:
+      - golang-go
+      - fdisk
+      - gdisk
+      - mtools
+      - python3-docutils
+    stage-packages:
+      - mtools
+      - fdisk
+      - gdisk
+      - e2fsprogs
+      - fakeroot
