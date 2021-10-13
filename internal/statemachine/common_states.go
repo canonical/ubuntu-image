@@ -135,11 +135,11 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 // on a 100MiB filesystem, ext4 takes a little over 7MiB for the
 // metadata. Use 8MB as a minimum padding here
 func (stateMachine *StateMachine) calculateRootfsSize() error {
-	RootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
+	rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
 	if err != nil {
 		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
 	}
-	var rootfsQuantity quantity.Size = RootfsSize
+	var rootfsQuantity quantity.Size = rootfsSize
 	rootfsPadding := 8 * quantity.SizeMiB
 
 	// fudge factor for incidentals

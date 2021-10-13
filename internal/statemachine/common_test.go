@@ -358,7 +358,7 @@ func TestCalculateRootfsSize(t *testing.T) {
 		correctSizeUpper := correctSizeLower + 100000 // 0.1 MB range
 		if stateMachine.RootfsSize > correctSizeUpper ||
 			stateMachine.RootfsSize < correctSizeLower {
-			t.Errorf("expected RootfsSize between %s and %s, got %s",
+			t.Errorf("expected rootfs size between %s and %s, got %s",
 				correctSizeLower.IECString(),
 				correctSizeUpper.IECString(),
 				stateMachine.RootfsSize.IECString())
