@@ -40,7 +40,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 	}
 
 	// set the gadget yaml location
-	snapStateMachine.yamlFilePath = filepath.Join(stateMachine.tempDirs.unpack, "gadget", "meta", "gadget.yaml")
+	snapStateMachine.YamlFilePath = filepath.Join(stateMachine.tempDirs.unpack, "gadget", "meta", "gadget.yaml")
 
 	return nil
 }
@@ -74,9 +74,10 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 		if !stateMachine.isSeeded && srcFile.Name() == "boot" {
 			continue
 		}
-		srcFile := filepath.Join(src, srcFile.Name())
-		if err := osutilCopySpecialFile(srcFile, dst); err != nil {
-			return fmt.Errorf("Error copying rootfs: %s", err.Error())
+		srcFileName := filepath.Join(src, srcFile.Name())
+		dstFileName := filepath.Join(dst, srcFile.Name())
+		if err := osRename(srcFileName, dstFileName); err != nil {
+			return fmt.Errorf("Error moving rootfs: %s", err.Error())
 		}
 	}
 

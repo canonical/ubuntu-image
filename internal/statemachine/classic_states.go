@@ -33,7 +33,7 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 
 	// We assume the gadget tree was built from a gadget source tree using
 	// snapcraft prime so the gadget.yaml file is expected in the meta directory
-	classicStateMachine.yamlFilePath = filepath.Join(gadgetDir, "meta", "gadget.yaml")
+	classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "meta", "gadget.yaml")
 
 	return nil
 }
@@ -84,11 +84,11 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 		os.Chdir(stateMachine.tempDirs.unpack)
 
 		if err := lbConfig.Run(); err != nil {
-			return err
+			return fmt.Errorf("Error running command \"%s\": %s", lbConfig.String(), err.Error())
 		}
 
 		if err := lbBuild.Run(); err != nil {
-			return err
+			return fmt.Errorf("Error running command \"%s\": %s", lbBuild.String(), err.Error())
 		}
 	}
 

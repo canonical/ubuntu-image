@@ -1,12 +1,15 @@
 package statemachine
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -43,20 +46,20 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 // Load gadget.yaml, do some validation, and store the relevant info in the StateMachine struct
 func (stateMachine *StateMachine) loadGadgetYaml() error {
 	gadgetYamlDst := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "gadget.yaml")
-	if err := osutilCopyFile(stateMachine.yamlFilePath,
+	if err := osutilCopyFile(stateMachine.YamlFilePath,
 		gadgetYamlDst, osutil.CopyFlagOverwrite); err != nil {
-		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
+		return fmt.Errorf("Error copying gadget.yaml to %s: %s", gadgetYamlDst, err.Error())
 	}
 
 	// read in the gadget.yaml as bytes, because snapd expects it that way
-	gadgetYamlBytes, err := ioutilReadFile(stateMachine.yamlFilePath)
+	gadgetYamlBytes, err := ioutilReadFile(stateMachine.YamlFilePath)
 	if err != nil {
-		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
+		return fmt.Errorf("Error reading gadget.yaml bytes: %s", err.Error())
 	}
 
-	stateMachine.gadgetInfo, err = gadget.InfoFromGadgetYaml(gadgetYamlBytes, nil)
+	stateMachine.GadgetInfo, err = gadget.InfoFromGadgetYaml(gadgetYamlBytes, nil)
 	if err != nil {
-		return fmt.Errorf("Error loading gadget.yaml: %s", err.Error())
+		return fmt.Errorf("Error running InfoFromGadgetYaml: %s", err.Error())
 	}
 
 	// check if the unpack dir should be preserved
@@ -138,12 +141,23 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	}
 	var rootfsQuantity quantity.Size = rootfsSize
 	rootfsPadding := 8 * quantity.SizeMiB
-	rootfsQuantity += rootfsPadding
 
 	// fudge factor for incidentals
-	rootfsQuantity += (rootfsQuantity / 2)
+	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity) * 1.5))
+	rootfsQuantity += rootfsPadding
 
 	stateMachine.rootfsSize = rootfsQuantity
+
+	// we have already saved the rootfs size in the state machine struct, but we
+	// should also set it in the gadget.Structure that represents the rootfs
+	for _, volume := range stateMachine.GadgetInfo.Volumes {
+		for structureNumber, structure := range volume.Structure {
+			if structure.Size == 0 {
+				structure.Size = rootfsQuantity
+			}
+			volume.Structure[structureNumber] = structure
+		}
+	}
 	return nil
 }
 
@@ -152,7 +166,7 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 	// find the name of the system volume. snapd functions have already verified it exists
 	var systemVolumeName string
 	var systemVolume *gadget.Volume
-	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
+	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		for _, structure := range volume.Structure {
 			// use the system-boot role to identify the system volume
 			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
@@ -215,11 +229,12 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 // Throughout this process, the offset is tracked to ensure partitions are not overlapping.
 func (stateMachine *StateMachine) populatePreparePartitions() error {
 	// iterate through all the volumes
-	for volumeName, volume := range stateMachine.gadgetInfo.Volumes {
+	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		if err := stateMachine.handleLkBootloader(volume); err != nil {
 			return err
 		}
 		var farthestOffset quantity.Offset = 0
+		//for structureNumber, structure := range volume.Structure {
 		for structureNumber, structure := range volume.Structure {
 			var contentRoot string
 			if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
@@ -228,14 +243,8 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
 					"part"+strconv.Itoa(structureNumber))
 			}
-			var offset quantity.Offset
-			if structure.Offset != nil {
-				offset = *structure.Offset
-			} else {
-				offset = 0
-			}
 			farthestOffset = maxOffset(farthestOffset,
-				quantity.Offset(structure.Size)+offset)
+				quantity.Offset(structure.Size)+getStructureOffset(structure))
 			if shouldSkipStructure(structure, stateMachine.isSeeded) {
 				continue
 			}
@@ -243,8 +252,8 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 			// copy the data
 			partImg := filepath.Join(stateMachine.tempDirs.volumes, volumeName,
 				"part"+strconv.Itoa(structureNumber)+".img")
-			if err := stateMachine.copyStructureContent(structure,
-				contentRoot, partImg); err != nil {
+			if err := stateMachine.copyStructureContent(volume, structure,
+				structureNumber, contentRoot, partImg); err != nil {
 				return err
 			}
 		}
@@ -256,6 +265,69 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 
 // Make the disk
 func (stateMachine *StateMachine) makeDisk() error {
+	// ensure the output dir exists
+	if stateMachine.commonFlags.OutputDir == "" {
+		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd
+			stateMachine.commonFlags.OutputDir, _ = os.Getwd()
+		} else {
+			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
+		}
+	} else {
+		err := osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating OutputDir: %s", err.Error())
+		}
+	}
+	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, volumeName+".img")
+
+		// Create the disk image
+		imgSize, _ := stateMachine.calculateImageSize()
+
+		diskImg, err := diskfsCreate(imgName, imgSize, diskfs.Raw)
+		if err != nil {
+			return fmt.Errorf("Error creating disk image: %s", err.Error())
+		}
+
+		// snapd always populates Schema, so it cannot be empty. Use the blocksize of the created disk
+		sectorSize := uint64(diskImg.LogicalBlocksize)
+
+		// set up the partitions on the device
+		partitionTable := createPartitionTable(volumeName, volume, sectorSize, stateMachine.isSeeded)
+
+		// Write the partition table to disk
+		if err := diskImg.Partition(*partitionTable); err != nil {
+			return fmt.Errorf("Error partitioning image file: %s", err.Error())
+		}
+
+		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
+		// this function is a temporary workaround, but we should change upstream go-diskfs
+		if volume.Schema == "mbr" {
+			randomBytes := make([]byte, 4)
+			rand.Read(randomBytes)
+			diskFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
+			defer diskFile.Close()
+			if err != nil {
+				return fmt.Errorf("Error opening disk to write MBR disk identifier: %s",
+					err.Error())
+			}
+			_, err = diskFile.WriteAt(randomBytes, 440)
+			if err != nil {
+				return fmt.Errorf("Error writing MBR disk identifier: %s", err.Error())
+			}
+			diskFile.Close()
+		}
+
+		// After the partitions have been created, copy the data into the correct locations
+		if err := stateMachine.copyDataToImage(volumeName, volume, diskImg); err != nil {
+			return err
+		}
+
+		// Open the file and write any OffsetWrite values
+		if err := writeOffsetValues(volume, imgName, sectorSize, uint64(imgSize)); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

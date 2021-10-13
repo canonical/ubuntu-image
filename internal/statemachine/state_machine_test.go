@@ -11,6 +11,8 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	diskfs "github.com/diskfs/go-diskfs"
+	"github.com/diskfs/go-diskfs/disk"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
@@ -45,6 +47,9 @@ var allTestStates = []stateFunc{
 func mockCopyBlob([]string) error {
 	return fmt.Errorf("Test Error")
 }
+func mockCopyBlobSuccess([]string) error {
+	return nil
+}
 func mockLayoutVolume(string, string, *gadget.Volume, gadget.LayoutConstraints) (*gadget.LaidOutVolume, error) {
 	return nil, fmt.Errorf("Test Error")
 }
@@ -73,7 +78,13 @@ func mockMkdirAll(string, os.FileMode) error {
 func mockOpenFile(string, int, os.FileMode) (*os.File, error) {
 	return nil, fmt.Errorf("Test error")
 }
+func mockOpenFileAppend(name string, flag int, perm os.FileMode) (*os.File, error) {
+	return os.OpenFile(name, flag|os.O_APPEND, perm)
+}
 func mockRemoveAll(string) error {
+	return fmt.Errorf("Test error")
+}
+func mockRename(string, string) error {
 	return fmt.Errorf("Test error")
 }
 func mockCreate(string) (*os.File, error) {
@@ -84,6 +95,17 @@ func mockCopyFile(string, string, osutil.CopyFlag) error {
 }
 func mockCopySpecialFile(string, string) error {
 	return fmt.Errorf("Test error")
+}
+func mockDiskfsCreate(string, int64, diskfs.Format) (*disk.Disk, error) {
+	return nil, fmt.Errorf("Test error")
+}
+func readOnlyDiskfsCreate(diskName string, size int64, format diskfs.Format) (*disk.Disk, error) {
+	diskFile, _ := os.OpenFile(diskName, os.O_RDONLY|os.O_CREATE, 0444)
+	disk := disk.Disk{
+		File:             diskFile,
+		LogicalBlocksize: 512,
+	}
+	return &disk, nil
 }
 
 // Fake exec command helper
@@ -164,6 +186,7 @@ func TestUntilThru(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			for _, state := range allTestStates {
+				asserter := helper.Asserter{T: t}
 				// run a partial state machine
 				var partialStateMachine testStateMachine
 				partialStateMachine.commonFlags, partialStateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -180,15 +203,14 @@ func TestUntilThru(t *testing.T) {
 					partialStateMachine.stateMachineFlags.Thru = state.name
 				}
 
-				if err := partialStateMachine.Setup(); err != nil {
-					t.Errorf("Failed to set up partial state machine: %s", err.Error())
-				}
-				if err := partialStateMachine.Run(); err != nil {
-					t.Errorf("Failed to run partial state machine: %s", err.Error())
-				}
-				if err := partialStateMachine.Teardown(); err != nil {
-					t.Errorf("Failed to teardown partial state machine: %s", err.Error())
-				}
+				err := partialStateMachine.Setup()
+				asserter.AssertErrNil(err, false)
+
+				err = partialStateMachine.Run()
+				asserter.AssertErrNil(err, false)
+
+				err = partialStateMachine.Teardown()
+				asserter.AssertErrNil(err, false)
 
 				// now resume
 				var resumeStateMachine testStateMachine
@@ -196,15 +218,15 @@ func TestUntilThru(t *testing.T) {
 				resumeStateMachine.stateMachineFlags.Resume = true
 				resumeStateMachine.stateMachineFlags.WorkDir = partialStateMachine.stateMachineFlags.WorkDir
 
-				if err := resumeStateMachine.Setup(); err != nil {
-					t.Errorf("Failed to resume state machine: %s", err.Error())
-				}
-				if err := resumeStateMachine.Run(); err != nil {
-					t.Errorf("Failed to resume state machine from state: %s\n", state.name)
-				}
-				if err := resumeStateMachine.Teardown(); err != nil {
-					t.Errorf("Failed to resume state machine: %s", err.Error())
-				}
+				err = resumeStateMachine.Setup()
+				asserter.AssertErrNil(err, false)
+
+				err = resumeStateMachine.Run()
+				asserter.AssertErrNil(err, false)
+
+				err = resumeStateMachine.Teardown()
+				asserter.AssertErrNil(err, false)
+
 				os.RemoveAll(tempDir)
 			}
 		})
@@ -218,24 +240,25 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 		until  string
 		thru   string
 		resume bool
+		errMsg string
 	}{
-		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false},
-		{"invalid_until_name", "fake step", "", false},
-		{"invalid_thru_name", "", "fake step", false},
-		{"resume_with_no_workdir", "", "", true},
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, "cannot specify both --until and --thru"},
+		{"invalid_until_name", "fake step", "", false, "not a valid state name"},
+		{"invalid_thru_name", "", "fake step", false, "not a valid state name"},
+		{"resume_with_no_workdir", "", "", true, "must specify workdir when using --resume flag"},
 	}
 
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.stateMachineFlags.Until = tc.until
 			stateMachine.stateMachineFlags.Thru = tc.thru
 			stateMachine.stateMachineFlags.Resume = tc.resume
 
-			if err := stateMachine.validateInput(); err == nil {
-				t.Error("Expected an error but there was none!")
-			}
+			err := stateMachine.validateInput()
+			asserter.AssertErrContains(err, tc.errMsg)
 		})
 	}
 }
@@ -243,6 +266,7 @@ func TestInvalidStateMachineArgs(t *testing.T) {
 // TestDebug ensures that the name of the states is printed when the --debug flag is used
 func TestDebug(t *testing.T) {
 	t.Run("test_debug", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		workDir := "ubuntu-image-test-debug"
 		if err := os.Mkdir("ubuntu-image-test-debug", 0755); err != nil {
 			t.Errorf("Failed to create temporary directory %s\n", workDir)
@@ -258,18 +282,15 @@ func TestDebug(t *testing.T) {
 		// just use the one state
 		stateMachine.states = testStates
 		stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
-		if err != nil {
-			t.Errorf("Failed to capture stdout: %s\n", err.Error())
-		}
+		asserter.AssertErrNil(err, true)
 
 		stateMachine.Run()
 
 		// restore stdout and check that the debug info was printed
 		restoreStdout()
 		readStdout, err := ioutil.ReadAll(stdout)
-		if err != nil {
-			t.Errorf("Failed to read stdout: %s\n", err.Error())
-		}
+		asserter.AssertErrNil(err, true)
+
 		if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
 			t.Errorf("Expected state name \"%s\" to appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
 		}
@@ -293,10 +314,10 @@ func TestFunctionErrors(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			workDir := filepath.Join("/tmp", "ubuntu-image-"+tc.name)
-			if err := os.Mkdir(workDir, 0755); err != nil {
-				t.Errorf("Failed to create temporary directory %s\n", workDir)
-			}
+			err := os.Mkdir(workDir, 0755)
+			asserter.AssertErrNil(err, true)
 
 			var stateMachine testStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -342,14 +363,14 @@ func TestSetCommonOpts(t *testing.T) {
 // by giving the state machine a syntactically invalid metadata file to parse
 func TestFailedMetadataParse(t *testing.T) {
 	t.Run("test_failed_metadata_parse", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.stateMachineFlags.Resume = true
 		stateMachine.stateMachineFlags.WorkDir = "testdata"
 
-		if err := stateMachine.readMetadata(); err == nil {
-			t.Errorf("Expected an error but there was none")
-		}
+		err := stateMachine.readMetadata()
+		asserter.AssertErrContains(err, "failed to parse metadata file")
 	})
 }
 
@@ -383,25 +404,25 @@ func TestParseImageSizes(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_parse_image_sizes_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-multi.yaml")
+			stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-multi.yaml")
 			stateMachine.commonFlags.Size = tc.size
 
 			// need workdir and loaded gadget.yaml set up for this
-			if err := stateMachine.makeTemporaryDirectories(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
-			if err := stateMachine.loadGadgetYaml(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, false)
 
-			if err := stateMachine.parseImageSizes(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, false)
+
+			err = stateMachine.parseImageSizes()
+			asserter.AssertErrNil(err, false)
+
 			// ensure the correct size was set
-			for volumeName := range stateMachine.gadgetInfo.Volumes {
-				setSize := stateMachine.imageSizes[volumeName]
+			for volumeName := range stateMachine.GadgetInfo.Volumes {
+				setSize := stateMachine.ImageSizes[volumeName]
 				if setSize != tc.result[volumeName] {
 					t.Errorf("Volume %s has the wrong size set: %d", volumeName, setSize)
 				}
@@ -414,40 +435,40 @@ func TestParseImageSizes(t *testing.T) {
 // TestFailedParseImageSizes tests failures in parsing the image sizes
 func TestFailedParseImageSizes(t *testing.T) {
 	testCases := []struct {
-		name string
-		size string
+		name   string
+		size   string
+		errMsg string
 	}{
-		{"invalid_size", "4test"},
-		{"too_many_args", "first:1G:2G"},
-		{"multiple_invalid", "first:1test"},
-		{"volume_not_exist", "fifth:1G"},
-		{"index_out_of_range", "9:1G"},
+		{"invalid_size", "4test", "Failed to parse argument to --image-size"},
+		{"too_many_args", "first:1G:2G", "Argument to --image-size first:1G:2G is not in the correct format"},
+		{"multiple_invalid", "first:1test", "Failed to parse argument to --image-size"},
+		{"volume_not_exist", "fifth:1G", "Volume fifth does not exist in gadget.yaml"},
+		{"index_out_of_range", "9:1G", "Volume index 9 is out of range"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_failed_parse_image_sizes_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-multi.yaml")
+			stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-multi.yaml")
 
 			// need workdir and loaded gadget.yaml set up for this
-			if err := stateMachine.makeTemporaryDirectories(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
-			if err := stateMachine.loadGadgetYaml(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, false)
+
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, false)
 
 			// run parseImage size and make sure it failed
 			stateMachine.commonFlags.Size = tc.size
-			if err := stateMachine.parseImageSizes(); err == nil {
-				t.Errorf("Expected an error, but got none")
-			}
+			err = stateMachine.parseImageSizes()
+			asserter.AssertErrContains(err, tc.errMsg)
 		})
 	}
 }
 
 // TestHandleContentSizes ensures that using --image-size with a few different values
-// results in the correct sizes in stateMachine.imageSizes
+// results in the correct sizes in stateMachine.ImageSizes
 func TestHandleContentSizes(t *testing.T) {
 	testCases := []struct {
 		name   string
@@ -460,24 +481,24 @@ func TestHandleContentSizes(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_handle_content_sizes_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.commonFlags.Size = tc.size
-			stateMachine.yamlFilePath = filepath.Join("testdata", "gadget_tree",
+			stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_tree",
 				"meta", "gadget.yaml")
 
 			// need workdir and loaded gadget.yaml set up for this
-			if err := stateMachine.makeTemporaryDirectories(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
-			if err := stateMachine.loadGadgetYaml(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, false)
+
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, false)
 
 			stateMachine.handleContentSizes(0, "pc")
 			// ensure the correct size was set
-			for volumeName := range stateMachine.gadgetInfo.Volumes {
-				setSize := stateMachine.imageSizes[volumeName]
+			for volumeName := range stateMachine.GadgetInfo.Volumes {
+				setSize := stateMachine.ImageSizes[volumeName]
 				if setSize != tc.result[volumeName] {
 					t.Errorf("Volume %s has the wrong size set: %d. "+
 						"Should be %d", volumeName, setSize, tc.result[volumeName])
@@ -492,25 +513,24 @@ func TestHandleContentSizes(t *testing.T) {
 // os.MkdirAll
 func TestFailedPostProcessGadgetYaml(t *testing.T) {
 	t.Run("test_failed_post_process_gadget_yaml", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		// set a valid yaml file and load it in
-		stateMachine.yamlFilePath = filepath.Join("testdata",
+		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
 		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, false)
 
 		// mock os.MkdirAll
 		osMkdirAll = mockMkdirAll
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		if err := stateMachine.postProcessGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.postProcessGadgetYaml()
+		asserter.AssertErrContains(err, "Error creating volume dir")
 		osMkdirAll = os.MkdirAll
 	})
 }

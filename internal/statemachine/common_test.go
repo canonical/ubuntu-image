@@ -5,13 +5,17 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
+	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 )
 
@@ -27,12 +31,14 @@ func TestMakeTemporaryDirectories(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.stateMachineFlags.WorkDir = tc.workdir
-			if err := stateMachine.makeTemporaryDirectories(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			// make sure workdir was successfully created
 			if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err != nil {
 				t.Errorf("Failed to create workdir %s",
 					stateMachine.stateMachineFlags.WorkDir)
@@ -45,6 +51,7 @@ func TestMakeTemporaryDirectories(t *testing.T) {
 // TestFailedMakeTemporaryDirectories tests some failed executions of the make_temporary_directories state
 func TestFailedMakeTemporaryDirectories(t *testing.T) {
 	t.Run("test_failed_mkdir", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
@@ -53,25 +60,24 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 		defer func() {
 			osMkdir = os.Mkdir
 		}()
-		if err := stateMachine.makeTemporaryDirectories(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrContains(err, "Failed to create temporary directory")
+
 		stateMachine.stateMachineFlags.WorkDir = testDir
-		if err := stateMachine.makeTemporaryDirectories(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrContains(err, "Error creating temporary directory")
 
 		// mock os.MkdirAll and only test with a WorkDir
 		osMkdirAll = mockMkdirAll
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		if err := stateMachine.makeTemporaryDirectories(); err == nil {
+		err = stateMachine.makeTemporaryDirectories()
+		if err == nil {
 			// try adding a workdir to see if that triggers the failure
 			stateMachine.stateMachineFlags.WorkDir = testDir
-			if err := stateMachine.makeTemporaryDirectories(); err == nil {
-				t.Error("Expected an error, but got none")
-			}
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrContains(err, "Error creating temporary directory")
 		}
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
@@ -81,14 +87,14 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 // directory is preserved if the relevant environment variable is set
 func TestLoadGadgetYaml(t *testing.T) {
 	t.Run("test_load_gadget_yaml", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.yamlFilePath = filepath.Join("testdata", "gadget_tree", "meta", "gadget.yaml")
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_tree", "meta", "gadget.yaml")
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
 		preserveDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
 		os.Setenv("UBUNTU_IMAGE_PRESERVE_UNPACK", preserveDir)
@@ -98,9 +104,10 @@ func TestLoadGadgetYaml(t *testing.T) {
 		// ensure unpack exists
 		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
 		defer os.RemoveAll(preserveDir)
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		// check that unpack was preserved
 		preserveUnpack := filepath.Join(preserveDir, "unpack")
 		if _, err := os.Stat(preserveUnpack); err != nil {
 			t.Errorf("Preserve unpack directory %s does not exist", preserveUnpack)
@@ -114,24 +121,23 @@ func TestLoadGadgetYaml(t *testing.T) {
 // os.MkdirAll, iotuil.ReadFile, osutil.CopyFile, and osutil.CopySpecialFile
 func TestFailedLoadGadgetYaml(t *testing.T) {
 	t.Run("test_failed_load_gadget_yaml", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
-		stateMachine.yamlFilePath = filepath.Join("testdata",
+		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// mock osutil.CopySpecialFile
 		osutilCopyFile = mockCopyFile
 		defer func() {
 			osutilCopyFile = osutil.CopyFile
 		}()
-		if err := stateMachine.loadGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrContains(err, "Error copying gadget.yaml")
 		osutilCopyFile = osutil.CopyFile
 
 		// mock ioutilReadFile
@@ -139,20 +145,18 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 		defer func() {
 			ioutilReadFile = ioutil.ReadFile
 		}()
-		if err := stateMachine.loadGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrContains(err, "Error reading gadget.yaml bytes")
 		ioutilReadFile = ioutil.ReadFile
 
 		// now test with the invalid yaml file
-		stateMachine.yamlFilePath = filepath.Join("testdata",
+		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree_invalid", "meta", "gadget.yaml")
-		if err := stateMachine.loadGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrContains(err, "Error running InfoFromGadgetYaml")
 
 		// set a valid yaml file and preserveDir
-		stateMachine.yamlFilePath = filepath.Join("testdata",
+		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 
 		// mock os.MkdirAll
@@ -161,18 +165,17 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 			osMkdirAll = os.MkdirAll
 		}()
 		// run with and without the environment variable set
-		if err := stateMachine.loadGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrContains(err, "Error creating volume dir")
+
 		preserveDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
 		os.Setenv("UBUNTU_IMAGE_PRESERVE_UNPACK", preserveDir)
 		defer func() {
 			os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
 		}()
 		defer os.RemoveAll(preserveDir)
-		if err := stateMachine.loadGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrContains(err, "Error creating preserve_unpack directory")
 		osMkdirAll = os.MkdirAll
 
 		// mock osutil.CopySpecialFile
@@ -180,17 +183,15 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 		defer func() {
 			osutilCopySpecialFile = osutil.CopySpecialFile
 		}()
-		if err := stateMachine.loadGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrContains(err, "Error preserving unpack dir")
 		osutilCopySpecialFile = osutil.CopySpecialFile
 		os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
 
 		// set an invalid --image-size argument to cause a failure
 		stateMachine.commonFlags.Size = "test"
-		if err := stateMachine.loadGadgetYaml(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrContains(err, "Failed to parse argument to --image-size")
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
@@ -209,6 +210,7 @@ func TestPopulateRootfsContentsHooks(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.commonFlags.Debug = true
@@ -219,15 +221,14 @@ func TestPopulateRootfsContentsHooks(t *testing.T) {
 			stateMachine.isSeeded = tc.isSeeded
 
 			// need workdir set up for this
-			if err := stateMachine.makeTemporaryDirectories(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
 
-			if err := stateMachine.populateRootfsContentsHooks(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
+			err = stateMachine.populateRootfsContentsHooks()
+			asserter.AssertErrNil(err, false)
 
-			// the hook scripts used for testing simply touch some files
+			// the hook scripts used for testing simply touches some files.
+			// make sure they were successfully created
 			for _, file := range tc.hooksCreated {
 				_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
 				if err != nil {
@@ -253,19 +254,18 @@ func TestFailedPopulateRootfsContentsHooks(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.commonFlags.HooksDirectories = tc.hooksDirs
 			stateMachine.isSeeded = false
 
 			// need workdir set up for this
-			if err := stateMachine.makeTemporaryDirectories(); err != nil {
-				t.Errorf("Did not expect an error, got %s", err.Error())
-			}
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
 
-			if err := stateMachine.populateRootfsContentsHooks(); err == nil {
-				t.Errorf("Expected an error, but got none")
-			}
+			err = stateMachine.populateRootfsContentsHooks()
+			asserter.AssertErrContains(err, "Error running hook")
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
@@ -274,21 +274,20 @@ func TestFailedPopulateRootfsContentsHooks(t *testing.T) {
 // TestGenerateDiskInfo tests that diskInfo can be generated
 func TestGenerateDiskInfo(t *testing.T) {
 	t.Run("test_generate_disk_info", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.commonFlags.DiskInfo = filepath.Join("testdata", "disk_info")
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
-		if err := stateMachine.generateDiskInfo(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.generateDiskInfo()
+		asserter.AssertErrNil(err, true)
 
 		// make sure rootfs/.disk/info exists
-		_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, ".disk", "info"))
+		_, err = os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, ".disk", "info"))
 		if err != nil {
 			if os.IsNotExist(err) {
 				t.Errorf("Disk Info file should exist, but does not")
@@ -302,23 +301,22 @@ func TestGenerateDiskInfo(t *testing.T) {
 // TestFailedGenerateDiskInfo tests failure scenarios in the generate_disk_info state
 func TestFailedGenerateDiskInfo(t *testing.T) {
 	t.Run("test_failed_generate_disk_info", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.commonFlags.DiskInfo = filepath.Join("testdata", "fake_disk_info")
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
 		osMkdir = mockMkdir
 		defer func() {
 			osMkdir = os.Mkdir
 		}()
-		if err := stateMachine.generateDiskInfo(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.generateDiskInfo()
+		asserter.AssertErrContains(err, "Failed to create disk info directory")
 		osMkdir = os.Mkdir
 
 		// mock osutil.CopyFile
@@ -326,9 +324,8 @@ func TestFailedGenerateDiskInfo(t *testing.T) {
 		defer func() {
 			osutilCopyFile = osutil.CopyFile
 		}()
-		if err := stateMachine.generateDiskInfo(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.generateDiskInfo()
+		asserter.AssertErrContains(err, "Failed to copy Disk Info file")
 		osutilCopyFile = osutil.CopyFile
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
@@ -340,17 +337,30 @@ func TestFailedGenerateDiskInfo(t *testing.T) {
 // verifying that the size is calculated correctly
 func TestCalculateRootfsSize(t *testing.T) {
 	t.Run("test_calculate_rootfs_size", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.tempDirs.rootfs = filepath.Join("testdata", "gadget_tree")
 
-		if err := stateMachine.calculateRootfsSize(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		// set a valid yaml file and load it in
+		stateMachine.YamlFilePath = filepath.Join("testdata",
+			"gadget_tree", "meta", "gadget.yaml")
+		// ensure unpack exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err := stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
 
-		correctSize := "12.01 MiB"
-		if stateMachine.rootfsSize.IECString() != correctSize {
-			t.Errorf("expected rootfsSize = %s, got %s", correctSize,
+		err = stateMachine.calculateRootfsSize()
+		asserter.AssertErrNil(err, true)
+
+		// rootfs size will be slightly different in different environments
+		correctSizeLower, _ := quantity.ParseSize("8M")
+		correctSizeUpper := correctSizeLower + 100000 // 0.1 MB range
+		if stateMachine.rootfsSize > correctSizeUpper ||
+			stateMachine.rootfsSize < correctSizeLower {
+			t.Errorf("expected rootfsSize between %s and %s, got %s",
+				correctSizeLower.IECString(),
+				correctSizeUpper.IECString(),
 				stateMachine.rootfsSize.IECString())
 		}
 
@@ -362,14 +372,13 @@ func TestCalculateRootfsSize(t *testing.T) {
 // this is accomplished by setting rootfs to a directory that does not exist
 func TestFailedCalculateRootfsSize(t *testing.T) {
 	t.Run("test_failed_calculate_rootfs_size", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.tempDirs.rootfs = filepath.Join("testdata", uuid.NewString())
 
-		if err := stateMachine.calculateRootfsSize(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
-
+		err := stateMachine.calculateRootfsSize()
+		asserter.AssertErrContains(err, "Error getting rootfs size")
 	})
 }
 
@@ -377,23 +386,22 @@ func TestFailedCalculateRootfsSize(t *testing.T) {
 // and ensures that the appropriate files are placed in the bootfs
 func TestPopulateBootfsContents(t *testing.T) {
 	t.Run("test_populate_bootfs_contents", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 		// set a valid yaml file and load it in
-		stateMachine.yamlFilePath = filepath.Join("testdata",
+		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
 		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
 
 		// populate unpack
 		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
@@ -404,10 +412,10 @@ func TestPopulateBootfsContents(t *testing.T) {
 
 		// ensure volumes exists
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
-		if err := stateMachine.populateBootfsContents(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrNil(err, true)
 
+		// check that bootfs contents were actually populated
 		bootFiles := []string{"boot", "ubuntu"}
 		for _, file := range bootFiles {
 			fullPath := filepath.Join(stateMachine.tempDirs.volumes,
@@ -422,22 +430,21 @@ func TestPopulateBootfsContents(t *testing.T) {
 // TestFailedPopulateBootfsContents tests failures in the populateBootfsContents state
 func TestFailedPopulateBootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_bootfs_contents", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 		// set a valid yaml file and load it in
-		stateMachine.yamlFilePath = filepath.Join("testdata", "gadget-seed.yaml")
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-seed.yaml")
 		// ensure unpack exists
 		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
@@ -454,9 +461,8 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		defer func() {
 			gadgetLayoutVolume = gadget.LayoutVolume
 		}()
-		if err := stateMachine.populateBootfsContents(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrContains(err, "Error laying out bootfs contents")
 		gadgetLayoutVolume = gadget.LayoutVolume
 
 		// mock gadget.NewMountedFilesystemWriter
@@ -464,24 +470,21 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		defer func() {
 			gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 		}()
-		if err := stateMachine.populateBootfsContents(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrContains(err, "Error creating NewMountedFilesystemWriter")
 		gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 
 		// set rootfs to an empty string in order to trigger a failure in Write()
 		stateMachine.tempDirs.rootfs = ""
-		if err := stateMachine.populateBootfsContents(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrContains(err, "Error in mountedFilesystem.Write")
 
 		// cause a failure in handleSecureBoot. First change to un-seeded yaml file and load it in
-		stateMachine.yamlFilePath = filepath.Join("testdata",
+		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
 		stateMachine.isSeeded = false
 		// now ensure grub dir exists
 		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack,
@@ -491,9 +494,8 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		if err := stateMachine.populateBootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 	})
 }
@@ -503,23 +505,22 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 // the rootfs size are corrected
 func TestPopulatePreparePartitions(t *testing.T) {
 	t.Run("test_populate_prepare_partitions", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 		// set a valid yaml file and load it in
-		stateMachine.yamlFilePath = filepath.Join("testdata",
+		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
 		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
@@ -532,18 +533,15 @@ func TestPopulatePreparePartitions(t *testing.T) {
 		}
 
 		// populate bootfs contents to ensure no failures there
-		if err := stateMachine.populateBootfsContents(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrNil(err, true)
 
 		// calculate rootfs size so the partition sizes can be set correctly
-		if err := stateMachine.calculateRootfsSize(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.calculateRootfsSize()
+		asserter.AssertErrNil(err, true)
 
-		if err := stateMachine.populatePreparePartitions(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.populatePreparePartitions()
+		asserter.AssertErrNil(err, true)
 
 		// ensure the .img files were created
 		for ii := 0; ii < 4; ii++ {
@@ -571,23 +569,22 @@ func TestPopulatePreparePartitions(t *testing.T) {
 // TestFailedPopulatePreparePartitions tests failures in the populatePreparePartitions state
 func TestFailedPopulatePreparePartitions(t *testing.T) {
 	t.Run("test_failed_populate_prepare_partitions", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 		// need workdir set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 		// set a valid yaml file and load it in
-		stateMachine.yamlFilePath = filepath.Join("testdata",
+		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
 		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
@@ -600,31 +597,246 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 		}
 
 		// populate bootfs contents to ensure no failures there
-		if err := stateMachine.populateBootfsContents(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrNil(err, true)
 
 		// now mock helper.CopyBlob to cause an error in copyStructureContent
 		helperCopyBlob = mockCopyBlob
 		defer func() {
 			helperCopyBlob = helper.CopyBlob
 		}()
-		if err := stateMachine.populatePreparePartitions(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
+		err = stateMachine.populatePreparePartitions()
+		asserter.AssertErrContains(err, "Error zeroing partition")
 		helperCopyBlob = helper.CopyBlob
 
 		// set a bootloader to lk and mock mkdir to cause a failure in that function
-		for _, volume := range stateMachine.gadgetInfo.Volumes {
+		for _, volume := range stateMachine.GadgetInfo.Volumes {
 			volume.Bootloader = "lk"
 		}
 		osMkdir = mockMkdir
 		defer func() {
 			osMkdir = os.Mkdir
 		}()
-		if err := stateMachine.populatePreparePartitions(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
+		err = stateMachine.populatePreparePartitions()
+		asserter.AssertErrContains(err, "got lk bootloader but directory")
 		osMkdir = os.Mkdir
+	})
+}
+
+// TestMakeDiskPartitionSchemes tests that makeDisk() can successfully parse
+// mbr, gpt, and hybrid schemes. It then runs "dumpe2fs" to ensure the
+// resulting disk has the correct type of partition table
+func TestMakeDiskPartitionSchemes(t *testing.T) {
+	testCases := []struct {
+		name      string
+		tableType string
+	}{
+		{"gpt", "gpt"},
+		{"mbr", "dos"},
+		{"hybrid", "gpt"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_make_disk_partition_type_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+			defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+			// also set up an output directory
+			outDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			asserter.AssertErrNil(err, true)
+			defer os.RemoveAll(outDir)
+			stateMachine.commonFlags.OutputDir = outDir
+
+			// set a valid yaml file and load it in
+			stateMachine.YamlFilePath = filepath.Join("testdata",
+				"gadget-"+tc.name+".yaml")
+			// ensure unpack exists
+			os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, true)
+
+			// set up a "rootfs" that we can eventually copy into the disk
+			os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
+			osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+
+			// also need to set the rootfs size to avoid partition errors
+			err = stateMachine.calculateRootfsSize()
+			asserter.AssertErrNil(err, true)
+
+			// ensure volumes exists
+			os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+
+			// populate unpack
+			files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+			for _, srcFile := range files {
+				srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
+				osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			}
+
+			// run through the rest of the states
+			err = stateMachine.populateBootfsContents()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.populatePreparePartitions()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.makeDisk()
+			asserter.AssertErrNil(err, true)
+
+			// now run "dumpe2fs" to ensure the correct type of partition table exists
+			imgFile := filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img")
+			dumpe2fsCommand := *exec.Command("dumpe2fs", imgFile)
+
+			dumpe2fsBytes, _ := dumpe2fsCommand.CombinedOutput()
+			if !strings.Contains(string(dumpe2fsBytes), tc.tableType) {
+				t.Errorf("File %s should have partition table %s, instead got \"%s\"",
+					imgFile, tc.tableType, string(dumpe2fsBytes))
+			}
+		})
+	}
+}
+
+// TestFailedMakeDisk tests failures in the MakeDisk state
+func TestFailedMakeDisk(t *testing.T) {
+	t.Run("test_failed_make_disk", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+		// also set up an output directory
+		outDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(outDir)
+		stateMachine.commonFlags.OutputDir = outDir
+
+		// set a valid yaml file and load it in
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-mbr.yaml")
+		// ensure unpack exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		// also need to set the rootfs size to avoid partition errors
+		err = stateMachine.calculateRootfsSize()
+		asserter.AssertErrNil(err, true)
+
+		// ensure volumes exists
+		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+
+		// populate unpack
+		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		for _, srcFile := range files {
+			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
+			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+		}
+
+		// mock os.MkdirAll
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error creating OutputDir")
+		osMkdirAll = os.MkdirAll
+
+		// mock diskfs.Create
+		diskfsCreate = mockDiskfsCreate
+		defer func() {
+			diskfsCreate = diskfs.Create
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error creating disk image")
+		diskfsCreate = diskfs.Create
+		os.Remove(filepath.Join(outDir, "pc.img")) // clean up for the next test run
+
+		// mock diskfs.Create to create a read only disk
+		diskfsCreate = readOnlyDiskfsCreate
+		defer func() {
+			diskfsCreate = diskfs.Create
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error partitioning image file")
+		diskfsCreate = diskfs.Create
+		os.Remove(filepath.Join(outDir, "pc.img"))
+
+		// mock os.OpenFile
+		// errors in file.WriteAt()
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error opening disk to write MBR disk identifier")
+		osOpenFile = os.OpenFile
+		os.Remove(filepath.Join(outDir, "pc.img"))
+
+		// mock os.OpenFile to force it to use os.O_APPEND, which causes
+		// errors in file.WriteAt()
+		osOpenFile = mockOpenFileAppend
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error writing MBR disk identifier")
+		osOpenFile = os.OpenFile
+		os.Remove(filepath.Join(outDir, "pc.img"))
+
+		// mock helper.CopyBlob to simulate a failure in copyDataToImage
+		helperCopyBlob = mockCopyBlob
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error writing disk image")
+		helperCopyBlob = helper.CopyBlob
+		os.Remove(filepath.Join(outDir, "pc.img"))
+
+		// Change to GPT for these next tests
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-gpt.yaml")
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.populatePreparePartitions()
+		asserter.AssertErrNil(err, true)
+
+		// mock os.OpenFile to simulate a failure in writeOffsetValues
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		// also mock helperCopyBlob to ignore missing files and return success
+		helperCopyBlob = mockCopyBlobSuccess
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error opening image file")
+		osOpenFile = os.OpenFile
+		helperCopyBlob = helper.CopyBlob
+		os.Remove(filepath.Join(outDir, "pc.img"))
+
+		helperCopyBlob = mockCopyBlob
+		defer func() {
+			helperCopyBlob = helper.CopyBlob
+		}()
+		stateMachine.cleanWorkDir = true // for coverage!
+		stateMachine.commonFlags.OutputDir = ""
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error writing disk image")
+		os.Remove(filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img"))
+		helperCopyBlob = helper.CopyBlob
 	})
 }

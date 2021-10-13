@@ -10,12 +10,12 @@ import (
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/snapcore/snapd/osutil"
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputSnap(t *testing.T) {
 	t.Run("test_failed_validate_input", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -26,15 +26,15 @@ func TestFailedValidateInputSnap(t *testing.T) {
 		stateMachine.stateMachineFlags.Until = "until-test"
 		stateMachine.stateMachineFlags.Thru = "thru-test"
 
-		if err := stateMachine.Setup(); err == nil {
-			t.Error("Expected an error but there was none")
-		}
+		err := stateMachine.Setup()
+		asserter.AssertErrContains(err, "cannot specify both --until and --thru")
 	})
 }
 
 // TestFailedReadMetadataSnap tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestFailedReadMetadataSnap(t *testing.T) {
 	t.Run("test_failed_read_metadata", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -45,15 +45,15 @@ func TestFailedReadMetadataSnap(t *testing.T) {
 		stateMachine.stateMachineFlags.Resume = true
 		stateMachine.stateMachineFlags.WorkDir = testDir
 
-		if err := stateMachine.Setup(); err == nil {
-			t.Error("Expected an error but there was none")
-		}
+		err := stateMachine.Setup()
+		asserter.AssertErrContains(err, "error reading metadata file")
 	})
 }
 
 // TestSuccessfulSnapCore20 builds a core 20 image and makes sure the factory boot flag is set
 func TestSuccessfulSnapCore20(t *testing.T) {
 	t.Run("test_successful_snap_run", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -62,36 +62,36 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 		stateMachine.Opts.FactoryImage = true
+		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
+		stateMachine.stateMachineFlags.WorkDir = workDir
 
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
 
-		if err := stateMachine.Run(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
 
 		// make sure the "factory" boot flag was set
-		grubenvFile := filepath.Join(stateMachine.tempDirs.unpack,
-			"system-seed", "EFI", "ubuntu", "grubenv")
+		grubenvFile := filepath.Join(stateMachine.tempDirs.rootfs,
+			"EFI", "ubuntu", "grubenv")
 		grubenvBytes, err := ioutil.ReadFile(grubenvFile)
-		if err != nil {
-			t.Errorf("Failed to read file %s: %s", grubenvFile, err.Error())
-		}
+		asserter.AssertErrNil(err, true)
 
 		if !strings.Contains(string(grubenvBytes), "snapd_boot_flags=factory") {
 			t.Errorf("grubenv file does not have factory boot flag set")
 		}
 
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
 	})
 }
 
 // TestSuccessfulSnapCore18 builds a core 18 image with a few special options
 func TestSuccessfulSnapCore18(t *testing.T) {
 	t.Run("test_successful_snap_options", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -103,19 +103,21 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		stateMachine.Opts.Snaps = []string{"hello-world"}
 		stateMachine.Opts.DisableConsoleConf = true
 		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
+		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
+		stateMachine.stateMachineFlags.WorkDir = workDir
 
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
 
-		if err := stateMachine.Run(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
 
 		// make sure cloud-init user-data was placed correctly
-		userDataPath := filepath.Join(stateMachine.tempDirs.unpack,
-			"image", "var", "lib", "cloud", "seed", "nocloud-net", "user-data")
-		_, err := os.Stat(userDataPath)
+		userDataPath := filepath.Join(stateMachine.tempDirs.rootfs,
+			"system-data", "var", "lib", "cloud", "seed", "nocloud-net", "user-data")
+		_, err = os.Stat(userDataPath)
 		if err != nil {
 			t.Errorf("cloud-init user-data file %s does not exist", userDataPath)
 		}
@@ -128,9 +130,8 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 			t.Errorf("Expected file %s to exist, but it does not", grubenvFile)
 		}
 
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
 	})
 }
 
@@ -138,6 +139,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 // by attempting to use --disable-console-conf with a core20 image
 func TestFailedPrepareImage(t *testing.T) {
 	t.Run("test_failed_prepare_image", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -147,17 +149,14 @@ func TestFailedPrepareImage(t *testing.T) {
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 		stateMachine.Opts.DisableConsoleConf = true
 
-		if err := stateMachine.Setup(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err := stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
 
-		if err := stateMachine.Run(); err == nil {
-			t.Errorf("Expected an error, but got none")
-		}
+		err = stateMachine.Run()
+		asserter.AssertErrContains(err, "Error preparing image")
 
-		if err := stateMachine.Teardown(); err != nil {
-			t.Errorf("Did not expect an error, got %s\n", err.Error())
-		}
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
 	})
 }
 
@@ -174,6 +173,7 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
 
@@ -183,13 +183,11 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 			stateMachine.Args.ModelAssertion = tc.modelAssertion
 			stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
 
-			if err := stateMachine.Setup(); err != nil {
-				t.Errorf("Did not expect an error, got %s\n", err.Error())
-			}
+			err := stateMachine.Setup()
+			asserter.AssertErrNil(err, true)
 
-			if err := stateMachine.Run(); err != nil {
-				t.Errorf("Did not expect an error, got %s\n", err.Error())
-			}
+			err = stateMachine.Run()
+			asserter.AssertErrNil(err, true)
 
 			// check the files before Teardown
 			for _, file := range tc.fileList {
@@ -201,9 +199,8 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 				}
 			}
 
-			if err := stateMachine.Teardown(); err != nil {
-				t.Errorf("Did not expect an error, got %s\n", err.Error())
-			}
+			err = stateMachine.Teardown()
+			asserter.AssertErrNil(err, true)
 		})
 	}
 }
@@ -219,13 +216,12 @@ func TestGenerateSnapManifest(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
 
 			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
-			if err != nil {
-				t.Errorf("Failed to create work directory")
-			}
+			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
 			var stateMachine SnapStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -256,16 +252,13 @@ func TestGenerateSnapManifest(t *testing.T) {
 			for dir, fileList := range testEnvMap {
 				for _, file := range fileList {
 					fp, err := os.Create(filepath.Join(dir, file))
-					if err != nil {
-						t.Error("Failed to create necessary dummy files")
-					}
+					asserter.AssertErrNil(err, false)
 					fp.Close()
 				}
 			}
 
-			if err := stateMachine.generateSnapManifest(); err != nil {
-				t.Errorf("Did not expect an error, but got %s", err.Error())
-			}
+			err = stateMachine.generateSnapManifest()
+			asserter.AssertErrNil(err, false)
 
 			// Check if manifests got generated and if they have expected contents
 			// For both UC20+ and regular images
@@ -283,9 +276,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 			for manifest, snapList := range testResultMap {
 				manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, manifest)
 				manifestBytes, err := ioutil.ReadFile(manifestPath)
-				if err != nil {
-					t.Errorf("Failed to read manifest file %s: %s", manifestPath, err.Error())
-				}
+				asserter.AssertErrNil(err, false)
 				// The order of snaps shouldn't matter
 				for _, snap := range snapList {
 					if !strings.Contains(string(manifestBytes), snap) {
@@ -301,30 +292,29 @@ func TestGenerateSnapManifest(t *testing.T) {
 // while building a snap image. This is achieved by mocking functions
 func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_snap_rootfs_contents", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 
 		// need workdir and gadget.yaml set up for this
-		if err := stateMachine.makeTemporaryDirectories(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
-		if err := stateMachine.prepareImage(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
-		if err := stateMachine.loadGadgetYaml(); err != nil {
-			t.Errorf("Did not expect an error, got %s", err.Error())
-		}
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.prepareImage()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
 
 		// mock os.MkdirAll
 		osMkdirAll = mockMkdirAll
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		if err := stateMachine.populateSnapRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateSnapRootfsContents()
+		asserter.AssertErrContains(err, "Error creating boot dir")
 		osMkdirAll = os.MkdirAll
 
 		// mock ioutil.ReadDir
@@ -332,26 +322,25 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 		defer func() {
 			ioutilReadDir = ioutil.ReadDir
 		}()
-		if err := stateMachine.populateSnapRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err = stateMachine.populateSnapRootfsContents()
+		asserter.AssertErrContains(err, "Error reading unpack dir")
 		ioutilReadDir = ioutil.ReadDir
 
 		// mock osutil.CopySpecialFile
-		osutilCopySpecialFile = mockCopySpecialFile
+		osRename = mockRename
 		defer func() {
-			osutilCopySpecialFile = osutil.CopySpecialFile
+			osRename = os.Rename
 		}()
-		if err := stateMachine.populateSnapRootfsContents(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
-		osutilCopySpecialFile = osutil.CopySpecialFile
+		err = stateMachine.populateSnapRootfsContents()
+		asserter.AssertErrContains(err, "Error moving rootfs")
+		osRename = os.Rename
 	})
 }
 
 // TestFailedGenerateSnapManifest tests if snap-based image manifest generation failures are catched
 func TestFailedGenerateSnapManifest(t *testing.T) {
 	t.Run("test_failed_generate_snap_manifest", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
@@ -374,8 +363,7 @@ func TestFailedGenerateSnapManifest(t *testing.T) {
 		stateMachine.isSeeded = false
 		stateMachine.commonFlags.OutputDir = "/dummy/path"
 
-		if err := stateMachine.generateSnapManifest(); err == nil {
-			t.Error("Expected an error, but got none")
-		}
+		err := stateMachine.generateSnapManifest()
+		asserter.AssertErrContains(err, "Error creating manifest file")
 	})
 }
