@@ -227,7 +227,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.stateMachineFlags.WorkDir = workDir
 			stateMachine.tempDirs.rootfs = filepath.Join(workDir, "rootfs")
-			stateMachine.isSeeded = tc.seeded
+			stateMachine.IsSeeded = tc.seeded
 			stateMachine.commonFlags.OutputDir = filepath.Join(workDir, "output")
 			osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
 
@@ -360,7 +360,7 @@ func TestFailedGenerateSnapManifest(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.stateMachineFlags.WorkDir = "/dummy/path"
 		stateMachine.tempDirs.rootfs = "/dummy/path"
-		stateMachine.isSeeded = false
+		stateMachine.IsSeeded = false
 		stateMachine.commonFlags.OutputDir = "/dummy/path"
 
 		err := stateMachine.generateSnapManifest()

@@ -48,7 +48,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 // populateSnapRootfsContents uses a NewMountedFileSystemWriter to populate the rootfs
 func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 	var src, dst string
-	if stateMachine.isSeeded {
+	if stateMachine.IsSeeded {
 		// For now, since we only create the system-seed partition for
 		// uc20 images, we hard-code to use this path for the rootfs
 		// seed population.  In the future we might want to consider
@@ -71,7 +71,7 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 		return fmt.Errorf("Error reading unpack dir: %s", err.Error())
 	}
 	for _, srcFile := range files {
-		if !stateMachine.isSeeded && srcFile.Name() == "boot" {
+		if !stateMachine.IsSeeded && srcFile.Name() == "boot" {
 			continue
 		}
 		srcFileName := filepath.Join(src, srcFile.Name())
@@ -100,7 +100,7 @@ func (stateMachine *StateMachine) generateSnapManifest() error {
 
 	// seed.manifest
 	outputPath = filepath.Join(stateMachine.commonFlags.OutputDir, "seed.manifest")
-	if stateMachine.isSeeded {
+	if stateMachine.IsSeeded {
 		snapsDir = filepath.Join(stateMachine.tempDirs.rootfs, "snaps")
 	} else {
 		snapsDir = filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "seed", "snaps")
