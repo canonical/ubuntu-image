@@ -5,9 +5,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/canonical/ubuntu-image)](https://goreportcard.com/report/github.com/canonical/ubuntu-image)
 
 
-This tool is used to build Ubuntu images.  Currently it only builds Snappy
-images from a model assertion, but it will be generalized to build more
-(eventually all) Ubuntu images.
+This tool is used to build Ubuntu images.  Currently builds Ubuntu Core snap-based
+images from model assertions and Ubuntu classic preinstalled images using gadget trees,
+but it will be generalized to build more (eventually all) Ubuntu images.
 
 
 # Requirements
