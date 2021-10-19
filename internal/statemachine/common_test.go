@@ -758,6 +758,15 @@ func TestFailedMakeDisk(t *testing.T) {
 		asserter.AssertErrContains(err, "Error creating OutputDir")
 		osMkdirAll = os.MkdirAll
 
+		// mock os.RemoveAll
+		osRemoveAll = mockRemoveAll
+		defer func() {
+			osRemoveAll = os.RemoveAll
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error removing old disk image")
+		osRemoveAll = os.RemoveAll
+
 		// mock diskfs.Create
 		diskfsCreate = mockDiskfsCreate
 		defer func() {
@@ -766,7 +775,6 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error creating disk image")
 		diskfsCreate = diskfs.Create
-		os.Remove(filepath.Join(outDir, "pc.img")) // clean up for the next test run
 
 		// mock os.Truncate
 		osTruncate = mockTruncate
@@ -776,7 +784,6 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error resizing disk image")
 		osTruncate = os.Truncate
-		os.Remove(filepath.Join(outDir, "pc.img")) // clean up for the next test run
 
 		// mock diskfs.Create to create a read only disk
 		diskfsCreate = readOnlyDiskfsCreate
@@ -786,7 +793,6 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error partitioning image file")
 		diskfsCreate = diskfs.Create
-		os.Remove(filepath.Join(outDir, "pc.img"))
 
 		// mock os.OpenFile
 		// errors in file.WriteAt()
@@ -797,7 +803,6 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error opening disk to write MBR disk identifier")
 		osOpenFile = os.OpenFile
-		os.Remove(filepath.Join(outDir, "pc.img"))
 
 		// mock os.OpenFile to force it to use os.O_APPEND, which causes
 		// errors in file.WriteAt()
@@ -808,7 +813,6 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error writing MBR disk identifier")
 		osOpenFile = os.OpenFile
-		os.Remove(filepath.Join(outDir, "pc.img"))
 
 		// mock helper.CopyBlob to simulate a failure in copyDataToImage
 		helperCopyBlob = mockCopyBlob
@@ -818,7 +822,6 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error writing disk image")
 		helperCopyBlob = helper.CopyBlob
-		os.Remove(filepath.Join(outDir, "pc.img"))
 
 		// Change to GPT for these next tests
 		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-gpt.yaml")
@@ -845,7 +848,6 @@ func TestFailedMakeDisk(t *testing.T) {
 		asserter.AssertErrContains(err, "Error opening image file")
 		osOpenFile = os.OpenFile
 		helperCopyBlob = helper.CopyBlob
-		os.Remove(filepath.Join(outDir, "pc.img"))
 
 		helperCopyBlob = mockCopyBlob
 		defer func() {
@@ -855,7 +857,6 @@ func TestFailedMakeDisk(t *testing.T) {
 		stateMachine.commonFlags.OutputDir = ""
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error writing disk image")
-		os.Remove(filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img"))
 		helperCopyBlob = helper.CopyBlob
 	})
 }
