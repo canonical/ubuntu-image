@@ -11,7 +11,7 @@ import (
 	"github.com/jessevdk/go-flags"
 )
 
-// global ubunut-image version number variable
+// Version holds the ubuntu-image version number variable
 // this is usually overriden at build time
 var Version string = ""
 
