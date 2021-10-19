@@ -7,7 +7,8 @@ export DH_GOPKG := github.com/canonical/ubuntu-image
 # strict symbols checking
 export DPKG_GENSYMBOLS_CHECK_LEVEL=4
 
-BUILDFLAGS+= -buildmode=pie
+PKGVERSION=$(shell dpkg-parsechangelog --show-field version)
+BUILDFLAGS+= -buildmode=pie -ldflags "-X main.Version=$(PKGVERSION)"
 builddir = $(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)
 artifactsdir = $(builddir)/build
 

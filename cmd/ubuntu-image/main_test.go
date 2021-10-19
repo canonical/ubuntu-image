@@ -171,6 +171,59 @@ func TestExitCode(t *testing.T) {
 	}
 }
 
+// TestVersion code runs ubuntu-image --version and checks if the resulting
+// version makes sense
+func TestVersion(t *testing.T) {
+	testCases := []struct {
+		name      string
+		hardcoded string
+		snapEnv   string
+		expected  string
+	}{
+		{"hardcoded_version", "2.0ubuntu1", "", "2.0ubuntu1"},
+		{"snap_version", "", "2.0+snap1", "2.0+snap1"},
+		{"both_hardcoded_and_snap", "2.0ubuntu1", "2.0+snap1", "2.0ubuntu1"},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+			// Override os.Exit temporarily
+			oldOsExit := osExit
+			defer func() {
+				osExit = oldOsExit
+			}()
+
+			var got int
+			tmpExit := func(code int) {
+				got = code
+			}
+			osExit = tmpExit
+
+			// set up the flags for the test cases
+			flag.CommandLine = flag.NewFlagSet(tc.name, flag.ExitOnError)
+			os.Args = append([]string{tc.name}, "--version")
+
+			// pre-set the test-case environment
+			Version = tc.hardcoded
+			os.Setenv("SNAP_VERSION", tc.snapEnv)
+
+			imageType = ""
+			main()
+			if got != 0 {
+				t.Errorf("Expected exit code: 0, got: %d", got)
+			}
+			os.Unsetenv("SNAP_VERSION")
+
+			// since we're printing the Version variable, no need to capture
+			// and analyze the output
+			if Version != tc.expected {
+				t.Errorf("Expected version string: '%s', got: '%s'", tc.expected, Version)
+			}
+		})
+	}
+}
+
 // TestFailedStdoutStderrCapture tests that scenarios involving failed stdout
 // and stderr captures and reads fail gracefully
 func TestFailedStdoutStderrCapture(t *testing.T) {

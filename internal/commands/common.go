@@ -11,6 +11,7 @@ type CommonOpts struct {
 	HooksDirectories []string `long:"hooks-directory" description:"Path or comma-separated list of paths of directories in which scripts for build-time hooks will be located." value-name:"DIRECTORY"`
 	DiskInfo         string   `long:"disk-info" description:"File to be used as .disk/info on the image's rootfs. This file can contain useful information about the target image, like image identification data, system name, build timestamp etc." value-name:"DISK-INFO-CONTENTS"`
 	OutputDir        string   `short:"O" long:"output-dir" description:"The directory in which to put generated disk image files. The disk image files themselves will be named <volume>.img inside this directory, where <volume> is the volume name taken from the gadget.yaml file." value-name:"DIRECTORY"`
+	Version          bool     `long:"version" description:"Print the version number of ubuntu-image and exit"`
 }
 
 // StateMachineOpts stores the options that are related to the state machine

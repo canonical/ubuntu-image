@@ -11,6 +11,10 @@ import (
 	"github.com/jessevdk/go-flags"
 )
 
+// global ubunut-image version number variable
+// this is usually overriden at build time
+var Version string = ""
+
 // helper variables for unit testing
 var osExit = os.Exit
 var captureStd = helper.CaptureStd
@@ -106,7 +110,7 @@ func main() {
 				return
 			case flags.ErrCommandRequired:
 				// if --resume was given, this is not an error
-				if !stateMachineOpts.Resume {
+				if !stateMachineOpts.Resume && !commonOpts.Version {
 					restoreStdout()
 					restoreStderr()
 					readStderr, err := ioutil.ReadAll(stderr)
@@ -133,6 +137,17 @@ func main() {
 	// restore stdout
 	restoreStdout()
 	restoreStderr()
+
+	// in case user only requested version number, print and exit
+	if commonOpts.Version {
+		// we expect Version to be supplied at build time or fetched from the snap environment
+		if Version == "" {
+			Version = os.Getenv("SNAP_VERSION")
+		}
+		fmt.Printf("ubuntu-image %s\n", Version)
+		osExit(0)
+		return
+	}
 
 	if parser.Command.Active != nil && imageType == "" {
 		imageType = parser.Command.Active.Name
