@@ -290,7 +290,7 @@ func (stateMachine *StateMachine) makeDisk() error {
 		}
 
 		// make sure the disk image size is a multiple of its block size
-		imgSize = int64(math.Ceil(float64(imgSize) / float64(diskImg.LogicalBlocksize))) *
+		imgSize = int64(math.Ceil(float64(imgSize)/float64(diskImg.LogicalBlocksize))) *
 			int64(diskImg.LogicalBlocksize)
 		if err := osTruncate(diskImg.File.Name(), imgSize); err != nil {
 			return fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
