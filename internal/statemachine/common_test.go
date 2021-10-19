@@ -697,6 +697,15 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 				t.Errorf("File %s should have partition table %s, instead got \"%s\"",
 					imgFile, tc.tableType, string(dumpe2fsBytes))
 			}
+
+			// ensure the resulting image file is a multiple of the block size
+			diskImg, err := diskfs.Open(imgFile)
+			defer diskImg.File.Close()
+			asserter.AssertErrNil(err, true)
+			if diskImg.Size % diskImg.LogicalBlocksize != 0 {
+				t.Errorf("Disk image size %d is not an multiple of the block size: %d",
+					diskImg.Size, diskImg.LogicalBlocksize)
+			}
 		})
 	}
 }
