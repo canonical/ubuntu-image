@@ -24,5 +24,6 @@ Depends: ${shlibs:Depends},
          livecd-rootfs,
          mtools,
          snapd,
+Conflicts: python3-ubuntu-image
 Description: toolkit for building Ubuntu images.
  This package contains the ubuntu-image program.
