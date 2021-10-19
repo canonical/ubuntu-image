@@ -759,6 +759,16 @@ func TestFailedMakeDisk(t *testing.T) {
 		diskfsCreate = diskfs.Create
 		os.Remove(filepath.Join(outDir, "pc.img")) // clean up for the next test run
 
+		// mock os.Truncate
+		osTruncate = mockTruncate
+		defer func() {
+			osTruncate = os.Truncate
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error resizing disk image")
+		osTruncate = os.Truncate
+		os.Remove(filepath.Join(outDir, "pc.img")) // clean up for the next test run
+
 		// mock diskfs.Create to create a read only disk
 		diskfsCreate = readOnlyDiskfsCreate
 		defer func() {

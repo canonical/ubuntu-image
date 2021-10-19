@@ -87,6 +87,9 @@ func mockRemoveAll(string) error {
 func mockRename(string, string) error {
 	return fmt.Errorf("Test error")
 }
+func mockTruncate(string, int64) error {
+	return fmt.Errorf("Test error")
+}
 func mockCreate(string) (*os.File, error) {
 	return nil, fmt.Errorf("Test error")
 }
