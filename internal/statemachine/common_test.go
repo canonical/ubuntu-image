@@ -702,7 +702,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			diskImg, err := diskfs.Open(imgFile)
 			defer diskImg.File.Close()
 			asserter.AssertErrNil(err, true)
-			if diskImg.Size % diskImg.LogicalBlocksize != 0 {
+			if diskImg.Size%diskImg.LogicalBlocksize != 0 {
 				t.Errorf("Disk image size %d is not an multiple of the block size: %d",
 					diskImg.Size, diskImg.LogicalBlocksize)
 			}
