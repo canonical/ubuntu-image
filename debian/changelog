@@ -1,9 +1,15 @@
 ubuntu-image (2.0+21.10ubuntu1) UNRELEASED; urgency=medium
 
+  [ William 'jawn-smith' Wilson ]
   * Re-write ubuntu-image in Go to improve integration with snapd
     - Remove -o / --output option that has been deprecated for years
     - The command line option --hooks-directory must now be specified
       once per hooks directory, rather than a comma separated list.
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * debian/control: as we're replacing the python ubuntu-image version,
+    force removal of the no-longer used python3-ubuntu-image via a Conflicts
+    stanza.
 
  -- William 'jawn-smith' Wilson <william.wilson@canonical.com>  Mon, 26 Apr 2021 15:33:22 -0500
 
