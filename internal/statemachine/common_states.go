@@ -284,6 +284,9 @@ func (stateMachine *StateMachine) makeDisk() error {
 		// Create the disk image
 		imgSize, _ := stateMachine.calculateImageSize()
 
+		if err := osRemoveAll(imgName); err != nil {
+			return fmt.Errorf("Error removing old disk image: %s", err.Error())
+		}
 		diskImg, err := diskfsCreate(imgName, imgSize, diskfs.Raw)
 		if err != nil {
 			return fmt.Errorf("Error creating disk image: %s", err.Error())
