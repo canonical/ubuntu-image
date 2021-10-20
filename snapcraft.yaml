@@ -8,6 +8,9 @@ grade: stable
 confinement: classic
 base: core20
 
+environment:
+  PATH: $SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$PATH
+
 apps:
   ubuntu-image:
     command: bin/ubuntu-image
@@ -29,3 +32,4 @@ parts:
       - gdisk
       - e2fsprogs
       - fakeroot
+      - dosfstools
