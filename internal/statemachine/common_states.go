@@ -289,6 +289,14 @@ func (stateMachine *StateMachine) makeDisk() error {
 			return fmt.Errorf("Error creating disk image: %s", err.Error())
 		}
 
+		// make sure the disk image size is a multiple of its block size
+		imgSize = int64(math.Ceil(float64(imgSize)/float64(diskImg.LogicalBlocksize))) *
+			int64(diskImg.LogicalBlocksize)
+		if err := osTruncate(diskImg.File.Name(), imgSize); err != nil {
+			return fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
+				err.Error())
+		}
+
 		// snapd always populates Schema, so it cannot be empty. Use the blocksize of the created disk
 		sectorSize := uint64(diskImg.LogicalBlocksize)
 

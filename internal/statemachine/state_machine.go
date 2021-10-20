@@ -35,6 +35,7 @@ var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
 var osRename = os.Rename
 var osCreate = os.Create
+var osTruncate = os.Truncate
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
 var execCommand = exec.Command

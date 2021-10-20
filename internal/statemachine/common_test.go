@@ -697,6 +697,15 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 				t.Errorf("File %s should have partition table %s, instead got \"%s\"",
 					imgFile, tc.tableType, string(dumpe2fsBytes))
 			}
+
+			// ensure the resulting image file is a multiple of the block size
+			diskImg, err := diskfs.Open(imgFile)
+			defer diskImg.File.Close()
+			asserter.AssertErrNil(err, true)
+			if diskImg.Size%diskImg.LogicalBlocksize != 0 {
+				t.Errorf("Disk image size %d is not an multiple of the block size: %d",
+					diskImg.Size, diskImg.LogicalBlocksize)
+			}
 		})
 	}
 }
@@ -757,6 +766,16 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error creating disk image")
 		diskfsCreate = diskfs.Create
+		os.Remove(filepath.Join(outDir, "pc.img")) // clean up for the next test run
+
+		// mock os.Truncate
+		osTruncate = mockTruncate
+		defer func() {
+			osTruncate = os.Truncate
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error resizing disk image")
+		osTruncate = os.Truncate
 		os.Remove(filepath.Join(outDir, "pc.img")) // clean up for the next test run
 
 		// mock diskfs.Create to create a read only disk
