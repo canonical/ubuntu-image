@@ -428,7 +428,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 					// now reach out to the snap store to find the revision
 					// of the snap for the specified channel
 					snapStore := store.New(nil, nil)
-					snapSpec := store.SnapSpec{snapName}
+					snapSpec := store.SnapSpec{Name: snapName}
 					context := context.TODO() //context can be empty, just not nil
 					snapInfo, err := snapStore.SnapInfo(context, snapSpec, nil)
 					asserter.AssertErrNil(err, true)
@@ -449,16 +449,6 @@ func TestSnapFlagSyntax(t *testing.T) {
 					}
 					seededRevision, err = strconv.Atoi(revString[1])
 					asserter.AssertErrNil(err, true)
-					/*scanner := bufio.NewScanner(seedManifest)
-					for scanner.Scan() {
-						if strings.Contains(scanner.Text(), snapName) {
-							seededRevision, err = strconv.Atoi(
-								strings.TrimPrefix(
-									strings.Split(scanner.Text(), ".")[0],
-									snapName))
-							asserter.AssertErrNil(err, true)
-						}
-					}*/
 
 					// finally check that the seeded revision matches what the store reports
 					if storeRevision != seededRevision {
