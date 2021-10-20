@@ -462,7 +462,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 
 					// finally check that the seeded revision matches what the store reports
 					if storeRevision != seededRevision {
-						t.Errorf("Error, expected snap %s to " +
+						t.Errorf("Error, expected snap %s to "+
 							"be revision %d, but it was %d",
 							snapName, storeRevision, seededRevision)
 					}
