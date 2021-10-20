@@ -440,7 +440,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 					revRegex, err := regexp.Compile(fmt.Sprintf(
 						"%s (.*?)\\.snap", snapName))
 					asserter.AssertErrNil(err, true)
-					seedData, err := os.ReadFile(filepath.Join(
+					seedData, err := ioutil.ReadFile(filepath.Join(
 						stateMachine.stateMachineFlags.WorkDir, "seed.manifest"))
 					asserter.AssertErrNil(err, true)
 					revString := revRegex.FindStringSubmatch(string(seedData))
