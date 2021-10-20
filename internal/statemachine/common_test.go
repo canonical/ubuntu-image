@@ -932,10 +932,10 @@ func TestFailedMakeDisk(t *testing.T) {
 // with the flag (LP: #1947867)
 func TestImageSizeFlag(t *testing.T) {
 	testCases := []struct {
-		name      string
-		sizeArg   string
-		gadgetTree  string
-		imageSize map[string]quantity.Size
+		name       string
+		sizeArg    string
+		gadgetTree string
+		imageSize  map[string]quantity.Size
 	}{
 		{"one_volume", "4G", filepath.Join("testdata", "gadget_tree"),
 			map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
