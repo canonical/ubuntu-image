@@ -623,6 +623,72 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 	})
 }
 
+// TestEmptyPartPopulatePreparePartitions performs a successful run a gadget.yaml that has,
+// besides regular partitions, one empty partition and makes sure that a partition image file
+// has been created for it (LP: #1947863)
+func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
+	t.Run("test_empty_part_populate_prepare_partitions", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+		// set a valid yaml file and load it in
+		// we use a special gadget.yaml here, special for this testcase
+		stateMachine.YamlFilePath = filepath.Join("testdata",
+			"gadget-empty-part.yaml")
+		// ensure unpack exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		// ensure volumes exists
+		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+
+		// populate unpack
+		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		for _, srcFile := range files {
+			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
+			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+		}
+
+		// populate bootfs contents to ensure no failures there
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrNil(err, true)
+
+		// calculate rootfs size so the partition sizes can be set correctly
+		err = stateMachine.calculateRootfsSize()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.populatePreparePartitions()
+		asserter.AssertErrNil(err, true)
+
+		// ensure the .img files were created
+		for ii := 0; ii < 5; ii++ {
+			partImg := filepath.Join(stateMachine.tempDirs.volumes,
+				"pc", "part"+strconv.Itoa(ii)+".img")
+			if _, err := os.Stat(partImg); err != nil {
+				t.Errorf("File %s should exist, but does not", partImg)
+			}
+		}
+
+		// check part2.img, it should be empty and have a 4K size
+		partImg := filepath.Join(stateMachine.tempDirs.volumes,
+			"pc", "part2.img")
+		partImgBytes, _ := ioutil.ReadFile(partImg)
+		// these are all zeroes
+		dataBytes := make([]byte, 4096)
+		if !bytes.Equal(partImgBytes, dataBytes) {
+			t.Errorf("Expected part2.img to contain %d zeroes, got something different (size %d)",
+				len(dataBytes), len(partImgBytes))
+		}
+	})
+}
+
 // TestMakeDiskPartitionSchemes tests that makeDisk() can successfully parse
 // mbr, gpt, and hybrid schemes. It then runs "dumpe2fs" to ensure the
 // resulting disk has the correct type of partition table
