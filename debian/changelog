@@ -1,4 +1,4 @@
-ubuntu-image (2.0+22.04ubuntu1) UNRELEASED; urgency=medium
+ubuntu-image (2.0+22.04ubuntu1) jammy; urgency=medium
 
   [ William 'jawn-smith' Wilson ]
   * Re-write ubuntu-image in Go to improve integration with snapd
