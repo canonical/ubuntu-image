@@ -156,21 +156,20 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 	contentRoot, partImg string) error {
 	if structure.Filesystem == "" {
 		// copy the contents to the new location
+		// first zero it out. Structures without filesystem specified in the gadget
+		// yaml must have the size specified, so the bs= argument below is valid
+		ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
+			"bs=" + strconv.FormatUint(uint64(structure.Size), 10),
+			"seek=1"}
+		if err := helperCopyBlob(ddArgs); err != nil {
+			return fmt.Errorf("Error zeroing partition: %s",
+				err.Error())
+		}
 		var runningOffset quantity.Offset = 0
 		for _, content := range structure.Content {
 			if content.Offset != nil {
 				runningOffset = *content.Offset
 			}
-			// first zero it out. Structures without filesystem specified in the gadget
-			// yaml must have the size specified, so the bs= argument below is valid
-			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
-				"bs=" + strconv.FormatUint(uint64(structure.Size), 10),
-				"seek=1"}
-			if err := helperCopyBlob(ddArgs); err != nil {
-				return fmt.Errorf("Error zeroing partition: %s",
-					err.Error())
-			}
-
 			// now copy the raw content file specified in gadget.yaml
 			inFile := filepath.Join(stateMachine.tempDirs.unpack,
 				"gadget", content.Image)
