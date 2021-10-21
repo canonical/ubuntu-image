@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -388,6 +389,9 @@ func TestSnapFlagSyntax(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_snap_flag_syntax_"+tc.name, func(t *testing.T) {
+			if runtime.GOARCH != "amd64" {
+				t.Skip("Test for amd64 only")
+			}
 			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()

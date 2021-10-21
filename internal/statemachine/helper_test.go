@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -19,6 +20,9 @@ import (
 // TestSetupCrossArch tests that the lb commands are set up correctly for cross arch compilation
 func TestSetupCrossArch(t *testing.T) {
 	t.Run("test_setup_cross_arch", func(t *testing.T) {
+		if runtime.GOARCH != "amd64" {
+			t.Skip("Test for amd64 only")
+		}
 		asserter := helper.Asserter{T: t}
 		// set up a temp dir for this
 		os.MkdirAll(testDir, 0755)

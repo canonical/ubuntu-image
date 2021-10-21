@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -270,6 +271,9 @@ func TestNoStatic(t *testing.T) {
 // the rootfs to ensure at least some of the correct file are in place
 func TestPopulateClassicRootfsContents(t *testing.T) {
 	t.Run("test_populate_classic_rootfs_contents", func(t *testing.T) {
+		if runtime.GOARCH != "amd64" {
+			t.Skip("Test for amd64 only")
+		}
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
