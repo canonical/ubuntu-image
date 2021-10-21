@@ -25,5 +25,6 @@ Depends: ${shlibs:Depends},
          mtools,
          snapd,
 Conflicts: python3-ubuntu-image
-Description: toolkit for building Ubuntu images.
- This package contains the ubuntu-image program.
+Description: Toolkit for building Ubuntu images.
+ Ubuntu Image is the official tool for building various Ubuntu images according
+ to the provided specification - both core and classic.
