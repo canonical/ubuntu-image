@@ -58,8 +58,8 @@ github.com/rogpeppe/clock v0.0.0-20190514195947-2896927a307a/go.mod h1:4r5QyqhjI
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/sirupsen/logrus v1.7.0 h1:ShrD1U9pZB12TX0cVy0DtePoCH97K8EtX+mg7ZARUtM=
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
-github.com/snapcore/bolt v1.3.1 h1:ctSvzzI2iPgJuodwoprEf1ufkxOb56e7mxMMhhEhnpc=
-github.com/snapcore/bolt v1.3.1/go.mod h1:Z6z3sf12AMDjT/4tbT/PmzzdACAxkWGhkuKWiVpTWLM=
+github.com/snapcore/bolt v0.0.0-20200602121001-37736442c875 h1:tGoCMyBy+R6w886x1jypdzItBqc1ni7oQ0MXRBPDinc=
+github.com/snapcore/bolt v0.0.0-20200602121001-37736442c875/go.mod h1:Z6z3sf12AMDjT/4tbT/PmzzdACAxkWGhkuKWiVpTWLM=
 github.com/snapcore/go-gettext v0.0.0-20191107141714-82bbea49e785/go.mod h1:D3SsWAXK7wCCBZu+Vk5hc1EuKj/L3XN1puEMXTU4LrQ=
 github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2 h1:nETXPg0CiJrMAwC2gqkcam9BiBWYGvTsSYRfrjOz2Kg=
 github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2/go.mod h1:D3SsWAXK7wCCBZu+Vk5hc1EuKj/L3XN1puEMXTU4LrQ=

@@ -15,7 +15,7 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/juju/ratelimit v1.0.1 // indirect
 	github.com/mvo5/goconfigparser v0.0.0-20201015074339-50f22f44deb5 // indirect
-	github.com/snapcore/bolt v1.3.1 // indirect
+	github.com/snapcore/bolt v0.0.0-20200602121001-37736442c875 // indirect
 	github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2 // indirect
 	github.com/snapcore/secboot v0.0.0-20210805184555-c9f2139ee92b // indirect
 	github.com/snapcore/snapd v0.0.0-20210824074111-a3fe6b7e2554

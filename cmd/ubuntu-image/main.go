@@ -12,7 +12,7 @@ import (
 )
 
 // Version holds the ubuntu-image version number
-// this is usually overriden at build time
+// this is usually overridden at build time
 var Version string = ""
 
 // helper variables for unit testing
