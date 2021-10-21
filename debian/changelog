@@ -1,10 +1,12 @@
-ubuntu-image (2.0+21.10ubuntu1) UNRELEASED; urgency=medium
+ubuntu-image (2.0+22.04ubuntu1) UNRELEASED; urgency=medium
 
   [ William 'jawn-smith' Wilson ]
   * Re-write ubuntu-image in Go to improve integration with snapd
     - Remove -o / --output option that has been deprecated for years
     - The command line option --hooks-directory must now be specified
       once per hooks directory, rather than a comma separated list.
+    - ubuntu-image no longer defaults to the 'snap' subcommand and requires
+      specifying the exact build mode to use.
 
   [ Łukasz 'sil2100' Zemczak ]
   * debian/control: as we're replacing the python ubuntu-image version,
