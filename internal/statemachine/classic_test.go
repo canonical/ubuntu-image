@@ -149,6 +149,9 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 // TestSuccessfulClassicRun runs through all states ensuring none failed
 func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
+		if runtime.GOARCH == "arm" {
+			t.Skip("Test not supported on armhf")
+		}
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
