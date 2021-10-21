@@ -3,13 +3,18 @@
 package statemachine
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/store"
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
@@ -366,4 +371,95 @@ func TestFailedGenerateSnapManifest(t *testing.T) {
 		err := stateMachine.generateSnapManifest()
 		asserter.AssertErrContains(err, "Error creating manifest file")
 	})
+}
+
+// TestSnapFlagSyntax tests various syntaxes for the "--snap" argument,
+// including valid and invalid syntax (LP: #1947864)
+func TestSnapFlagSyntax(t *testing.T) {
+	testCases := []struct {
+		name     string
+		snapArgs []string
+		valid    bool
+	}{
+		{"no_channel_specified", []string{"hello"}, true},
+		{"channel_specified", []string{"hello=edge"}, true},
+		{"mixed_syntax", []string{"hello", "core=edge"}, true},
+		{"invalid_syntax", []string{"hello=edge=stable"}, false},
+	}
+	for _, tc := range testCases {
+		t.Run("test_snap_flag_syntax_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine SnapStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+
+			// use core18 because it builds the fastest
+			stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
+			stateMachine.Opts.Snaps = tc.snapArgs
+			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			asserter.AssertErrNil(err, true)
+			defer os.RemoveAll(workDir)
+			stateMachine.stateMachineFlags.WorkDir = workDir
+
+			err = stateMachine.Setup()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.Run()
+
+			if tc.valid {
+				// check Run() ended without errors
+				asserter.AssertErrNil(err, true)
+
+				// make sure the correct channels were used
+				for _, snapArg := range tc.snapArgs {
+					var snapName string
+					var snapChannel string
+					if strings.Contains(snapArg, "=") {
+						splitArg := strings.Split(snapArg, "=")
+						snapName = splitArg[0]
+						snapChannel = splitArg[1]
+					} else {
+						snapName = snapArg
+						snapChannel = "stable"
+					}
+					// now reach out to the snap store to find the revision
+					// of the snap for the specified channel
+					snapStore := store.New(nil, nil)
+					snapSpec := store.SnapSpec{Name: snapName}
+					context := context.TODO() //context can be empty, just not nil
+					snapInfo, err := snapStore.SnapInfo(context, snapSpec, nil)
+					asserter.AssertErrNil(err, true)
+
+					var storeRevision, seededRevision int
+					storeRevision = snapInfo.Channels["latest/"+snapChannel].Revision.N
+
+					// compile a regex used to get revision numbers from seed.manifest
+					revRegex, err := regexp.Compile(fmt.Sprintf(
+						"%s (.*?)\\.snap", snapName))
+					asserter.AssertErrNil(err, true)
+					seedData, err := ioutil.ReadFile(filepath.Join(
+						stateMachine.stateMachineFlags.WorkDir, "seed.manifest"))
+					asserter.AssertErrNil(err, true)
+					revString := revRegex.FindStringSubmatch(string(seedData))
+					if len(revString) != 2 {
+						t.Fatal("Error finding snap revision via regex")
+					}
+					seededRevision, err = strconv.Atoi(revString[1])
+					asserter.AssertErrNil(err, true)
+
+					// finally check that the seeded revision matches what the store reports
+					if storeRevision != seededRevision {
+						t.Errorf("Error, expected snap %s to "+
+							"be revision %d, but it was %d",
+							snapName, storeRevision, seededRevision)
+					}
+				}
+			} else {
+				asserter.AssertErrContains(err, "Invalid syntax")
+			}
+		})
+	}
 }
