@@ -442,14 +442,14 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 }
 
 // calculateImageSize calculates the total sum of all partition sizes in an image
-func (stateMachine *StateMachine) calculateImageSize() (int64, error) {
+func (stateMachine *StateMachine) calculateImageSize() (quantity.Size, error) {
 	if stateMachine.GadgetInfo == nil {
 		return 0, fmt.Errorf("Cannot calculate image size before initializing GadgetInfo")
 	}
-	var imgSize int64 = 0
+	var imgSize quantity.Size = 0
 	for _, volume := range stateMachine.GadgetInfo.Volumes {
 		for _, structure := range volume.Structure {
-			imgSize += int64(structure.Size)
+			imgSize += structure.Size
 		}
 	}
 	return imgSize, nil

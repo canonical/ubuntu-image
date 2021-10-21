@@ -926,3 +926,91 @@ func TestFailedMakeDisk(t *testing.T) {
 		helperCopyBlob = helper.CopyBlob
 	})
 }
+
+// TestImageSizeFlag performs a successful call to StateMachine.MakeDisk with the
+// --image-size flag, and ensures that the resulting image is the size specified
+// with the flag (LP: #1947867)
+func TestImageSizeFlag(t *testing.T) {
+	testCases := []struct {
+		name       string
+		sizeArg    string
+		gadgetTree string
+		imageSize  map[string]quantity.Size
+	}{
+		{"one_volume", "4G", filepath.Join("testdata", "gadget_tree"),
+			map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
+		{"multi-volume", "first:4G,second:1G",
+			filepath.Join("testdata", "gadget_tree_multi"),
+			map[string]quantity.Size{
+				"first":  4 * quantity.SizeGiB,
+				"second": 1 * quantity.SizeGiB}},
+	}
+	for _, tc := range testCases {
+
+		t.Run("test_image_size_flag_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.IsSeeded = true
+			stateMachine.commonFlags.Size = tc.sizeArg
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+			//defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+			// also set up an output directory
+			outDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			asserter.AssertErrNil(err, true)
+			//defer os.RemoveAll(outDir)
+			stateMachine.commonFlags.OutputDir = outDir
+
+			// set a valid yaml file and load it in
+			stateMachine.YamlFilePath = filepath.Join(tc.gadgetTree, "meta", "gadget.yaml")
+			// ensure unpack exists
+			os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, true)
+
+			// set up a "rootfs" that we can eventually copy into the disk
+			os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
+			osutil.CopySpecialFile(tc.gadgetTree, stateMachine.tempDirs.rootfs)
+
+			// also need to set the rootfs size to avoid partition errors
+			err = stateMachine.calculateRootfsSize()
+			asserter.AssertErrNil(err, true)
+
+			// ensure volumes exists
+			os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+
+			// populate unpack
+			files, _ := ioutil.ReadDir(tc.gadgetTree)
+			for _, srcFile := range files {
+				srcFile := filepath.Join(tc.gadgetTree, srcFile.Name())
+				osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			}
+
+			// run through the rest of the states
+			err = stateMachine.populateBootfsContents()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.populatePreparePartitions()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.makeDisk()
+			asserter.AssertErrNil(err, true)
+
+			// check the size of the disk(s)
+			for volume, expectedSize := range tc.imageSize {
+				imgFile := filepath.Join(stateMachine.commonFlags.OutputDir, volume+".img")
+				diskImg, err := os.Stat(imgFile)
+				asserter.AssertErrNil(err, true)
+				if diskImg.Size() != int64(expectedSize) {
+					t.Errorf("--image-size %d was specified, but resulting image is %d bytes",
+						expectedSize, diskImg.Size())
+				}
+			}
+		})
+
+	}
+}

@@ -282,20 +282,23 @@ func (stateMachine *StateMachine) makeDisk() error {
 		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, volumeName+".img")
 
 		// Create the disk image
-		imgSize, _ := stateMachine.calculateImageSize()
+		imgSize, found := stateMachine.ImageSizes[volumeName]
+		if !found {
+			imgSize, _ = stateMachine.calculateImageSize()
+		}
 
 		if err := osRemoveAll(imgName); err != nil {
 			return fmt.Errorf("Error removing old disk image: %s", err.Error())
 		}
-		diskImg, err := diskfsCreate(imgName, imgSize, diskfs.Raw)
+		diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw)
 		if err != nil {
 			return fmt.Errorf("Error creating disk image: %s", err.Error())
 		}
 
 		// make sure the disk image size is a multiple of its block size
-		imgSize = int64(math.Ceil(float64(imgSize)/float64(diskImg.LogicalBlocksize))) *
-			int64(diskImg.LogicalBlocksize)
-		if err := osTruncate(diskImg.File.Name(), imgSize); err != nil {
+		imgSize = quantity.Size(math.Ceil(float64(imgSize)/float64(diskImg.LogicalBlocksize))) *
+			quantity.Size(diskImg.LogicalBlocksize)
+		if err := osTruncate(diskImg.File.Name(), int64(imgSize)); err != nil {
 			return fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
 				err.Error())
 		}
