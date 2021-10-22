@@ -146,41 +146,6 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 	})
 }
 
-// TestSuccessfulClassicRun runs through all states ensuring none failed
-func TestSuccessfulClassicRun(t *testing.T) {
-	t.Run("test_successful_classic_run", func(t *testing.T) {
-		if runtime.GOARCH == "arm" {
-			t.Skip("Test not supported on armhf")
-		}
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Opts.Project = "ubuntu-cpc"
-		stateMachine.Opts.Suite = "focal"
-		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-		stateMachine.parent = &stateMachine
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
-		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(workDir)
-		stateMachine.stateMachineFlags.WorkDir = workDir
-
-		// Setup, Run, and Teardown the state machine and assert no errors
-		err = stateMachine.Setup()
-		asserter.AssertErrNil(err, false)
-
-		err = stateMachine.Run()
-		asserter.AssertErrNil(err, false)
-
-		err = stateMachine.Teardown()
-		asserter.AssertErrNil(err, false)
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}
-
 // TODO replace this with fakeExecCommand that sil2100 wrote
 // TestFailedLiveBuildCommands tests the scenario where calls to `lb` fail
 // this is accomplished by temporarily replacing lb on disk with a test script
