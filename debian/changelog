@@ -1,4 +1,4 @@
-ubuntu-image (2.0+22.04ubuntu3) UNRELEASED; urgency=medium
+ubuntu-image (2.0+22.04ubuntu3) jammy; urgency=medium
 
   * Disable some tests on some architectures. This resolves failures
     caused by snaps not being available on certain architectures, and 
