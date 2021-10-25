@@ -1,3 +1,11 @@
+ubuntu-image (2.0+22.04ubuntu3) UNRELEASED; urgency=medium
+
+  * Disable some tests on some architectures. This resolves failures
+    caused by snaps not being available on certain architectures, and 
+    a few other scenarios where not every test is applicable.
+
+ -- William 'jawn-smith' Wilson <william.wilson@canonical.com>  Fri, 22 Oct 2021 15:35:18 -0500
+
 ubuntu-image (2.0+22.04ubuntu2) jammy; urgency=medium
 
   * go.mod: use git-meta tag for snapcore/bolt to pull in latest

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -58,6 +59,9 @@ func TestFailedReadMetadataSnap(t *testing.T) {
 // TestSuccessfulSnapCore20 builds a core 20 image and makes sure the factory boot flag is set
 func TestSuccessfulSnapCore20(t *testing.T) {
 	t.Run("test_successful_snap_run", func(t *testing.T) {
+		if runtime.GOARCH == "arm" {
+			t.Skip("Test not supported on armhf")
+		}
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -96,6 +100,9 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 // TestSuccessfulSnapCore18 builds a core 18 image with a few special options
 func TestSuccessfulSnapCore18(t *testing.T) {
 	t.Run("test_successful_snap_options", func(t *testing.T) {
+		if runtime.GOARCH == "arm" {
+			t.Skip("Test not supported on armhf")
+		}
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -388,6 +395,9 @@ func TestSnapFlagSyntax(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_snap_flag_syntax_"+tc.name, func(t *testing.T) {
+			if runtime.GOARCH != "amd64" {
+				t.Skip("Test for amd64 only")
+			}
 			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
