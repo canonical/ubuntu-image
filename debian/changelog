@@ -1,3 +1,9 @@
+ubuntu-image (2.0+22.04ubuntu4) UNRELEASED; urgency=medium
+
+  * Make sure the generated disk IDs are unique.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Tue, 26 Oct 2021 13:14:27 +0200
+
 ubuntu-image (2.0+22.04ubuntu3) jammy; urgency=medium
 
   * Disable some tests on some architectures. This resolves failures
