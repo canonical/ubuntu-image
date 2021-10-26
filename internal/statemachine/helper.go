@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -515,4 +516,31 @@ func getStructureOffset(structure gadget.VolumeStructure) quantity.Offset {
 		return 0
 	}
 	return *structure.Offset
+}
+
+// generateUniqueDiskID returns a random 4-byte long disk ID, unique per the list of existing IDs
+func generateUniqueDiskID(existing [][]byte) ([]byte, error) {
+	var retry bool
+	randomBytes := make([]byte, 4)
+	// we'll try 10 times, not to loop into infinity in case the RNG is broken (no entropy?)
+	for i := 0; i < 10; i++ {
+		retry = false
+		randRead(randomBytes)
+		for _, id := range existing {
+			if bytes.Compare(randomBytes, id) == 0 {
+				retry = true
+				break
+			}
+		}
+
+		if !retry {
+			break
+		}
+	}
+	if retry {
+		// this means for some weird reason we didn't get an unique ID after many retries
+		return nil, fmt.Errorf("Failed to generate unique disk ID. Random generator failure?")
+	}
+	existing = append(existing, randomBytes)
+	return randomBytes, nil
 }
