@@ -543,9 +543,9 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 		expected    []byte
 		expectedErr bool
 	}{
-		{"one_time", [][]byte{[]byte{4, 5, 6, 7} }, [][]byte{[]byte{0, 1, 2, 3} }, []byte{0, 1, 2, 3}, false},
-		{"collision", [][]byte{[]byte{0, 1, 2, 3} }, [][]byte{[]byte{0, 1, 2, 3}, []byte{4, 5, 6, 7} }, []byte{4, 5, 6, 7}, false},
-		{"broken", [][]byte{[]byte{0, 0, 0, 0} }, nil, []byte{0, 0, 0, 0}, true},
+		{"one_time", [][]byte{[]byte{4, 5, 6, 7}}, [][]byte{[]byte{0, 1, 2, 3}}, []byte{0, 1, 2, 3}, false},
+		{"collision", [][]byte{[]byte{0, 1, 2, 3}}, [][]byte{[]byte{0, 1, 2, 3}, []byte{4, 5, 6, 7}}, []byte{4, 5, 6, 7}, false},
+		{"broken", [][]byte{[]byte{0, 0, 0, 0}}, nil, []byte{0, 0, 0, 0}, true},
 		//{"", gadget.VolumeStructure{Offset: &testOffset}, 1},
 	}
 	for _, tc := range testCases {
