@@ -3,6 +3,7 @@ package statemachine
 
 import (
 	"bytes"
+	"crypto/rand"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -870,6 +871,16 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error opening disk to write MBR disk identifier")
 		osOpenFile = os.OpenFile
+
+		// mock generateUniqueDiskID
+		// errors in generateUniqueDiskID TODO
+		randRead = mockRandRead
+		defer func() {
+			randRead = rand.Read
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error generating disk ID")
+		randRead = rand.Read
 
 		// mock os.OpenFile to force it to use os.O_APPEND, which causes
 		// errors in file.WriteAt()

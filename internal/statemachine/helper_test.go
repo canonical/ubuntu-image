@@ -546,7 +546,6 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 		{"one_time", [][]byte{[]byte{4, 5, 6, 7}}, [][]byte{[]byte{0, 1, 2, 3}}, []byte{0, 1, 2, 3}, false},
 		{"collision", [][]byte{[]byte{0, 1, 2, 3}}, [][]byte{[]byte{0, 1, 2, 3}, []byte{4, 5, 6, 7}}, []byte{4, 5, 6, 7}, false},
 		{"broken", [][]byte{[]byte{0, 0, 0, 0}}, nil, []byte{0, 0, 0, 0}, true},
-		//{"", gadget.VolumeStructure{Offset: &testOffset}, 1},
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_unique_diskid_"+tc.name, func(t *testing.T) {
@@ -568,13 +567,24 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 				randRead = rand.Read
 			}()
 
-			randomBytes, err := generateUniqueDiskID(tc.existing)
+			randomBytes, err := generateUniqueDiskID(&tc.existing)
 			if tc.expectedErr {
 				asserter.AssertErrContains(err, "Failed to generate unique disk ID")
 			} else {
 				asserter.AssertErrNil(err, true)
 				if bytes.Compare(randomBytes, tc.expected) != 0 {
 					t.Errorf("Error, expected ID %v but got %v", tc.expected, randomBytes)
+				}
+				// check if the ID was added to the list of existing IDs
+				found := false
+				for _, id := range tc.existing {
+					if bytes.Compare(id, randomBytes) == 0 {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Error, disk ID not added to the existing list")
 				}
 			}
 		})

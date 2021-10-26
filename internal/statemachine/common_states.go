@@ -318,7 +318,7 @@ func (stateMachine *StateMachine) makeDisk() error {
 		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
 		// this function is a temporary workaround, but we should change upstream go-diskfs
 		if volume.Schema == "mbr" {
-			randomBytes, err := generateUniqueDiskID(existingDiskIds)
+			randomBytes, err := generateUniqueDiskID(&existingDiskIds)
 			if err != nil {
 				return fmt.Errorf("Error generating disk ID: %s", err.Error())
 			}
