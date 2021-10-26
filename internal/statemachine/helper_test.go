@@ -534,7 +534,7 @@ func TestGetStructureOffset(t *testing.T) {
 	}
 }
 
-// TestGenerateUniqueDiskID TODO
+// TestGenerateUniqueDiskID ensures that we generate unique disk IDs
 func TestGenerateUniqueDiskID(t *testing.T) {
 	testCases := []struct {
 		name        string

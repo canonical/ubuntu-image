@@ -872,8 +872,8 @@ func TestFailedMakeDisk(t *testing.T) {
 		asserter.AssertErrContains(err, "Error opening disk to write MBR disk identifier")
 		osOpenFile = os.OpenFile
 
-		// mock generateUniqueDiskID
-		// errors in generateUniqueDiskID TODO
+		// mock rand.Read
+		// errors in generateUniqueDiskID()
 		randRead = mockRandRead
 		defer func() {
 			randRead = rand.Read
