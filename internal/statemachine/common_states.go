@@ -1,7 +1,6 @@
 package statemachine
 
 import (
-	"crypto/rand"
 	"fmt"
 	"math"
 	"os"
@@ -278,6 +277,8 @@ func (stateMachine *StateMachine) makeDisk() error {
 			return fmt.Errorf("Error creating OutputDir: %s", err.Error())
 		}
 	}
+	// TODO: this is only temporarily needed until go-diskfs is fixed - see below
+	var existingDiskIds [][]byte
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, volumeName+".img")
 
@@ -317,8 +318,10 @@ func (stateMachine *StateMachine) makeDisk() error {
 		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
 		// this function is a temporary workaround, but we should change upstream go-diskfs
 		if volume.Schema == "mbr" {
-			randomBytes := make([]byte, 4)
-			rand.Read(randomBytes)
+			randomBytes, err := generateUniqueDiskID(&existingDiskIds)
+			if err != nil {
+				return fmt.Errorf("Error generating disk ID: %s", err.Error())
+			}
 			diskFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
 			defer diskFile.Close()
 			if err != nil {

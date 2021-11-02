@@ -3,6 +3,7 @@
 package statemachine
 
 import (
+	"crypto/rand"
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
@@ -41,6 +42,7 @@ var osutilCopySpecialFile = osutil.CopySpecialFile
 var execCommand = exec.Command
 var mkfsMakeWithContent = mkfs.MakeWithContent
 var diskfsCreate = diskfs.Create
+var randRead = rand.Read
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 

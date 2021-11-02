@@ -1,6 +1,8 @@
 package statemachine
 
 import (
+	"bytes"
+	"crypto/rand"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -526,7 +528,64 @@ func TestGetStructureOffset(t *testing.T) {
 		t.Run("test_get_structure_offset_"+tc.name, func(t *testing.T) {
 			offset := getStructureOffset(tc.structure)
 			if offset != tc.expected {
-				t.Errorf("Error, expected offset %d but got %d", offset, tc.expected)
+				t.Errorf("Error, expected offset %d but got %d", tc.expected, offset)
+			}
+		})
+	}
+}
+
+// TestGenerateUniqueDiskID ensures that we generate unique disk IDs
+func TestGenerateUniqueDiskID(t *testing.T) {
+	testCases := []struct {
+		name        string
+		existing    [][]byte
+		randomBytes [][]byte
+		expected    []byte
+		expectedErr bool
+	}{
+		{"one_time", [][]byte{[]byte{4, 5, 6, 7}}, [][]byte{[]byte{0, 1, 2, 3}}, []byte{0, 1, 2, 3}, false},
+		{"collision", [][]byte{[]byte{0, 1, 2, 3}}, [][]byte{[]byte{0, 1, 2, 3}, []byte{4, 5, 6, 7}}, []byte{4, 5, 6, 7}, false},
+		{"broken", [][]byte{[]byte{0, 0, 0, 0}}, nil, []byte{0, 0, 0, 0}, true},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_unique_diskid_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			// create a test rng reader, using data from our testcase
+			ithRead := 0
+			randRead = func(output []byte) (int, error) {
+				var randomBytes []byte
+				if tc.randomBytes == nil || ithRead > (len(tc.randomBytes)-1) {
+					randomBytes = []byte{0, 0, 0, 0}
+				} else {
+					randomBytes = tc.randomBytes[ithRead]
+				}
+				copy(output, randomBytes)
+				ithRead++
+				return 0, nil
+			}
+			defer func() {
+				randRead = rand.Read
+			}()
+
+			randomBytes, err := generateUniqueDiskID(&tc.existing)
+			if tc.expectedErr {
+				asserter.AssertErrContains(err, "Failed to generate unique disk ID")
+			} else {
+				asserter.AssertErrNil(err, true)
+				if bytes.Compare(randomBytes, tc.expected) != 0 {
+					t.Errorf("Error, expected ID %v but got %v", tc.expected, randomBytes)
+				}
+				// check if the ID was added to the list of existing IDs
+				found := false
+				for _, id := range tc.existing {
+					if bytes.Compare(id, randomBytes) == 0 {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Error, disk ID not added to the existing list")
+				}
 			}
 		})
 	}

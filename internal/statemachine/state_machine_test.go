@@ -102,6 +102,9 @@ func mockCopySpecialFile(string, string) error {
 func mockDiskfsCreate(string, int64, diskfs.Format) (*disk.Disk, error) {
 	return nil, fmt.Errorf("Test error")
 }
+func mockRandRead(output []byte) (int, error) {
+	return 0, fmt.Errorf("Test error")
+}
 func readOnlyDiskfsCreate(diskName string, size int64, format diskfs.Format) (*disk.Disk, error) {
 	diskFile, _ := os.OpenFile(diskName, os.O_RDONLY|os.O_CREATE, 0444)
 	disk := disk.Disk{
