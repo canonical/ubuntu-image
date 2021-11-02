@@ -12,8 +12,8 @@ github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf h1:iW4rZ826su+pq
 github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/diskfs/go-diskfs v0.0.0-20211001122056-308c225a001f h1:ZkWW96d7c8mDuVFCL0CZIc6mpkjqQ+PYiIvhGNVykMc=
-github.com/diskfs/go-diskfs v0.0.0-20211001122056-308c225a001f/go.mod h1:IoDpuEbpS+D+yCGdoOm6GNfyTeEws77ALvcMQFxmenw=
+github.com/diskfs/go-diskfs v0.0.0-20211026085633-d25f8c810488 h1:N2lE9PPSkHiFVXYETJQYfFsCFN/WAB2B/T+kIpkA/LE=
+github.com/diskfs/go-diskfs v0.0.0-20211026085633-d25f8c810488/go.mod h1:IoDpuEbpS+D+yCGdoOm6GNfyTeEws77ALvcMQFxmenw=
 github.com/frankban/quicktest v1.2.2/go.mod h1:Qh/WofXFeiAFII1aEBu529AtJo6Zg2VHscnEsbBnJ20=
 github.com/frankban/quicktest v1.13.0 h1:yNZif1OkDfNoDfb9zZa9aXIpejNR4F23Wely0c+Qdqk=
 github.com/frankban/quicktest v1.13.0/go.mod h1:qLE0fzW0VuyUAJgPU19zByoIr0HtCHN/r/VLSOOIySU=

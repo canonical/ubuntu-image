@@ -543,9 +543,9 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 		expected    []byte
 		expectedErr bool
 	}{
-		{"one_time", [][]byte{[]byte{4, 5, 6, 7}}, [][]byte{[]byte{0, 1, 2, 3}}, []byte{0, 1, 2, 3}, false},
-		{"collision", [][]byte{[]byte{0, 1, 2, 3}}, [][]byte{[]byte{0, 1, 2, 3}, []byte{4, 5, 6, 7}}, []byte{4, 5, 6, 7}, false},
-		{"broken", [][]byte{[]byte{0, 0, 0, 0}}, nil, []byte{0, 0, 0, 0}, true},
+		{"one_time", [][]byte{{4, 5, 6, 7}}, [][]byte{{0, 1, 2, 3}}, []byte{0, 1, 2, 3}, false},
+		{"collision", [][]byte{{0, 1, 2, 3}}, [][]byte{{0, 1, 2, 3}, {4, 5, 6, 7}}, []byte{4, 5, 6, 7}, false},
+		{"broken", [][]byte{{0, 0, 0, 0}}, nil, []byte{0, 0, 0, 0}, true},
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_unique_diskid_"+tc.name, func(t *testing.T) {
