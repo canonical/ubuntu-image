@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -960,9 +959,6 @@ func TestImageSizeFlag(t *testing.T) {
 	for _, tc := range testCases {
 
 		t.Run("test_image_size_flag_"+tc.name, func(t *testing.T) {
-			if runtime.GOARCH == "arm" {
-				t.Skip("Test not supported on armhf")
-			}
 			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()

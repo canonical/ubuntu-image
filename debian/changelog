@@ -1,8 +1,13 @@
 ubuntu-image (2.0+22.04ubuntu4) UNRELEASED; urgency=medium
 
+  [ Łukasz 'sil2100' Zemczak ]
   * Make sure the generated disk IDs are unique.
 
- -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Tue, 26 Oct 2021 13:14:27 +0200
+  [ William 'jawn-smith' Wilson ]
+  * Pull in upstream change from go-diskfs to fix integer overflows on armhf
+    (LP: #1949208)
+
+ -- William 'jawn-smith' Wilson <william.wilson@canonical.com>  Tue, 02 Nov 2021 12:57:01 -0500
 
 ubuntu-image (2.0+22.04ubuntu3) jammy; urgency=medium
 
