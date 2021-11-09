@@ -8,8 +8,8 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/snapcore/snapd/osutil"
-	//"github.com/snapcore/snapd/image"
-	//"github.com/snapcore/snapd/snap"
+	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/snap"
 )
 
 // Prepare the gadget tree
