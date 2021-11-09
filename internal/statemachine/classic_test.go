@@ -252,6 +252,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+		stateMachine.commonFlags.Snaps = []string{"hello"}
 		stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
 
 		err := stateMachine.Setup()
@@ -285,6 +286,15 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		if !strings.Contains(string(fstab), correctLabel) {
 			t.Errorf("Expected fstab contents %s to contain %s",
 				string(fstab), correctLabel)
+		}
+
+		// check that extra snaps were added to the rootfs
+		for _, snap := range stateMachine.commonFlags.Snaps {
+			filePath := filepath.Join(stateMachine.tempDirs.unpack,
+				"chroot", "var", "snap", snap)
+			if !osutil.FileExists(filePath) {
+				t.Errorf("File %s should exist but it does not", filePath)
+			}
 		}
 
 		err = stateMachine.Teardown()
@@ -459,5 +469,63 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 
 		err := stateMachine.generatePackageManifest()
 		asserter.AssertErrContains(err, "Error creating manifest file")
+	})
+}
+
+// TestFailedRunLiveBuild tests some error scenarios in the runLiveBuild state that are not
+// caused by actual failures in the `lb` commands
+func TestFailedRunLiveBuild(t *testing.T) {
+	t.Run("test_failed_run_live_build", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Opts.Project = "ubuntu-cpc"
+		stateMachine.Opts.Suite = "focal"
+		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+		stateMachine.commonFlags.Snaps = []string{"hello"}
+		stateMachine.stateMachineFlags.Thru = "run_live_build"
+
+		// replace the lb commands with a script that will simply pass
+		testCaseName = "TestFailedRunLiveBuild"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		// since we have mocked exec.Command, running dpkg -L to find the livecd-rootfs
+		// filepath will fail. We can use an environment variable instead
+		dpkgArgs := "dpkg -L livecd-rootfs | grep \"auto$\""
+		dpkgCommand := *exec.Command("bash", "-c", dpkgArgs)
+		dpkgBytes, err := dpkgCommand.Output()
+		autoSrc := strings.TrimSpace(string(dpkgBytes))
+		os.Setenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH", autoSrc)
+
+		// mock os.OpenFile
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		asserter.AssertErrContains(err, "Error opening seeded-snaps")
+		osOpenFile = os.OpenFile
+		os.RemoveAll(testDir)
+
+		// mock os.OpenFile
+		osOpenFile = mockOpenFileBadPerms
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		asserter.AssertErrContains(err, "Error writing snap hello=stable to seeded-snaps")
+		osOpenFile = os.OpenFile
+		os.RemoveAll(testDir)
+		os.Unsetenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH")
 	})
 }

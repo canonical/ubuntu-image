@@ -112,8 +112,8 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 		stateMachine.Opts.Channel = "stable"
-		stateMachine.Opts.Snaps = []string{"hello-world"}
 		stateMachine.Opts.DisableConsoleConf = true
+		stateMachine.commonFlags.Snaps = []string{"hello-world"}
 		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
 		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
@@ -408,7 +408,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 
 			// use core18 because it builds the fastest
 			stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
-			stateMachine.Opts.Snaps = tc.snapArgs
+			stateMachine.commonFlags.Snaps = tc.snapArgs
 			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)

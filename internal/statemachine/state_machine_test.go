@@ -81,6 +81,9 @@ func mockOpenFile(string, int, os.FileMode) (*os.File, error) {
 func mockOpenFileAppend(name string, flag int, perm os.FileMode) (*os.File, error) {
 	return os.OpenFile(name, flag|os.O_APPEND, perm)
 }
+func mockOpenFileBadPerms(name string, flag int, perm os.FileMode) (*os.File, error) {
+	return os.OpenFile(name, os.O_RDONLY|os.O_CREATE, perm)
+}
 func mockRemoveAll(string) error {
 	return fmt.Errorf("Test error")
 }
@@ -154,6 +157,9 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestFailedSetupLiveBuildCommands":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
+		break
+	case "TestFailedRunLiveBuild":
+		// Do nothing so we don't have to wait for actual lb commands
 		break
 	}
 }

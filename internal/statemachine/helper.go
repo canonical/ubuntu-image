@@ -316,8 +316,8 @@ func getQemuStaticForArch(arch string) string {
 // setupLiveBuildCommands creates the live build commands used in classic images
 func setupLiveBuildCommands(rootfs, arch string, env []string, enableCrossBuild bool) (lbConfig, lbBuild exec.Cmd, err error) {
 
-	lbConfig = *exec.Command("lb", "config")
-	lbBuild = *exec.Command("lb", "build")
+	lbConfig = *execCommand("lb", "config")
+	lbBuild = *execCommand("lb", "build")
 
 	lbConfig.Stdout = os.Stdout
 	lbConfig.Stderr = os.Stderr
@@ -547,4 +547,27 @@ func generateUniqueDiskID(existing *[][]byte) ([]byte, error) {
 	}
 	*existing = append(*existing, randomBytes)
 	return randomBytes, nil
+}
+
+// parseSnapsAndChannels converts the command line arguments to a format that is expected
+// by snapd's image.Prepare()
+func parseSnapsAndChannels(snaps []string) (snapNames []string, snapChannels map[string]string, err error) {
+	snapNames = make([]string, len(snaps))
+	snapChannels = make(map[string]string)
+	for ii, snap := range snaps {
+		if strings.Contains(snap, "=") {
+			splitSnap := strings.Split(snap, "=")
+			if len(splitSnap) != 2 {
+				return snapNames, snapChannels,
+					fmt.Errorf("Invalid syntax passed to --snap: %s. "+
+						"Argument must be in the form --snap=name or "+
+						"--snap=name=channel", snap)
+			}
+			snapNames[ii] = splitSnap[0]
+			snapChannels[splitSnap[0]] = splitSnap[1]
+		} else {
+			snapNames[ii] = snap
+		}
+	}
+	return snapNames, snapChannels, nil
 }
