@@ -252,7 +252,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-		stateMachine.commonFlags.Snaps = []string{"hello"}
+		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic"}
 		stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
 
 		err := stateMachine.Setup()
@@ -290,6 +290,9 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 
 		// check that extra snaps were added to the rootfs
 		for _, snap := range stateMachine.commonFlags.Snaps {
+			if strings.Contains(snap, "/") {
+				snap = strings.Split(snap, "/")[0]
+			}
 			filePath := filepath.Join(stateMachine.tempDirs.unpack,
 				"chroot", "var", "snap", snap)
 			if !osutil.FileExists(filePath) {
@@ -484,7 +487,7 @@ func TestFailedRunLiveBuild(t *testing.T) {
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-		stateMachine.commonFlags.Snaps = []string{"hello"}
+		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic"}
 		stateMachine.stateMachineFlags.Thru = "run_live_build"
 
 		// replace the lb commands with a script that will simply pass
