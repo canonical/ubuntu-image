@@ -252,6 +252,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+		stateMachine.commonFlags.Channel = "stable"
 		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic"}
 		stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
 
@@ -487,6 +488,7 @@ func TestFailedRunLiveBuild(t *testing.T) {
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
+		stateMachine.commonFlags.Channel = "stable"
 		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic"}
 		stateMachine.stateMachineFlags.Thru = "run_live_build"
 

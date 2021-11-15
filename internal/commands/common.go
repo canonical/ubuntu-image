@@ -13,6 +13,7 @@ type CommonOpts struct {
 	OutputDir        string   `short:"O" long:"output-dir" description:"The directory in which to put generated disk image files. The disk image files themselves will be named <volume>.img inside this directory, where <volume> is the volume name taken from the gadget.yaml file." value-name:"DIRECTORY"`
 	Version          bool     `long:"version" description:"Print the version number of ubuntu-image and exit"`
 	Snaps            []string `long:"snap" description:"Install extra snaps. These are passed through to \"snap prepare-image\". The snap argument can include additional information about the channel and/or risk with the following syntax: <snap>=<channel|risk>" value-name:"SNAP"`
+	Channel          string   `short:"c" long:"channel" description:"The default snap channel to use" value-name:"CHANNEL" default:"stable"`
 }
 
 // StateMachineOpts stores the options that are related to the state machine

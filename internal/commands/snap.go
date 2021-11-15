@@ -7,9 +7,8 @@ type SnapArgs struct {
 
 // SnapOpts holds all flags that are specific to the snap command
 type SnapOpts struct {
-	Channel            string `short:"c" long:"channel" description:"The default snap channel to use" value-name:"CHANNEL"`
-	DisableConsoleConf bool   `long:"disable-console-conf" description:"Disable console-conf on the resulting image."`
-	FactoryImage       bool   `long:"factory-image" description:"Hint that the image is meant to boot in a device factory."`
+	DisableConsoleConf bool `long:"disable-console-conf" description:"Disable console-conf on the resulting image."`
+	FactoryImage       bool `long:"factory-image" description:"Hint that the image is meant to boot in a device factory."`
 }
 
 type snapCommand struct {

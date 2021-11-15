@@ -105,8 +105,8 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
-		stateMachine.Opts.Channel = "stable"
 		stateMachine.Opts.DisableConsoleConf = true
+		stateMachine.commonFlags.Channel = "stable"
 		stateMachine.commonFlags.Snaps = []string{"hello-world"}
 		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
 		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")

@@ -100,7 +100,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 
 		for _, snap := range stateMachine.commonFlags.Snaps {
 			if !strings.Contains(snap, "=") {
-				snap += "=stable"
+				snap += "=" + classicStateMachine.commonFlags.Channel
 			}
 			_, err := seededSnaps.WriteString(snap + "\n")
 			if err != nil {

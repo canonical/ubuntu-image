@@ -25,9 +25,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 	imageOpts.PrepareDir = snapStateMachine.tempDirs.unpack
 	imageOpts.ModelFile = snapStateMachine.Args.ModelAssertion
-	if snapStateMachine.Opts.Channel != "" {
-		imageOpts.Channel = snapStateMachine.Opts.Channel
-	}
+	imageOpts.Channel = snapStateMachine.commonFlags.Channel
 
 	customizations := *new(image.Customizations)
 	if snapStateMachine.Opts.DisableConsoleConf {
