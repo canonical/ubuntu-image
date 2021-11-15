@@ -559,7 +559,7 @@ func TestPopulatePreparePartitions(t *testing.T) {
 		partImgBytes, _ := ioutil.ReadFile(partImg)
 		dataBytes := make([]byte, 440)
 		// partImg should consist of these 11 bytes and 429 null bytes
-		copy(dataBytes[:11], []byte{68, 85, 77, 77, 89, 32, 70, 73, 76, 69, 10})
+		copy(dataBytes[:11], []byte{84, 69, 83, 84, 32, 70, 73, 76, 69, 10})
 		if !bytes.Equal(partImgBytes, dataBytes) {
 			t.Errorf("Expected part0.img to contain %v, instead got %v %d",
 				dataBytes, partImgBytes, len(partImgBytes))
