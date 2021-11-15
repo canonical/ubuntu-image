@@ -253,7 +253,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic"}
+		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic", "core20=beta"}
 		stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
 
 		err := stateMachine.Setup()
@@ -293,6 +293,9 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		for _, snap := range stateMachine.commonFlags.Snaps {
 			if strings.Contains(snap, "/") {
 				snap = strings.Split(snap, "/")[0]
+			}
+			if strings.Contains(snap, "=") {
+				snap = strings.Split(snap, "=")[0]
 			}
 			filePath := filepath.Join(stateMachine.tempDirs.unpack,
 				"chroot", "var", "snap", snap)
@@ -489,7 +492,7 @@ func TestFailedRunLiveBuild(t *testing.T) {
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
 		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic"}
+		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic", "core20=beta"}
 		stateMachine.stateMachineFlags.Thru = "run_live_build"
 
 		// replace the lb commands with a script that will simply pass
