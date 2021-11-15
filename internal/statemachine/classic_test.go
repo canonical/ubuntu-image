@@ -501,6 +501,7 @@ func TestFailedRunLiveBuild(t *testing.T) {
 		dpkgArgs := "dpkg -L livecd-rootfs | grep \"auto$\""
 		dpkgCommand := *exec.Command("bash", "-c", dpkgArgs)
 		dpkgBytes, err := dpkgCommand.Output()
+		asserter.AssertErrNil(err, true)
 		autoSrc := strings.TrimSpace(string(dpkgBytes))
 		os.Setenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH", autoSrc)
 
