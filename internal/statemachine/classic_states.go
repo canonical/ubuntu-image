@@ -8,8 +8,8 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/snapcore/snapd/osutil"
-	"github.com/snapcore/snapd/image"
-	"github.com/snapcore/snapd/snap"
+	//"github.com/snapcore/snapd/image"
+	//"github.com/snapcore/snapd/snap"
 )
 
 // Prepare the gadget tree
@@ -117,7 +117,7 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 }
 
 // prepareClassicImage calls image.Prepare to seed extra snaps in classic images
-func (stateMachine *StateMachine) prepareClassicImage() error {
+/*func (stateMachine *StateMachine) prepareClassicImage() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
@@ -149,7 +149,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	}
 
 	return nil
-}
+}*/
 
 // populateClassicRootfsContents takes the results of `lb` commands and copies them over
 // to rootfs. It also changes fstab and handles the --cloud-init flag
