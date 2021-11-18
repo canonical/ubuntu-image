@@ -151,7 +151,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 
 	// align the size of the rootfs to sector size
 	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity)/float64(stateMachine.SectorSize))) *
-			quantity.Size(stateMachine.SectorSize)
+		quantity.Size(stateMachine.SectorSize)
 
 	stateMachine.RootfsSize = rootfsQuantity
 

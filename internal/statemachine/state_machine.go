@@ -68,11 +68,11 @@ type temporaryDirectories struct {
 
 // StateMachine will hold the command line data, track the current state, and handle all function calls
 type StateMachine struct {
-	cleanWorkDir bool   // whether or not to clean up the workDir
-	CurrentStep  string // tracks the current progress of the state machine
-	StepsTaken   int    // counts the number of steps taken
-	YamlFilePath string // the location for the yaml file
-	IsSeeded     bool   // core 20 images are seeded
+	cleanWorkDir bool          // whether or not to clean up the workDir
+	CurrentStep  string        // tracks the current progress of the state machine
+	StepsTaken   int           // counts the number of steps taken
+	YamlFilePath string        // the location for the yaml file
+	IsSeeded     bool          // core 20 images are seeded
 	SectorSize   quantity.Size // parsed (converted) sector size
 	RootfsSize   quantity.Size
 	tempDirs     temporaryDirectories

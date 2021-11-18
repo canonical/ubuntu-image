@@ -138,7 +138,7 @@ func TestExitCode(t *testing.T) {
 		{"bad_state_machine_args_snap", []string{"snap", "model_assertion.yaml", "-u", "5", "-t", "6"}, 1},
 		{"no_command_given", []string{}, 1},
 		{"resume_without_workdir", []string{"--resume"}, 1},
-		{"invalid_sector_size", []string{"--sector-size", "128", "--help"}, 1},  // Cheap trick with the --help to make the test work
+		{"invalid_sector_size", []string{"--sector-size", "128", "--help"}, 1}, // Cheap trick with the --help to make the test work
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {

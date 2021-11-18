@@ -703,7 +703,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 		{"gpt", "gpt", "512"},
 		{"mbr", "dos", "512"},
 		{"hybrid", "gpt", "512"},
-		{"gpt4k", "PMBR", "4096"},  // PMBR still seems valid GPT
+		{"gpt4k", "PMBR", "4096"}, // PMBR still seems valid GPT
 	}
 	for _, tc := range testCases {
 		t.Run("test_make_disk_partition_type_"+tc.name, func(t *testing.T) {
