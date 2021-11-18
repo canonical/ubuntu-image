@@ -6,6 +6,8 @@ ubuntu-image (2.0+22.04ubuntu4) UNRELEASED; urgency=medium
   [ William 'jawn-smith' Wilson ]
   * Pull in upstream change from go-diskfs to fix integer overflows on armhf
     (LP: #1949208)
+  * Add logic to name system-data partitions "writable" if a name isn't
+    specified (LP: #1951334)
 
  -- William 'jawn-smith' Wilson <william.wilson@canonical.com>  Tue, 02 Nov 2021 12:57:01 -0500
 

@@ -412,12 +412,19 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 			}
 			mbrPartitions = append(mbrPartitions, mbrPartition)
 		} else {
+			var partitionName string
+			if structure.Role == "system-data" && structure.Name == "" {
+				partitionName = "writable"
+			} else {
+				partitionName = structure.Name
+			}
+
 			partitionType := gpt.Type(structureType)
 			gptPartition := &gpt.Partition{
 				Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
 				Size:  uint64(structure.Size),
 				Type:  partitionType,
-				Name:  structure.Name,
+				Name:  partitionName,
 			}
 			gptPartitions = append(gptPartitions, gptPartition)
 		}

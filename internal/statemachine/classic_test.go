@@ -455,7 +455,7 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.commonFlags.OutputDir = "/dummy/path"
+		stateMachine.commonFlags.OutputDir = "/test/path"
 
 		err := stateMachine.generatePackageManifest()
 		asserter.AssertErrContains(err, "Error creating manifest file")
