@@ -87,6 +87,10 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 		return err
 	}
 
+	// pre-parse the sector size argument here as it's a string and we will be using it
+	// in various places
+	stateMachine.SectorSize, _ = quantity.ParseSize(stateMachine.commonFlags.SectorSize)
+
 	return nil
 }
 
@@ -144,6 +148,10 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	// fudge factor for incidentals
 	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity) * 1.5))
 	rootfsQuantity += rootfsPadding
+
+	// align the size of the rootfs to sector size
+	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity)/float64(stateMachine.SectorSize))) *
+			quantity.Size(stateMachine.SectorSize)
 
 	stateMachine.RootfsSize = rootfsQuantity
 
@@ -291,24 +299,22 @@ func (stateMachine *StateMachine) makeDisk() error {
 		if err := osRemoveAll(imgName); err != nil {
 			return fmt.Errorf("Error removing old disk image: %s", err.Error())
 		}
-		diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw)
+		sectorSizeFlag := diskfs.SectorSize(int(stateMachine.SectorSize))
+		diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw, sectorSizeFlag)
 		if err != nil {
 			return fmt.Errorf("Error creating disk image: %s", err.Error())
 		}
 
-		// make sure the disk image size is a multiple of its block size
-		imgSize = quantity.Size(math.Ceil(float64(imgSize)/float64(diskImg.LogicalBlocksize))) *
-			quantity.Size(diskImg.LogicalBlocksize)
+		// make sure the disk image size is a multiple of its block/sector size
+		imgSize = quantity.Size(math.Ceil(float64(imgSize)/float64(stateMachine.SectorSize))) *
+			stateMachine.SectorSize
 		if err := osTruncate(diskImg.File.Name(), int64(imgSize)); err != nil {
 			return fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
 				err.Error())
 		}
 
-		// snapd always populates Schema, so it cannot be empty. Use the blocksize of the created disk
-		sectorSize := uint64(diskImg.LogicalBlocksize)
-
 		// set up the partitions on the device
-		partitionTable := createPartitionTable(volumeName, volume, sectorSize, stateMachine.IsSeeded)
+		partitionTable := createPartitionTable(volumeName, volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
 
 		// Write the partition table to disk
 		if err := diskImg.Partition(*partitionTable); err != nil {
@@ -341,7 +347,7 @@ func (stateMachine *StateMachine) makeDisk() error {
 		}
 
 		// Open the file and write any OffsetWrite values
-		if err := writeOffsetValues(volume, imgName, sectorSize, uint64(imgSize)); err != nil {
+		if err := writeOffsetValues(volume, imgName, uint64(stateMachine.SectorSize), uint64(imgSize)); err != nil {
 			return err
 		}
 	}

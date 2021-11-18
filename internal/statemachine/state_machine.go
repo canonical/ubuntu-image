@@ -73,6 +73,7 @@ type StateMachine struct {
 	StepsTaken   int    // counts the number of steps taken
 	YamlFilePath string // the location for the yaml file
 	IsSeeded     bool   // core 20 images are seeded
+	SectorSize   quantity.Size // parsed (converted) sector size
 	RootfsSize   quantity.Size
 	tempDirs     temporaryDirectories
 
