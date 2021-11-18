@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -134,6 +135,15 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		_, err = os.Stat(grubenvFile)
 		if err != nil {
 			t.Errorf("Expected file %s to exist, but it does not", grubenvFile)
+		}
+
+		// check that the system-data partition has the name "writable"
+		diskImg := filepath.Join(workDir, "pc.img")
+		fdiskCommand := *exec.Command("fdisk", "-l", "-o", "Name", diskImg)
+
+		fdiskBytes, _ := fdiskCommand.CombinedOutput()
+		if !strings.Contains(string(fdiskBytes), "writable") {
+			t.Error("system-data partition is not named \"writable\"")
 		}
 
 		err = stateMachine.Teardown()
