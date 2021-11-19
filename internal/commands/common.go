@@ -14,6 +14,7 @@ type CommonOpts struct {
 	Version          bool     `long:"version" description:"Print the version number of ubuntu-image and exit"`
 	Snaps            []string `long:"snap" description:"Install extra snaps. These are passed through to \"snap prepare-image\". The snap argument can include additional information about the channel and/or risk with the following syntax: <snap>=<channel|risk>" value-name:"SNAP"`
 	Channel          string   `short:"c" long:"channel" description:"The default snap channel to use" value-name:"CHANNEL" default:"stable"`
+	SectorSize       string   `long:"sector-size" description:"Sector size to use when creating the disk image. Only 512 and 4k sector sizes are supported." choice:"512" choice:"4096" value-name:"SECTOR-SIZE" default:"512"`
 }
 
 // StateMachineOpts stores the options that are related to the state machine

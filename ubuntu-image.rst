@@ -200,6 +200,10 @@ in more detail below.
 -c CHANNEL, --channel CHANNEL
     The snap channel to use.
 
+--sector-size SIZE
+    When creating the disk image file, use the given sector size.  This
+    can be either 512 or 4096 (4k sector size), defaulting to 512.
+
 
 State machine options
 ---------------------

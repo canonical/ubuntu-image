@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -136,6 +137,15 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 			t.Errorf("Expected file %s to exist, but it does not", grubenvFile)
 		}
 
+		// check that the system-data partition has the name "writable"
+		diskImg := filepath.Join(workDir, "pc.img")
+		fdiskCommand := *exec.Command("fdisk", "-l", "-o", "Name", diskImg)
+
+		fdiskBytes, _ := fdiskCommand.CombinedOutput()
+		if !strings.Contains(string(fdiskBytes), "writable") {
+			t.Error("system-data partition is not named \"writable\"")
+		}
+
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
 	})
@@ -251,8 +261,8 @@ func TestGenerateSnapManifest(t *testing.T) {
 				}
 			} else {
 				testEnvMap = map[string][]string{
-					snapsDir: {"foo_1.23.snap", "bar_1.23_version.snap", "baz_234.snap", "dummy_file"},
-					seedDir:  {"foo_1.23.snap", "dummy_file_2.txt", "test_1234.snap"},
+					snapsDir: {"foo_1.23.snap", "bar_1.23_version.snap", "baz_234.snap", "test_file"},
+					seedDir:  {"foo_1.23.snap", "test_file_2.txt", "test_1234.snap"},
 				}
 			}
 			for dir, fileList := range testEnvMap {
@@ -364,10 +374,10 @@ func TestFailedGenerateSnapManifest(t *testing.T) {
 
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.stateMachineFlags.WorkDir = "/dummy/path"
-		stateMachine.tempDirs.rootfs = "/dummy/path"
+		stateMachine.stateMachineFlags.WorkDir = "/test/path"
+		stateMachine.tempDirs.rootfs = "/test/path"
 		stateMachine.IsSeeded = false
-		stateMachine.commonFlags.OutputDir = "/dummy/path"
+		stateMachine.commonFlags.OutputDir = "/test/path"
 
 		err := stateMachine.generateSnapManifest()
 		asserter.AssertErrContains(err, "Error creating manifest file")

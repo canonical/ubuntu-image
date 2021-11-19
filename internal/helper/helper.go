@@ -34,7 +34,12 @@ func CaptureStd(toCap **os.File) (io.Reader, func(), error) {
 // InitCommonOpts initializes default common options for state machines.
 // This is used for test scenarios to avoid nil pointer dereferences
 func InitCommonOpts() (*commands.CommonOpts, *commands.StateMachineOpts) {
-	return new(commands.CommonOpts), new(commands.StateMachineOpts)
+	commonOpts := new(commands.CommonOpts)
+	// This is a workaround to set the default value for test cases. Normally
+	// go-flags makes sure that the option has a sane value at all times, but
+	// for tests we'd have to set it manually all the time.
+	commonOpts.SectorSize = "512"
+	return commonOpts, new(commands.StateMachineOpts)
 }
 
 // RunScript runs scripts from disk. Currently only used for hooks

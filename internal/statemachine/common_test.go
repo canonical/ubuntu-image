@@ -559,7 +559,7 @@ func TestPopulatePreparePartitions(t *testing.T) {
 		partImgBytes, _ := ioutil.ReadFile(partImg)
 		dataBytes := make([]byte, 440)
 		// partImg should consist of these 11 bytes and 429 null bytes
-		copy(dataBytes[:11], []byte{68, 85, 77, 77, 89, 32, 70, 73, 76, 69, 10})
+		copy(dataBytes[:11], []byte{84, 69, 83, 84, 32, 70, 73, 76, 69, 10})
 		if !bytes.Equal(partImgBytes, dataBytes) {
 			t.Errorf("Expected part0.img to contain %v, instead got %v %d",
 				dataBytes, partImgBytes, len(partImgBytes))
@@ -692,21 +692,27 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 
 // TestMakeDiskPartitionSchemes tests that makeDisk() can successfully parse
 // mbr, gpt, and hybrid schemes. It then runs "dumpe2fs" to ensure the
-// resulting disk has the correct type of partition table
+// resulting disk has the correct type of partition table.
+// We also check various sector sizes while at it.
 func TestMakeDiskPartitionSchemes(t *testing.T) {
 	testCases := []struct {
-		name      string
-		tableType string
+		name       string
+		tableType  string
+		sectorSize string
 	}{
-		{"gpt", "gpt"},
-		{"mbr", "dos"},
-		{"hybrid", "gpt"},
+		{"gpt", "gpt", "512"},
+		{"mbr", "dos", "512"},
+		{"hybrid", "gpt", "512"},
+		{"gpt4k", "PMBR", "4096"}, // PMBR still seems valid GPT
 	}
 	for _, tc := range testCases {
 		t.Run("test_make_disk_partition_type_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+			// set the sector size to the one needed during testing
+			stateMachine.commonFlags.SectorSize = tc.sectorSize
 
 			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
@@ -769,9 +775,9 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			diskImg, err := diskfs.Open(imgFile)
 			defer diskImg.File.Close()
 			asserter.AssertErrNil(err, true)
-			if diskImg.Size%diskImg.LogicalBlocksize != 0 {
+			if diskImg.Size%int64(stateMachine.SectorSize) != 0 {
 				t.Errorf("Disk image size %d is not an multiple of the block size: %d",
-					diskImg.Size, diskImg.LogicalBlocksize)
+					diskImg.Size, int64(stateMachine.SectorSize))
 			}
 		})
 	}
