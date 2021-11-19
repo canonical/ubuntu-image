@@ -204,6 +204,10 @@ in more detail below.
     contain useful information about the target image, like image
     identification data, system name, build timestamp etc.
 
+--sector-size SIZE
+    When creating the disk image file, use the given sector size.  This
+    can be either 512 or 4096 (4k sector size), defaulting to 512.
+
 
 State machine options
 ---------------------
