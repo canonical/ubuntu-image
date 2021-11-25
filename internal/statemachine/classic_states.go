@@ -8,6 +8,8 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/snapcore/snapd/osutil"
+	//"github.com/snapcore/snapd/image"
+	//"github.com/snapcore/snapd/snap"
 )
 
 // Prepare the gadget tree
@@ -87,6 +89,25 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 			return fmt.Errorf("Error running command \"%s\": %s", lbConfig.String(), err.Error())
 		}
 
+		// add extra snaps to config/seeded-snaps
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "config"), 0755)
+		seededSnaps, err := osOpenFile(filepath.Join(stateMachine.tempDirs.unpack,
+			"config", "seeded-snaps"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
+		if err != nil {
+			return fmt.Errorf("Error opening seeded-snaps: %s", err.Error())
+		}
+		defer seededSnaps.Close()
+
+		for _, snap := range stateMachine.commonFlags.Snaps {
+			if !strings.Contains(snap, "=") {
+				snap += "=" + classicStateMachine.commonFlags.Channel
+			}
+			_, err := seededSnaps.WriteString(snap + "\n")
+			if err != nil {
+				return fmt.Errorf("Error writing snap %s to seeded-snaps: %s", snap, err.Error())
+			}
+		}
+
 		if err := lbBuild.Run(); err != nil {
 			return fmt.Errorf("Error running command \"%s\": %s", lbBuild.String(), err.Error())
 		}
@@ -94,6 +115,41 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 
 	return nil
 }
+
+// prepareClassicImage calls image.Prepare to seed extra snaps in classic images
+/*func (stateMachine *StateMachine) prepareClassicImage() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	var imageOpts image.Options
+
+	var err error
+	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
+		classicStateMachine.commonFlags.Snaps)
+	if err != nil {
+		return err
+	}
+
+	imageOpts.Classic = true
+	imageOpts.Architecture = classicStateMachine.Opts.Arch
+	if imageOpts.Architecture == "" {
+		imageOpts.Architecture = getHostArch()
+	}
+
+	imageOpts.PrepareDir = filepath.Join(classicStateMachine.tempDirs.unpack, "chroot")
+
+	customizations := *new(image.Customizations)
+	imageOpts.Customizations = customizations
+
+	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
+	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+
+	if err := image.Prepare(&imageOpts); err != nil {
+		return fmt.Errorf("Error preparing image: %s", err.Error())
+	}
+
+	return nil
+}*/
 
 // populateClassicRootfsContents takes the results of `lb` commands and copies them over
 // to rootfs. It also changes fstab and handles the --cloud-init flag

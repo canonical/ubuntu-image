@@ -81,20 +81,8 @@ model_assertion
     Path to the model assertion file.  This positional argument must be given
     for this mode of operation.
 
---snap SNAP
-    Install an extra snap.  This is passed through to ``snap prepare-image``.
-    The snap argument can include additional information about the channel
-    and/or risk with the following syntax: ``<snap>=<channel|risk>``
-
---extra-snaps EXTRA_SNAPS
-    **DEPRECATED** (Use ``--snap`` instead.) Extra snaps to install.  This is
-    passed through to ``snap prepare-image``.
-
 --cloud-init USER-DATA-FILE
     ``cloud-config`` data to be copied to the image.
-
--c CHANNEL, --channel CHANNEL
-    The snap channel to use.
 
 --disable-console-conf
     Disable console-conf on the resulting image.
@@ -204,6 +192,14 @@ in more detail below.
     contain useful information about the target image, like image
     identification data, system name, build timestamp etc.
 
+--snap SNAP
+    Install an extra snap.  This is passed through to ``snap prepare-image``.
+    The snap argument can include additional information about the channel
+    and/or risk with the following syntax: ``<snap>=<channel|risk>``
+
+-c CHANNEL, --channel CHANNEL
+    The snap channel to use.
+
 --sector-size SIZE
     When creating the disk image file, use the given sector size.  This
     can be either 512 or 4096 (4k sector size), defaulting to 512.
@@ -267,14 +263,6 @@ ENVIRONMENT
 ===========
 
 The following environment variables are recognized by ``ubuntu-image``.
-
-``UBUNTU_IMAGE_SNAP_CMD``
-    ``ubuntu-image`` calls ``snap prepare-image`` to communicate with the
-    store, download the gadget, and unpack its contents.  Normally for the
-    ``ubuntu-image`` deb, whatever ``snap`` command is first on your ``$PATH``
-    is used, while for the classic snap, the bundled ``snap`` command is used.
-    Set this environment variable to specify an alternative ``snap`` command
-    which ``prepare-image`` is called on.
 
 ``UBUNTU_IMAGE_PRESERVE_UNPACK``
     When set, this names a directory for preserving a pristine copy of the

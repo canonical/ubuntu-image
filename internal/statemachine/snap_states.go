@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/snap"
@@ -17,32 +16,16 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 	var imageOpts image.Options
 
-	// parse the "--snap" arguments, including the
-	// "--snap=name=channel" syntax
-	snapNames := make([]string, len(snapStateMachine.Opts.Snaps))
-	snapChannels := make(map[string]string)
-	for ii, snap := range snapStateMachine.Opts.Snaps {
-		if strings.Contains(snap, "=") {
-			splitSnap := strings.Split(snap, "=")
-			if len(splitSnap) != 2 {
-				return fmt.Errorf("Invalid syntax passed to --snap: %s. "+
-					"Argument must be in the form --snap=name or "+
-					"--snap=name=channel", snap)
-			}
-			snapNames[ii] = splitSnap[0]
-			snapChannels[splitSnap[0]] = splitSnap[1]
-		} else {
-			snapNames[ii] = snap
-		}
+	var err error
+	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
+		snapStateMachine.commonFlags.Snaps)
+	if err != nil {
+		return err
 	}
-	imageOpts.Snaps = snapNames
-	imageOpts.SnapChannels = snapChannels
 
 	imageOpts.PrepareDir = snapStateMachine.tempDirs.unpack
 	imageOpts.ModelFile = snapStateMachine.Args.ModelAssertion
-	if snapStateMachine.Opts.Channel != "" {
-		imageOpts.Channel = snapStateMachine.Opts.Channel
-	}
+	imageOpts.Channel = snapStateMachine.commonFlags.Channel
 
 	customizations := *new(image.Customizations)
 	if snapStateMachine.Opts.DisableConsoleConf {
