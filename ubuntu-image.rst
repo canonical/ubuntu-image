@@ -230,13 +230,13 @@ but ``--workdir`` must be given in that case since the state is saved in a
 
 -u STEP, --until STEP
     Run the state machine until the given ``STEP``, non-inclusively.  ``STEP``
-    can be the name of a state machine method, or a number indicating the
-    ordinal of the step.
+    is the name of a state machine method. The list of all steps can be
+    found in the STEPS section of this document.
 
 -t STEP, --thru STEP
     Run the state machine through the given ``STEP``, inclusively.  ``STEP``
-    can be the name of a state machine method, or a number indicating the
-    ordinal of the step.
+    is the name of a state machine method. The list of all steps can be
+    found in the STEPS section of this document.
 
 -r, --resume
     Continue the state machine from the previously saved state.  It is an
@@ -314,6 +314,44 @@ post-populate-rootfs
         ``UBUNTU_IMAGE_HOOK_ROOTFS``
             Includes the absolute path to the rootfs contents.
 
+STEPS
+=====
+
+The names of steps that can be used with --until and --thru for each image
+type are listed below
+
+Classic image steps
+-------------------
+
+#. make_temporary_directories
+#. prepare_gadget_tree
+#. run_live_build
+#. load_gadget_yaml
+#. populate_rootfs_contents
+#. populate_rootfs_contents_hooks
+#. generate_disk_info
+#. calculate_rootfs_size
+#. populate_bootfs_contents
+#. populate_prepare_partitions
+#. make_disk
+#. generate_manifest
+#. finish
+
+Snap image steps
+----------------
+
+#. make_temporary_directories
+#. prepare_image
+#. load_gadget_yaml
+#. populate_rootfs_contents
+#. populate_rootfs_contents_hooks
+#. generate_disk_info
+#. calculate_rootfs_size
+#. populate_bootfs_contents
+#. populate_prepare_partitions
+#. make_disk
+#. generate_manifest
+#. finish
 
 NOTES
 =====
