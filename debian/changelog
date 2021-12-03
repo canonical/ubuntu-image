@@ -10,6 +10,7 @@ ubuntu-image (2.0+22.04ubuntu4) UNRELEASED; urgency=medium
     specified (LP: #1951334)
   * Add support for specifying a disk sector-size to use while building the
     images (LP: #1942416)
+  * Fix logic for filesystem labeling in /etc/fstab (LP: #1950677)
 
  -- William 'jawn-smith' Wilson <william.wilson@canonical.com>  Tue, 02 Nov 2021 12:57:01 -0500
 
