@@ -25,7 +25,9 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 	imageOpts.PrepareDir = snapStateMachine.tempDirs.unpack
 	imageOpts.ModelFile = snapStateMachine.Args.ModelAssertion
-	imageOpts.Channel = snapStateMachine.commonFlags.Channel
+	if snapStateMachine.commonFlags.Channel != "" {
+		imageOpts.Channel = snapStateMachine.commonFlags.Channel
+	}
 
 	customizations := *new(image.Customizations)
 	if snapStateMachine.Opts.DisableConsoleConf {
@@ -35,6 +37,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 		customizations.BootFlags = append(customizations.BootFlags, "factory")
 	}
 	customizations.CloudInitUserData = stateMachine.commonFlags.CloudInit
+	customizations.Validation = snapStateMachine.Opts.Validation
 	imageOpts.Customizations = customizations
 
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.

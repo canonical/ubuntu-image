@@ -90,6 +90,9 @@ model_assertion
 --factory-image
     Hint that the image is meant to boot in a device factory.
 
+--validation=<ignore|enforce>
+    Control whether validations should be ignored or enforced.
+
 Classic command options
 -----------------------
 

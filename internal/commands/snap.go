@@ -7,8 +7,9 @@ type SnapArgs struct {
 
 // SnapOpts holds all flags that are specific to the snap command
 type SnapOpts struct {
-	DisableConsoleConf bool `long:"disable-console-conf" description:"Disable console-conf on the resulting image."`
-	FactoryImage       bool `long:"factory-image" description:"Hint that the image is meant to boot in a device factory."`
+	DisableConsoleConf bool   `long:"disable-console-conf" description:"Disable console-conf on the resulting image."`
+	FactoryImage       bool   `long:"factory-image" description:"Hint that the image is meant to boot in a device factory."`
+	Validation         string `long:"validation" description:"Control whether validations should be ignored or enforced"`
 }
 
 type snapCommand struct {
