@@ -38,6 +38,9 @@ func (classicStateMachine *ClassicStateMachine) validateClassicInput() error {
 	} else if classicStateMachine.Opts.Project != "" && classicStateMachine.Opts.Filesystem != "" {
 		return fmt.Errorf("project and filesystem are mutually exclusive")
 	}
+	if classicStateMachine.commonFlags.Channel == "" {
+		classicStateMachine.commonFlags.Channel = "stable"
+	}
 
 	return nil
 }
