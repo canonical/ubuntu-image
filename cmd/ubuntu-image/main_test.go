@@ -101,6 +101,8 @@ func TestInvalidCommands(t *testing.T) {
 		{"no_model_assertion", []string{"snap"}, nil, "accepts 1 arg(s), received 0"},
 		{"no_gadget_tree", []string{"classic"}, nil, "accepts 1 arg(s), received 0"},
 		{"invalid_flag", []string{"classic"}, []string{"--nonexistent"}, "unknown flag: --nonexistent"},
+		{"invalid_validation", []string{"snap"}, []string{"--validation=test"}, "Invalid value"},
+		{"invalid_sector_size", []string{"snap"}, []string{"--sector_size=123"}, "Invalid value"},
 	}
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution

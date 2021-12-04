@@ -477,3 +477,40 @@ func TestSnapFlagSyntax(t *testing.T) {
 		})
 	}
 }
+
+// TestValidationFlag ensures that the the validation flag is passed through to image.Prepare
+// correctly. This is accomplished by enabling the flag and ensuring the correct version
+// of a snap is installed as a result
+func TestValidationFlag(t *testing.T) {
+	t.Run("test_validation_flag", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine SnapStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
+		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
+		stateMachine.stateMachineFlags.WorkDir = workDir
+		stateMachine.stateMachineFlags.Thru = "prepare_image"
+		stateMachine.Opts.Validation = "enforce"
+
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
+
+		// make sure the correct revision of the snap exists
+		gatedRevision := "2"
+		_, err = os.Stat(filepath.Join(stateMachine.tempDirs.unpack,
+			"system-seed", "snaps", "test-snapd-gated_"+gatedRevision+".snap"))
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
+	})
+}
