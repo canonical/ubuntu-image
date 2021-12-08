@@ -10,6 +10,7 @@ ubuntu-image (2.0+22.04ubuntu4) UNRELEASED; urgency=medium
     (LP: #1949208)
   * Add logic to name system-data partitions "writable" if a name isn't
     specified (LP: #1951334)
+  * Fix logic for filesystem labeling in /etc/fstab (LP: #1950677)
   * Add --validation flag (LP: #1933665)
 
  -- William 'jawn-smith' Wilson <william.wilson@canonical.com>  Tue, 02 Nov 2021 12:57:01 -0500

@@ -276,13 +276,14 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 			}
 		}
 
-		// check /etc/fstab contents to test the regex part
+		// check /etc/fstab contents to test the scenario where the regex replaced an
+		// existing filesystem label with LABEL=writable
 		fstab, err := ioutilReadFile(filepath.Join(stateMachine.tempDirs.rootfs,
 			"etc", "fstab"))
 		if err != nil {
 			t.Errorf("Error reading fstab to check regex")
 		}
-		correctLabel := "LABEL=writable   /    ext4   defaults    0 0"
+		correctLabel := "LABEL=writable"
 		if !strings.Contains(string(fstab), correctLabel) {
 			t.Errorf("Expected fstab contents %s to contain %s",
 				string(fstab), correctLabel)
@@ -296,8 +297,8 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 			if strings.Contains(snap, "=") {
 				snap = strings.Split(snap, "=")[0]
 			}
-			filePath := filepath.Join(stateMachine.tempDirs.unpack,
-				"chroot", "var", "snap", snap)
+			filePath := filepath.Join(stateMachine.tempDirs.rootfs,
+				"var", "snap", snap)
 			if !osutil.FileExists(filePath) {
 				t.Errorf("File %s should exist but it does not", filePath)
 			}
@@ -408,6 +409,19 @@ func TestFilesystemFlag(t *testing.T) {
 		// check that the specified filesystem was copied over
 		if _, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, "testfile")); err != nil {
 			t.Errorf("Failed to copy --filesystem to rootfs")
+		}
+
+		// the included filesystem contains an invalid /etc/fstab. Make sure it
+		// was overwritten to have a valid /etc/fstab
+		fstab, err := ioutilReadFile(filepath.Join(stateMachine.tempDirs.rootfs,
+			"etc", "fstab"))
+		if err != nil {
+			t.Errorf("Error reading fstab to check regex")
+		}
+		correctLabel := "LABEL=writable   /    ext4   defaults    0 0"
+		if !strings.Contains(string(fstab), correctLabel) {
+			t.Errorf("Expected fstab contents %s to contain %s",
+				string(fstab), correctLabel)
 		}
 	})
 }
