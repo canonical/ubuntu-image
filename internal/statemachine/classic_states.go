@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -183,8 +184,12 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	}
 
 	if !strings.Contains(string(fstabBytes), "LABEL=writable") {
-		newFstab := []byte("LABEL=writable   /    ext4   defaults    0 0")
-		err := ioutilWriteFile(fstabPath, newFstab, 0644)
+		re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
+		newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
+		if !strings.Contains(string(newContents), "LABEL=writable") {
+			newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
+		}
+		err := ioutilWriteFile(fstabPath, newContents, 0644)
 		if err != nil {
 			return fmt.Errorf("Error writing to fstab: %s", err.Error())
 		}
