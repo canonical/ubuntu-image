@@ -1,4 +1,4 @@
-ubuntu-image (2.0+22.04ubuntu4) UNRELEASED; urgency=medium
+ubuntu-image (2.1+22.04ubuntu1) UNRELEASED; urgency=medium
 
   [ Łukasz 'sil2100' Zemczak ]
   * Make sure the generated disk IDs are unique.
