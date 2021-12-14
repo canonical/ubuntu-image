@@ -252,17 +252,16 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 		// Since so far we have no knowledge of the rootfs contents, the
 		// size is set to 0, and will be calculated later
 		rootfsStructure := gadget.VolumeStructure{
-			Name:        "",
-			Label:       "writable",
-			Offset:      &farthestOffset,
-			OffsetWrite: new(gadget.RelativeOffset),
-			Size:        quantity.Size(0),
-			Type:        "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
-			Role:        gadget.SystemData,
-			ID:          "",
-			Filesystem:  "ext4",
-			Content:     []gadget.VolumeContent{},
-			Update:      gadget.VolumeUpdate{},
+			Name:       "",
+			Label:      "writable",
+			Offset:     &farthestOffset,
+			Size:       quantity.Size(0),
+			Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+			Role:       gadget.SystemData,
+			ID:         "",
+			Filesystem: "ext4",
+			Content:    []gadget.VolumeContent{},
+			Update:     gadget.VolumeUpdate{},
 		}
 
 		// There is only one volume, so lastVolumeName is its name
