@@ -3,6 +3,7 @@
 package statemachine
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -144,6 +145,18 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		fdiskBytes, _ := fdiskCommand.CombinedOutput()
 		if !strings.Contains(string(fdiskBytes), "writable") {
 			t.Error("system-data partition is not named \"writable\"")
+		}
+
+		// check that the first 3 bytes of the resulting image file are the
+		// necessary values in order to boot on Legacy BIOS
+		correctLegacyBytes := []byte{0xeb, 0x63, 0x90}
+		diskFile, err := os.OpenFile(diskImg, os.O_RDWR, 0755)
+		asserter.AssertErrNil(err, true)
+		diskImgBytes := make([]byte, 3)
+		_, err = diskFile.Read(diskImgBytes)
+		asserter.AssertErrNil(err, true)
+		if !bytes.Equal(correctLegacyBytes, diskImgBytes) {
+			t.Error("First three bytes of resulting image file are not correct")
 		}
 
 		err = stateMachine.Teardown()
