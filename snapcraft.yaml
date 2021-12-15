@@ -10,6 +10,7 @@ base: core20
 
 environment:
   PATH: $SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$PATH
+  LD_LIBRARY_PATH: $SNAP/usr/lib:$SNAP/lib:$SNAP/usr/lib/lib-arch:$SNAP/lib/lib-arch
 
 apps:
   ubuntu-image:
