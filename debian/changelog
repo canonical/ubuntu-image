@@ -1,4 +1,4 @@
-ubuntu-image (2.1+22.04ubuntu2) jammy; urgency=medium
+ubuntu-image (2.1+20.04ubuntu2) focal; urgency=medium
 
   * Create rootfs partitions with OffsetWrite nil instead of zero
     (LP: #1954850)
