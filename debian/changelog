@@ -1,3 +1,9 @@
+ubuntu-image (2.1+22.04ubuntu3) UNRELEASED; urgency=medium
+
+  * Update tests to reflect changes in the hello snap
+
+ -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Thu, 13 Jan 2022 22:40:24 -0600
+
 ubuntu-image (2.1+22.04ubuntu2) jammy; urgency=medium
 
   * Create rootfs partitions with OffsetWrite nil instead of zero
