@@ -1,4 +1,4 @@
-ubuntu-image (2.1+22.04ubuntu3) UNRELEASED; urgency=medium
+ubuntu-image (2.1+22.04ubuntu3) jammy; urgency=medium
 
   * Update tests to reflect changes in the hello snap
 
