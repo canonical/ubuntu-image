@@ -252,7 +252,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.Opts.Project = "ubuntu-cpc"
 		stateMachine.Opts.Suite = "focal"
 		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic", "core20=beta"}
+		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic=edge", "core20=beta"}
 		stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
 
 		err := stateMachine.Setup()

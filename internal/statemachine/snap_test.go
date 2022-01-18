@@ -405,10 +405,10 @@ func TestSnapFlagSyntax(t *testing.T) {
 		snapArgs []string
 		valid    bool
 	}{
-		{"no_channel_specified", []string{"hello"}, true},
-		{"channel_specified", []string{"hello=edge"}, true},
-		{"mixed_syntax", []string{"hello", "core=edge"}, true},
-		{"invalid_syntax", []string{"hello=edge=stable"}, false},
+		{"no_channel_specified", []string{"hello", "core20"}, true},
+		{"channel_specified", []string{"hello=edge", "core20"}, true},
+		{"mixed_syntax", []string{"hello", "core20=edge"}, true},
+		{"invalid_syntax", []string{"hello=edge=stable", "core20"}, false},
 	}
 	for _, tc := range testCases {
 		t.Run("test_snap_flag_syntax_"+tc.name, func(t *testing.T) {
