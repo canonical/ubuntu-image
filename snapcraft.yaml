@@ -3,13 +3,10 @@ summary: Create Ubuntu images
 description: |
   Official tool for building Ubuntu images, currently supporing Ubuntu Core
   snap-based images and preinstalled Ubuntu classic images.
-version: 2.1+snap3
+version: 2.1+snap4
 grade: stable
 confinement: classic
 base: core20
-
-environment:
-  PATH: $SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$PATH
 
 apps:
   ubuntu-image:
