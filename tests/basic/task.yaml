@@ -1,0 +1,3 @@
+summary: Run ubuntu-image smoke test
+execute: |
+    ubuntu-image --help | MATCH '^Usage:'
