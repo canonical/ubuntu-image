@@ -3,10 +3,14 @@ summary: Create Ubuntu images
 description: |
   Official tool for building Ubuntu images, currently supporing Ubuntu Core
   snap-based images and preinstalled Ubuntu classic images.
-version: 2.1+snap4
+version: 2.1+snap5
 grade: stable
 confinement: classic
 base: core20
+
+# Force the snap to only use binaries staged with the snap
+environment:
+  PATH: $SNAP/usr/local/sbin:$SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$SNAP/usr/local/bin:$SNAP/usr/sbin
 
 apps:
   ubuntu-image:
@@ -16,7 +20,6 @@ parts:
   ubuntu-image:
     plugin: go
     source: .
-    source-type: git
     build-packages:
       - golang-go
       - fdisk
@@ -30,3 +33,17 @@ parts:
       - e2fsprogs
       - fakeroot
       - dosfstools
+      - squashfs-tools
+      - coreutils
+      - util-linux
+      - sed
+    override-build: |
+      snapcraftctl build
+      cd $SNAPCRAFT_PART_INSTALL/usr/bin/
+      # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
+      ln -s fakeroot-tcp fakeroot
+      # fakeroot hard codes the library paths. To avoid using the libfakeroot from
+      # the host system, we replace the line in the fakeroot wrapper script
+      sed -i 's/PATHS=.*/PATHS=\${SNAP}\/usr\/lib\/lib-arch\/libfakeroot\//' fakeroot-tcp
+      cd $SNAPCRAFT_PART_INSTALL/usr/lib/
+      ln -s *-linux-gnu* lib-arch
