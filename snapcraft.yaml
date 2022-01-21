@@ -40,11 +40,12 @@ parts:
       - sed
     override-build: |
       snapcraftctl build
-      cd $SNAPCRAFT_PART_INSTALL/usr/bin/
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
+      cd $SNAPCRAFT_PART_INSTALL/usr/bin/
       ln -s fakeroot-tcp fakeroot
       # fakeroot hard codes the library paths. To avoid using the libfakeroot from
       # the host system, we replace the line in the fakeroot wrapper script
       sed -i 's/PATHS=.*/PATHS=\${SNAP}\/usr\/lib\/lib-arch\/libfakeroot\//' fakeroot-tcp
+      # Create a symbolic link to /usr/lib/<arch> where libfakeroot will live
       cd $SNAPCRAFT_PART_INSTALL/usr/lib/
       ln -s *-linux-gnu* lib-arch
