@@ -20,6 +20,7 @@ parts:
   ubuntu-image:
     plugin: go
     source: .
+    source-type: git
     build-packages:
       - golang-go
       - fdisk
