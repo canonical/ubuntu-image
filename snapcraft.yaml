@@ -11,6 +11,7 @@ base: core20
 # Force the snap to only use binaries staged with the snap
 environment:
   PATH: $SNAP/usr/local/sbin:$SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$SNAP/usr/local/bin:$SNAP/usr/sbin
+  FAKEROOT_LIB: $SNAP/usr/lib/lib-arch/libfakeroot/libfakeroot-tcp.so
 
 apps:
   ubuntu-image:
@@ -43,9 +44,6 @@ parts:
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
       cd $SNAPCRAFT_PART_INSTALL/usr/bin/
       ln -s fakeroot-tcp fakeroot
-      # fakeroot hard codes the library paths. To avoid using the libfakeroot from
-      # the host system, we replace the line in the fakeroot wrapper script
-      sed -i 's/PATHS=.*/PATHS=\${SNAP}\/usr\/lib\/lib-arch\/libfakeroot\//' fakeroot-tcp
       # Create a symbolic link to /usr/lib/<arch> where libfakeroot will live
       cd $SNAPCRAFT_PART_INSTALL/usr/lib/
       ln -s *-linux-gnu* lib-arch
