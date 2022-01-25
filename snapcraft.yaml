@@ -46,4 +46,4 @@ parts:
       ln -s fakeroot-tcp fakeroot
       # Create a symbolic link to /usr/lib/<arch> where libfakeroot will live
       cd $SNAPCRAFT_PART_INSTALL/usr/lib/
-      ln -s *-linux-gnu* lib-arch
+      ln -s ${SNAPCRAFT_ARCH_TRIPLET} lib-arch

@@ -66,8 +66,8 @@ github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2/go.mod h1:D3Ss
 github.com/snapcore/secboot v0.0.0-20211018143212-802bb19ca263 h1:cq2rG4JcNBCwHvo7iNdJL4nb8Ns7L/aOUd1EFs2toFs=
 github.com/snapcore/secboot v0.0.0-20211018143212-802bb19ca263/go.mod h1:72paVOkm4sJugXt+v9ItmnjXgO921D8xqsbH2OekouY=
 github.com/snapcore/snapd v0.0.0-20201005140838-501d14ac146e/go.mod h1:3xrn7QDDKymcE5VO2rgWEQ5ZAUGb9htfwlXnoel6Io8=
-github.com/snapcore/snapd v0.0.0-20211203204653-46cd020702cd h1:wgES/8UgTaDyBCSaE9s06FuayXrHLVJVrA2+OoXle8w=
-github.com/snapcore/snapd v0.0.0-20211203204653-46cd020702cd/go.mod h1:Ypuk/H7dwlEFWXBJBhq8PFDwZxcyN5bfxNAAMBRPaDI=
+github.com/snapcore/snapd v0.0.0-20220125081029-923d01412498 h1:wWF5iMNblzZfEk5tzVeTMzArHiq88wNSlL0r2wclGjo=
+github.com/snapcore/snapd v0.0.0-20220125081029-923d01412498/go.mod h1:Ypuk/H7dwlEFWXBJBhq8PFDwZxcyN5bfxNAAMBRPaDI=
 github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/ulikunitz/xz v0.5.10 h1:t92gobL9l3HE202wg3rlk19F6X+JOxl9BBrCCMYEYd8=
