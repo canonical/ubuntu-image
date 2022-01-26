@@ -1,0 +1,21 @@
+project: ubuntu-image
+
+backends:
+  lxd:
+    systems:
+      - ubuntu-18.04
+      - ubuntu-20.04
+      - ubuntu-22.04
+
+path: /home/ubuntu-image
+
+prepare: |
+  apt update
+  apt install snapd
+  snap install --classic snapcraft
+  snapcraft --destructive-mode
+  snap install --classic --dangerous ubuntu-image_*.snap
+
+suites:
+  tests/:
+    summary: Integration tests for ubuntu-image
