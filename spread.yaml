@@ -12,7 +12,9 @@ path: /home/ubuntu-image
 prepare: |
   apt update
   apt install snapd
+  snap install core20 --channel=latest/edge
   snap install --classic snapcraft
+  unset SHELL
   snapcraft --destructive-mode
   snap install --classic --dangerous ubuntu-image_*.snap
 
