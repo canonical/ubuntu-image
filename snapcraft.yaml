@@ -11,7 +11,7 @@ base: core20
 # Force the snap to only use binaries staged with the snap
 environment:
   PATH: $SNAP/usr/local/sbin:$SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$SNAP/usr/local/bin:$SNAP/usr/sbin
-  FAKEROOT_LIB: $SNAP/usr/lib/lib-arch/libfakeroot/libfakeroot-tcp.so
+  FAKEROOT_FLAGS: "--lib $SNAP/usr/lib/lib-arch/libfakeroot/libfakeroot-tcp.so --faked $SNAP/usr/bin/faked-tcp"
 
 apps:
   ubuntu-image:
