@@ -173,6 +173,7 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 	// find the name of the system volume. snapd functions have already verified it exists
 	var systemVolumeName string
 	var systemVolume *gadget.Volume
+	var preserve []string
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		for _, structure := range volume.Structure {
 			// use the system-boot role to identify the system volume
@@ -180,6 +181,11 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 				systemVolumeName = volumeName
 				systemVolume = volume
 			}
+		}
+		// piboot modifies the original config.txt from the gadget,
+		// avoid overwriting with the one coming from the gadget
+		if volume.Bootloader == "piboot" {
+			preserve = append(preserve, "config.txt")
 		}
 	}
 
@@ -221,7 +227,7 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 				return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
 			}
 
-			err = mountedFilesystemWriter.Write(targetDir, []string{})
+			err = mountedFilesystemWriter.Write(targetDir, preserve)
 			if err != nil {
 				return fmt.Errorf("Error in mountedFilesystem.Write(): %s", err.Error())
 			}
