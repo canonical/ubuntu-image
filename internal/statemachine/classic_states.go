@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
-	//"github.com/snapcore/snapd/image"
-	//"github.com/snapcore/snapd/snap"
+	"github.com/snapcore/snapd/snap"
 )
 
 // Prepare the gadget tree
@@ -118,39 +118,64 @@ func (stateMachine *StateMachine) runLiveBuild() error {
 }
 
 // prepareClassicImage calls image.Prepare to seed extra snaps in classic images
-/*func (stateMachine *StateMachine) prepareClassicImage() error {
+// currently only used when --filesystem is provided
+func (stateMachine *StateMachine) prepareClassicImage() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	var imageOpts image.Options
+	if classicStateMachine.Opts.Filesystem != "" {
+		var imageOpts image.Options
 
-	var err error
-	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
-		classicStateMachine.commonFlags.Snaps)
-	if err != nil {
-		return err
-	}
+		var err error
+		imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
+			classicStateMachine.commonFlags.Snaps)
+		if err != nil {
+			return err
+		}
 
-	imageOpts.Classic = true
-	imageOpts.Architecture = classicStateMachine.Opts.Arch
-	if imageOpts.Architecture == "" {
-		imageOpts.Architecture = getHostArch()
-	}
+		// If the rootfs has already been pre-seeded, we need to delete the
+		// pre-seeded snaps and redo the preseed with all of the snaps
+		stateFile := filepath.Join(classicStateMachine.tempDirs.rootfs,
+			"var", "lib", "snapd", "seed", "seed.yaml")
+		if _, err := os.Stat(stateFile); err == nil {
+			preseededSnaps, err := removePreseeding(
+				classicStateMachine.tempDirs.rootfs)
+			if err != nil {
+				return fmt.Errorf("Error removing preseeded snaps from existing rootfs: %s",
+					err.Error())
+			}
+			for snap, channel := range preseededSnaps {
+				// if a channel is specified on the command line for a snap that was already
+				// preseeded, use the channel from the command line instead of the channel
+				// that was originally used for the preseeding
+				if _, found := imageOpts.SnapChannels[snap]; !found {
+					imageOpts.Snaps = append(imageOpts.Snaps, snap)
+					imageOpts.SnapChannels[snap] = channel
+				}
+			}
+		}
 
-	imageOpts.PrepareDir = filepath.Join(classicStateMachine.tempDirs.unpack, "chroot")
+		imageOpts.Classic = true
+		imageOpts.Architecture = classicStateMachine.Opts.Arch
+		if imageOpts.Architecture == "" {
+			imageOpts.Architecture = getHostArch()
+		}
 
-	customizations := *new(image.Customizations)
-	imageOpts.Customizations = customizations
+		imageOpts.PrepareDir = classicStateMachine.tempDirs.rootfs
 
-	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
-	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+		customizations := *new(image.Customizations)
+		imageOpts.Customizations = customizations
 
-	if err := image.Prepare(&imageOpts); err != nil {
-		return fmt.Errorf("Error preparing image: %s", err.Error())
+		// plug/slot sanitization not used by snap image.Prepare, make it no-op.
+		snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+
+		if err := imagePrepare(&imageOpts); err != nil {
+			return fmt.Errorf("Error preparing image: %s", err.Error())
+		}
 	}
 
 	return nil
-}*/
+}
 
 // populateClassicRootfsContents takes the results of `lb` commands and copies them over
 // to rootfs. It also changes fstab and handles the --cloud-init flag

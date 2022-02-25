@@ -17,6 +17,7 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
+	"github.com/snapcore/snapd/seed"
 )
 
 // TestSetupCrossArch tests that the lb commands are set up correctly for cross arch compilation
@@ -589,4 +590,74 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFailedRemovePreseeding tests various failure scenarios in the removePreseeding function
+func TestFailedRemovePreseeding(t *testing.T) {
+	t.Run("test_failed_remove_preseeding", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "snapd", "seed")
+		err = os.MkdirAll(seedDir, 0755)
+		asserter.AssertErrNil(err, true)
+
+		// call "snap prepare image" to preseed the filesystem.
+		// Doing the preseed at the time of the test allows it to
+		// run on each architecture and keeps the github repository
+		// free of large .snap files
+		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
+			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
+			filepath.Join("testdata", "modelAssertionClassic"),
+			stateMachine.tempDirs.rootfs)
+		err = snapPrepareImage.Run()
+		asserter.AssertErrNil(err, true)
+
+		// mock os.RemoveAll so the directory isn't cleared out every time
+		osRemoveAll = mockRemoveAll
+		defer func() {
+			osRemoveAll = os.RemoveAll
+		}()
+
+		// mock seed.Open
+		seedOpen = mockSeedOpen
+		defer func() {
+			seedOpen = seed.Open
+		}()
+		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "Test error")
+		seedOpen = seed.Open
+
+		// move the model from var/lib/snapd/seed/assertions to cause an error
+		err = os.Rename(filepath.Join(seedDir, "assertions", "model"),
+			filepath.Join(stateMachine.tempDirs.rootfs, "model"))
+		asserter.AssertErrNil(err, true)
+		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "seed must have a model assertion")
+		err = os.Rename(filepath.Join(stateMachine.tempDirs.rootfs, "model"),
+			filepath.Join(seedDir, "assertions", "model"))
+		asserter.AssertErrNil(err, true)
+
+		// move seed.yaml to cause an error in LoadMeta
+		err = os.Rename(filepath.Join(seedDir, "seed.yaml"),
+			filepath.Join(seedDir, "seed.yaml.bak"))
+		asserter.AssertErrNil(err, true)
+		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "no seed metadata")
+		err = os.Rename(filepath.Join(seedDir, "seed.yaml.bak"),
+			filepath.Join(seedDir, "seed.yaml"))
+		asserter.AssertErrNil(err, true)
+
+		// the files have been restored, just test the failure in os.RemoveAll
+		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "Test error")
+		osRemoveAll = os.RemoveAll
+		
+		//os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
 }

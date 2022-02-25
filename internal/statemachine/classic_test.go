@@ -12,7 +12,9 @@ import (
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
+	"github.com/snapcore/snapd/seed"
 )
 
 // TestInvalidCommandLineClassic tests invalid command line input for classic images
@@ -548,5 +550,113 @@ func TestFailedRunLiveBuild(t *testing.T) {
 		osOpenFile = os.OpenFile
 		os.RemoveAll(testDir)
 		os.Unsetenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH")
+	})
+}
+
+// TestExtraSnapsWithFilesystem tests that using --snap along with --filesystem preseeds the snaps
+// in the resulting root filesystem
+func TestExtraSnapsWithFilesystem(t *testing.T) {
+	t.Run("test_extra_snaps_with_filesystem", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Opts.Filesystem = filepath.Join("testdata", "filesystem")
+		stateMachine.commonFlags.Snaps = []string{"hello"}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// copy the filesystem over before attempting to preseed it
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
+
+		// call "snap prepare image" to preseed the filesystem.
+		// Doing the preseed at the time of the test allows it to
+		// run on each architecture and keeps the github repository
+		// free of large .snap files
+		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
+			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
+			filepath.Join("testdata", "modelAssertionClassic"),
+			stateMachine.tempDirs.rootfs)
+		err = snapPrepareImage.Run()
+		asserter.AssertErrNil(err, true)
+
+		// now call prepateClassicImage to simulate using --snap with --filesystem
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrNil(err, true)
+
+		// Ensure that the hello snap was preseeded in the filesystem and the
+		// snaps that were already there haven't been removed
+		snapList := []string{"hello", "lxd", "core20", "snapd"}
+		for _, snap := range snapList {
+			snapGlob := filepath.Join(stateMachine.tempDirs.rootfs,
+				"var", "lib", "snapd", "snaps", snap+"*.snap")
+			snapFile, _ := filepath.Glob(snapGlob)
+			if len(snapFile) == 0 {
+				if os.IsNotExist(err) {
+					t.Errorf("File %s should exist, but does not", snapGlob)
+				}
+			}
+		}
+	})
+}
+
+// TestFailedPrepareClassiImage tests various failure scenarios in the prepateClassicImage function
+func TestFailedPrepareClassicImage(t *testing.T) {
+	t.Run("test_failed_prepare_classic_image", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Opts.Filesystem = filepath.Join("testdata", "filesystem")
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// copy the filesystem over before attempting to preseed it
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
+
+		// call "snap prepare image" to preseed the filesystem.
+		// Doing the preseed at the time of the test allows it to
+		// run on each architecture and keeps the github repository
+		// free of large .snap files
+		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
+			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
+			filepath.Join("testdata", "modelAssertionClassic"),
+			stateMachine.tempDirs.rootfs)
+		err = snapPrepareImage.Run()
+		asserter.AssertErrNil(err, true)
+
+		// set an invalid value for --snap to cause an error in
+		// parseSnapsAndChannels
+		stateMachine.commonFlags.Snaps = []string{"hello=test=invalid"}
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrContains(err, "Invalid syntax passed to --snap")
+
+		// set a valid value for --snap and mock seed.Open to simulate
+		// a failure reading the seed
+		stateMachine.commonFlags.Snaps = []string{"hello"}
+		seedOpen = mockSeedOpen
+		defer func() {
+			seedOpen = seed.Open
+		}()
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrContains(err, "Error removing preseeded snaps")
+		seedOpen = seed.Open
+
+		// mock image.Prepare
+		stateMachine.commonFlags.Snaps = []string{"hello"}
+		imagePrepare = mockImagePrepare
+		defer func() {
+			imagePrepare = image.Prepare
+		}()
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrContains(err, "Error preparing image")
+		imagePrepare = image.Prepare
+
 	})
 }
