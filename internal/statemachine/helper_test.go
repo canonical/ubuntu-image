@@ -615,7 +615,10 @@ func TestFailedRemovePreseeding(t *testing.T) {
 			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
 			filepath.Join("testdata", "modelAssertionClassic"),
 			stateMachine.tempDirs.rootfs)
-		err = snapPrepareImage.Run()
+		piOutput, err := snapPrepareImage.CombinedOutput()
+		if err != nil {
+			t.Errorf(string(piOutput))
+		}
 		asserter.AssertErrNil(err, true)
 
 		// mock os.RemoveAll so the directory isn't cleared out every time
