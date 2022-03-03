@@ -1,0 +1,5 @@
+summary: Run ubuntu-image smoke test
+execute: |
+    ubuntu-image --help | MATCH '^Usage:'
+    ubuntu-image snap /home/ubuntu-image/internal/statemachine/testdata/modelAssertion18
+    ubuntu-image snap /home/ubuntu-image/internal/statemachine/testdata/modelAssertion20

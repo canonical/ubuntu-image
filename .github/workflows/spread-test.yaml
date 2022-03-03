@@ -1,0 +1,22 @@
+name: Run a spread test of the generated snap
+
+on: [pull_request]
+
+jobs:
+  spread:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        system:
+          - ubuntu-18.04
+          - ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - name: Download spread
+        run: curl -s https://storage.googleapis.com/snapd-spread-tests/spread/spread-amd64.tar.gz | tar -xz
+      - name: Init lxd
+        run: sudo lxd init --auto
+      - name: Run spread tests
+        run: sudo ./spread lxd:${{ matrix.system }}
