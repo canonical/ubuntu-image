@@ -583,6 +583,14 @@ func TestExtraSnapsWithFilesystem(t *testing.T) {
 		err = snapPrepareImage.Run()
 		asserter.AssertErrNil(err, true)
 
+		// copy the test model file to the rootfs to cover the case where a model
+		// file is present
+		testModel := filepath.Join("testdata", "modelAssertionClassic")
+		stagedModel := filepath.Join(stateMachine.tempDirs.rootfs,
+			"var", "lib", "snapd", "seed", "assertions", "model")
+		err = osutil.CopyFile(testModel, stagedModel, 0)
+		asserter.AssertErrNil(err, true)
+
 		// now call prepateClassicImage to simulate using --snap with --filesystem
 		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrNil(err, true)
@@ -636,6 +644,7 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 		stateMachine.commonFlags.Snaps = []string{"hello=test=invalid"}
 		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrContains(err, "Invalid syntax passed to --snap")
+		os.RemoveAll(filepath.Join(stateMachine.stateMachineFlags.WorkDir, "model"))
 
 		// set a valid value for --snap and mock seed.Open to simulate
 		// a failure reading the seed
@@ -647,6 +656,17 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrContains(err, "Error removing preseeded snaps")
 		seedOpen = seed.Open
+		os.RemoveAll(filepath.Join(stateMachine.stateMachineFlags.WorkDir, "model"))
+
+		// mock osutil.CopyFile
+		osutilCopyFile = mockCopyFile
+		defer func() {
+			osutilCopyFile = osutil.CopyFile
+		}()
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrContains(err, "Error copying model")
+		osutilCopyFile = osutil.CopyFile
+		os.RemoveAll(filepath.Join(stateMachine.stateMachineFlags.WorkDir, "model"))
 
 		// mock image.Prepare
 		stateMachine.commonFlags.Snaps = []string{"hello"}
@@ -658,5 +678,6 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 		asserter.AssertErrContains(err, "Error preparing image")
 		imagePrepare = image.Prepare
 
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

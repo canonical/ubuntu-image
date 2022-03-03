@@ -138,6 +138,22 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 		stateFile := filepath.Join(classicStateMachine.tempDirs.rootfs,
 			"var", "lib", "snapd", "seed", "seed.yaml")
 		if _, err := os.Stat(stateFile); err == nil {
+			// check for an existing model assertion file, otherwise snapd will use
+			// a generic model assertion
+			modelFile := filepath.Join(classicStateMachine.tempDirs.rootfs,
+				"var", "lib", "snapd", "seed", "assertions", "model")
+			if _, err := os.Stat(modelFile); err == nil {
+				// create a copy of the model file because it will be deleted soon
+				newModelFile := filepath.Join(classicStateMachine.stateMachineFlags.WorkDir,
+					"model")
+				if err := osutilCopyFile(modelFile, newModelFile, 0); err != nil {
+					return fmt.Errorf("Error copying modelFile from preseeded filesystem: %s",
+						err.Error())
+				}
+				imageOpts.ModelFile = newModelFile
+			}
+
+			// Now remove all of the seeded snaps
 			preseededSnaps, err := removePreseeding(
 				classicStateMachine.tempDirs.rootfs)
 			if err != nil {
