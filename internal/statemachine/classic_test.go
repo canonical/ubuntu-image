@@ -583,14 +583,6 @@ func TestExtraSnapsWithFilesystem(t *testing.T) {
 		err = snapPrepareImage.Run()
 		asserter.AssertErrNil(err, true)
 
-		// copy the test model file to the rootfs to cover the case where a model
-		// file is present
-		testModel := filepath.Join("testdata", "modelAssertionClassic")
-		stagedModel := filepath.Join(stateMachine.tempDirs.rootfs,
-			"var", "lib", "snapd", "seed", "assertions", "model")
-		err = osutil.CopyFile(testModel, stagedModel, 0)
-		asserter.AssertErrNil(err, true)
-
 		// now call prepateClassicImage to simulate using --snap with --filesystem
 		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrNil(err, true)
