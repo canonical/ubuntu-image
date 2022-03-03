@@ -657,7 +657,7 @@ func TestFailedRemovePreseeding(t *testing.T) {
 		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
 		asserter.AssertErrContains(err, "Test error")
 		osRemoveAll = os.RemoveAll
-		
+
 		//os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
