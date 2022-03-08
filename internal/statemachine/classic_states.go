@@ -45,6 +45,8 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 func (stateMachine *StateMachine) runLiveBuild() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	// TODO: Move preseeding logic from livecd-rootfs to ubuntu-image
+	// for all builds
 	if classicStateMachine.Opts.Filesystem == "" {
 		// --filesystem was not provided, so we use live-build to create one
 		var env []string
@@ -123,7 +125,8 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	if classicStateMachine.Opts.Filesystem != "" {
+	if classicStateMachine.Opts.Filesystem != "" &&
+		len(classicStateMachine.commonFlags.Snaps) > 0 {
 		var imageOpts image.Options
 
 		var err error
