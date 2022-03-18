@@ -428,6 +428,52 @@ func TestPopulateBootfsContents(t *testing.T) {
 	})
 }
 
+// TestPopulateBootfsContentsPiboot tests a successful run of the
+// populateBootfsContents state and ensures that the appropriate files are
+// placed in the bootfs, for the piboot bootloader.
+func TestPopulateBootfsContentsPiboot(t *testing.T) {
+	t.Run("test_populate_bootfs_contents_piboot", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+		// set a valid yaml file and load it in
+		stateMachine.YamlFilePath = filepath.Join("testdata",
+			"gadget_tree_piboot", "meta", "gadget.yaml")
+		// ensure unpack exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		// populate unpack
+		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree_piboot"))
+		for _, srcFile := range files {
+			srcFile := filepath.Join("testdata", "gadget_tree_piboot", srcFile.Name())
+			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+		}
+
+		// ensure volumes exists
+		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = stateMachine.populateBootfsContents()
+		asserter.AssertErrNil(err, true)
+
+		// check that bootfs contents were actually populated
+		bootFiles := []string{"config.txt", "cmdline.txt"}
+		for _, file := range bootFiles {
+			fullPath := filepath.Join(stateMachine.stateMachineFlags.WorkDir,
+				"root", file)
+			if _, err := os.Stat(fullPath); err != nil {
+				t.Errorf("Expected %s to exist, but it does not", fullPath)
+			}
+		}
+	})
+}
+
 // TestFailedPopulateBootfsContents tests failures in the populateBootfsContents state
 func TestFailedPopulateBootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_bootfs_contents", func(t *testing.T) {

@@ -1,0 +1,43 @@
+[pi4]
+kernel=kernel.img
+arm_boost=1
+max_framebuffers=2
+
+[cm4]
+# Enable the USB2 outputs on the IO board (assuming your CM4 is plugged into
+# such a board)
+dtoverlay=dwc2,dr_mode=host
+
+[pi2]
+kernel=kernel.img
+
+[pi3]
+kernel=kernel.img
+
+[pi0]
+kernel=kernel.img
+
+[all]
+arm_64bit=1
+device_tree_address=0x02000000
+
+# Enable the serial pins
+enable_uart=1
+
+# Enable the FKMS ("Fake" KMS) graphics overlay, and allocate 128Mb to the
+# GPU memory
+dtoverlay=vc4-fkms-v3d,cma-128
+
+# Enable audio output, I2C and SPI interfaces on the GPIO header
+dtparam=audio=on
+dtparam=i2c_arm=on
+dtparam=spi=on
+
+# Prior versions of Ubuntu Core customized the on-board LEDs so that the green
+# ACT LED was a heartbeat, and the red PWR LED represented SD card activity.
+# Uncomment the following lines if you wish to restore these customizations
+#dtparam=act_led_trigger=heartbeat
+#dtparam=pwr_led_trigger=mmc0
+
+initramfs initrd.img followkernel
+os_prefix=

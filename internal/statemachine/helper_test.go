@@ -194,6 +194,58 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 	})
 }
 
+// TestFailedHandleSecureBootPiboot tests failures in the handleSecureBoot
+// function by mocking functions, for piboot
+func TestFailedHandleSecureBootPiboot(t *testing.T) {
+	t.Run("test_failed_handle_secure_boot_piboot", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir for this
+		if err := stateMachine.makeTemporaryDirectories(); err != nil {
+			t.Errorf("Did not expect an error, got %s", err.Error())
+		}
+
+		// create a volume
+		volume := new(gadget.Volume)
+		volume.Bootloader = "piboot"
+		// make the piboot directory and add a file
+		bootDir := filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "piboot")
+		os.MkdirAll(bootDir, 0755)
+		osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree_piboot",
+			"piboot.conf"), bootDir)
+
+		// mock os.Mkdir
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "Error creating ubuntu dir")
+		osMkdirAll = os.MkdirAll
+
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "Error reading boot dir")
+		ioutilReadDir = ioutil.ReadDir
+
+		// mock os.Rename
+		osRename = mockRename
+		defer func() {
+			osRename = os.Rename
+		}()
+		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "Error copying boot dir")
+		osRename = os.Rename
+	})
+}
+
 // TestHandleLkBootloader tests that the handleLkBootloader function runs successfully
 func TestHandleLkBootloader(t *testing.T) {
 	t.Run("test_handle_lk_bootloader", func(t *testing.T) {

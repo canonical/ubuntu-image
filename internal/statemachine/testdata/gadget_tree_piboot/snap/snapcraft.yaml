@@ -1,0 +1,304 @@
+name: pi
+version: 22-2
+summary: Raspberry Pi gadget
+description: |
+  Support files for booting Raspberry Pi.
+  This gadget snap supports the Raspberry Pi 2B, 3B, 3A+, 3B+, 4B, Compute
+  Module 3, and the Compute Module 3+ universally.
+type: gadget
+base: core22
+assumes: [kernel-assets]
+architectures:
+  - build-on: [amd64, arm64]
+    run-on: arm64
+
+package-repositories:
+  - type: apt
+    ppa: snappy-dev/image
+
+confinement: strict
+grade: devel
+parts:
+  gadget:
+    plugin: nil
+    source: .
+    override-build: |
+      set -x
+      # unconditionally set the arch-triplet since this snapcraft.yaml will 
+      # always be used to produce an armhf snap
+      BUILD_ARCH_TRIPLET=aarch64-linux-gnu
+      # but only use the cross-compiling sources when actually cross compiling
+      # as otherwise its just safer to use the build environment - it offers
+      # much more flexibility.
+      if [ "$SNAPCRAFT_ARCH_TRIPLET" = "x86_64-linux-gnu" ] || [ -z "$SNAPCRAFT_ARCH_TRIPLET" ]; then
+        OPTIONAL_ARGS="SERIES_HOST=\"focal\" SOURCES_HOST=\"./helpers/cross-sources.list\" SOURCES_D_HOST=\"./helpers\""
+      fi
+      make -C $SNAPCRAFT_PART_SRC core \
+        DESTDIR=${SNAPCRAFT_PART_INSTALL} \
+        ARCH="$(dpkg-architecture -t $BUILD_ARCH_TRIPLET -q DEB_HOST_ARCH)" \
+        ${OPTIONAL_ARGS:-}
+    prime:
+      - boot-assets/*
+      - piboot.conf
+      - cmdline.txt
+      - config.txt
+    build-packages:
+      - lsb-release
+      - dpkg-dev
+      - make
+  psplash-local:
+    plugin: dump
+    prime: [-*]
+    source: .
+    stage: [psplash]
+  psplash:
+    after: [psplash-local]
+    source-type: git
+    source: https://git.yoctoproject.org/psplash
+    source-commit: 2015f7073e98dd9562db0936a254af5ef56356cf
+    plugin: nil
+    override-build: |
+      set -x
+      if [ "$SNAPCRAFT_ARCH_TRIPLET" = "x86_64-linux-gnu" ] || [ -z "$SNAPCRAFT_ARCH_TRIPLET" ]; then
+        # manually set since new snapcraft doesn't like --target-arch when 
+        # building with lxd/multipass
+        BUILD_ARCH_TRIPLET=aarch64-linux-gnu
+      else
+        BUILD_ARCH_TRIPLET=$SNAPCRAFT_ARCH_TRIPLET
+      fi
+      export TREE="${SNAPCRAFT_STAGE:-.}/psplash"
+      . ${TREE}/config
+      if ! $(echo "$FONT" | grep -q ^/); then
+        FONT="${TREE}/${FONT}"
+      fi
+      if ! $(echo "$SPLASH" | grep -q ^/); then
+        SPLASH="${TREE}/${SPLASH}"
+      fi
+      git apply ${TREE}/psplash.patch
+      ${TREE}/font-gen.sh "$FONT"
+      ./make-image-header.sh "$SPLASH" CORE psplash-core
+      aclocal
+      autoreconf --install
+      if ! dpkg-architecture -t "${SNAPCRAFT_ARCH_TRIPLET}" -e \
+          $(dpkg-architecture -q DEB_BUILD_ARCH)
+      then
+        export CROSS_COMPILE=$(dpkg-architecture \
+          -t "${BUILD_ARCH_TRIPLET}" -q DEB_HOST_GNU_TYPE)-
+      else
+        export CROSS_COMPILE=
+      fi
+      ./configure --build=$(dpkg-architecture -q DEB_BUILD_GNU_TYPE) \
+        --host=${BUILD_ARCH_TRIPLET} CC=${CROSS_COMPILE}gcc || cat config.log
+      ARCH=$(dpkg-architecture -t "${BUILD_ARCH_TRIPLET}" -q DEB_HOST_ARCH) make
+      rm -rf $SNAPCRAFT_PART_INSTALL/usr
+      cp -a $TREE/initrd .
+      mkdir -p initrd/bin
+      cp psplash initrd/bin
+      mkdir -p $SNAPCRAFT_PART_INSTALL/boot-assets
+      cd initrd && find . | cpio --quiet -o -H newc | lz4 -9 -l >> \
+        "${SNAPCRAFT_PART_INSTALL}/boot-assets/psplash.img"
+    build-packages:
+      - libgdk-pixbuf2.0-dev
+      - automake
+      - autoconf
+      - gcc
+      - otf2bdf
+      - libbogl-dev
+      - ttf-ubuntu-font-family
+      - cpio
+      - findutils
+      - liblz4-tool
+      - libc-dev
+      - try:
+          - gcc-aarch64-linux-gnu:amd64
+          - libc6-dev-arm64-cross:amd64
+
+slots:
+  bcm-gpio-0:
+    interface: gpio
+    number: 0
+  bcm-gpio-1:
+    interface: gpio
+    number: 1
+  bcm-gpio-2:
+    interface: gpio
+    number: 2
+  bcm-gpio-3:
+    interface: gpio
+    number: 3
+  bcm-gpio-4:
+    interface: gpio
+    number: 4
+  bcm-gpio-5:
+    interface: gpio
+    number: 5
+  bcm-gpio-6:
+    interface: gpio
+    number: 6
+  bcm-gpio-7:
+    interface: gpio
+    number: 7
+  bcm-gpio-8:
+    interface: gpio
+    number: 8
+  bcm-gpio-9:
+    interface: gpio
+    number: 9
+  bcm-gpio-10:
+    interface: gpio
+    number: 10
+  bcm-gpio-11:
+    interface: gpio
+    number: 11
+  bcm-gpio-12:
+    interface: gpio
+    number: 12
+  bcm-gpio-13:
+    interface: gpio
+    number: 13
+  bcm-gpio-14:
+    interface: gpio
+    number: 14
+  bcm-gpio-15:
+    interface: gpio
+    number: 15
+  bcm-gpio-16:
+    interface: gpio
+    number: 16
+  bcm-gpio-17:
+    interface: gpio
+    number: 17
+  bcm-gpio-18:
+    interface: gpio
+    number: 18
+  bcm-gpio-19:
+    interface: gpio
+    number: 19
+  bcm-gpio-20:
+    interface: gpio
+    number: 20
+  bcm-gpio-21:
+    interface: gpio
+    number: 21
+  bcm-gpio-22:
+    interface: gpio
+    number: 22
+  bcm-gpio-23:
+    interface: gpio
+    number: 23
+  bcm-gpio-24:
+    interface: gpio
+    number: 24
+  bcm-gpio-25:
+    interface: gpio
+    number: 25
+  bcm-gpio-26:
+    interface: gpio
+    number: 26
+  bcm-gpio-27:
+    interface: gpio
+    number: 27
+  i2c-0:
+    interface: i2c
+    path: /dev/i2c-0
+  i2c-1:
+    interface: i2c
+    path: /dev/i2c-1
+  i2c-2:
+    interface: i2c
+    path: /dev/i2c-2
+  i2c-3:
+    interface: i2c
+    path: /dev/i2c-3
+  i2c-4:
+    interface: i2c
+    path: /dev/i2c-4
+  i2c-5:
+    interface: i2c
+    path: /dev/i2c-5
+  i2c-6:
+    interface: i2c
+    path: /dev/i2c-6
+  bt-serial:
+    interface: serial-port
+    path: /dev/ttyAMA0
+  serial0:
+    interface: serial-port
+    path: /dev/ttyS0
+  serial1:
+    interface: serial-port
+    path: /dev/ttyS1
+  serial2:
+    interface: serial-port
+    path: /dev/ttyS2
+  serial3:
+    interface: serial-port
+    path: /dev/ttyS3
+  serial4:
+    interface: serial-port
+    path: /dev/ttyS4
+  serial5:
+    interface: serial-port
+    path: /dev/ttyS5
+  serial6:
+    interface: serial-port
+    path: /dev/ttyS6
+  serial7:
+    interface: serial-port
+    path: /dev/ttyS7
+  serial8:
+    interface: serial-port
+    path: /dev/ttyS8
+  serial9:
+    interface: serial-port
+    path: /dev/ttyS9
+  spidev0:
+    interface: spi
+    path: /dev/spidev0.0
+  spidev1:
+    interface: spi
+    path: /dev/spidev0.1
+  spidev1-0:
+    interface: spi
+    path: /dev/spidev1.0
+  spidev1-1:
+    interface: spi
+    path: /dev/spidev1.1
+  spidev2-0:
+    interface: spi
+    path: /dev/spidev2.0
+  spidev2-1:
+    interface: spi
+    path: /dev/spidev2.1
+  spidev3-0:
+    interface: spi
+    path: /dev/spidev3.0
+  spidev3-1:
+    interface: spi
+    path: /dev/spidev3.1
+  spidev4-0:
+    interface: spi
+    path: /dev/spidev4.0
+  spidev4-1:
+    interface: spi
+    path: /dev/spidev4.1
+  spidev5-0:
+    interface: spi
+    path: /dev/spidev5.0
+  spidev5-1:
+    interface: spi
+    path: /dev/spidev5.1
+  spidev6-0:
+    interface: spi
+    path: /dev/spidev6.0
+  spidev6-1:
+    interface: spi
+    path: /dev/spidev6.1
+  pwm0:
+    interface: pwm
+    chip-number: 0
+    channel: 0
+  pwm1:
+    interface: pwm
+    chip-number: 0
+    channel: 1

@@ -233,6 +233,10 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "uboot")
 		ubuntuDir = targetDir
+	} else if volume.Bootloader == "piboot" {
+		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
+			"image", "boot", "piboot")
+		ubuntuDir = targetDir
 	} else if volume.Bootloader == "grub" {
 		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "grub")

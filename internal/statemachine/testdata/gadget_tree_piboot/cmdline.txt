@@ -1,0 +1,1 @@
+dwc_otg.lpm_enable=0 console=serial0,115200 rng_core.default_quality=700 vt.handoff=2 quiet splash
