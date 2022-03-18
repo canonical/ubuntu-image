@@ -1,3 +1,16 @@
+ubuntu-image (2.1+22.04ubuntu4) UNRELEASED; urgency=medium
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Allow for no fstab in the rootfs for classic image builds.
+
+  [ William 'jawn-smith' Wilson ]
+  * Fix use of --snap flag with the --filesystem flag (LP: #1958275)
+
+  [ Alfonso Sanchez-Beato ]
+  * Add support for the piboot bootloader
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Fri, 18 Mar 2022 17:15:10 +0100
+
 ubuntu-image (2.1+22.04ubuntu3) jammy; urgency=medium
 
   * Update tests to reflect changes in the hello snap

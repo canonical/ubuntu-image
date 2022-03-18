@@ -344,15 +344,6 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		asserter.AssertErrContains(err, "Error copying rootfs")
 		osutilCopySpecialFile = osutil.CopySpecialFile
 
-		// mock ioutil.ReadFile
-		ioutilReadFile = mockReadFile
-		defer func() {
-			ioutilReadFile = ioutil.ReadFile
-		}()
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error opening fstab")
-		ioutilReadFile = ioutil.ReadFile
-
 		// mock ioutil.WriteFile
 		ioutilWriteFile = mockWriteFile
 		defer func() {
