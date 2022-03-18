@@ -14,6 +14,7 @@ var classicStates = []stateFunc{
 	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
 	{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents},
 	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
+	{"prepare_classic_image", (*StateMachine).prepareClassicImage},
 	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
