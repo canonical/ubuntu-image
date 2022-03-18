@@ -19,6 +19,8 @@ import (
 
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/seed"
+	"github.com/snapcore/snapd/timings"
 )
 
 // validateInput ensures that command line flags for the state machine are valid. These
@@ -581,4 +583,38 @@ func parseSnapsAndChannels(snaps []string) (snapNames []string, snapChannels map
 		}
 	}
 	return snapNames, snapChannels, nil
+}
+
+// removePreseeding removes preseeded snaps from an existing rootfs and returns
+// a slice of the snaps and their channels that were removed this way
+func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) {
+	// seededSnaps maps the snap name and channel that was seeded
+	seededSnaps = make(map[string]string)
+
+	// open the seed and run LoadAssertions and LoadMeta to get a list of snaps
+	snapdDir := filepath.Join(rootfs, "var", "lib", "snapd")
+	seedDir := filepath.Join(snapdDir, "seed")
+	preseed, err := seedOpen(seedDir, "")
+	if err != nil {
+		return seededSnaps, err
+	}
+	measurer := timings.New(nil)
+	if err := preseed.LoadAssertions(nil, nil); err != nil {
+		return seededSnaps, err
+	}
+	if err := preseed.LoadMeta(measurer); err != nil {
+		return seededSnaps, err
+	}
+
+	// iterate over the snaps in the seed and add them to the list
+	preseed.Iter(func(sn *seed.Snap) error {
+		seededSnaps[sn.SnapName()] = sn.Channel
+		return nil
+	})
+
+	// now delete the preseeded snaps from the rootfs
+	if err := osRemoveAll(snapdDir); err != nil {
+		return seededSnaps, err
+	}
+	return seededSnaps, nil
 }

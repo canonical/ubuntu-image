@@ -15,7 +15,9 @@ import (
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
+	"github.com/snapcore/snapd/seed"
 )
 
 var testDir = "ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"
@@ -108,6 +110,13 @@ func mockDiskfsCreate(string, int64, diskfs.Format, diskfs.SectorSize) (*disk.Di
 func mockRandRead(output []byte) (int, error) {
 	return 0, fmt.Errorf("Test error")
 }
+func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
+	return nil, fmt.Errorf("Test error")
+}
+func mockImagePrepare(*image.Options) error {
+	return fmt.Errorf("Test Error")
+}
+
 func readOnlyDiskfsCreate(diskName string, size int64, format diskfs.Format, sectorSize diskfs.SectorSize) (*disk.Disk, error) {
 	diskFile, _ := os.OpenFile(diskName, os.O_RDONLY|os.O_CREATE, 0444)
 	disk := disk.Disk{
