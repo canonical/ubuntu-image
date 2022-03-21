@@ -174,18 +174,28 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 	var systemVolumeName string
 	var systemVolume *gadget.Volume
 	var preserve []string
-	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
-		for _, structure := range volume.Structure {
-			// use the system-boot role to identify the system volume
-			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
-				systemVolumeName = volumeName
-				systemVolume = volume
-			}
+
+	// in cases where there's just one volume defined, no need to look for
+	// system-boot to determine the system volume
+	if len(stateMachine.GadgetInfo.Volumes) == 1 {
+		for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+			systemVolumeName = volumeName
+			systemVolume = volume
 		}
-		// piboot modifies the original config.txt from the gadget,
-		// avoid overwriting with the one coming from the gadget
-		if volume.Bootloader == "piboot" {
-			preserve = append(preserve, "config.txt")
+	} else {
+		for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+			for _, structure := range volume.Structure {
+				// use the system-boot role to identify the system volume
+				if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+					systemVolumeName = volumeName
+					systemVolume = volume
+				}
+			}
+			// piboot modifies the original config.txt from the gadget,
+			// avoid overwriting with the one coming from the gadget
+			if volume.Bootloader == "piboot" {
+				preserve = append(preserve, "config.txt")
+			}
 		}
 	}
 

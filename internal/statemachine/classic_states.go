@@ -276,5 +276,10 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 
 	cmd.Stdout = manifest
 	err = cmd.Run()
-	return err
+	// sometimes it might not be possible to generate a package manifest, so
+	// warn instead of failing
+	if err != nil {
+		fmt.Printf("WARNING: failed generating image's package manifest.\n")
+	}
+	return nil
 }
