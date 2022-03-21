@@ -3,14 +3,13 @@ summary: Create Ubuntu images
 description: |
   Official tool for building Ubuntu images, currently supporing Ubuntu Core
   snap-based images and preinstalled Ubuntu classic images.
-version: 2.1+snap6
+version: 2.1+snap7
 grade: stable
 confinement: classic
 base: core20
 
-# Force the snap to only use binaries staged with the snap
+# Force the snap to use fakeroot staged within the snap
 environment:
-  PATH: $SNAP/usr/local/sbin:$SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$SNAP/usr/local/bin:$SNAP/usr/sbin
   FAKEROOT_FLAGS: "--lib $SNAP/usr/lib/lib-arch/libfakeroot/libfakeroot-tcp.so --faked $SNAP/usr/bin/faked-tcp"
 
 apps:
