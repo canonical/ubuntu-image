@@ -216,10 +216,12 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 					partImg, err.Error())
 			}
 		}
-		err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
-			contentRoot, structure.Size, stateMachine.SectorSize)
-		if err != nil {
-			return fmt.Errorf("Error running mkfs: %s", err.Error())
+		if structure.Content != nil {
+			err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
+				contentRoot, structure.Size, stateMachine.SectorSize)
+			if err != nil {
+				return fmt.Errorf("Error running mkfs: %s", err.Error())
+			}
 		}
 	}
 	return nil
