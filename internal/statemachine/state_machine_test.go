@@ -62,6 +62,9 @@ func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure,
 func mockMkfsWithContent(typ, img, label, contentRootDir string, deviceSize, sectorSize quantity.Size) error {
 	return fmt.Errorf("Test Error")
 }
+func mockMkfs(typ, img, label string, deviceSize, sectorSize quantity.Size) error {
+	return fmt.Errorf("Test Error")
+}
 func mockReadDir(string) ([]os.FileInfo, error) {
 	return []os.FileInfo{}, fmt.Errorf("Test Error")
 }
