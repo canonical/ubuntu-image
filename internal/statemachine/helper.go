@@ -208,7 +208,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			os.Create(partImg)
 			os.Truncate(partImg, int64(stateMachine.RootfsSize))
 		} else {
-			// use mkfs functions from snapd to create the filesystems
+			// zero out the .img file
 			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
 				"bs=" + strconv.FormatUint(uint64(blockSize), 10), "seek=1"}
 			if err := helperCopyBlob(ddArgs); err != nil {
@@ -216,10 +216,19 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 					partImg, err.Error())
 			}
 		}
-		err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
-			contentRoot, structure.Size, stateMachine.SectorSize)
-		if err != nil {
-			return fmt.Errorf("Error running mkfs: %s", err.Error())
+		// use mkfs functions from snapd to create the filesystems
+		if structure.Content == nil {
+			err := mkfsMake(structure.Filesystem, partImg, structure.Label,
+				structure.Size, stateMachine.SectorSize)
+			if err != nil {
+				return fmt.Errorf("Error running mkfs: %s", err.Error())
+			}
+		} else {
+			err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
+				contentRoot, structure.Size, stateMachine.SectorSize)
+			if err != nil {
+				return fmt.Errorf("Error running mkfs with content: %s", err.Error())
+			}
 		}
 	}
 	return nil

@@ -5,6 +5,7 @@ ubuntu-image (2.1+22.04ubuntu4) UNRELEASED; urgency=medium
 
   [ William 'jawn-smith' Wilson ]
   * Fix use of --snap flag with the --filesystem flag (LP: #1958275)
+  * Fix bug with attempting to create partition with no content
 
   [ Alfonso Sanchez-Beato ]
   * Add support for the piboot bootloader (LP: #1965585)

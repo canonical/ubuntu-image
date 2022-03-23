@@ -402,8 +402,19 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		}()
 		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
 			filepath.Join("/tmp", uuid.NewString()+".img"))
-		asserter.AssertErrContains(err, "Error running mkfs")
+		asserter.AssertErrContains(err, "Error running mkfs with content")
 		mkfsMakeWithContent = mkfs.MakeWithContent
+
+		// mock mkfs.Mkfs
+		rootfsStruct.Content = nil // to trigger the "empty partition" case
+		mkfsMake = mockMkfs
+		defer func() {
+			mkfsMake = mkfs.Make
+		}()
+		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
+			filepath.Join("/tmp", uuid.NewString()+".img"))
+		asserter.AssertErrContains(err, "Error running mkfs")
+		mkfsMake = mkfs.Make
 	})
 }
 
