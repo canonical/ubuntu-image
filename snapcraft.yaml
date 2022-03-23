@@ -35,9 +35,6 @@ parts:
       - fakeroot
       - dosfstools
       - squashfs-tools
-      - coreutils
-      - util-linux
-      - sed
     override-build: |
       snapcraftctl build
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
