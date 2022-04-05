@@ -11,6 +11,8 @@ jobs:
           fetch-depth: 2
       - name: install-go
         run: sudo snap install go --classic
+      - name: install-snapcraft
+        run: sudo snap install snapcraft --classic
       - name: build
         run: go build ./...
       - name: add-sil2100-ppa
