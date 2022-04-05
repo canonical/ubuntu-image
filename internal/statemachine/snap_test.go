@@ -527,3 +527,43 @@ func TestValidationFlag(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 	})
 }
+
+// TestGadgetEdgeCases tests a few edge cases with odd structures in gadget.yaml
+func TestGadgetEdgeCases(t *testing.T) {
+	t.Run("test_gadget_edge_cases", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		// before setting up the state machine, build the custom snap
+		err := os.Chdir(filepath.Join("testdata", "gadget_edge_cases"))
+
+		snapcraftCommand := *exec.Command("snapcraft", "--destructive-mode")
+		err = snapcraftCommand.Run()
+		asserter.AssertErrNil(err, true)
+
+		saveCWD()
+
+		var stateMachine SnapStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20Dangerous")
+		stateMachine.Opts.FactoryImage = true
+		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
+		stateMachine.stateMachineFlags.WorkDir = workDir
+		// use the custom snap with a complicated gadget.yaml
+		customSnap := filepath.Join("testdata", "gadget_edge_cases", "pc_20-0.4_amd64.snap")
+		stateMachine.commonFlags.Snaps = []string{customSnap}
+
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
+	})
+}
