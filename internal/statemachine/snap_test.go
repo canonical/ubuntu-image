@@ -529,6 +529,7 @@ func TestValidationFlag(t *testing.T) {
 }
 
 // TestGadgetEdgeCases tests a few edge cases with odd structures in gadget.yaml
+// LP: #1968205
 func TestGadgetEdgeCases(t *testing.T) {
 	t.Run("test_gadget_edge_cases", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
