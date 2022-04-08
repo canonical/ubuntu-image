@@ -1,4 +1,4 @@
-ubuntu-image (2.1+22.04ubuntu4) UNRELEASED; urgency=medium
+ubuntu-image (2.2+22.04ubuntu1) UNRELEASED; urgency=medium
 
   [ Łukasz 'sil2100' Zemczak ]
   * Allow for no fstab in the rootfs for classic image builds.
@@ -6,6 +6,7 @@ ubuntu-image (2.1+22.04ubuntu4) UNRELEASED; urgency=medium
   [ William 'jawn-smith' Wilson ]
   * Fix use of --snap flag with the --filesystem flag (LP: #1958275)
   * Fix bug with attempting to create partition with no content
+  * Fix edge cases with custom gadget.yaml (LP: #1968205)
 
   [ Alfonso Sanchez-Beato ]
   * Add support for the piboot bootloader (LP: #1965585)

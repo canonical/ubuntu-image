@@ -170,66 +170,57 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 
 // Populate the Bootfs Contents by using snapd's MountedFilesystemWriter
 func (stateMachine *StateMachine) populateBootfsContents() error {
-	// find the name of the system volume. snapd functions have already verified it exists
-	var systemVolumeName string
-	var systemVolume *gadget.Volume
 	var preserve []string
-	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
-		for _, structure := range volume.Structure {
-			// use the system-boot role to identify the system volume
-			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
-				systemVolumeName = volumeName
-				systemVolume = volume
-			}
-		}
+	for _, volumeName := range stateMachine.VolumeOrder {
+		volume := stateMachine.GadgetInfo.Volumes[volumeName]
 		// piboot modifies the original config.txt from the gadget,
 		// avoid overwriting with the one coming from the gadget
 		if volume.Bootloader == "piboot" {
 			preserve = append(preserve, "config.txt")
 		}
-	}
 
-	// now call LayoutVolume to get a LaidOutVolume we can use
-	// with a mountedFilesystemWriter
-	layoutConstraints := gadget.LayoutConstraints{SkipResolveContent: false}
-	laidOutVolume, err := gadgetLayoutVolume(
-		filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
-		filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
-		systemVolume, layoutConstraints)
-	if err != nil {
-		return fmt.Errorf("Error laying out bootfs contents: %s", err.Error())
-	}
-
-	for ii, laidOutStructure := range laidOutVolume.LaidOutStructure {
-		var targetDir string
-		if laidOutStructure.Role == gadget.SystemSeed {
-			targetDir = stateMachine.tempDirs.rootfs
-		} else {
-			targetDir = filepath.Join(stateMachine.tempDirs.volumes,
-				systemVolumeName,
-				"part"+strconv.Itoa(ii))
+		// now call LayoutVolume to get a LaidOutVolume we can use
+		// with a mountedFilesystemWriter
+		layoutConstraints := gadget.LayoutConstraints{SkipResolveContent: false}
+		laidOutVolume, err := gadgetLayoutVolume(
+			filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
+			filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
+			volume, layoutConstraints)
+		if err != nil {
+			return fmt.Errorf("Error laying out bootfs contents: %s", err.Error())
 		}
-		// Bad special-casing.  snapd's image.Prepare currently
-		// installs to /boot/grub, but we need to map this to
-		// /EFI/ubuntu.  This is because we are using a SecureBoot
-		// signed bootloader image which has this path embedded, so
-		// we need to install our files to there.
-		if !stateMachine.IsSeeded &&
-			(laidOutStructure.Role == gadget.SystemBoot ||
-				laidOutStructure.Label == gadget.SystemBoot) {
-			if err := stateMachine.handleSecureBoot(systemVolume, targetDir); err != nil {
-				return err
-			}
-		}
-		if laidOutStructure.HasFilesystem() {
-			mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(&laidOutStructure, nil)
-			if err != nil {
-				return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
-			}
 
-			err = mountedFilesystemWriter.Write(targetDir, preserve)
-			if err != nil {
-				return fmt.Errorf("Error in mountedFilesystem.Write(): %s", err.Error())
+		for ii, laidOutStructure := range laidOutVolume.LaidOutStructure {
+			var targetDir string
+			if laidOutStructure.Role == gadget.SystemSeed {
+				targetDir = stateMachine.tempDirs.rootfs
+			} else {
+				targetDir = filepath.Join(stateMachine.tempDirs.volumes,
+					volumeName,
+					"part"+strconv.Itoa(ii))
+			}
+			// Bad special-casing.  snapd's image.Prepare currently
+			// installs to /boot/grub, but we need to map this to
+			// /EFI/ubuntu.  This is because we are using a SecureBoot
+			// signed bootloader image which has this path embedded, so
+			// we need to install our files to there.
+			if !stateMachine.IsSeeded &&
+				(laidOutStructure.Role == gadget.SystemBoot ||
+					laidOutStructure.Label == gadget.SystemBoot) {
+				if err := stateMachine.handleSecureBoot(volume, targetDir); err != nil {
+					return err
+				}
+			}
+			if laidOutStructure.HasFilesystem() {
+				mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(&laidOutStructure, nil)
+				if err != nil {
+					return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
+				}
+
+				err = mountedFilesystemWriter.Write(targetDir, preserve)
+				if err != nil {
+					return fmt.Errorf("Error in mountedFilesystem.Write(): %s", err.Error())
+				}
 			}
 		}
 	}

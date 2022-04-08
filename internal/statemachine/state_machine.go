@@ -166,11 +166,6 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 // saveVolumeOrder records the order that the volumes appear in gadget.yaml. This is necessary
 // to preserve backwards compatibility of the command line syntax --image-size <volume_number>:<size>
 func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
-	// don't bother doing this if --image-size was not used
-	if stateMachine.commonFlags.Size == "" {
-		return
-	}
-
 	indexMap := make(map[string]int)
 	for volumeName := range stateMachine.GadgetInfo.Volumes {
 		searchString := volumeName + ":"
