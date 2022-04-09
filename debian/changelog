@@ -1,4 +1,4 @@
-ubuntu-image (2.2+22.04ubuntu1) UNRELEASED; urgency=medium
+ubuntu-image (2.2+22.04ubuntu1) jammy; urgency=medium
 
   [ Łukasz 'sil2100' Zemczak ]
   * Allow for no fstab in the rootfs for classic image builds.
