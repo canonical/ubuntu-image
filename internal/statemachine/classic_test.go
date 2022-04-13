@@ -548,6 +548,9 @@ func TestFailedRunLiveBuild(t *testing.T) {
 // in the resulting root filesystem
 func TestExtraSnapsWithFilesystem(t *testing.T) {
 	t.Run("test_extra_snaps_with_filesystem", func(t *testing.T) {
+		if runtime.GOARCH != "amd64" {
+			t.Skip("Test for amd64 only")
+		}
 		asserter := helper.Asserter{T: t}
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
