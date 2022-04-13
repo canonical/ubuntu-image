@@ -1,4 +1,4 @@
-ubuntu-image (2.2+22.04ubuntu2) UNRELEASED; urgency=medium
+ubuntu-image (2.2+22.04ubuntu2) jammy; urgency=medium
 
   * Fix failing autopkgtests:
     - Restrict test using snap prepare-image --arch=amd64 to only run on amd64
