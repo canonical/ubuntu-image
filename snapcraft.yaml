@@ -7,6 +7,8 @@ version: 2.1+snap7
 grade: stable
 confinement: classic
 base: core20
+source-code: https://github.com/canonical/ubuntu-image
+issues: https://bugs.launchpad.net/ubuntu-image/+filebug
 
 # Force the snap to use fakeroot staged within the snap
 environment:
