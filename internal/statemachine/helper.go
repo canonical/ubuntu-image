@@ -611,7 +611,7 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 	if err := preseed.LoadAssertions(nil, nil); err != nil {
 		return seededSnaps, err
 	}
-	if err := preseed.LoadMeta(measurer); err != nil {
+	if err := preseed.LoadMeta(seed.AllModes, measurer); err != nil {
 		return seededSnaps, err
 	}
 
