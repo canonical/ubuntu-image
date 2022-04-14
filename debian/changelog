@@ -1,3 +1,13 @@
+ubuntu-image (2.2+22.04ubuntu3) UNRELEASED; urgency=medium
+
+  [ William 'jawn-smith' Wilson ]
+  * Add lintian overrides for test files
+
+  [ Maciej Borzecki ]
+  * Pull in a newer snapd version and load snaps from all modes
+
+ -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Wed, 13 Apr 2022 16:28:11 -0500
+
 ubuntu-image (2.2+22.04ubuntu2) jammy; urgency=medium
 
   * Fix failing autopkgtests:

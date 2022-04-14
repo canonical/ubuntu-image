@@ -1,0 +1,9 @@
+# These are static boot files for piboot test cases and therefore don't need source
+ubuntu-image: source-is-missing internal/statemachine/testdata/gadget_tree_piboot/boot-assets/start.elf
+ubuntu-image: source-is-missing internal/statemachine/testdata/gadget_tree_piboot/boot-assets/start4.elf
+ubuntu-image: source-is-missing internal/statemachine/testdata/gadget_tree_piboot/boot-assets/start4cd.elf
+ubuntu-image: source-is-missing internal/statemachine/testdata/gadget_tree_piboot/boot-assets/start4db.elf
+ubuntu-image: source-is-missing internal/statemachine/testdata/gadget_tree_piboot/boot-assets/start4x.elf
+ubuntu-image: source-is-missing internal/statemachine/testdata/gadget_tree_piboot/boot-assets/start_cd.elf
+ubuntu-image: source-is-missing internal/statemachine/testdata/gadget_tree_piboot/boot-assets/start_db.elf
+ubuntu-image: source-is-missing internal/statemachine/testdata/gadget_tree_piboot/boot-assets/start_x.elf
