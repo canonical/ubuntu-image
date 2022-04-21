@@ -32,7 +32,7 @@ course, you can just install the packages named in the `Build-Depends` field.
 * Report bugs at: https://bugs.launchpad.net/ubuntu-image
 * Git clone: https://github.com/Canonical/ubuntu-image.git
 * Manual page: man ubuntu-image
-  (https://github.com/Canonical/ubuntu-image/blob/master/ubuntu-image.md)
+  (https://github.com/Canonical/ubuntu-image/blob/main/ubuntu-image.rst)
 
 The "gadget.yaml" specification has moved to [the snapcraft forum](https://forum.snapcraft.io/t/the-gadget-snap)
 
