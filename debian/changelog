@@ -1,4 +1,4 @@
-ubuntu-image (2.2+22.04ubuntu3) UNRELEASED; urgency=medium
+ubuntu-image (2.2+22.04ubuntu3) jammy; urgency=medium
 
   [ William 'jawn-smith' Wilson ]
   * Add lintian overrides for test files
