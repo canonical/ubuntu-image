@@ -4,7 +4,7 @@ ubuntu-image (2.2+22.04ubuntu3) UNRELEASED; urgency=medium
   * Add lintian overrides for test files
 
   [ Maciej Borzecki ]
-  * Pull in a newer snapd version and load snaps from all modes
+  * Pull in a newer snapd version and load snaps from all modes (LP: #1969979)
 
  -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Wed, 13 Apr 2022 16:28:11 -0500
 
