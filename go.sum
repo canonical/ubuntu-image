@@ -70,6 +70,8 @@ github.com/snapcore/snapd v0.0.0-20220411132918-d69f2ac36bd2 h1:hu/d6YhU12uWCT3d
 github.com/snapcore/snapd v0.0.0-20220411132918-d69f2ac36bd2/go.mod h1:Ypuk/H7dwlEFWXBJBhq8PFDwZxcyN5bfxNAAMBRPaDI=
 github.com/snapcore/snapd v0.0.0-20220426105407-5b97b04f7d11 h1:oCJ62wP7V/7e2Ldx5LC9I27Sz3mLxDK8321D+NOBA0c=
 github.com/snapcore/snapd v0.0.0-20220426105407-5b97b04f7d11/go.mod h1:Ypuk/H7dwlEFWXBJBhq8PFDwZxcyN5bfxNAAMBRPaDI=
+github.com/snapcore/snapd v0.0.0-20220504063749-08e22fe6c2a0 h1:TBnniDRu5OjSQB2iJh0yu4VCqfvYo8grixwlmWMPFKo=
+github.com/snapcore/snapd v0.0.0-20220504063749-08e22fe6c2a0/go.mod h1:Ypuk/H7dwlEFWXBJBhq8PFDwZxcyN5bfxNAAMBRPaDI=
 github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/ulikunitz/xz v0.5.10 h1:t92gobL9l3HE202wg3rlk19F6X+JOxl9BBrCCMYEYd8=
