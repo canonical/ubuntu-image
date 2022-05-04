@@ -29,6 +29,11 @@ func (stateMachine *StateMachine) prepareImage() error {
 		imageOpts.Channel = snapStateMachine.commonFlags.Channel
 	}
 
+	// preseeding-related
+	imageOpts.Preseed = snapStateMachine.Opts.Preseed
+	imageOpts.PreseedSignKey = snapStateMachine.Opts.PreseedSignKey
+	imageOpts.AppArmorKernelFeaturesDir = snapStateMachine.Opts.AppArmorKernelFeaturesDir
+
 	customizations := *new(image.Customizations)
 	if snapStateMachine.Opts.DisableConsoleConf {
 		customizations.ConsoleConf = "disabled"
