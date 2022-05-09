@@ -48,7 +48,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
 
-	if err := image.Prepare(&imageOpts); err != nil {
+	if err := imagePrepare(&imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
 
