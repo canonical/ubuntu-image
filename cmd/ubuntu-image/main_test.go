@@ -45,11 +45,10 @@ func TestValidCommands(t *testing.T) {
 		name        string
 		command     string
 		gadgetModel string
-		expected    string
 		isSnap      bool
 	}{
-		{"valid_snap_command", "snap", "model_assertion.yml", "snap functionality to be added", true},
-		{"valid_classic_command", "classic", "gadget_tree.yml", "classic functionality to be added", false},
+		{"valid_snap_command", "snap", "model_assertion.yml", true},
+		{"valid_classic_command", "classic", "image_defintion.yml", false},
 	}
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution
@@ -75,7 +74,7 @@ func TestValidCommands(t *testing.T) {
 			if tc.isSnap {
 				comparison = ubuntuImageCommand.Snap.SnapArgsPassed.ModelAssertion
 			} else {
-				comparison = ubuntuImageCommand.Classic.ClassicArgsPassed.GadgetTree
+				comparison = ubuntuImageCommand.Classic.ClassicArgsPassed.ImageDefinitionFile
 			}
 			if comparison != tc.gadgetModel {
 				t.Errorf("Unexpected input file value \"%s\". Expected \"%s\"",

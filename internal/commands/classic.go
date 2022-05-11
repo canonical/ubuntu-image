@@ -2,7 +2,7 @@ package commands
 
 // ClassicArgs holds the gadget tree. positional arguments need their own struct
 type ClassicArgs struct {
-	GadgetTree string `positional-arg-name:"gadget_tree" description:"Gadget tree. This is a tree equivalent to an unpacked and primed gadget snap at core image build time."`
+	ImageDefinition string `positional-arg-name:"image_definition" description:"Classic image definition file. This is used to define how the image is built and the outputs that are created."`
 }
 
 // ClassicOpts holds all flags that are specific to the classic command

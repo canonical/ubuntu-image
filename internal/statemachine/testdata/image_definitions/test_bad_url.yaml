@@ -1,0 +1,37 @@
+name: ubuntu-server-raspi-arm64
+display-name: Ubuntu Server Raspberry Pi arm64
+revision: 2
+architecture: arm64
+series: jammy
+class: preinstalled
+kernel:
+  name: linux-raspi
+gadget:
+  url: "this is not what a url looks like"
+  branch: classic
+  type: "git"
+model-assertion: pi-generic.model
+bootstrap:
+  seed:
+    url: "and this isn't either!"
+    branch: jammy
+    names:
+      - server
+      - minimal
+      - standard
+      - cloud-image
+      - ubuntu-server-raspi
+customization:
+  cloud_init:
+    user_data:
+      name: ubuntu
+      password: ubuntu
+  extra_packages:
+    - ubuntu-minimal
+    - linux-firmware-raspi
+    - pi-bluetooth
+artifacts:
+  img:
+      path: raspi.img
+  manifest:
+      path: raspi.manifest
