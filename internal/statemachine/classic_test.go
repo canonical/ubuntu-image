@@ -3,48 +3,19 @@
 package statemachine
 
 import (
-	"io/ioutil"
+	//"io/ioutil"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
-	"strings"
+	//"os/exec"
+	//"path/filepath"
+	//"runtime"
+	//"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/snapcore/snapd/image"
-	"github.com/snapcore/snapd/osutil"
-	"github.com/snapcore/snapd/seed"
+	//"github.com/snapcore/snapd/image"
+	//"github.com/snapcore/snapd/osutil"
+	//"github.com/snapcore/snapd/seed"
 )
-
-// TestInvalidCommandLineClassic tests invalid command line input for classic images
-func TestInvalidCommandLineClassic(t *testing.T) {
-	testCases := []struct {
-		name       string
-		project    string
-		filesystem string
-		errMsg     string
-	}{
-		{"neither_project_nor_filesystem", "", "", "project or filesystem is required"},
-		{"both_project_and_filesystem", "ubuntu-cpc", "/tmp", "project and filesystem are mutually exclusive"},
-	}
-	for _, tc := range testCases {
-		t.Run("test "+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
-
-			var stateMachine ClassicStateMachine
-			stateMachine.Opts.Project = tc.project
-			stateMachine.Opts.Filesystem = tc.filesystem
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-			err := stateMachine.Setup()
-			asserter.AssertErrContains(err, tc.errMsg)
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		})
-	}
-}
 
 // TestFailedValidateInputClassic tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputClassic(t *testing.T) {

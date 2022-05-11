@@ -74,7 +74,7 @@ func TestValidCommands(t *testing.T) {
 			if tc.isSnap {
 				comparison = ubuntuImageCommand.Snap.SnapArgsPassed.ModelAssertion
 			} else {
-				comparison = ubuntuImageCommand.Classic.ClassicArgsPassed.ImageDefinitionFile
+				comparison = ubuntuImageCommand.Classic.ClassicArgsPassed.ImageDefinition
 			}
 			if comparison != tc.gadgetModel {
 				t.Errorf("Unexpected input file value \"%s\". Expected \"%s\"",

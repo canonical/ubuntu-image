@@ -328,56 +328,6 @@ func getQemuStaticForArch(arch string) string {
 	return ""
 }
 
-// setupLiveBuildCommands creates the live build commands used in classic images
-func setupLiveBuildCommands(rootfs, arch string, env []string, enableCrossBuild bool) (lbConfig, lbBuild exec.Cmd, err error) {
-
-	lbConfig = *execCommand("lb", "config")
-	lbBuild = *execCommand("lb", "build")
-
-	lbConfig.Stdout = os.Stdout
-	lbConfig.Stderr = os.Stderr
-	lbConfig.Env = append(os.Environ(), env...)
-	lbBuild.Stdout = os.Stdout
-	lbBuild.Stderr = os.Stderr
-	lbBuild.Env = append(os.Environ(), env...)
-
-	autoSrc := os.Getenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH")
-	if autoSrc == "" {
-		dpkgArgs := "dpkg -L livecd-rootfs | grep \"auto$\""
-		dpkgCommand := execCommand("bash", "-c", dpkgArgs)
-		dpkgBytes, err := dpkgCommand.Output()
-		if err != nil {
-			return lbConfig, lbBuild, err
-		}
-		autoSrc = strings.TrimSpace(string(dpkgBytes))
-	}
-	autoDst := rootfs + "/auto"
-	if err := osutilCopySpecialFile(autoSrc, autoDst); err != nil {
-		return lbConfig, lbBuild, fmt.Errorf("Error copying livecd-rootfs/auto: %s", err.Error())
-	}
-
-	if arch != getHostArch() && enableCrossBuild {
-		// For cases where we want to cross-build, we need to pass
-		// additional options to live-build with the arch to use and path
-		// to the qemu static
-		var qemuPath string
-		qemuPath = os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
-		if qemuPath == "" {
-			static := getQemuStaticForArch(arch)
-			qemuPath, err = exec.LookPath(static)
-			if err != nil {
-				return lbConfig, lbBuild, fmt.Errorf("Use " +
-					"UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in case " +
-					"of non-standard archs or custom paths")
-			}
-		}
-		lbConfig.Args = append(lbConfig.Args, []string{"--bootstrap-qemu-arch",
-			arch, "--bootstrap-qemu-static", qemuPath, "--architectures", arch}...)
-	}
-
-	return lbConfig, lbBuild, nil
-}
-
 // maxOffset returns the maximum of two quantity.Offset types
 func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	if offset1 > offset2 {

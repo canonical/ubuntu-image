@@ -11,11 +11,7 @@ var startingClassicStates = []stateFunc{
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
 }
 
-var bootfsClassicStates = []stateFunc{
-	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
-	{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents},
-	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
-	{"prepare_classic_image", (*StateMachine).prepareClassicImage},
+var imageCreationStates = []stateFunc{
 	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
@@ -35,6 +31,10 @@ type ClassicStateMachine struct {
 
 // Setup assigns variables and calls other functions that must be executed before Run()
 func (classicStateMachine *ClassicStateMachine) Setup() error {
+	//TODO: this is a temporary way to skip some states while we
+	// implement the classic image redesign. remove it when possible
+	classicStateMachine.stateSkip = true
+
 	// set the parent pointer of the embedded struct
 	classicStateMachine.parent = classicStateMachine
 

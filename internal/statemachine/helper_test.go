@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -19,77 +18,6 @@ import (
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
 )
-
-// TestSetupCrossArch tests that the lb commands are set up correctly for cross arch compilation
-func TestSetupCrossArch(t *testing.T) {
-	t.Run("test_setup_cross_arch", func(t *testing.T) {
-		if runtime.GOARCH == "s390x" || runtime.GOARCH == "ppc64le" {
-			t.Skipf("No qemu-user-static available on %s", runtime.GOARCH)
-		}
-		asserter := helper.Asserter{T: t}
-		// set up a temp dir for this
-		os.MkdirAll(testDir, 0755)
-		defer os.RemoveAll(testDir)
-
-		// make sure we always call with a different arch than we are currently running tests on
-		var arch string
-		if getHostArch() != "arm64" {
-			arch = "arm64"
-		} else {
-			arch = "armhf"
-		}
-
-		lbConfig, _, err := setupLiveBuildCommands(testDir, arch, []string{}, true)
-		asserter.AssertErrNil(err, true)
-
-		// make sure the qemu args were appended to "lb config"
-		qemuArgFound := false
-		for _, arg := range lbConfig.Args {
-			if arg == "--bootstrap-qemu-arch" {
-				qemuArgFound = true
-			}
-		}
-		if !qemuArgFound {
-			t.Errorf("lb config command \"%s\" is missing qemu arguments",
-				lbConfig.String())
-		}
-	})
-}
-
-// TestFailedSetupLiveBuildCommands tests failures in the setupLiveBuildCommands helper function
-func TestFailedSetupLiveBuildCommands(t *testing.T) {
-	t.Run("test_failed_setup_live_build_commands", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		// set up a temp dir for this
-		os.MkdirAll(testDir, 0755)
-		defer os.RemoveAll(testDir)
-
-		// first test a failure in the dpkg command
-		// Setup the exec.Command mock
-		testCaseName = "TestFailedSetupLiveBuildCommands"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		_, _, err := setupLiveBuildCommands(testDir, "amd64", []string{}, true)
-		asserter.AssertErrContains(err, "exit status 1")
-		execCommand = exec.Command
-
-		// mock osutil.CopySpecialFile
-		osutilCopySpecialFile = mockCopySpecialFile
-		defer func() {
-			osutilCopySpecialFile = osutil.CopySpecialFile
-		}()
-		_, _, err = setupLiveBuildCommands(testDir, "amd64", []string{}, true)
-		asserter.AssertErrContains(err, "Error copying livecd-rootfs/auto")
-		osutilCopySpecialFile = osutil.CopySpecialFile
-
-		// use an arch with no qemu-static binary
-		os.Unsetenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
-		_, _, err = setupLiveBuildCommands(testDir, "fake64", []string{}, true)
-		asserter.AssertErrContains(err, "in case of non-standard archs or custom paths")
-	})
-}
 
 // TestMaxOffset tests the functionality of the maxOffset function
 func TestMaxOffset(t *testing.T) {

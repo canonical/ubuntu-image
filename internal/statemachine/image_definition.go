@@ -3,51 +3,61 @@ package statemachine
 // ImageDefinition is the parent struct for the data
 // contained within a classic image definition file
 type ImageDefinition struct {
-	ImageName      string            `yaml:"name"            json:"ImageName"`
-	DisplayName    string            `yaml:"display-name"    json:"DisplayName"`
-	Revision       int               `yaml:"revision"        json:"Revision,omitempty"`
-	Architecture   string            `yaml:"architecture"    json:"Architecture"`
-	Series         string            `yaml:"series"          json:"Series"`
+	ImageName      string             `yaml:"name"            json:"ImageName"`
+	DisplayName    string             `yaml:"display-name"    json:"DisplayName"`
+	Revision       int                `yaml:"revision"        json:"Revision,omitempty"`
+	Architecture   string             `yaml:"architecture"    json:"Architecture"`
+	Series         string             `yaml:"series"          json:"Series"`
 	Kernel         *KernelType        `yaml:"kernel"          json:"Kernel"`
 	Gadget         *GadgetType        `yaml:"gadget"          json:"Gadget"`
-	ModelAssertion string            `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
+	ModelAssertion string             `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
 	Rootfs         *RootfsType        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *CustomizationType `yaml:"customization"   json:"Customization"`
 	Artifacts      *ArtifactType      `yaml:"artifacts"       json:"Artifacts"`
-	Class          string            `yaml:"class"           json:"Classic" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
+	Class          string             `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
 }
 
-// struct for the kernel section of the image definition file
+// KernelType defines the kernel section of the image definition file
 type KernelType struct {
 	KernelName string `yaml:"name" json:"KernelName" default:"linux"`
 	KernelType string `yaml:"type" json:"KernelType,omitempty"`
 }
 
-// struct for the gadget section of the image definition file
+// GadgetType defines the gadget section of the image definition file
 type GadgetType struct {
-	Ref          *string `yaml:"ref"    json:"Ref,omitempty"`
-	GadgetBranch *string `yaml:"branch" json:"GadgetBranch,omitempty"`
-	GadgetType   *string `yaml:"type"   json:"GadgetType"` // TODO enumerate types
-	GadgetUrl    *string `yaml:"url"    json:"GadgetUrl,omitempty"  jsonschema:"type=string,format=uri"` // TODO, figure out how to enforce this field exists if type is git
+	Ref          string `yaml:"ref"    json:"Ref,omitempty"`
+	GadgetBranch string `yaml:"branch" json:"GadgetBranch,omitempty"`
+	GadgetType   string `yaml:"type"   json:"GadgetType"             jsonschema:"enum=git,enum=directory,enum=prebuilt"`
+	GadgetUrl    string `yaml:"url"    json:"GadgetUrl,omitempty"  jsonschema:"type=string,format=uri"` // TODO, custom check to make this required if the type is "git"
 }
 
-// struct for the rootfs-preparation section of the image definition file
+// RootfsType defines the rootfs section of the image definition file
 type RootfsType struct {
-	Components   []*string `yaml:"components"    json:"Components,omitempty"`
-	Archive      string    `yaml:"archive"       json:"Archive"                default:"ubuntu"`
-	Pocket       string    `yaml:"pocket"        json:"Pocket"                 default:"release"`
-	Seed         *SeedType `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
-	ArchiveTasks []*string `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
+	Components   []*string    `yaml:"components"    json:"Components,omitempty"`
+	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
+	Pocket       string       `yaml:"pocket"        json:"Pocket"                 default:"release"`
+	Seed         *SeedType    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
+	Tarball      *TarballType `yaml:"tarball"    json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
+	ArchiveTasks []string     `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
 }
 
-// struct for the seed section of rootfs-preparation
+// SeedType defines the seed section of rootfs, which is used to
+// build a rootfs via seed germination
 type SeedType struct {
-	SeedUrl    *string   `yaml:"url"    json:"SeedUrl"    jsonschema:"type=string,format=uri"`
-	SeedBranch *string   `yaml:"branch" json:"SeedBranch,omitempty"`
-	Names      []*string `yaml:"names"  json:"Names"`
+	SeedUrl    string   `yaml:"url"    json:"SeedUrl"    jsonschema:"type=string,format=uri"`
+	SeedBranch string   `yaml:"branch" json:"SeedBranch,omitempty"`
+	Names      []string `yaml:"names"  json:"Names"`
 }
 
-// struct for the customization section of the image definition file
+// TarballType defines the tarball section of rootfs, which is used
+// to create images from a pre-built rootfs
+type TarballType struct {
+	Url       string `yaml:"url"       json:"TarballUrl"    jsonschema:"type=string,format=uri"`
+	SHA256sum string `yaml:"sha256sum" json:"SHA256sum,omitempty"`
+	GPG       string `yaml:"gpg"       json:"GPG,omitemtpy", jsonschema:"type=string,format=uri"`
+}
+
+// CustomizationType defines the customization section of the image definition file
 type CustomizationType struct {
 	Installer     *InstallerType `yaml:"installer"      json:"Installer,omitempty"`
 	CloudInit     *CloudInitType `yaml:"cloud-init"     json:"CloudInit,omitempty"`
@@ -57,47 +67,47 @@ type CustomizationType struct {
 	Manual        *ManualType    `yaml:"manual"         json:"Manual,omitempty"`
 }
 
-// struct for the installer section of customization
+// InstallerType provides customization options specific to installer images
 type InstallerType struct {
-	Preseeds []*string `yaml:"preseeds" json:"Preseeds,omitempty"`
-	Layers   []*string `yaml:"layers"   json:"Layers,omitempty"`
+	Preseeds []string `yaml:"preseeds" json:"Preseeds,omitempty"`
+	Layers   []string `yaml:"layers"   json:"Layers,omitempty"`
 }
 
-// struct for the cloud-init section of customization
+// CloudInitType provides customizations for running cloud-init
 type CloudInitType struct {
-	MetaData      *string         `yaml:"meta-data"      json:"MetaData,omitempty"`
+	MetaData      string          `yaml:"meta-data"      json:"MetaData,omitempty"`
 	UserData      *[]UserDataType `yaml:"user-data"      json:"UserData,omitempty"`
-	NetworkConfig *string         `yaml:"network-config" json:"NetworkConfig,omitempty"`
+	NetworkConfig string          `yaml:"network-config" json:"NetworkConfig,omitempty"`
 }
 
-// struct for cloud-init user data
+// UserDataType defines the user information to be used by cloud-init
 type UserDataType struct {
-	UserName *string     `yaml:"name"     json:"UserName"`
-	UserPassword *string `yaml:"password" json:"UserPassword"`
+	UserName     string `yaml:"name"     json:"UserName"`
+	UserPassword string `yaml:"password" json:"UserPassword"`
 }
 
-// struct for the extra-ppas section of customization
+// PPAType contains information about a public or private PPA
 type PPAType struct {
-	PPAName     *string `yaml:"name"         json:"PPAName"`
-	Auth        *string `yaml:"auth"         json:"Auth,omitempty"`
-	Fingerprint *string `yaml:"fingerprint"  json:"Fingerprint,omitempty"`
-	KeepEnabled *bool   `yaml:"keep-enabled" json:"KeepEnabled"           default:"true"`
+	PPAName     string `yaml:"name"         json:"PPAName"`
+	Auth        string `yaml:"auth"         json:"Auth,omitempty"`
+	Fingerprint string `yaml:"fingerprint"  json:"Fingerprint,omitempty"`
+	KeepEnabled bool   `yaml:"keep-enabled" json:"KeepEnabled"           default:"true"`
 }
 
-// struct for the extra-packages section of customization
+// PackageType contains information about packages
 type PackageType struct {
-	PackageName *string `yaml:"name" json:"PackageName"`
+	PackageName string `yaml:"name" json:"PackageName"`
 }
 
-// struct for the extra-snaps section of customization
+// SnapType contains information about snaps
 type SnapType struct {
-	SnapName     *string `yaml:"name"     json:"SnapName"`
-	SnapRevision *string `yaml:"revision" json:"SnapRevision,omitempty"`
-	Store        *string `yaml:"store"    json:"Store"                  default:"canonical"`
-	Channel      *string `yaml:"channel"  json:"Channel"                default:"stable"`
+	SnapName     string `yaml:"name"     json:"SnapName"`
+	SnapRevision string `yaml:"revision" json:"SnapRevision,omitempty"`
+	Store        string `yaml:"store"    json:"Store"                  default:"canonical"`
+	Channel      string `yaml:"channel"  json:"Channel"                default:"stable"`
 }
 
-// struct for the manual section of customization
+// ManualType provides manual customization options
 type ManualType struct {
 	CopyFile  []*CopyFileType  `yaml:"copy-file"  json:"CopyFile,omitempty"`
 	Execute   []*ExecuteType   `yaml:"execute"    json:"Execute,omitempty"`
@@ -106,35 +116,36 @@ type ManualType struct {
 	AddUser   []*AddUserType   `yaml:"add-user"   json:"AddUser,omitempty"`
 }
 
-// struct for the copy-file manual customization
+// CopyFileType allows users to copy files into the rootfs of an image
 type CopyFileType struct {
-	Dest   *string `yaml:"destination" json:"Dest"`
-	Source *string `yaml:"source"      json:"Source"`
+	Dest   string `yaml:"destination" json:"Dest"`
+	Source string `yaml:"source"      json:"Source"`
 }
 
-// struct for the execute manual customization
+// ExecuteType allows users to execute a script in the rootfs of an image
 type ExecuteType struct {
-	ExecutePath *string `yaml:"path" json:"ExecutePath"`
+	ExecutePath string `yaml:"path" json:"ExecutePath"`
 }
 
-// struct for the touch-file manual customization
+// TouchFileType allows users to touch a file in the rootfs of an image
 type TouchFileType struct {
-	TouchPath *string `yaml:"path" json:"TouchPath"`
+	TouchPath string `yaml:"path" json:"TouchPath"`
 }
 
-// struct for the add-group manual customization
+// AddGroupType allows users to add a group in the image that is being built
 type AddGroupType struct {
-	GroupName *string `yaml:"name" json:"GroupName"`
-	GroupId   *string `yaml:"id"   json:"GroupId,omitempty"`
+	GroupName string `yaml:"name" json:"GroupName"`
+	GroupId   string `yaml:"id"   json:"GroupId,omitempty"`
 }
 
-// struct for the add-user manual customization
+// AddUserType allows users to add a user in the image that is being built
 type AddUserType struct {
-	UserName *string `yaml:"name" json:"UserName"`
-	UserId   *string `yaml:"id"   json:"UserId,omitempty"`
+	UserName string `yaml:"name" json:"UserName"`
+	UserId   string `yaml:"id"   json:"UserId,omitempty"`
 }
 
-// struct for the artifacts section of the image definition file
+// ArtifactType contains information about the files that are created
+// during and as a result of the image build process
 type ArtifactType struct {
 	Img       *ImgType       `yaml:"img"        json:"Img,omitempty"`
 	Iso       *IsoType       `yaml:"iso"        json:"Iso,omitempty"`
@@ -144,33 +155,40 @@ type ArtifactType struct {
 	Changelog *ChangelogType `yaml:"changelog" json:"Changelog,omitempty"`
 }
 
-// struct for the img section of artifacts
+// ImgType specifies the name of the resulting .img file.
+// If left emtpy no .img file will be created
 type ImgType struct {
-	ImgPath *string `yaml:"path" json:"ImgPath"`
+	ImgPath string `yaml:"path" json:"ImgPath"`
 }
 
-// struct for the ISO section of artifacts
+// IsoType specifies the name of the resulting .iso file
+// and optionally the xorrisofs command used to create it.
+// If left emtpy no .iso file will be created
 type IsoType struct {
-	IsoPath *string `yaml:"path"    json:"IsoPath"`
-	Command *string `yaml:"command" json:"Command,omitempty"`
+	IsoPath string `yaml:"path"    json:"IsoPath"`
+	Command string `yaml:"command" json:"Command,omitempty"`
 }
 
-// struct for the qcow2 section of artifacts
+// Qcow2Type specifies the name of the resulting .qcow2 file
+// If left emtpy no .qcow2 file will be created
 type Qcow2Type struct {
-	Qcow2Path *string `yaml:"path" json:"Qcow2Path"`
+	Qcow2Path string `yaml:"path" json:"Qcow2Path"`
 }
 
-// struct for the manifest section of artifacts
+// ManifestType specifies the name of the manifest file.
+// If left emtpy no manifest file will be created
 type ManifestType struct {
-	ManifestPath *string `yaml:"path" json:"ManifestPath"`
+	ManifestPath string `yaml:"path" json:"ManifestPath"`
 }
 
-// struct for the filelist section of artifacts
+// FilelistType specifies the name of the filelist file.
+// If left emtpy no filelist file will be created
 type FilelistType struct {
-	FilelistPath *string `yaml:"path" json:"FilelistPath"`
+	FilelistPath string `yaml:"path" json:"FilelistPath"`
 }
 
-// struct for the changelog section of artifacts
+// ChangelogType specifies the name of the changelog file.
+// If left emtpy no changelog file will be created
 type ChangelogType struct {
-	ChangelogPath *string `yaml:"path" json:"ChangelogPath"`
+	ChangelogPath string `yaml:"path" json:"ChangelogPath"`
 }

@@ -1,7 +1,6 @@
 package statemachine
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -28,11 +27,9 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return err
 	}
 
-	// populate the default values for imageDefinition if they were not provided in 
+	// populate the default values for imageDefinition if they were not provided in
 	// the image definition YAML file
-	fmt.Printf("JAWN archive is: %s\n", imageDefinition.Rootfs.Archive)
 	helper.SetDefaults(&imageDefinition)
-	fmt.Printf("JAWN archive is: %s\n", imageDefinition.Rootfs.Archive)
 
 	// The official standard for YAML schemas states that they are an extension of
 	// JSON schema draft 4. We therefore validate the decoded YAML against a JSON
@@ -42,9 +39,6 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	// 3. Use the gojsonschema library to validate the parsed YAML against the schema
 
 	var jsonReflector jsonschema.Reflector
-	//jsonReflector.YAMLEmbeddedStructs = true
-	//jsonReflector.PreferYAMLSchema = true
-	//jsonReflector.ExpandedStruct = true
 
 	// 1. parse the ImageDefinition struct into a schema using the jsonschema tags
 	schema := jsonReflector.Reflect(&ImageDefinition{})
@@ -52,12 +46,6 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return fmt.Errorf("Error generating schema to validate against")
 	}
 
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	_ = enc.Encode(schema)
-
-	//fmt.Printf("%+v\n", imageDefinition)
-	//fmt.Printf("%+v\n", &ImageDefinition{})
 	// 2. load the schema and parsed YAML data into types understood by gojsonschema
 	schemaLoader := gojsonschema.NewGoLoader(schema)
 	imageDefinitionLoader := gojsonschema.NewGoLoader(imageDefinition)
@@ -81,28 +69,71 @@ func (stateMachine *StateMachine) calculateStates() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	fmt.Println(stateMachine.states)
 	var rootfsCreationStates []stateFunc
 
-	switch *classicStateMachine.ImageDef.Gadget.GadgetType {
+	// determine the states needed for preparing the gadget
+	switch classicStateMachine.ImageDef.Gadget.GadgetType {
 	case "git":
+		fallthrough
 	case "directory":
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"build_gadget_tree", (*StateMachine).buildGadgetTree})
-		break
+		fallthrough
 	case "prebuilt":
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree})
 		break
 	}
 
+	// Load the gadget yaml after the gadget is built
 	rootfsCreationStates = append(rootfsCreationStates,
-		stateFunc{"finish", (*StateMachine).finish})
+		stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml})
+
+	// determine the states needed for preparing the rootfs.
+	// The rootfs is either created from a seed, from
+	// archive-tasks or as a prebuilt tarball. These
+	// options are mutually exclusive and have been validated
+	// by the schema already
+	if classicStateMachine.ImageDef.Rootfs.Tarball != nil {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
+	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"build_rootfs_from_seed", (*StateMachine).buildRootfsFromSeed})
+	} else {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
+	}
+
+	// Determine any customization that needs to run before the image is created
+	//TODO: installer image customization... eventually.
+	if classicStateMachine.ImageDef.Customization.CloudInit != nil {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
+	}
+	if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"configure_extra_ppas", (*StateMachine).setupExtraPPAs})
+	}
+	if len(classicStateMachine.ImageDef.Customization.ExtraPackages) > 0 {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"install_extra_packages", (*StateMachine).installExtraPackages})
+	}
+	if len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"install_extra_snaps", (*StateMachine).prepareClassicImage})
+	}
+	if classicStateMachine.ImageDef.Customization.Manual != nil {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
+	}
+
+	// Add the "always there" states that populate partitions, build the disk, etc.
+	// This includes the no-op "finish" state to signify successful setup
+	rootfsCreationStates = append(rootfsCreationStates, imageCreationStates...)
 
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	stateMachine.states = append(stateMachine.states, rootfsCreationStates...)
-
-	fmt.Println(stateMachine.states)
 
 	return nil
 }
@@ -139,6 +170,50 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	  // snapcraft prime so the gadget.yaml file is expected in the meta directory
 	  classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "meta", "gadget.yaml")*/
 
+	return nil
+}
+
+// Build a rootfs via seed germination
+func (stateMachine *StateMachine) buildRootfsFromSeed() error {
+	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// Build a rootfs from a list of archive tasks
+func (stateMachine *StateMachine) buildRootfsFromTasks() error {
+	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// Extract the rootfs from a tar archive
+func (stateMachine *StateMachine) extractRootfsTar() error {
+	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// Customize Cloud init with the values in the image definition YAML
+func (stateMachine *StateMachine) customizeCloudInit() error {
+	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// Configure Extra PPAs
+func (stateMachine *StateMachine) setupExtraPPAs() error {
+	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// Install extra packages
+// TODO: this should probably happen during the rootfs build steps.
+// but what about extra packages with a tarball based images...
+func (stateMachine *StateMachine) installExtraPackages() error {
+	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// Handle any manual customizations specified in the image definition
+func (stateMachine *StateMachine) manualCustomization() error {
+	// currently a no-op pending implementation of the classic image redesign
 	return nil
 }
 

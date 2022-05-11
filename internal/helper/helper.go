@@ -88,58 +88,13 @@ func CopyBlob(ddArgs []string) error {
 	return nil
 }
 
-// SetDefaults sets the default values in the struct if they are not
-// already set. They are defined though the `default` struct tag.
-// Currently only setting strings is supported
-/*func SetDefaults(needsDefaults interface{}) {
-	indirectedNeedsDefaults := reflect.Indirect(reflect.ValueOf(needsDefaults))
-	indirectedInterface := indirectedNeedsDefaults.Interface()
-	interfaceType := reflect.TypeOf(indirectedInterface)
-	interfaceFields := reflect.VisibleFields(interfaceType)
-	for _, field := range interfaceFields {
-		// check types and dereference pointers
-		var fieldKind reflect.Kind
-		var nonPointerValue reflect.Value
-		if field.Type.Kind() == reflect.Ptr {
-			fieldPointer := reflect.ValueOf(indirectedInterface).FieldByIndex(field.Index)
-			if !fieldPointer.IsNil() {
-				indirectedField := reflect.Indirect(fieldPointer)
-				fieldKind = indirectedField.Type().Kind()
-				nonPointerValue = indirectedField
-			}
-		} else {
-			fieldKind = field.Type.Kind()
-			nonPointerValue = reflect.ValueOf(indirectedInterface).FieldByIndex(field.Index)
-		}
-
-		// if the current field is a non-nil struct, call this function recursively
-		if fieldKind == reflect.Struct {
-			nonPointerInterface := nonPointerValue.Interface()
-			fmt.Println(reflect.TypeOf(nonPointerInterface))
-			SetDefaults(&nonPointerInterface)
-		}
-		// otherwise, look for the "default" struct tag
-		defaultValue, hasDefault := field.Tag.Lookup("default")
-		if hasDefault {
-			fmt.Printf("Key %s of type %s has default value %s\n", field.Name, field.Type, defaultValue)
-			addressableValue := nonPointerValue.String()
-			fmt.Println(reflect.TypeOf(addressableValue))
-			if addressableValue.CanAddr() {
-				fmt.Println("JAWN this field is addressable")
-			} else {
-				fmt.Println("JAWN this field is NOT addressable")
-			}
-			if nonPointerValue.CanSet() {
-				fmt.Println("JAWN we can set the value!")
-				nonPointerValue.SetString(defaultValue)
-			}
-		}
-	}
-}*/
-func SetDefaults(needsDefaults interface{}) {
+// SetDefaults iterates through the keys in a struct and sets
+// default values if one is specified with a struct tag of "default".
+// Currently on default values of strings are supported
+func SetDefaults(needsDefaults interface{}) error {
 	value := reflect.ValueOf(needsDefaults)
 	if value.Kind() != reflect.Ptr {
-		panic("The argument to SetDefaults must be a pointer!")
+		return fmt.Errorf("The argument to SetDefaults must be a pointer!")
 	}
 	elem := value.Elem()
 	for i := 0; i < elem.NumField(); i++ {
@@ -153,54 +108,11 @@ func SetDefaults(needsDefaults interface{}) {
 		tags := elem.Type().Field(i).Tag
 		defaultValue, hasDefault := tags.Lookup("default")
 		if hasDefault {
-			fmt.Printf(defaultValue)
-			fmt.Println(field.Type())
-			fmt.Println(field.Type().Kind())
 			indirectedField := reflect.Indirect(field)
-			if indirectedField.CanSet() {
-				fmt.Println("JAWN setting default value")
+			if indirectedField.CanSet() && field.IsZero() {
 				field.SetString(defaultValue)
-			} else {
-				fmt.Println("JAWN cannot set default value")
 			}
 		}
 	}
-}
-
-/*func setField(field reflect.Value, defaultVal string) error {
-
-	if !field.CanSet() {
-		return fmt.Errorf("Can't set value\n")
-	}
-
-	switch field.Kind() {
-
-	case reflect.Int:
-		if val, err := strconv.ParseInt(defaultVal, 10, 64); err == nil {
-			field.Set(reflect.ValueOf(int(val)).Convert(field.Type()))
-		}
-	case reflect.String:
-		field.Set(reflect.ValueOf(defaultVal).Convert(field.Type()))
-	}
-
 	return nil
 }
-
-func Set(ptr interface{}, tag string) error {
-	if reflect.TypeOf(ptr).Kind() != reflect.Ptr {
-		return fmt.Errorf("Not a pointer")
-	}
-
-	v := reflect.ValueOf(ptr).Elem()
-	t := v.Type()
-
-	for i := 0; i < t.NumField(); i++ {
-		if defaultVal := t.Field(i).Tag.Get(tag); defaultVal != "-" {
-			if err := setField(v.Field(i), defaultVal); err != nil {
-				return err
-			}
-
-		}
-	}
-	return nil
-}*/
