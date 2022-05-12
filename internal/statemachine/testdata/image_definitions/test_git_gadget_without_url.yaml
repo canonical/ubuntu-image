@@ -3,11 +3,10 @@ display-name: Ubuntu Server Raspberry Pi arm64
 revision: 2
 architecture: arm64
 series: jammy
-class: testclass
+class: preinstalled
 kernel:
   name: linux-raspi
 gadget:
-  url: "https://github.com/snapcore/pi-gadget.git"
   branch: classic
   type: "git"
 model-assertion: pi-generic.model

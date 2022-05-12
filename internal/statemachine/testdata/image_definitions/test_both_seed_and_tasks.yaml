@@ -11,7 +11,7 @@ gadget:
   branch: classic
   type: "git"
 model-assertion: pi-generic.model
-bootstrap:
+rootfs:
   seed:
     url: "https://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/ubuntu"
     branch: jammy
@@ -22,17 +22,18 @@ bootstrap:
       - cloud-image
       - ubuntu-server-raspi
   archive-tasks:
-    - ubuntu-server
-    - ubuntu-server-minimal
+    - desktop
+    - desktop-raspi
 customization:
-  cloud_init:
-    user_data:
-      name: ubuntu
-      password: ubuntu
-  extra_packages:
-    - ubuntu-minimal
-    - linux-firmware-raspi
-    - pi-bluetooth
+  cloud-init:
+    user-data:
+      -
+        name: ubuntu
+        password: ubuntu
+  extra-packages:
+    - name: ubuntu-minimal
+    - name: linux-firmware-raspi
+    - name: pi-bluetooth
 artifacts:
   img:
       path: raspi.img

@@ -407,7 +407,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 	}{
 		{"no_channel_specified", []string{"hello", "core20"}, true},
 		{"channel_specified", []string{"hello=edge", "core20"}, true},
-		{"mixed_syntax", []string{"hello", "core20=edge"}, true},
+		{"mixed_syntax", []string{"hello", "core20=candidate"}, true},
 		{"invalid_syntax", []string{"hello=edge=stable", "core20"}, false},
 	}
 	for _, tc := range testCases {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"
 
@@ -29,7 +28,9 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 
 	// populate the default values for imageDefinition if they were not provided in
 	// the image definition YAML file
-	helper.SetDefaults(&imageDefinition)
+	if err := helperSetDefaults(&imageDefinition); err != nil {
+		return err
+	}
 
 	// The official standard for YAML schemas states that they are an extension of
 	// JSON schema draft 4. We therefore validate the decoded YAML against a JSON
@@ -42,19 +43,34 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 
 	// 1. parse the ImageDefinition struct into a schema using the jsonschema tags
 	schema := jsonReflector.Reflect(&ImageDefinition{})
-	if schema == nil {
-		return fmt.Errorf("Error generating schema to validate against")
-	}
 
 	// 2. load the schema and parsed YAML data into types understood by gojsonschema
 	schemaLoader := gojsonschema.NewGoLoader(schema)
 	imageDefinitionLoader := gojsonschema.NewGoLoader(imageDefinition)
 
 	// 3. validate the parsed data against the schema
-	result, err := gojsonschema.Validate(schemaLoader, imageDefinitionLoader)
+	result, err := gojsonschemaValidate(schemaLoader, imageDefinitionLoader)
 	if err != nil {
 		return fmt.Errorf("Schema validation returned an error: %s", err.Error())
 	}
+
+	// do some custom validation
+	if imageDefinition.Gadget.GadgetType == "git" && imageDefinition.Gadget.GadgetUrl == "" {
+		jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
+		errDetail := gojsonschema.ErrorDetails{
+			"key":   "gadget:type",
+			"value": "git",
+		}
+		result.AddError(
+			newMissingUrlError(
+				gojsonschema.NewJsonContext("missingURL", jsonContext),
+				52,
+				errDetail,
+			),
+			errDetail,
+		)
+	}
+
 	if !result.Valid() {
 		return fmt.Errorf("Schema validation failed: %s", result.Errors())
 	}

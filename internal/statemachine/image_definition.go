@@ -1,5 +1,9 @@
 package statemachine
 
+import (
+	"github.com/xeipuuv/gojsonschema"
+)
+
 // ImageDefinition is the parent struct for the data
 // contained within a classic image definition file
 type ImageDefinition struct {
@@ -52,9 +56,9 @@ type SeedType struct {
 // TarballType defines the tarball section of rootfs, which is used
 // to create images from a pre-built rootfs
 type TarballType struct {
-	Url       string `yaml:"url"       json:"TarballUrl"    jsonschema:"type=string,format=uri"`
-	SHA256sum string `yaml:"sha256sum" json:"SHA256sum,omitempty"`
-	GPG       string `yaml:"gpg"       json:"GPG,omitemtpy", jsonschema:"type=string,format=uri"`
+	TarballUrl string `yaml:"url"       json:"TarballUrl"    jsonschema:"type=string,format=uri"`
+	GPG        string `yaml:"gpg"       json:"GPG,omitempty" jsonschema:"type=string,format=uri"`
+	SHA256sum  string `yaml:"sha256sum" json:"SHA256sum,omitempty"`
 }
 
 // CustomizationType defines the customization section of the image definition file
@@ -191,4 +195,21 @@ type FilelistType struct {
 // If left emtpy no changelog file will be created
 type ChangelogType struct {
 	ChangelogPath string `yaml:"path" json:"ChangelogPath"`
+}
+
+func newMissingUrlError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingUrlError {
+	err := MissingUrlError{}
+	err.SetContext(context)
+	err.SetType("missing_url_error")
+	err.SetDescriptionFormat("When key {{.key}} is specified as {{.value}}, a URL must be provided")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// This struct is extensible for any other fields that may require a URL
+// based on the values in other fields
+type MissingUrlError struct {
+	gojsonschema.ResultErrorFields
 }

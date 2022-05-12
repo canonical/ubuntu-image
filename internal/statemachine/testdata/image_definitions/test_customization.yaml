@@ -3,7 +3,7 @@ display-name: Ubuntu Server Raspberry Pi arm64
 revision: 2
 architecture: arm64
 series: jammy
-class: testclass
+class: preinstalled
 kernel:
   name: linux-raspi
 gadget:
@@ -27,10 +27,20 @@ customization:
       -
         name: ubuntu
         password: ubuntu
+  extra-ppas:
+    -
+      name: "test/test-ppa"
   extra-packages:
     - name: ubuntu-minimal
     - name: linux-firmware-raspi
     - name: pi-bluetooth
+  extra-snaps:
+    -
+      name: hello
+      channel: stable
+  manual:
+    touch-file:
+      - path: "/etc/testfile"
 artifacts:
   img:
       path: raspi.img

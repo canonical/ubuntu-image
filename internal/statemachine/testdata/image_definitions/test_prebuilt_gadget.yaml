@@ -5,12 +5,10 @@ architecture: arm64
 series: jammy
 class: preinstalled
 kernel:
-  #name: linux-raspi
-  type: "hwe"
+  name: linux-raspi
 gadget:
-  url: "https://github.com/snapcore/pi-gadget.git"
-  branch: classic
-  type: "git"
+  url: "file://test.tar"
+  type: "directory"
 model-assertion: pi-generic.model
 rootfs:
   seed:

@@ -90,7 +90,7 @@ func CopyBlob(ddArgs []string) error {
 
 // SetDefaults iterates through the keys in a struct and sets
 // default values if one is specified with a struct tag of "default".
-// Currently on default values of strings are supported
+// Currently on default values of strings and bools are supported
 func SetDefaults(needsDefaults interface{}) error {
 	value := reflect.ValueOf(needsDefaults)
 	if value.Kind() != reflect.Ptr {
@@ -99,7 +99,17 @@ func SetDefaults(needsDefaults interface{}) error {
 	elem := value.Elem()
 	for i := 0; i < elem.NumField(); i++ {
 		field := elem.Field(i)
-		// no sense checking non-pointer values as they can't be updated
+		// if we're dealing with a slice, iterate through
+		// it and set the defaults for each struct pointer
+		if field.Type().Kind() == reflect.Slice {
+			for i := 0; i < field.Cap(); i++ {
+				sliceElem := field.Index(i)
+				if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
+					SetDefaults(sliceElem.Interface())
+				}
+			}
+		}
+		// otherwise if it's just a pointer, look for default types
 		if field.Type().Kind() == reflect.Ptr {
 			if field.Elem().Kind() == reflect.Struct {
 				SetDefaults(field.Interface())
@@ -110,7 +120,22 @@ func SetDefaults(needsDefaults interface{}) error {
 		if hasDefault {
 			indirectedField := reflect.Indirect(field)
 			if indirectedField.CanSet() && field.IsZero() {
-				field.SetString(defaultValue)
+				varType := field.Type().Kind()
+				switch varType {
+				case reflect.String:
+					field.SetString(defaultValue)
+					break
+				case reflect.Bool:
+					if defaultValue == "true" {
+						field.SetBool(true)
+					} else {
+						field.SetBool(false)
+					}
+					break
+				default:
+					return fmt.Errorf("Setting default value of type %s not supported",
+						varType)
+				}
 			}
 		}
 	}

@@ -23,12 +23,14 @@ import (
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 // define some functions that can be mocked by test cases
 var gadgetLayoutVolume = gadget.LayoutVolume
 var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 var helperCopyBlob = helper.CopyBlob
+var helperSetDefaults = helper.SetDefaults
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
 var ioutilWriteFile = ioutil.WriteFile
@@ -48,6 +50,7 @@ var diskfsCreate = diskfs.Create
 var randRead = rand.Read
 var seedOpen = seed.Open
 var imagePrepare = image.Prepare
+var gojsonschemaValidate = gojsonschema.Validate
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 

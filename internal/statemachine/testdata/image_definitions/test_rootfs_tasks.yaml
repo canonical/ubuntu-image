@@ -3,7 +3,7 @@ display-name: Ubuntu Server Raspberry Pi arm64
 revision: 2
 architecture: arm64
 series: jammy
-class: testclass
+class: preinstalled
 kernel:
   name: linux-raspi
 gadget:
@@ -12,15 +12,9 @@ gadget:
   type: "git"
 model-assertion: pi-generic.model
 rootfs:
-  seed:
-    url: "https://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/ubuntu"
-    branch: jammy
-    names:
-      - server
-      - minimal
-      - standard
-      - cloud-image
-      - ubuntu-server-raspi
+  archive-tasks:
+    - ubuntu-server-minimal
+    - ubuntu-server
 customization:
   cloud-init:
     user-data:

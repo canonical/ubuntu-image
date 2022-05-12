@@ -7,13 +7,13 @@ class: preinstalled
 kernel:
   name: linux-raspi
 gadget:
-  url: "this is not what a url looks like"
+  url: "This is not a valid URL"
   branch: classic
   type: "git"
 model-assertion: pi-generic.model
-bootstrap:
+rootfs:
   seed:
-    url: "and this isn't either!"
+    url: "And this isn't either!"
     branch: jammy
     names:
       - server
@@ -22,14 +22,15 @@ bootstrap:
       - cloud-image
       - ubuntu-server-raspi
 customization:
-  cloud_init:
-    user_data:
-      name: ubuntu
-      password: ubuntu
-  extra_packages:
-    - ubuntu-minimal
-    - linux-firmware-raspi
-    - pi-bluetooth
+  cloud-init:
+    user-data:
+      -
+        name: ubuntu
+        password: ubuntu
+  extra-packages:
+    - name: ubuntu-minimal
+    - name: linux-firmware-raspi
+    - name: pi-bluetooth
 artifacts:
   img:
       path: raspi.img
