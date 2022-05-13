@@ -121,6 +121,10 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
 	}
 
+	// The rootfs is laid out in a staging area, now populate it in the correct location
+	rootfsCreationStates = append(rootfsCreationStates,
+		stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents})
+
 	// Determine any customization that needs to run before the image is created
 	//TODO: installer image customization... eventually.
 	if classicStateMachine.ImageDef.Customization.CloudInit != nil {

@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	//"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -649,6 +651,113 @@ func TestFailedRemovePreseeding(t *testing.T) {
 		asserter.AssertErrContains(err, "Test error")
 		osRemoveAll = os.RemoveAll
 
-		//os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
+
+// TestGetHostArch unit tests the getHostArch function
+func TestGetHostArch(t *testing.T) {
+	t.Run("test_get_host_arch", func(t *testing.T) {
+		hostArch := getHostArch()
+		switch runtime.GOARCH {
+		case "amd64":
+			expected := "amd64"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", expected, hostArch)
+			}
+			break
+		case "arm":
+			expected := "armhf"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		case "arm64":
+			expected := "arm64"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		case "ppc64le":
+			expected := "ppc64el"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		case "s390x":
+			expected := "s390x"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		case "riscv64":
+			expected := "riscv64"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		default:
+			t.Skipf("Test not supported on architecture %s", runtime.GOARCH)
+			break
+		}
+	})
+}
+
+// TestGetHostSuite unit tests the getHostSuite function to make sure
+// it returns a string with length greater than zero
+func TestGetHostSuite(t *testing.T) {
+	t.Run("test_get_host_suite", func(t *testing.T) {
+		hostSuite := getHostSuite()
+		if len(hostSuite) == 0 {
+			t.Error("getHostSuite could not get the host suite")
+		}
+	})
+}
+
+// TestGetQemuStaticForArch unit tests the getQemuStaticForArch function
+func TestGetQemuStaticForArch(t *testing.T) {
+	testCases := []struct {
+		arch string
+		expected   string
+	}{
+		{"amd64", ""},
+		{"armhf", "qemu-arm-static"},
+		{"arm64", "qemu-aarch64-static"},
+		{"ppc64el", "qemu-ppc64le-static"},
+		{"s390x", ""},
+		{"riscv64", ""},
+	}
+	for _, tc := range testCases {
+		t.Run("test_get_qemu_static_for_"+tc.arch, func(t *testing.T) {
+			qemuStatic := getQemuStaticForArch(tc.arch)
+			if qemuStatic != tc.expected {
+				t.Errorf("Expected qemu static \"%s\" for arch \"%s\", instead got \"%s\"",
+					tc.expected, tc.arch, qemuStatic)
+			}
+		})
+	}
+}
+
+// TestRemovePreseeding unit tests the removePreseeding function
+// TODO: figure out a way to unit test this function without having to
+// commit a bunch of snaps into github.
+/*func TestRemovePreseeding(t *testing.T) {
+	t.Run("test_remove_preseeding", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		preseededRootfs := filepath.Join("testdata", "preseeded")
+		seededSnaps, err := removePreseeding(preseededRootfs)
+		asserter.AssertErrNil(err, true)
+
+		// make sure the correct snaps were returned by removePreseeding
+		expectedSnaps := map[string]string {
+			"core20": "stable",
+			"snapd": "stable",
+			"lxd": "stable/ubuntu-21.10",
+		}
+
+		if !reflect.DeepEqual(seededSnaps, expectedSnaps) {
+			t.Error("removePreseeding did not find the correct snap/channel mappings")
+		}
+	})
+}*/
