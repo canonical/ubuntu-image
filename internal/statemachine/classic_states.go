@@ -71,6 +71,14 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		)
 	}
 
+	// TODO: I've created a PR upstream in xeipuuv/gojsonschema
+	// https://github.com/xeipuuv/gojsonschema/pull/352
+	// if it gets merged this can be removed
+	err = helperCheckEmptyFields(&imageDefinition, result, schema)
+	if err != nil {
+		return err
+	}
+
 	if !result.Valid() {
 		return fmt.Errorf("Schema validation failed: %s", result.Errors())
 	}

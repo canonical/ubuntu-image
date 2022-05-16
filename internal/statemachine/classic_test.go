@@ -50,6 +50,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"git_gadget_without_url", "test_git_gadget_without_url.yaml", false, "When key gadget:type is specified as git, a URL must be provided"},
 		{"file_doesnt_exist", "test_not_exist.yaml", false, "no such file or directory"},
 		{"not_valid_yaml", "test_invalid_yaml.yaml", false, "yaml: unmarshal errors"},
+		{"missing_yaml_fields", "test_missing_name.yaml", false, "Key \"name\" is required in struct \"ImageDefinition\", but is not in the YAML file!"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_yaml_schema_"+tc.name, func(t *testing.T) {
@@ -95,6 +96,15 @@ func TestFailedParseImageDefinition(t *testing.T) {
 		err := stateMachine.parseImageDefinition()
 		asserter.AssertErrContains(err, "Test Error")
 		helperSetDefaults = helper.SetDefaults
+
+		// mock helper.CheckEmptyFields
+		helperCheckEmptyFields = mockCheckEmptyFields
+		defer func() {
+			helperCheckEmptyFields = helper.CheckEmptyFields
+		}()
+		err = stateMachine.parseImageDefinition()
+		asserter.AssertErrContains(err, "Test Error")
+		helperCheckEmptyFields = helper.CheckEmptyFields
 
 		// mock gojsonschema.Validate
 		gojsonschemaValidate = mockGojsonschemaValidateError
@@ -627,6 +637,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 		}*/
 	})
 }
+
 /*
 // TestFailedGeneratePackageManifest tests if classic manifest generation failures are reported
 func TestFailedGeneratePackageManifest(t *testing.T) {

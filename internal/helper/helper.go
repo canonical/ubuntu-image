@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 // CaptureStd returns an io.Reader to read what was printed, and teardown
@@ -140,4 +142,96 @@ func SetDefaults(needsDefaults interface{}) error {
 		}
 	}
 	return nil
+}
+
+// CheckEmptyFields iterates through the image definition struct and
+// checks for fields that are present but return IsZero == true.
+// TODO: I've created a PR upstream in xeipuuv/gojsonschema
+// https://github.com/xeipuuv/gojsonschema/pull/352
+// if it gets merged this can be deleted
+func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema *jsonschema.Schema) error {
+	value := reflect.ValueOf(Interface)
+	if value.Kind() != reflect.Ptr {
+		return fmt.Errorf("The argument to CheckEmptyFields must be a pointer!")
+	}
+	elem := value.Elem()
+	for i := 0; i < elem.NumField(); i++ {
+		field := elem.Field(i)
+		// if we're dealing with a slice, iterate through
+		// it and search for missing required fields in each
+		// element of the slice
+		if field.Type().Kind() == reflect.Slice {
+			for i := 0; i < field.Cap(); i++ {
+				sliceElem := field.Index(i)
+				if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
+					err := CheckEmptyFields(sliceElem.Interface(), result, schema)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+		// otherwise if it's just a pointer to a nested struct
+		// search it for empty required fields
+		if field.Type().Kind() == reflect.Ptr {
+			if field.Elem().Kind() == reflect.Struct {
+				err := CheckEmptyFields(field.Interface(), result, schema)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// check if the field is required and if it is present in the YAML file
+		required := false
+		tags := elem.Type().Field(i).Tag
+		jsonTag, hasJson := tags.Lookup("json")
+		if hasJson {
+			if !strings.Contains(jsonTag, "omitempty") {
+				required = true
+			}
+		}
+		// also check for required values in the jsonschema
+		for _, requiredField := range schema.Required {
+			if elem.Type().Field(i).Name == requiredField {
+				required = true
+			}
+		}
+		if required {
+			// this is a required field, check for zero values
+			if reflect.Indirect(field).IsZero() {
+				fmt.Println(elem.Type())
+				jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
+				errDetail := gojsonschema.ErrorDetails{
+					"property": tags.Get("yaml"),
+					"parent":   elem.Type().Name(),
+				}
+				result.AddError(
+					newMissingFieldError(
+						gojsonschema.NewJsonContext("missing_field", jsonContext),
+						52,
+						errDetail,
+					),
+					errDetail,
+				)
+			}
+		}
+	}
+	return nil
+}
+
+func newMissingFieldError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingFieldError {
+	err := MissingFieldError{}
+	err.SetContext(context)
+	err.SetType("missing_field_error")
+	err.SetValue(value)
+	err.SetDescriptionFormat("Key \"{{.property}}\" is required in struct \"{{.parent}}\", but is not in the YAML file!")
+	err.SetDetails(details)
+
+	return &err
+}
+
+// MissingFieldError is used when the fields exist but are the zero value for their type
+type MissingFieldError struct {
+	gojsonschema.ResultErrorFields
 }

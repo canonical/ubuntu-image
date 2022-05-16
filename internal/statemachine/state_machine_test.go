@@ -13,6 +13,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/diskfs/go-diskfs/disk"
+	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/image"
@@ -51,6 +52,9 @@ func mockCopyBlob([]string) error {
 	return fmt.Errorf("Test Error")
 }
 func mockSetDefaults(interface{}) error {
+	return fmt.Errorf("Test Error")
+}
+func mockCheckEmptyFields(interface{}, *gojsonschema.Result, *jsonschema.Schema) error {
 	return fmt.Errorf("Test Error")
 }
 func mockCopyBlobSuccess([]string) error {

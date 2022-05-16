@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	//"reflect"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -717,8 +717,8 @@ func TestGetHostSuite(t *testing.T) {
 // TestGetQemuStaticForArch unit tests the getQemuStaticForArch function
 func TestGetQemuStaticForArch(t *testing.T) {
 	testCases := []struct {
-		arch string
-		expected   string
+		arch     string
+		expected string
 	}{
 		{"amd64", ""},
 		{"armhf", "qemu-arm-static"},
@@ -739,25 +739,86 @@ func TestGetQemuStaticForArch(t *testing.T) {
 }
 
 // TestRemovePreseeding unit tests the removePreseeding function
-// TODO: figure out a way to unit test this function without having to
-// commit a bunch of snaps into github.
-/*func TestRemovePreseeding(t *testing.T) {
+func TestRemovePreseeding(t *testing.T) {
 	t.Run("test_remove_preseeding", func(t *testing.T) {
+		if runtime.GOARCH != "amd64" {
+			t.Skip("Test for amd64 only")
+		}
 		asserter := helper.Asserter{T: t}
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
 
-		preseededRootfs := filepath.Join("testdata", "preseeded")
-		seededSnaps, err := removePreseeding(preseededRootfs)
+		// copy the filesystem over before attempting to preseed it
+		osutil.CopySpecialFile(filepath.Join("testdata", "filesystem"), stateMachine.tempDirs.rootfs)
+
+		// call "snap prepare image" to preseed the filesystem.
+		// Doing the preseed at the time of the test keeps the
+		// github repository free of large .snap files
+		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
+			"--classic", "--snap=core20=candidate", "--snap=snapd=beta", "--snap=lxd",
+			filepath.Join("testdata", "modelAssertionClassic"),
+			stateMachine.tempDirs.rootfs)
+		err := snapPrepareImage.Run()
+		asserter.AssertErrNil(err, true)
+
+		seededSnaps, err := removePreseeding(stateMachine.tempDirs.rootfs)
 		asserter.AssertErrNil(err, true)
 
 		// make sure the correct snaps were returned by removePreseeding
-		expectedSnaps := map[string]string {
-			"core20": "stable",
-			"snapd": "stable",
-			"lxd": "stable/ubuntu-21.10",
+		expectedSnaps := map[string]string{
+			"core20": "candidate",
+			"snapd":  "beta",
+			"lxd":    "stable",
 		}
 
 		if !reflect.DeepEqual(seededSnaps, expectedSnaps) {
 			t.Error("removePreseeding did not find the correct snap/channel mappings")
 		}
 	})
+}
+
+// TestCheckEmptyFields unit tests the CheckEmptyFields function
+/*func TestCheckEmptyFields(t *testing.T) {
+	// define the struct we will use to test
+	type testStruct struct {
+		a string `yaml:"a", json:"fieldA,required"`
+		b string `yaml:"b", json:"fieldB"`
+		c string `yaml:"c", json:"fieldC,omitempty"`
+	}
+
+	// generate the schema for our testStruct
+	var jsonReflector jsonschema.Reflector
+	schema := jsonReflector.Reflect(&testStruct{})
+
+	// now run CheckEmptyFields with a variety of test data
+	// to ensure the correct return values
+	testCases := []struct {
+		name       string
+		structData testStruct
+		shouldPass bool
+	}{
+		{"success", testStruct{a: "foo", b: "bar", c: "baz",}, true},
+		{"missing_explicitly_required", testStruct{b: "bar", c: "baz",}, false},
+		{"missing_implicitly_required", testStruct{a: "foo", c: "baz",}, false},
+		{"missing_omitempty", testStruct{a: "foo", b: "bar",}, true},
+	}
+	for _, tc := range testCases {
+		t.Run("test_check_empty_fields_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+
+			result := new(gojsonschema.Result)
+			err := CheckEmptyFields(tc.structData, schema, result)
+			asserter.AssertErrNil(err, false)
+
+			// make sure validation will fail only when expected
+			if tc.shouldPass && !result.Valid() {
+				t.Error("CheckEmptyFields added errors when it should not have")
+			}
+			if !tc.shouldPass && result.Valid() {
+				t.Error("CheckEmptyFields did NOT add errors when it should have")
+			}
+
+		})
+	}
 }*/

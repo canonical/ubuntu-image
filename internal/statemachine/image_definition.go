@@ -32,17 +32,23 @@ type GadgetType struct {
 	Ref          string `yaml:"ref"    json:"Ref,omitempty"`
 	GadgetBranch string `yaml:"branch" json:"GadgetBranch,omitempty"`
 	GadgetType   string `yaml:"type"   json:"GadgetType"             jsonschema:"enum=git,enum=directory,enum=prebuilt"`
-	GadgetUrl    string `yaml:"url"    json:"GadgetUrl,omitempty"  jsonschema:"type=string,format=uri"` // TODO, custom check to make this required if the type is "git"
+	GadgetUrl    string `yaml:"url"    json:"GadgetUrl,omitempty"    jsonschema:"type=string,format=uri"`
 }
 
 // RootfsType defines the rootfs section of the image definition file
 type RootfsType struct {
-	Components   []*string    `yaml:"components"    json:"Components,omitempty"`
-	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
-	Pocket       string       `yaml:"pocket"        json:"Pocket"                 default:"release"`
-	Seed         *SeedType    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
-	Tarball      *TarballType `yaml:"tarball"    json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
-	ArchiveTasks []string     `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
+	AptConfig    *AptConfigType `yaml:"apt-config"    json:"AptConfig,omitempty"`
+	Seed         *SeedType      `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
+	Tarball      *TarballType   `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
+	ArchiveTasks []string       `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
+}
+
+// AptConfigType defines the apt configuration to use while
+// building the rootfs
+type AptConfigType struct {
+	Components []*string `yaml:"components"    json:"Components,omitempty"`
+	Archive    string    `yaml:"archive"       json:"Archive"                default:"ubuntu"`
+	Pocket     string    `yaml:"pocket"        json:"Pocket"                 default:"release"`
 }
 
 // SeedType defines the seed section of rootfs, which is used to
@@ -169,8 +175,8 @@ type ImgType struct {
 // and optionally the xorrisofs command used to create it.
 // If left emtpy no .iso file will be created
 type IsoType struct {
-	IsoPath string `yaml:"path"    json:"IsoPath"`
-	Command string `yaml:"command" json:"Command,omitempty"`
+	IsoPath string `yaml:"path"            json:"IsoPath"`
+	Command string `yaml:"xorriso-command" json:"Command,omitempty"`
 }
 
 // Qcow2Type specifies the name of the resulting .qcow2 file
@@ -208,7 +214,8 @@ func newMissingUrlError(context *gojsonschema.JsonContext, value interface{}, de
 	return &err
 }
 
-// This struct is extensible for any other fields that may require a URL
+// MissingUrlError implements gojsonschema.ErrorType. It is used for custom errors for
+// fields that require a url based on the value of other fields
 // based on the values in other fields
 type MissingUrlError struct {
 	gojsonschema.ResultErrorFields
