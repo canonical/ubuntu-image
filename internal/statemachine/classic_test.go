@@ -425,7 +425,6 @@ func TestPrepareClassicImage(t *testing.T) {
 	}
 }*/
 
-//TODO: make this into more of a unit test
 // TestPopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
 // the rootfs to ensure at least some of the correct file are in place
 func TestPopulateClassicRootfsContents(t *testing.T) {
