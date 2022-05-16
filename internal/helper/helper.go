@@ -200,7 +200,6 @@ func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema
 		if required {
 			// this is a required field, check for zero values
 			if reflect.Indirect(field).IsZero() {
-				fmt.Println(elem.Type())
 				jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
 				errDetail := gojsonschema.ErrorDetails{
 					"property": tags.Get("yaml"),
