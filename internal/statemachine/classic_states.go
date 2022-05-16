@@ -55,14 +55,14 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	}
 
 	// do some custom validation
-	if imageDefinition.Gadget.GadgetType == "git" && imageDefinition.Gadget.GadgetUrl == "" {
+	if imageDefinition.Gadget.GadgetType == "git" && imageDefinition.Gadget.GadgetURL == "" {
 		jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
 		errDetail := gojsonschema.ErrorDetails{
 			"key":   "gadget:type",
 			"value": "git",
 		}
 		result.AddError(
-			newMissingUrlError(
+			newMissingURLError(
 				gojsonschema.NewJsonContext("missingURL", jsonContext),
 				52,
 				errDetail,

@@ -96,7 +96,7 @@ func CopyBlob(ddArgs []string) error {
 func SetDefaults(needsDefaults interface{}) error {
 	value := reflect.ValueOf(needsDefaults)
 	if value.Kind() != reflect.Ptr {
-		return fmt.Errorf("The argument to SetDefaults must be a pointer!")
+		return fmt.Errorf("The argument to SetDefaults must be a pointer")
 	}
 	elem := value.Elem()
 	for i := 0; i < elem.NumField(); i++ {
@@ -152,7 +152,7 @@ func SetDefaults(needsDefaults interface{}) error {
 func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema *jsonschema.Schema) error {
 	value := reflect.ValueOf(Interface)
 	if value.Kind() != reflect.Ptr {
-		return fmt.Errorf("The argument to CheckEmptyFields must be a pointer!")
+		return fmt.Errorf("The argument to CheckEmptyFields must be a pointer")
 	}
 	elem := value.Elem()
 	for i := 0; i < elem.NumField(); i++ {
@@ -185,8 +185,8 @@ func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema
 		// check if the field is required and if it is present in the YAML file
 		required := false
 		tags := elem.Type().Field(i).Tag
-		jsonTag, hasJson := tags.Lookup("json")
-		if hasJson {
+		jsonTag, hasJSON := tags.Lookup("json")
+		if hasJSON {
 			if !strings.Contains(jsonTag, "omitempty") {
 				required = true
 			}

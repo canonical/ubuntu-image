@@ -32,7 +32,7 @@ type GadgetType struct {
 	Ref          string `yaml:"ref"    json:"Ref,omitempty"`
 	GadgetBranch string `yaml:"branch" json:"GadgetBranch,omitempty"`
 	GadgetType   string `yaml:"type"   json:"GadgetType"             jsonschema:"enum=git,enum=directory,enum=prebuilt"`
-	GadgetUrl    string `yaml:"url"    json:"GadgetUrl,omitempty"    jsonschema:"type=string,format=uri"`
+	GadgetURL    string `yaml:"url"    json:"GadgetURL,omitempty"    jsonschema:"type=string,format=uri"`
 }
 
 // RootfsType defines the rootfs section of the image definition file
@@ -54,7 +54,7 @@ type AptConfigType struct {
 // SeedType defines the seed section of rootfs, which is used to
 // build a rootfs via seed germination
 type SeedType struct {
-	SeedUrl    string   `yaml:"url"    json:"SeedUrl"    jsonschema:"type=string,format=uri"`
+	SeedURL    string   `yaml:"url"    json:"SeedURL"    jsonschema:"type=string,format=uri"`
 	SeedBranch string   `yaml:"branch" json:"SeedBranch,omitempty"`
 	Names      []string `yaml:"names"  json:"Names"`
 }
@@ -62,7 +62,7 @@ type SeedType struct {
 // TarballType defines the tarball section of rootfs, which is used
 // to create images from a pre-built rootfs
 type TarballType struct {
-	TarballUrl string `yaml:"url"       json:"TarballUrl"    jsonschema:"type=string,format=uri"`
+	TarballURL string `yaml:"url"       json:"TarballURL"    jsonschema:"type=string,format=uri"`
 	GPG        string `yaml:"gpg"       json:"GPG,omitempty" jsonschema:"type=string,format=uri"`
 	SHA256sum  string `yaml:"sha256sum" json:"SHA256sum,omitempty"`
 }
@@ -145,20 +145,20 @@ type TouchFileType struct {
 // AddGroupType allows users to add a group in the image that is being built
 type AddGroupType struct {
 	GroupName string `yaml:"name" json:"GroupName"`
-	GroupId   string `yaml:"id"   json:"GroupId,omitempty"`
+	GroupID   string `yaml:"id"   json:"GroupID,omitempty"`
 }
 
 // AddUserType allows users to add a user in the image that is being built
 type AddUserType struct {
 	UserName string `yaml:"name" json:"UserName"`
-	UserId   string `yaml:"id"   json:"UserId,omitempty"`
+	UserID   string `yaml:"id"   json:"UserID,omitempty"`
 }
 
 // ArtifactType contains information about the files that are created
 // during and as a result of the image build process
 type ArtifactType struct {
-	Img       *ImgType       `yaml:"img"        json:"Img,omitempty"`
-	Iso       *IsoType       `yaml:"iso"        json:"Iso,omitempty"`
+	Img       *ImgType       `yaml:"img"       json:"Img,omitempty"`
+	Iso       *IsoType       `yaml:"iso"       json:"Iso,omitempty"`
 	Qcow2     *Qcow2Type     `yaml:"qcow2"     json:"Qcow2,omitempty"`
 	Manifest  *ManifestType  `yaml:"manifest"  json:"Manifest,omitempty"`
 	Filelist  *FilelistType  `yaml:"filelist"  json:"Filelist,omitempty"`
@@ -203,8 +203,8 @@ type ChangelogType struct {
 	ChangelogPath string `yaml:"path" json:"ChangelogPath"`
 }
 
-func newMissingUrlError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingUrlError {
-	err := MissingUrlError{}
+func newMissingURLError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingURLError {
+	err := MissingURLError{}
 	err.SetContext(context)
 	err.SetType("missing_url_error")
 	err.SetDescriptionFormat("When key {{.key}} is specified as {{.value}}, a URL must be provided")
@@ -214,9 +214,9 @@ func newMissingUrlError(context *gojsonschema.JsonContext, value interface{}, de
 	return &err
 }
 
-// MissingUrlError implements gojsonschema.ErrorType. It is used for custom errors for
+// MissingURLError implements gojsonschema.ErrorType. It is used for custom errors for
 // fields that require a url based on the value of other fields
 // based on the values in other fields
-type MissingUrlError struct {
+type MissingURLError struct {
 	gojsonschema.ResultErrorFields
 }
