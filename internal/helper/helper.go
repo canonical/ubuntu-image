@@ -92,7 +92,7 @@ func CopyBlob(ddArgs []string) error {
 
 // SetDefaults iterates through the keys in a struct and sets
 // default values if one is specified with a struct tag of "default".
-// Currently on default values of strings and bools are supported
+// Currently only default values of strings and bools are supported
 func SetDefaults(needsDefaults interface{}) error {
 	value := reflect.ValueOf(needsDefaults)
 	if value.Kind() != reflect.Ptr {
