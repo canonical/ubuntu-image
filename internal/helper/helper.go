@@ -110,33 +110,33 @@ func SetDefaults(needsDefaults interface{}) error {
 					SetDefaults(sliceElem.Interface())
 				}
 			}
-		}
-		// otherwise if it's just a pointer, look for default types
-		if field.Type().Kind() == reflect.Ptr {
+		} else if field.Type().Kind() == reflect.Ptr {
+			// otherwise if it's just a pointer, look for default types
 			if field.Elem().Kind() == reflect.Struct {
 				SetDefaults(field.Interface())
 			}
-		}
-		tags := elem.Type().Field(i).Tag
-		defaultValue, hasDefault := tags.Lookup("default")
-		if hasDefault {
-			indirectedField := reflect.Indirect(field)
-			if indirectedField.CanSet() && field.IsZero() {
-				varType := field.Type().Kind()
-				switch varType {
-				case reflect.String:
-					field.SetString(defaultValue)
-					break
-				case reflect.Bool:
-					if defaultValue == "true" {
-						field.SetBool(true)
-					} else {
-						field.SetBool(false)
+		} else {
+			tags := elem.Type().Field(i).Tag
+			defaultValue, hasDefault := tags.Lookup("default")
+			if hasDefault {
+				indirectedField := reflect.Indirect(field)
+				if indirectedField.CanSet() && field.IsZero() {
+					varType := field.Type().Kind()
+					switch varType {
+					case reflect.String:
+						field.SetString(defaultValue)
+						break
+					case reflect.Bool:
+						if defaultValue == "true" {
+							field.SetBool(true)
+						} else {
+							field.SetBool(false)
+						}
+						break
+					default:
+						return fmt.Errorf("Setting default value of type %s not supported",
+							varType)
 					}
-					break
-				default:
-					return fmt.Errorf("Setting default value of type %s not supported",
-						varType)
 				}
 			}
 		}
@@ -170,49 +170,49 @@ func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema
 					}
 				}
 			}
-		}
-		// otherwise if it's just a pointer to a nested struct
-		// search it for empty required fields
-		if field.Type().Kind() == reflect.Ptr {
+		} else if field.Type().Kind() == reflect.Ptr {
+			// otherwise if it's just a pointer to a nested struct
+			// search it for empty required fields
 			if field.Elem().Kind() == reflect.Struct {
 				err := CheckEmptyFields(field.Interface(), result, schema)
 				if err != nil {
 					return err
 				}
 			}
-		}
+		} else {
 
-		// check if the field is required and if it is present in the YAML file
-		required := false
-		tags := elem.Type().Field(i).Tag
-		jsonTag, hasJSON := tags.Lookup("json")
-		if hasJSON {
-			if !strings.Contains(jsonTag, "omitempty") {
-				required = true
-			}
-		}
-		// also check for required values in the jsonschema
-		for _, requiredField := range schema.Required {
-			if elem.Type().Field(i).Name == requiredField {
-				required = true
-			}
-		}
-		if required {
-			// this is a required field, check for zero values
-			if reflect.Indirect(field).IsZero() {
-				jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
-				errDetail := gojsonschema.ErrorDetails{
-					"property": tags.Get("yaml"),
-					"parent":   elem.Type().Name(),
+			// check if the field is required and if it is present in the YAML file
+			required := false
+			tags := elem.Type().Field(i).Tag
+			jsonTag, hasJSON := tags.Lookup("json")
+			if hasJSON {
+				if !strings.Contains(jsonTag, "omitempty") {
+					required = true
 				}
-				result.AddError(
-					newMissingFieldError(
-						gojsonschema.NewJsonContext("missing_field", jsonContext),
-						52,
+			}
+			// also check for required values in the jsonschema
+			for _, requiredField := range schema.Required {
+				if elem.Type().Field(i).Name == requiredField {
+					required = true
+				}
+			}
+			if required {
+				// this is a required field, check for zero values
+				if reflect.Indirect(field).IsZero() {
+					jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
+					errDetail := gojsonschema.ErrorDetails{
+						"property": tags.Get("yaml"),
+						"parent":   elem.Type().Name(),
+					}
+					result.AddError(
+						newMissingFieldError(
+							gojsonschema.NewJsonContext("missing_field", jsonContext),
+							52,
+							errDetail,
+						),
 						errDetail,
-					),
-					errDetail,
-				)
+					)
+				}
 			}
 		}
 	}
