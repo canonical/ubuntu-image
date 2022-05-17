@@ -819,9 +819,9 @@ func TestSuccessfulClassicRun(t *testing.T) {
 func TestCheckEmptyFields(t *testing.T) {
 	// define the struct we will use to test
 	type testStruct struct {
-		a string `yaml:"a" json:"fieldA,required"`
-		b string `yaml:"b" json:"fieldB"`
-		c string `yaml:"c" json:"fieldC,omitempty"`
+		A string `yaml:"a" json:"fieldA,required"`
+		B string `yaml:"b" json:"fieldB"`
+		C string `yaml:"c" json:"fieldC,omitempty"`
 	}
 
 	// generate the schema for our testStruct
@@ -835,10 +835,10 @@ func TestCheckEmptyFields(t *testing.T) {
 		structData testStruct
 		shouldPass bool
 	}{
-		{"success", testStruct{a: "foo", b: "bar", c: "baz"}, true},
-		{"missing_explicitly_required", testStruct{b: "bar", c: "baz"}, false},
-		{"missing_implicitly_required", testStruct{a: "foo", c: "baz"}, false},
-		{"missing_omitempty", testStruct{a: "foo", b: "bar"}, true},
+		{"success", testStruct{A: "foo", B: "bar", C: "baz"}, true},
+		{"missing_explicitly_required", testStruct{B: "bar", C: "baz"}, false},
+		{"missing_implicitly_required", testStruct{A: "foo", C: "baz"}, false},
+		{"missing_omitempty", testStruct{A: "foo", B: "bar"}, true},
 	}
 	for _, tc := range testCases {
 		t.Run("test_check_empty_fields_"+tc.name, func(t *testing.T) {
