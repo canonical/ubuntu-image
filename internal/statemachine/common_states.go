@@ -73,15 +73,15 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 		}
 	}
 
-	if err := stateMachine.postProcessGadgetYaml(); err != nil {
-		return err
-	}
-
 	// for the --image-size argument, the order of the volumes specified in gadget.yaml
 	// must be preserved. However, since gadget.Info stores the volumes as a map, the
 	// order is not preserved. We use the already read-in gadget.yaml file to store the
 	// order of the volumes as an array in the StateMachine struct
 	stateMachine.saveVolumeOrder(string(gadgetYamlBytes))
+
+	if err := stateMachine.postProcessGadgetYaml(); err != nil {
+		return err
+	}
 
 	if err := stateMachine.parseImageSizes(); err != nil {
 		return err
@@ -233,7 +233,8 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 // Throughout this process, the offset is tracked to ensure partitions are not overlapping.
 func (stateMachine *StateMachine) populatePreparePartitions() error {
 	// iterate through all the volumes
-	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+	for _, volumeName := range stateMachine.VolumeOrder {
+		volume := stateMachine.GadgetInfo.Volumes[volumeName]
 		if err := stateMachine.handleLkBootloader(volume); err != nil {
 			return err
 		}
