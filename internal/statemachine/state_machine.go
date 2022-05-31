@@ -23,12 +23,15 @@ import (
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 // define some functions that can be mocked by test cases
 var gadgetLayoutVolume = gadget.LayoutVolume
 var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 var helperCopyBlob = helper.CopyBlob
+var helperSetDefaults = helper.SetDefaults
+var helperCheckEmptyFields = helper.CheckEmptyFields
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
 var ioutilWriteFile = ioutil.WriteFile
@@ -48,6 +51,7 @@ var diskfsCreate = diskfs.Create
 var randRead = rand.Read
 var seedOpen = seed.Open
 var imagePrepare = image.Prepare
+var gojsonschemaValidate = gojsonschema.Validate
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 
@@ -97,6 +101,10 @@ type StateMachine struct {
 	// image sizes for parsing the --image-size flags
 	ImageSizes  map[string]quantity.Size
 	VolumeOrder []string
+
+	// TODO: this is a temporary way to skip states while we implement
+	// the classic image redesign
+	stateSkip bool
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -347,7 +355,8 @@ func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Off
 // Run iterates through the state functions, stopping when appropriate based on --until and --thru
 func (stateMachine *StateMachine) Run() error {
 	// iterate through the states
-	for _, stateFunc := range stateMachine.states {
+	for i := 0; i < len(stateMachine.states); i++ {
+		stateFunc := stateMachine.states[i]
 		if stateFunc.name == stateMachine.stateMachineFlags.Until {
 			break
 		}

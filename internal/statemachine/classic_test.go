@@ -8,40 +8,160 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
+	//"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/snapcore/snapd/image"
-	"github.com/snapcore/snapd/osutil"
-	"github.com/snapcore/snapd/seed"
+	"github.com/invopop/jsonschema"
+	//"github.com/snapcore/snapd/image"
+	//"github.com/snapcore/snapd/osutil"
+	//"github.com/snapcore/snapd/seed"
+	"github.com/xeipuuv/gojsonschema"
 )
 
-// TestInvalidCommandLineClassic tests invalid command line input for classic images
-func TestInvalidCommandLineClassic(t *testing.T) {
+//TestClassicSetup tests a successful run of the polymorphed Setup function
+func TestClassicSetup(t *testing.T) {
+	t.Run("test_classic_setup", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		err := stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestYAMLSchemaParsing attempts to parse a variety of image definition files, both
+// valid and invalid, and ensures the correct result/errors are returned
+func TestYAMLSchemaParsing(t *testing.T) {
 	testCases := []struct {
-		name       string
-		project    string
-		filesystem string
-		errMsg     string
+		name            string
+		imageDefinition string
+		shouldPass      bool
+		expectedError   string
 	}{
-		{"neither_project_nor_filesystem", "", "", "project or filesystem is required"},
-		{"both_project_and_filesystem", "ubuntu-cpc", "/tmp", "project and filesystem are mutually exclusive"},
+		{"valid_image_definition", "test_valid.yaml", true, ""},
+		{"invalid_class", "test_bad_class.yaml", false, "Class must be one of the following"},
+		{"invalid_url", "test_bad_url.yaml", false, "Does not match format 'uri'"},
+		{"both_seed_and_tasks", "test_both_seed_and_tasks.yaml", false, "Must validate one and only one schema"},
+		{"git_gadget_without_url", "test_git_gadget_without_url.yaml", false, "When key gadget:type is specified as git, a URL must be provided"},
+		{"file_doesnt_exist", "test_not_exist.yaml", false, "no such file or directory"},
+		{"not_valid_yaml", "test_invalid_yaml.yaml", false, "yaml: unmarshal errors"},
+		{"missing_yaml_fields", "test_missing_name.yaml", false, "Key \"name\" is required in struct \"ImageDefinition\", but is not in the YAML file!"},
 	}
 	for _, tc := range testCases {
-		t.Run("test "+tc.name, func(t *testing.T) {
+		t.Run("test_yaml_schema_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
 
 			var stateMachine ClassicStateMachine
-			stateMachine.Opts.Project = tc.project
-			stateMachine.Opts.Filesystem = tc.filesystem
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+				tc.imageDefinition)
+			err := stateMachine.parseImageDefinition()
 
-			err := stateMachine.Setup()
-			asserter.AssertErrContains(err, tc.errMsg)
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+			if tc.shouldPass {
+				asserter.AssertErrNil(err, false)
+			} else {
+				asserter.AssertErrContains(err, tc.expectedError)
+			}
+		})
+	}
+}
+
+// TestFailedParseImageDefinition mocks function calls to test
+// failure cases in the parseImageDefinition state
+func TestFailedParseImageDefinition(t *testing.T) {
+	t.Run("test_failed_parse_image_definition", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+			"test_valid.yaml")
+
+		// mock helper.SetDefaults
+		helperSetDefaults = mockSetDefaults
+		defer func() {
+			helperSetDefaults = helper.SetDefaults
+		}()
+		err := stateMachine.parseImageDefinition()
+		asserter.AssertErrContains(err, "Test Error")
+		helperSetDefaults = helper.SetDefaults
+
+		// mock helper.CheckEmptyFields
+		helperCheckEmptyFields = mockCheckEmptyFields
+		defer func() {
+			helperCheckEmptyFields = helper.CheckEmptyFields
+		}()
+		err = stateMachine.parseImageDefinition()
+		asserter.AssertErrContains(err, "Test Error")
+		helperCheckEmptyFields = helper.CheckEmptyFields
+
+		// mock gojsonschema.Validate
+		gojsonschemaValidate = mockGojsonschemaValidateError
+		defer func() {
+			gojsonschemaValidate = gojsonschema.Validate
+		}()
+		err = stateMachine.parseImageDefinition()
+		asserter.AssertErrContains(err, "Schema validation returned an error")
+		gojsonschemaValidate = gojsonschema.Validate
+	})
+}
+
+// TestCalculateStates reads in a variety of yaml files and ensures
+// that the correct states are added to the state machine
+func TestCalculateStates(t *testing.T) {
+	testCases := []struct {
+		name            string
+		imageDefinition string
+		expectedStates  []string
+	}{
+		{"state_build_gadget", "test_build_gadget.yaml", []string{"build_gadget_tree", "load_gadget_yaml"}},
+		{"state_prebuilt_gadget", "test_prebuilt_gadget.yaml", []string{"prepare_gadget_tree", "load_gadget_yaml"}},
+		{"extract_rootfs_tar", "test_extract_rootfs_tar.yaml", []string{"extract_rootfs_tar"}},
+		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"build_rootfs_from_seed"}},
+		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
+		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "configure_extra_ppas", "install_extra_packages", "install_extra_snaps", "perform_manual_customization"}},
+	}
+	for _, tc := range testCases {
+		t.Run("test_calcluate_states_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions", tc.imageDefinition)
+			err := stateMachine.parseImageDefinition()
+			asserter.AssertErrNil(err, true)
+
+			// now calculate the states and ensure that the expected states are in the slice
+			err = stateMachine.calculateStates()
+			asserter.AssertErrNil(err, true)
+
+			for _, expectedState := range tc.expectedStates {
+				stateFound := false
+				for _, state := range stateMachine.states {
+					if expectedState == state.name {
+						stateFound = true
+					}
+				}
+				if !stateFound {
+					t.Errorf("state %s should exist in %v, but does not",
+						expectedState, stateMachine.states)
+				}
+			}
 		})
 	}
 }
@@ -89,69 +209,168 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 func TestPrepareGadgetTree(t *testing.T) {
 	t.Run("test_prepare_gadget_tree", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-		stateMachine.parent = &stateMachine
 
 		err := stateMachine.prepareGadgetTree()
 		asserter.AssertErrNil(err, true)
-
-		gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
-		for _, file := range gadgetTreeFiles {
-			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
-			if err != nil {
-				t.Errorf("File %s should be in unpack, but is missing", file)
-			}
-		}
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
 // TestFailedPrepareGadgetTree tests failures in os, osutil, and ioutil libraries
 func TestFailedPrepareGadgetTree(t *testing.T) {
 	t.Run("test_failed_prepare_gadget_tree", func(t *testing.T) {
+		// currently a no-op, waiting for prepareGadgetTree
+		// to be converted to the new ubuntu-image classic
+		// design. This will have ubuntu-image build the
+		// gadget tree rather than relying on the user
+		// to have done this ahead of time
+		t.Skip()
+	})
+}
+
+// TestBuildGadgetTree unit tests the buildGadgetTree function
+func TestBuildGadgetTree(t *testing.T) {
+	t.Run("test_build_gadget_tree", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-		stateMachine.parent = &stateMachine
 
-		// mock os.Mkdir
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		err := stateMachine.prepareGadgetTree()
-		asserter.AssertErrContains(err, "Error creating unpack directory")
-		osMkdirAll = os.MkdirAll
+		err := stateMachine.buildGadgetTree()
+		asserter.AssertErrNil(err, true)
+	})
+}
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
-		defer func() {
-			ioutilReadDir = ioutil.ReadDir
-		}()
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrContains(err, "Error reading gadget tree")
-		ioutilReadDir = ioutil.ReadDir
+// TestBuildRootfsFromSeed unit tests the buildRootfsFromSeed function
+func TestBuildRootfsFromSeed(t *testing.T) {
+	t.Run("test_build_rootfs_from_seed", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
 
-		// mock osutil.CopySpecialFile
-		osutilCopySpecialFile = mockCopySpecialFile
-		defer func() {
-			osutilCopySpecialFile = osutil.CopySpecialFile
-		}()
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrContains(err, "Error copying gadget tree")
-		osutilCopySpecialFile = osutil.CopySpecialFile
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		err := stateMachine.buildRootfsFromSeed()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestBuildRootfsFromTasks unit tests the buildRootfsFromTasks function
+func TestBuildRootfsFromTasks(t *testing.T) {
+	t.Run("test_build_rootfs_from_tasks", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		err := stateMachine.buildRootfsFromTasks()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestExtractRootfsTar unit tests the extractRootfsTar function
+func TestExtractRootfsTar(t *testing.T) {
+	t.Run("test_extract_rootfs_tar", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		err := stateMachine.extractRootfsTar()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestCustomizeCloudInit unit tests the customizeCloudInit function
+func TestCustomizeCloudInit(t *testing.T) {
+	t.Run("test_customize_cloud_init", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		err := stateMachine.customizeCloudInit()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestSetupExtraPPAs unit tests the setupExtraPPAs function
+func TestSetupExtraPPAs(t *testing.T) {
+	t.Run("test_setup_extra_PPAs", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		err := stateMachine.setupExtraPPAs()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestInstallExtraPackages unit tests the installExtraPackages function
+func TestInstallExtraPackages(t *testing.T) {
+	t.Run("test_install_extra_packages", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		err := stateMachine.installExtraPackages()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestManualCustomization unit tests the manualCustomization function
+func TestManualCustomization(t *testing.T) {
+	t.Run("test_manual_customization", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		err := stateMachine.manualCustomization()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestPrepareClassicImage unit tests the prepareClassicImage function
+func TestPrepareClassicImage(t *testing.T) {
+	t.Run("test_prepare_classic_image", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		err := stateMachine.prepareClassicImage()
+		asserter.AssertErrNil(err, true)
 	})
 }
 
 // TODO replace this with fakeExecCommand that sil2100 wrote
 // TestFailedLiveBuildCommands tests the scenario where calls to `lb` fail
 // this is accomplished by temporarily replacing lb on disk with a test script
-func TestFailedLiveBuildCommands(t *testing.T) {
+/*func TestFailedLiveBuildCommands(t *testing.T) {
 	testCases := []struct {
 		name       string
 		testScript string
@@ -205,37 +424,7 @@ func TestFailedLiveBuildCommands(t *testing.T) {
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
-}
-
-// TestNoStatic tests that the helper function to prepare lb commands
-// returns an error if the qemu-static binary is missing. This is accomplished
-// by passing an architecture for which there is no qemu-static binary
-func TestNoStatic(t *testing.T) {
-	t.Run("test_no_qemu_static", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Opts.Project = "ubuntu-cpc"
-		stateMachine.Opts.Arch = "fakearch"
-		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-		stateMachine.parent = &stateMachine
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// also need unpack set up
-		err = os.Mkdir(stateMachine.tempDirs.unpack, 0755)
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.runLiveBuild()
-		asserter.AssertErrContains(err, "in case of non-standard archs or custom paths")
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}
+}*/
 
 // TestPopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
 // the rootfs to ensure at least some of the correct file are in place
@@ -251,20 +440,14 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.Opts.Project = "ubuntu-cpc"
-		stateMachine.Opts.Suite = "focal"
-		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic=edge", "core20=beta"}
-		stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
+		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+			"test_valid.yaml")
 
-		err := stateMachine.Setup()
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.Run()
+		err := stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrNil(err, true)
 
 		// check the files before Teardown
-		fileList := []string{filepath.Join("etc", "shadow"),
+		/*fileList := []string{filepath.Join("etc", "shadow"),
 			filepath.Join("etc", "systemd"),
 			filepath.Join("boot", "vmlinuz"),
 			filepath.Join("boot", "grub"),
@@ -304,16 +487,13 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 			if !osutil.FileExists(filePath) {
 				t.Errorf("File %s should exist but it does not", filePath)
 			}
-		}
-
-		err = stateMachine.Teardown()
-		asserter.AssertErrNil(err, false)
+		}*/
 	})
 }
 
 // TestFailedPopulateClassicRootfsContents tests failed scenarios in populateClassicRootfsContents
 // this is accomplished by mocking functions
-func TestFailedPopulateClassicRootfsContents(t *testing.T) {
+/*func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_classic_rootfs_contents", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine ClassicStateMachine
@@ -418,7 +598,7 @@ func TestFilesystemFlag(t *testing.T) {
 		}
 	})
 }
-
+*/
 // TestGeneratePackageManifest tests if classic image manifest generation works
 func TestGeneratePackageManifest(t *testing.T) {
 	t.Run("test_generate_package_manifest", func(t *testing.T) {
@@ -445,7 +625,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// Check if manifest file got generated and if it has expected contents
-		manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
+		/*manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
 		manifestBytes, err := ioutil.ReadFile(manifestPath)
 		asserter.AssertErrNil(err, true)
 		// The order of packages shouldn't matter
@@ -454,10 +634,11 @@ func TestGeneratePackageManifest(t *testing.T) {
 			if !strings.Contains(string(manifestBytes), pkg) {
 				t.Errorf("filesystem.manifest does not contain expected package: %s", pkg)
 			}
-		}
+		}*/
 	})
 }
 
+/*
 // TestFailedGeneratePackageManifest tests if classic manifest generation failures are reported
 func TestFailedGeneratePackageManifest(t *testing.T) {
 	t.Run("test_failed_generate_package_manifest", func(t *testing.T) {
@@ -482,65 +663,6 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 
 		err := stateMachine.generatePackageManifest()
 		asserter.AssertErrContains(err, "Error creating manifest file")
-	})
-}
-
-// TestFailedRunLiveBuild tests some error scenarios in the runLiveBuild state that are not
-// caused by actual failures in the `lb` commands
-func TestFailedRunLiveBuild(t *testing.T) {
-	t.Run("test_failed_run_live_build", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Opts.Project = "ubuntu-cpc"
-		stateMachine.Opts.Suite = "focal"
-		stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-		stateMachine.commonFlags.Snaps = []string{"hello", "ubuntu-image/classic", "core20=beta"}
-		stateMachine.stateMachineFlags.Thru = "run_live_build"
-
-		// replace the lb commands with a script that will simply pass
-		testCaseName = "TestFailedRunLiveBuild"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		// since we have mocked exec.Command, running dpkg -L to find the livecd-rootfs
-		// filepath will fail. We can use an environment variable instead
-		dpkgArgs := "dpkg -L livecd-rootfs | grep \"auto$\""
-		dpkgCommand := *exec.Command("bash", "-c", dpkgArgs)
-		dpkgBytes, err := dpkgCommand.Output()
-		asserter.AssertErrNil(err, true)
-		autoSrc := strings.TrimSpace(string(dpkgBytes))
-		os.Setenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH", autoSrc)
-
-		// mock os.OpenFile
-		osOpenFile = mockOpenFile
-		defer func() {
-			osOpenFile = os.OpenFile
-		}()
-		err = stateMachine.Setup()
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.Run()
-		asserter.AssertErrContains(err, "Error opening seeded-snaps")
-		osOpenFile = os.OpenFile
-		os.RemoveAll(testDir)
-
-		// mock os.OpenFile
-		osOpenFile = mockOpenFileBadPerms
-		defer func() {
-			osOpenFile = os.OpenFile
-		}()
-		err = stateMachine.Setup()
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.Run()
-		asserter.AssertErrContains(err, "Error writing snap hello=stable to seeded-snaps")
-		osOpenFile = os.OpenFile
-		os.RemoveAll(testDir)
-		os.Unsetenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH")
 	})
 }
 
@@ -666,4 +788,75 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}*/
+
+// TestSuccessfulClassicRun runs through a full classic state machine run and ensures
+// it is successful
+func TestSuccessfulClassicRun(t *testing.T) {
+	t.Run("test_successful_classic_run", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+			"test_valid.yaml")
+
+		err := stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestCheckEmptyFields unit tests the helper.CheckEmptyFields function
+func TestCheckEmptyFields(t *testing.T) {
+	// define the struct we will use to test
+	type testStruct struct {
+		A string `yaml:"a" json:"fieldA,required"`
+		B string `yaml:"b" json:"fieldB"`
+		C string `yaml:"c" json:"fieldC,omitempty"`
+	}
+
+	// generate the schema for our testStruct
+	var jsonReflector jsonschema.Reflector
+	schema := jsonReflector.Reflect(&testStruct{})
+
+	// now run CheckEmptyFields with a variety of test data
+	// to ensure the correct return values
+	testCases := []struct {
+		name       string
+		structData testStruct
+		shouldPass bool
+	}{
+		{"success", testStruct{A: "foo", B: "bar", C: "baz"}, true},
+		{"missing_explicitly_required", testStruct{B: "bar", C: "baz"}, false},
+		{"missing_implicitly_required", testStruct{A: "foo", C: "baz"}, false},
+		{"missing_omitempty", testStruct{A: "foo", B: "bar"}, true},
+	}
+	for _, tc := range testCases {
+		t.Run("test_check_empty_fields_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+
+			result := new(gojsonschema.Result)
+			err := helper.CheckEmptyFields(&tc.structData, result, schema)
+			asserter.AssertErrNil(err, false)
+			schema.Required = append(schema.Required, "fieldA")
+
+			// make sure validation will fail only when expected
+			if tc.shouldPass && !result.Valid() {
+				t.Error("CheckEmptyFields added errors when it should not have")
+			}
+			if !tc.shouldPass && result.Valid() {
+				t.Error("CheckEmptyFields did NOT add errors when it should have")
+			}
+
+		})
+	}
 }

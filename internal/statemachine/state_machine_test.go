@@ -13,11 +13,13 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/diskfs/go-diskfs/disk"
+	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 var testDir = "ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"
@@ -47,6 +49,12 @@ var allTestStates = []stateFunc{
 
 // define some mocked versions of go package functions
 func mockCopyBlob([]string) error {
+	return fmt.Errorf("Test Error")
+}
+func mockSetDefaults(interface{}) error {
+	return fmt.Errorf("Test Error")
+}
+func mockCheckEmptyFields(interface{}, *gojsonschema.Result, *jsonschema.Schema) error {
 	return fmt.Errorf("Test Error")
 }
 func mockCopyBlobSuccess([]string) error {
@@ -118,6 +126,9 @@ func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
 }
 func mockImagePrepare(*image.Options) error {
 	return fmt.Errorf("Test Error")
+}
+func mockGojsonschemaValidateError(gojsonschema.JSONLoader, gojsonschema.JSONLoader) (*gojsonschema.Result, error) {
+	return nil, fmt.Errorf("Test Error")
 }
 
 func readOnlyDiskfsCreate(diskName string, size int64, format diskfs.Format, sectorSize diskfs.SectorSize) (*disk.Disk, error) {
