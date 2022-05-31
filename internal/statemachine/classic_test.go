@@ -194,7 +194,7 @@ func TestPrintStates(t *testing.T) {
 		readStdout, err := ioutil.ReadAll(stdout)
 		asserter.AssertErrNil(err, true)
 
-		expected_states := `The calculated states are as follows:
+		expectedStates := `The calculated states are as follows:
 [0] build_gadget_tree
 [1] prepare_gadget_tree
 [2] load_gadget_yaml
@@ -210,9 +210,9 @@ func TestPrintStates(t *testing.T) {
 [12] generate_manifest
 [13] finish
 `
-		if string(readStdout) != expected_states {
+		if string(readStdout) != expectedStates {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
-				string(readStdout), expected_states)
+				string(readStdout), expectedStates)
 		}
 	})
 }
