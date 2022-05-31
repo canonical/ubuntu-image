@@ -29,6 +29,11 @@ func (stateMachine *StateMachine) prepareImage() error {
 		imageOpts.Channel = snapStateMachine.commonFlags.Channel
 	}
 
+	// preseeding-related
+	imageOpts.Preseed = snapStateMachine.Opts.Preseed
+	imageOpts.PreseedSignKey = snapStateMachine.Opts.PreseedSignKey
+	imageOpts.AppArmorKernelFeaturesDir = snapStateMachine.Opts.AppArmorKernelFeaturesDir
+
 	customizations := *new(image.Customizations)
 	if snapStateMachine.Opts.DisableConsoleConf {
 		customizations.ConsoleConf = "disabled"
@@ -43,7 +48,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
 
-	if err := image.Prepare(&imageOpts); err != nil {
+	if err := imagePrepare(&imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
 

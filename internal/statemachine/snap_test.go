@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/store"
 )
 
@@ -554,6 +555,63 @@ func TestGadgetEdgeCases(t *testing.T) {
 
 		err = stateMachine.Run()
 		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+func TestPreseedFlag(t *testing.T) {
+	t.Run("test_preseed_flag", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var calledOpts *image.Options
+		imagePrepare = func(opts *image.Options) error {
+			calledOpts = opts
+			return nil
+		}
+		defer func() {
+			imagePrepare = image.Prepare
+		}()
+
+		var stateMachine SnapStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
+		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
+		stateMachine.stateMachineFlags.WorkDir = workDir
+		stateMachine.stateMachineFlags.Thru = "prepare_image"
+		stateMachine.Opts.Preseed = true
+		stateMachine.Opts.AppArmorKernelFeaturesDir = "/some/path"
+		stateMachine.Opts.PreseedSignKey = "akey"
+
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
+
+		if calledOpts == nil {
+			t.Errorf("options passed to image.Prepare are nil")
+		}
+
+		if calledOpts.Preseed == false {
+			t.Error("Expected preseed flag to be set")
+		}
+
+		expectedKey := "akey"
+		if calledOpts.PreseedSignKey != expectedKey {
+			t.Errorf("Expected preseed sign key to be %q, but it's %q", expectedKey, calledOpts.PreseedSignKey)
+		}
+
+		expectedAAPath := "/some/path"
+		if calledOpts.AppArmorKernelFeaturesDir != expectedAAPath {
+			t.Errorf("Expected apparmor kernel features dir to be %q, but it's %q", expectedAAPath, calledOpts.AppArmorKernelFeaturesDir)
+		}
 
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
