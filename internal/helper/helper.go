@@ -144,6 +144,96 @@ func SetDefaults(needsDefaults interface{}) error {
 	return nil
 }
 
+func sliceHasElement(haystack []string, needle string) bool {
+	found := false
+	for _, element := range haystack {
+		if element == needle {
+			found = true
+		}
+	}
+	return found
+}
+
+// GetHandledBy iterates through a generic interface and finds a struct tag of
+// "handled_by". It returns a slice of values for the tags and an error if applicable
+func GetHandledBy(interf interface{}, stateFuncs []string) ([]string, error) {
+	value := reflect.ValueOf(interf)
+	if value.Kind() != reflect.Ptr {
+		return []string{}, fmt.Errorf("The argument to GetHandledBy must be a pointer")
+	}
+	elem := value.Elem()
+	for i := 0; i < elem.NumField(); i++ {
+		field := elem.Field(i)
+		if field.Type().Kind() == reflect.Ptr {
+			// if the element is a pointer, recursively look for handled_by tags
+			if field.Elem().Kind() == reflect.Struct {
+				var err error
+				stateFuncs, err = GetHandledBy(field.Interface(), stateFuncs)
+				if err != nil {
+					return []string{}, err
+				}
+			}
+		}
+		tags := elem.Type().Field(i).Tag
+		handledBy, hasHandledBy := tags.Lookup("handled_by")
+		if hasHandledBy && !field.IsZero() {
+			// look for the special handling of <if_state>:<then_state>
+			if strings.Contains(handledBy, ":") {
+				// look for the even special-er "<conditional>|<conditional>"
+				if strings.Contains(handledBy, "|") {
+					conditionalFuncs := strings.Split(handledBy, "|")
+					found := false
+					for _, conditionalFunc := range conditionalFuncs {
+						ifThenState := strings.Split(conditionalFunc, ":")
+						if sliceHasElement(stateFuncs, ifThenState[0]) {
+							if !sliceHasElement(stateFuncs, ifThenState[1]) {
+								stateFuncs = append(stateFuncs, ifThenState[1])
+							}
+							found = true
+						}
+					}
+					if !found {
+						return []string{}, fmt.Errorf(
+							"Error getting handled by. A field is "+
+								"handled by \"%s\", but none of the "+
+								"conditional functions were found in list:\n%s",
+							handledBy, stateFuncs)
+					}
+				} else {
+					found := false
+					ifThenState := strings.Split(handledBy, ":")
+					if sliceHasElement(stateFuncs, ifThenState[0]) {
+						if !sliceHasElement(stateFuncs, ifThenState[1]) {
+							stateFuncs = append(stateFuncs, ifThenState[1])
+						}
+						found = true
+					}
+					if !found {
+						return []string{}, fmt.Errorf(
+							"Error getting handled by. A field is "+
+								"handled by %s, but none of the conditional "+
+								"functions were found", handledBy)
+					}
+				}
+
+			} else if strings.Contains(handledBy, ",") {
+				// handle parsing of multiple states, such as "germinate,create_chroot..."
+				stateNames := strings.Split(handledBy, ",")
+				for _, stateName := range stateNames {
+					if !sliceHasElement(stateFuncs, stateName) {
+						stateFuncs = append(stateFuncs, stateName)
+					}
+				}
+			} else {
+				if !sliceHasElement(stateFuncs, handledBy) {
+					stateFuncs = append(stateFuncs, handledBy)
+				}
+			}
+		}
+	}
+	return stateFuncs, nil
+}
+
 // CheckEmptyFields iterates through the image definition struct and
 // checks for fields that are present but return IsZero == true.
 // TODO: I've created a PR upstream in xeipuuv/gojsonschema

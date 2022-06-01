@@ -13,7 +13,7 @@ type ImageDefinition struct {
 	Architecture   string             `yaml:"architecture"    json:"Architecture"`
 	Series         string             `yaml:"series"          json:"Series"`
 	Kernel         *KernelType        `yaml:"kernel"          json:"Kernel"`
-	Gadget         *GadgetType        `yaml:"gadget"          json:"Gadget"`
+	Gadget         *GadgetType        `yaml:"gadget"          json:"Gadget"             handled_by:"prepare_gadget_tree,load_gadget_yaml"`
 	ModelAssertion string             `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
 	Rootfs         *RootfsType        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *CustomizationType `yaml:"customization"   json:"Customization"`
@@ -32,23 +32,17 @@ type GadgetType struct {
 	Ref          string `yaml:"ref"    json:"Ref,omitempty"`
 	GadgetBranch string `yaml:"branch" json:"GadgetBranch,omitempty"`
 	GadgetType   string `yaml:"type"   json:"GadgetType"             jsonschema:"enum=git,enum=directory,enum=prebuilt"`
-	GadgetURL    string `yaml:"url"    json:"GadgetURL,omitempty"    jsonschema:"type=string,format=uri"`
+	GadgetURL    string `yaml:"url"    json:"GadgetURL,omitempty"    jsonschema:"type=string,format=uri" handled_by:"build_gadget_tree"`
 }
 
 // RootfsType defines the rootfs section of the image definition file
 type RootfsType struct {
-	AptConfig    *AptConfigType `yaml:"apt-config"    json:"AptConfig,omitempty"`
-	Seed         *SeedType      `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
-	Tarball      *TarballType   `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
-	ArchiveTasks []string       `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
-}
-
-// AptConfigType defines the apt configuration to use while
-// building the rootfs
-type AptConfigType struct {
-	Components []*string `yaml:"components"    json:"Components,omitempty"`
-	Archive    string    `yaml:"archive"       json:"Archive"                default:"ubuntu"`
-	Pocket     string    `yaml:"pocket"        json:"Pocket"                 default:"release"`
+	Components   []*string    `yaml:"components"    json:"Components,omitempty"`
+	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
+	Pocket       string       `yaml:"pocket"        json:"Pocket"                 default:"release"`
+	Seed         *SeedType    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"         handled_by:"germinate,create_chroot,install_packages"`
+	Tarball      *TarballType `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"      handled_by:"extract_rootfs_tar"`
+	ArchiveTasks []string     `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks" handled_by:"expand_tasks,create_chroot,install_packages"`
 }
 
 // SeedType defines the seed section of rootfs, which is used to
@@ -71,10 +65,10 @@ type TarballType struct {
 type CustomizationType struct {
 	Installer     *InstallerType `yaml:"installer"      json:"Installer,omitempty"`
 	CloudInit     *CloudInitType `yaml:"cloud-init"     json:"CloudInit,omitempty"`
-	ExtraPPAs     []*PPAType     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"`
-	ExtraPackages []*PackageType `yaml:"extra-packages" json:"ExtraPackages,omitempty"`
-	ExtraSnaps    []*SnapType    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"`
 	Manual        *ManualType    `yaml:"manual"         json:"Manual,omitempty"`
+	ExtraPPAs     []*PPAType     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"     handled_by:"configure_extra_ppas"`
+	ExtraPackages []*PackageType `yaml:"extra-packages" json:"ExtraPackages,omitempty" handled_by:"create_chroot:configure_extra_packages|extract_rootfs_tar:install_extra_packages"`
+	ExtraSnaps    []*SnapType    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"    handled_by:"install_extra_snaps"`
 }
 
 // InstallerType provides customization options specific to installer images
@@ -119,11 +113,11 @@ type SnapType struct {
 
 // ManualType provides manual customization options
 type ManualType struct {
-	CopyFile  []*CopyFileType  `yaml:"copy-file"  json:"CopyFile,omitempty"`
-	Execute   []*ExecuteType   `yaml:"execute"    json:"Execute,omitempty"`
-	TouchFile []*TouchFileType `yaml:"touch-file" json:"TouchFile,omitempty"`
-	AddGroup  []*AddGroupType  `yaml:"add-group"  json:"AddGroup,omitempty"`
-	AddUser   []*AddUserType   `yaml:"add-user"   json:"AddUser,omitempty"`
+	CopyFile  []*CopyFileType  `yaml:"copy-file"  json:"CopyFile,omitempty"  handled_by:"copy_custom_files"`
+	Execute   []*ExecuteType   `yaml:"execute"    json:"Execute,omitempty"   handled_by:"execute_custom_files"`
+	TouchFile []*TouchFileType `yaml:"touch-file" json:"TouchFile,omitempty" handled_by:"touch_custom_files"`
+	AddGroup  []*AddGroupType  `yaml:"add-group"  json:"AddGroup,omitempty"  handled_by:"add_groups"`
+	AddUser   []*AddUserType   `yaml:"add-user"   json:"AddUser,omitempty"   handled_by:"add_users"`
 }
 
 // CopyFileType allows users to copy files into the rootfs of an image

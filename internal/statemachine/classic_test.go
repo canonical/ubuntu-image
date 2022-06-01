@@ -129,9 +129,9 @@ func TestCalculateStates(t *testing.T) {
 		{"state_build_gadget", "test_build_gadget.yaml", []string{"build_gadget_tree", "load_gadget_yaml"}},
 		{"state_prebuilt_gadget", "test_prebuilt_gadget.yaml", []string{"prepare_gadget_tree", "load_gadget_yaml"}},
 		{"extract_rootfs_tar", "test_extract_rootfs_tar.yaml", []string{"extract_rootfs_tar"}},
-		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"build_rootfs_from_seed"}},
-		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
-		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "configure_extra_ppas", "install_extra_packages", "install_extra_snaps", "perform_manual_customization"}},
+		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"germinate"}},
+		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"expand_tasks"}},
+		{"customization_states", "test_customization.yaml", []string{"configure_extra_ppas", "configure_extra_packages", "install_extra_snaps", "touch_custom_files"}},
 	}
 	for _, tc := range testCases {
 		t.Run("test_calcluate_states_"+tc.name, func(t *testing.T) {
@@ -247,36 +247,6 @@ func TestBuildGadgetTree(t *testing.T) {
 	})
 }
 
-// TestBuildRootfsFromSeed unit tests the buildRootfsFromSeed function
-func TestBuildRootfsFromSeed(t *testing.T) {
-	t.Run("test_build_rootfs_from_seed", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		err := stateMachine.buildRootfsFromSeed()
-		asserter.AssertErrNil(err, true)
-	})
-}
-
-// TestBuildRootfsFromTasks unit tests the buildRootfsFromTasks function
-func TestBuildRootfsFromTasks(t *testing.T) {
-	t.Run("test_build_rootfs_from_tasks", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		err := stateMachine.buildRootfsFromTasks()
-		asserter.AssertErrNil(err, true)
-	})
-}
-
 // TestExtractRootfsTar unit tests the extractRootfsTar function
 func TestExtractRootfsTar(t *testing.T) {
 	t.Run("test_extract_rootfs_tar", func(t *testing.T) {
@@ -288,21 +258,6 @@ func TestExtractRootfsTar(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 		err := stateMachine.extractRootfsTar()
-		asserter.AssertErrNil(err, true)
-	})
-}
-
-// TestCustomizeCloudInit unit tests the customizeCloudInit function
-func TestCustomizeCloudInit(t *testing.T) {
-	t.Run("test_customize_cloud_init", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		err := stateMachine.customizeCloudInit()
 		asserter.AssertErrNil(err, true)
 	})
 }
@@ -333,21 +288,6 @@ func TestInstallExtraPackages(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 		err := stateMachine.installExtraPackages()
-		asserter.AssertErrNil(err, true)
-	})
-}
-
-// TestManualCustomization unit tests the manualCustomization function
-func TestManualCustomization(t *testing.T) {
-	t.Run("test_manual_customization", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		err := stateMachine.manualCustomization()
 		asserter.AssertErrNil(err, true)
 	})
 }
