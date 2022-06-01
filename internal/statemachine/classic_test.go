@@ -186,6 +186,18 @@ func TestPrintStates(t *testing.T) {
 		defer restoreStdout()
 		asserter.AssertErrNil(err, true)
 
+		// override os.Exit to capture the exit code
+		oldOsExit := osExit
+		defer func() {
+			osExit = oldOsExit
+		}()
+
+		var exitCode int
+		tmpExit := func(code int) {
+			exitCode = code
+		}
+
+		osExit = tmpExit
 		err = stateMachine.calculateStates()
 		asserter.AssertErrNil(err, true)
 
@@ -213,6 +225,10 @@ func TestPrintStates(t *testing.T) {
 		if string(readStdout) != expectedStates {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
 				string(readStdout), expectedStates)
+		}
+
+		if exitCode != 0 {
+			t.Errorf("Expected exit code 0, got %d instead", exitCode)
 		}
 	})
 }

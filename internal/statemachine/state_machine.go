@@ -52,6 +52,7 @@ var randRead = rand.Read
 var seedOpen = seed.Open
 var imagePrepare = image.Prepare
 var gojsonschemaValidate = gojsonschema.Validate
+var osExit = os.Exit
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 

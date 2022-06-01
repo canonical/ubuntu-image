@@ -169,6 +169,7 @@ func (stateMachine *StateMachine) calculateStates() error {
 		for i, state := range stateMachine.states {
 			fmt.Printf("[%d] %s\n", i, state.name)
 		}
+		osExit(0)
 	}
 
 	return nil
