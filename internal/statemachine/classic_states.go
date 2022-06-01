@@ -163,6 +163,14 @@ func (stateMachine *StateMachine) calculateStates() error {
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	stateMachine.states = append(stateMachine.states, rootfsCreationStates...)
 
+	// if the --print-states option was passed, print the calculated states
+	if classicStateMachine.Opts.PrintStates {
+		fmt.Println("The calculated states are as follows:")
+		for i, state := range stateMachine.states {
+			fmt.Printf("[%d] %s\n", i, state.name)
+		}
+	}
+
 	return nil
 }
 

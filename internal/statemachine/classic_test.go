@@ -166,6 +166,57 @@ func TestCalculateStates(t *testing.T) {
 	}
 }
 
+// TestPrintStates ensures the states are printed to stdout when the flag is set
+func TestPrintStates(t *testing.T) {
+	t.Run("test_print_states", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Opts.PrintStates = true
+		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions", "test_valid.yaml")
+		err := stateMachine.parseImageDefinition()
+		asserter.AssertErrNil(err, true)
+
+		// capture stdout, calculate the states, and ensure they were printed
+		stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+		defer restoreStdout()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.calculateStates()
+		asserter.AssertErrNil(err, true)
+
+		// restore stdout and examine what was printed
+		restoreStdout()
+		readStdout, err := ioutil.ReadAll(stdout)
+		asserter.AssertErrNil(err, true)
+
+		expectedStates := `The calculated states are as follows:
+[0] build_gadget_tree
+[1] prepare_gadget_tree
+[2] load_gadget_yaml
+[3] build_rootfs_from_seed
+[4] populate_rootfs_contents
+[5] customize_cloud_init
+[6] install_extra_packages
+[7] generate_disk_info
+[8] calculate_rootfs_size
+[9] populate_bootfs_contents
+[10] populate_prepare_partitions
+[11] make_disk
+[12] generate_manifest
+[13] finish
+`
+		if string(readStdout) != expectedStates {
+			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
+				string(readStdout), expectedStates)
+		}
+	})
+}
+
 // TestFailedValidateInputClassic tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputClassic(t *testing.T) {
 	t.Run("test_failed_validate_input", func(t *testing.T) {
