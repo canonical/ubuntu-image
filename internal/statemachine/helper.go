@@ -16,7 +16,8 @@ import (
 	"github.com/diskfs/go-diskfs/partition"
 	"github.com/diskfs/go-diskfs/partition/gpt"
 	"github.com/diskfs/go-diskfs/partition/mbr"
-
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/seed"
@@ -576,4 +577,22 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 		return seededSnaps, err
 	}
 	return seededSnaps, nil
+}
+
+// cloneGitRepo takes options from the image definition and clones the git
+// repo with the corresponding options
+func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
+	// clone the repo
+	cloneOptions := &git.CloneOptions{
+		URL:          imageDefinition.Gadget.GadgetURL,
+		SingleBranch: true,
+	}
+	if imageDefinition.Gadget.GadgetBranch != "" {
+		cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(imageDefinition.Gadget.GadgetBranch)
+	}
+
+	cloneOptions.Validate()
+
+	_, err := git.PlainClone(workDir, false, cloneOptions)
+	return err
 }
