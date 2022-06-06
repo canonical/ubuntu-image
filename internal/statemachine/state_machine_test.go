@@ -155,7 +155,6 @@ func fakeExecCommand(command string, args ...string) *exec.Cmd {
 // This is a helper that mocks out any exec calls performed in this package
 func TestExecHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
-		fmt.Println("JAWN exiting early")
 		return
 	}
 	defer os.Exit(0)
@@ -182,7 +181,6 @@ func TestExecHelperProcess(t *testing.T) {
 		fallthrough
 	case "TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
-		fmt.Println("JAWN")
 		os.Exit(1)
 		break
 	case "TestFailedRunLiveBuild":
