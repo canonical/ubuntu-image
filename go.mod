@@ -17,6 +17,5 @@ require (
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect
 	gopkg.in/macaroon.v1 v1.0.0 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v2 v2.4.0
 )

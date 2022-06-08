@@ -1,8 +1,12 @@
 package statemachine
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"
@@ -122,8 +126,7 @@ func (stateMachine *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"build_rootfs_from_seed", (*StateMachine).buildRootfsFromSeed})
+		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
@@ -216,6 +219,43 @@ func (stateMachine *StateMachine) buildRootfsFromTasks() error {
 // Extract the rootfs from a tar archive
 func (stateMachine *StateMachine) extractRootfsTar() error {
 	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+func (stateMachine *StateMachine) germinate() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef,
+		classicStateMachine.stateMachineFlags.WorkDir)
+
+	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
+			germinateCmd.String(), err.Error(), string(germinateOutput))
+	}
+
+	for _, fileName := range classicStateMachine.ImageDef.Rootfs.Seed.Names {
+		seedFilePath := filepath.Join(classicStateMachine.stateMachineFlags.WorkDir,
+			fileName+".seed")
+		seedFile, err := os.Open(seedFilePath)
+		if err != nil {
+			return fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
+		}
+		defer seedFile.Close()
+
+		seedScanner := bufio.NewScanner(seedFile)
+		for seedScanner.Scan() {
+			seedLine := seedScanner.Bytes()
+			matched, _ := regexp.Match(`^[a-z].*`, seedLine)
+			if matched {
+				packageName := strings.Split(string(seedLine), " ")[0]
+				classicStateMachine.Packages = append(classicStateMachine.Packages, packageName)
+			}
+		}
+	}
+
+	fmt.Println(classicStateMachine.Packages)
+
 	return nil
 }
 

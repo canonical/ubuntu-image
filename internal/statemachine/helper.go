@@ -577,3 +577,41 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 	}
 	return seededSnaps, nil
 }
+
+// generateGerminateCmd creates the appropriate germinate command for the
+// values configured in the image definition yaml file
+func generateGerminateCmd(imageDefinition ImageDefinition, workDir string) *exec.Cmd {
+	// determine the value for the seed-dist in the form of <archive>.<series>
+	seedDist := imageDefinition.Rootfs.Archive
+	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
+		seedDist = seedDist + "." + imageDefinition.Rootfs.Seed.SeedBranch
+	}
+
+	var mirror string
+	if imageDefinition.Architecture == "amd64" {
+		mirror = "http://archive.ubuntu.com/ubuntu/"
+	} else {
+		mirror = "http://ports.ubuntu.com/ubuntu/"
+	}
+
+	germinateCmd := exec.Command("germinate",
+		"--seed-source", imageDefinition.Rootfs.Seed.SeedURL,
+		"--arch", imageDefinition.Architecture,
+		"--dist", imageDefinition.Series,
+		"--seed-dist", seedDist,
+		"--mirror", mirror,
+		"--vcs", "git",
+	)
+
+	if len(imageDefinition.Rootfs.Components) > 0 {
+		var components string
+		for _, component := range imageDefinition.Rootfs.Components {
+			components = components + component + ","
+		}
+		germinateCmd.Args = append(germinateCmd.Args, components)
+	}
+
+	germinateCmd.Dir = workDir
+
+	return germinateCmd
+}

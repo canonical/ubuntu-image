@@ -11,6 +11,14 @@ var startingClassicStates = []stateFunc{
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
 }
 
+var rootfsSeedStates = []stateFunc{
+	{"germinate", (*StateMachine).germinate},
+	/*{"create_chroot", (*StateMachine).createChroot},
+	{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+	{"install_packages", (*StateMachine).installPackages},
+	{"apply_customization", (*StateMachine).applyCustomization},*/
+}
+
 var imageCreationStates = []stateFunc{
 	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
@@ -27,6 +35,7 @@ type ClassicStateMachine struct {
 	ImageDef ImageDefinition
 	Opts     commands.ClassicOpts
 	Args     commands.ClassicArgs
+	Packages []string
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run()
