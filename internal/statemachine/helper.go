@@ -580,7 +580,7 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 
 // generateGerminateCmd creates the appropriate germinate command for the
 // values configured in the image definition yaml file
-func generateGerminateCmd(imageDefinition ImageDefinition, workDir string) *exec.Cmd {
+func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 	// determine the value for the seed-dist in the form of <archive>.<series>
 	seedDist := imageDefinition.Rootfs.Archive
 	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
@@ -594,24 +594,31 @@ func generateGerminateCmd(imageDefinition ImageDefinition, workDir string) *exec
 		mirror = "http://ports.ubuntu.com/ubuntu/"
 	}
 
-	germinateCmd := exec.Command("germinate",
+	vcs := false
+	if strings.Contains(imageDefinition.Rootfs.Seed.SeedURL, "git") ||
+		strings.Contains(imageDefinition.Rootfs.Seed.SeedURL, "bazaar") {
+		vcs = true
+	}
+
+	germinateCmd := execCommand("germinate",
 		"--seed-source", imageDefinition.Rootfs.Seed.SeedURL,
 		"--arch", imageDefinition.Architecture,
 		"--dist", imageDefinition.Series,
 		"--seed-dist", seedDist,
 		"--mirror", mirror,
-		"--vcs", "git",
+		"--no-rdepends",
 	)
+	if vcs {
+		germinateCmd.Args = append(germinateCmd.Args, "--vcs=auto")
+	}
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
 		var components string
 		for _, component := range imageDefinition.Rootfs.Components {
 			components = components + component + ","
 		}
-		germinateCmd.Args = append(germinateCmd.Args, components)
+		germinateCmd.Args = append(germinateCmd.Args, "--components="+components)
 	}
-
-	germinateCmd.Dir = workDir
 
 	return germinateCmd
 }

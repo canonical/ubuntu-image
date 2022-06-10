@@ -860,3 +860,125 @@ func TestCheckEmptyFields(t *testing.T) {
 		})
 	}
 }
+
+// TestGerminate tests the germinate state and ensures some necessary packages are included
+func TestGerminate(t *testing.T) {
+	testCases := []struct {
+		name    string
+		seedURL string
+		archive string
+	}{
+		{"git", "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/", "ubuntu"},
+		//{"bzr", "bzr+ssh://bazaar.launchpad.net/~ubuntu-mate-dev/ubuntu-seeds/", "ubuntu-mate"},
+		{"http", "https://people.canonical.com/~ubuntu-archive/seeds/", "ubuntu"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_germinate_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			hostArch := getHostArch()
+			hostSuite := getHostSuite()
+			imageDef := ImageDefinition{
+				Architecture: hostArch,
+				Series:       hostSuite,
+				Rootfs: &RootfsType{
+					Archive: tc.archive,
+					Seed: &SeedType{
+						SeedURL:    tc.seedURL,
+						SeedBranch: hostSuite,
+						Names:      []string{"server", "minimal", "standard", "cloud-image"},
+					},
+				},
+			}
+
+			stateMachine.ImageDef = imageDef
+
+			err = stateMachine.germinate()
+			asserter.AssertErrNil(err, true)
+
+			// spot check some packages that should remain seeded for a long time
+			expectedPackages := []string{"python3", "sudo", "cloud-init", "ubuntu-server"}
+			for _, expectedPackage := range expectedPackages {
+				found := false
+				for _, seedPackage := range stateMachine.Packages {
+					if expectedPackage == seedPackage {
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("Expected to find %s in list of packages: %v",
+						expectedPackage, stateMachine.Packages)
+				}
+			}
+		})
+	}
+}
+
+// TestFailedGerminate mocks function calls to test
+// failure cases in the germinate state
+func TestFailedGerminate(t *testing.T) {
+	t.Run("test_failed_germinate", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		// create a valid imageDefinition
+		hostArch := getHostArch()
+		hostSuite := getHostSuite()
+		imageDef := ImageDefinition{
+			Architecture: hostArch,
+			Series:       hostSuite,
+			Rootfs: &RootfsType{
+				Archive: "ubuntu",
+				Seed: &SeedType{
+					SeedURL:    "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/",
+					SeedBranch: hostSuite,
+					Names:      []string{"server", "minimal", "standard", "cloud-image"},
+				},
+			},
+		}
+		stateMachine.ImageDef = imageDef
+
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err := stateMachine.germinate()
+		asserter.AssertErrContains(err, "Error creating germinate directory")
+		osMkdir = os.Mkdir
+
+		// Setup the exec.Command mock
+		testCaseName = "TestFailedGerminate"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err = stateMachine.germinate()
+		asserter.AssertErrContains(err, "Error running germinate command")
+		execCommand = exec.Command
+
+		// mock os.Open
+		osOpen = mockOpen
+		defer func() {
+			osOpen = os.Open
+		}()
+		err = stateMachine.germinate()
+		asserter.AssertErrContains(err, "Error opening seed file")
+		osOpen = os.Open
+	})
+}

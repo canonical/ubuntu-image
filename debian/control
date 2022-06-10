@@ -21,7 +21,7 @@ Depends: ${shlibs:Depends},
          ${misc:Depends},
          fdisk,
          gdisk,
-         livecd-rootfs,
+         germinate,
          mtools,
          snapd,
 Conflicts: python3-ubuntu-image

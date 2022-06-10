@@ -222,12 +222,21 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	return nil
 }
 
+// germinate runs the germinate binary and parses the output to create
+// a list of packages from the seed section of the image definition
 func (stateMachine *StateMachine) germinate() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef,
-		classicStateMachine.stateMachineFlags.WorkDir)
+	// create a scratch directory to run germinate in
+	germinateDir := filepath.Join(classicStateMachine.stateMachineFlags.WorkDir, "germinate")
+	err := osMkdir(germinateDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating germinate directory: \"%s\"", err.Error())
+	}
+
+	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
+	germinateCmd.Dir = germinateDir
 
 	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
@@ -235,9 +244,8 @@ func (stateMachine *StateMachine) germinate() error {
 	}
 
 	for _, fileName := range classicStateMachine.ImageDef.Rootfs.Seed.Names {
-		seedFilePath := filepath.Join(classicStateMachine.stateMachineFlags.WorkDir,
-			fileName+".seed")
-		seedFile, err := os.Open(seedFilePath)
+		seedFilePath := filepath.Join(germinateDir, fileName+".seed")
+		seedFile, err := osOpen(seedFilePath)
 		if err != nil {
 			return fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
 		}
@@ -253,8 +261,6 @@ func (stateMachine *StateMachine) germinate() error {
 			}
 		}
 	}
-
-	fmt.Println(classicStateMachine.Packages)
 
 	return nil
 }

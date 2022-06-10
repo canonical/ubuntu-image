@@ -88,6 +88,9 @@ func mockMkdir(string, os.FileMode) error {
 func mockMkdirAll(string, os.FileMode) error {
 	return fmt.Errorf("Test error")
 }
+func mockOpen(string) (*os.File, error) {
+	return nil, fmt.Errorf("Test error")
+}
 func mockOpenFile(string, int, os.FileMode) (*os.File, error) {
 	return nil, fmt.Errorf("Test error")
 }
@@ -177,6 +180,8 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestGeneratePackageManifest":
 		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
 		break
+	case "TestFailedGerminate":
+		fallthrough
 	case "TestFailedSetupLiveBuildCommands":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
