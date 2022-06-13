@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/diskfs/go-diskfs v0.0.0-20211104185512-274de576a1a5
+	github.com/go-git/go-git/v5 v5.4.2
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/invopop/jsonschema v0.4.0

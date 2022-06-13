@@ -178,6 +178,8 @@ func TestExecHelperProcess(t *testing.T) {
 		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
 		break
 	case "TestFailedSetupLiveBuildCommands":
+		fallthrough
+	case "TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
 		break

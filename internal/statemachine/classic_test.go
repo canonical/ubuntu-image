@@ -283,21 +283,6 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 	})
 }
 
-// TestBuildGadgetTree unit tests the buildGadgetTree function
-func TestBuildGadgetTree(t *testing.T) {
-	t.Run("test_build_gadget_tree", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		err := stateMachine.buildGadgetTree()
-		asserter.AssertErrNil(err, true)
-	})
-}
-
 // TestBuildRootfsFromSeed unit tests the buildRootfsFromSeed function
 func TestBuildRootfsFromSeed(t *testing.T) {
 	t.Run("test_build_rootfs_from_seed", func(t *testing.T) {
@@ -853,7 +838,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
-			"test_valid.yaml")
+			"test_amd64.yaml")
 
 		err := stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
@@ -910,4 +895,121 @@ func TestCheckEmptyFields(t *testing.T) {
 
 		})
 	}
+}
+
+// TestBuildGadgetTree tests the successful build of a gadget tree
+func TestBuildGadgetTree(t *testing.T) {
+	t.Run("test_build_gadget_tree", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// test the directory method
+		wd, _ := os.Getwd()
+		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
+		sourcePath = "file://" + sourcePath
+		imageDef := ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:  sourcePath,
+				GadgetType: "directory",
+			},
+		}
+
+		stateMachine.ImageDef = imageDef
+
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrNil(err, true)
+
+		// test the git methdo
+		imageDef = ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
+				GadgetType:   "git",
+				GadgetBranch: "20",
+			},
+		}
+
+		stateMachine.ImageDef = imageDef
+
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestFailedBuildGadgetTree tests failures in the  buildGadgetTree function
+func TestFailedBuildGadgetTree(t *testing.T) {
+	t.Run("test_failed_build_gadget_tree", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// mock os.MkdirAll
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrContains(err, "Error creating scratch/gadget")
+		osMkdir = os.Mkdir
+
+		// try to clone a repo that doesn't exist
+		imageDef := ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:  "http://fakerepo.git",
+				GadgetType: "git",
+			},
+		}
+		stateMachine.ImageDef = imageDef
+
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrContains(err, "Error cloning gadget repository")
+
+		// try to copy a file that doesn't exist
+		imageDef = ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:  "file:///fake/file/that/does/not/exist",
+				GadgetType: "directory",
+			},
+		}
+		stateMachine.ImageDef = imageDef
+
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrContains(err, "Error copying gadget source")
+
+		// run a "make" command that will fail by mocking exec.Command
+		testCaseName = "TestFailedBuildGadgetTree"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		wd, _ := os.Getwd()
+		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
+		sourcePath = "file://" + sourcePath
+		imageDef = ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:  sourcePath,
+				GadgetType: "directory",
+			},
+		}
+		stateMachine.ImageDef = imageDef
+
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrContains(err, "Error running \"make\" in gadget source")
+	})
 }

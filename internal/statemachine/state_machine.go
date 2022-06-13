@@ -73,6 +73,7 @@ type temporaryDirectories struct {
 	rootfs  string
 	unpack  string
 	volumes string
+	scratch string
 }
 
 // StateMachine will hold the command line data, track the current state, and handle all function calls
