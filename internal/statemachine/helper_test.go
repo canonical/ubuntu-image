@@ -794,7 +794,7 @@ func TestGenerateGerminateCmd(t *testing.T) {
 				Architecture: tc.name,
 				Rootfs: &RootfsType{
 					Seed: &SeedType{
-						SeedURL:    "git://test.git",
+						SeedURLs:   []string{"git://test.git"},
 						SeedBranch: "testbranch",
 					},
 					Components: []string{"main", "universe"},

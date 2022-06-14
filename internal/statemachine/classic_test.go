@@ -864,13 +864,34 @@ func TestCheckEmptyFields(t *testing.T) {
 // TestGerminate tests the germinate state and ensures some necessary packages are included
 func TestGerminate(t *testing.T) {
 	testCases := []struct {
-		name    string
-		seedURL string
-		archive string
+		name             string
+		archive          string
+		seedURLs         []string
+		seedNames        []string
+		expectedPackages []string
 	}{
-		{"git", "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/", "ubuntu"},
-		//{"bzr", "bzr+ssh://bazaar.launchpad.net/~ubuntu-mate-dev/ubuntu-seeds/", "ubuntu-mate"},
-		{"http", "https://people.canonical.com/~ubuntu-archive/seeds/", "ubuntu"},
+		{
+			"git",
+			"ubuntu",
+			[]string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
+			[]string{"server", "minimal", "standard", "cloud-image"},
+			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
+		},
+		{
+			"http",
+			"ubuntu",
+			[]string{"https://people.canonical.com/~ubuntu-archive/seeds/"},
+			[]string{"server", "minimal", "standard", "cloud-image"},
+			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
+		},
+		{
+			"bzr+git",
+			"ubuntu-mate",
+			[]string{"http://bazaar.launchpad.net/~ubuntu-mate-dev/ubuntu-seeds/",
+				"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
+			[]string{"desktop-common", "standard", "minimal"},
+			[]string{"xorg", "wget", "ubuntu-minimal"},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run("test_germinate_"+tc.name, func(t *testing.T) {
@@ -894,9 +915,9 @@ func TestGerminate(t *testing.T) {
 				Rootfs: &RootfsType{
 					Archive: tc.archive,
 					Seed: &SeedType{
-						SeedURL:    tc.seedURL,
+						SeedURLs:   tc.seedURLs,
 						SeedBranch: hostSuite,
-						Names:      []string{"server", "minimal", "standard", "cloud-image"},
+						Names:      tc.seedNames,
 					},
 				},
 			}
@@ -907,8 +928,7 @@ func TestGerminate(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			// spot check some packages that should remain seeded for a long time
-			expectedPackages := []string{"python3", "sudo", "cloud-init", "ubuntu-server"}
-			for _, expectedPackage := range expectedPackages {
+			for _, expectedPackage := range tc.expectedPackages {
 				found := false
 				for _, seedPackage := range stateMachine.Packages {
 					if expectedPackage == seedPackage {
@@ -945,7 +965,7 @@ func TestFailedGerminate(t *testing.T) {
 			Rootfs: &RootfsType{
 				Archive: "ubuntu",
 				Seed: &SeedType{
-					SeedURL:    "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/",
+					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 					SeedBranch: hostSuite,
 					Names:      []string{"server", "minimal", "standard", "cloud-image"},
 				},

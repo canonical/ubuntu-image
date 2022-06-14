@@ -48,8 +48,8 @@ type RootfsType struct {
 // SeedType defines the seed section of rootfs, which is used to
 // build a rootfs via seed germination
 type SeedType struct {
-	SeedURL    string   `yaml:"url"    json:"SeedURL"    jsonschema:"type=string,format=uri"`
 	SeedBranch string   `yaml:"branch" json:"SeedBranch,omitempty"`
+	SeedURLs   []string `yaml:"urls"   json:"SeedURLs"    jsonschema:"type=array,format=uri"`
 	Names      []string `yaml:"names"  json:"Names"`
 }
 

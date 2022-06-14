@@ -594,20 +594,24 @@ func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 		mirror = "http://ports.ubuntu.com/ubuntu/"
 	}
 
+	var seedSource string
 	vcs := false
-	if strings.Contains(imageDefinition.Rootfs.Seed.SeedURL, "git") ||
-		strings.Contains(imageDefinition.Rootfs.Seed.SeedURL, "bazaar") {
-		vcs = true
+	for _, seedURL := range imageDefinition.Rootfs.Seed.SeedURLs {
+		seedSource = seedSource + seedURL + ","
+		if strings.Contains(seedURL, "git") || strings.Contains(seedURL, "bazaar") {
+			vcs = true
+		}
 	}
 
 	germinateCmd := execCommand("germinate",
-		"--seed-source", imageDefinition.Rootfs.Seed.SeedURL,
 		"--arch", imageDefinition.Architecture,
 		"--dist", imageDefinition.Series,
+		"--seed-source", seedSource,
 		"--seed-dist", seedDist,
 		"--mirror", mirror,
 		"--no-rdepends",
 	)
+
 	if vcs {
 		germinateCmd.Args = append(germinateCmd.Args, "--vcs=auto")
 	}

@@ -15,7 +15,9 @@ rootfs:
   apt-config:
     archive: ubuntu
   seed:
-    url: "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+    urls:
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
     branch: jammy
     names:
       - server
