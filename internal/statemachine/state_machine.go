@@ -74,6 +74,7 @@ type temporaryDirectories struct {
 	rootfs  string
 	unpack  string
 	volumes string
+	scratch string
 }
 
 // StateMachine will hold the command line data, track the current state, and handle all function calls
@@ -211,7 +212,8 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var farthestOffset quantity.Offset = 0
 	var lastOffset quantity.Offset = 0
 	var lastVolumeName string
-	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+	for _, volumeName := range stateMachine.VolumeOrder {
+		volume := stateMachine.GadgetInfo.Volumes[volumeName]
 		lastVolumeName = volumeName
 		volumeBaseDir := filepath.Join(stateMachine.tempDirs.volumes, volumeName)
 		if err := osMkdirAll(volumeBaseDir, 0755); err != nil {

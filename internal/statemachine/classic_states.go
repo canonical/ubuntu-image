@@ -3,7 +3,9 @@ package statemachine
 import (
 	"bufio"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -59,11 +61,11 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	}
 
 	// do some custom validation
-	if imageDefinition.Gadget.GadgetType == "git" && imageDefinition.Gadget.GadgetURL == "" {
+	if imageDefinition.Gadget.GadgetType != "prebuilt" && imageDefinition.Gadget.GadgetURL == "" {
 		jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
 		errDetail := gojsonschema.ErrorDetails{
 			"key":   "gadget:type",
-			"value": "git",
+			"value": imageDefinition.Gadget.GadgetType,
 		}
 		result.AddError(
 			newMissingURLError(
@@ -166,12 +168,65 @@ func (stateMachine *StateMachine) calculateStates() error {
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	stateMachine.states = append(stateMachine.states, rootfsCreationStates...)
 
+	// if the --print-states option was passed, print the calculated states
+	if classicStateMachine.Opts.PrintStates {
+		fmt.Println("The calculated states are as follows:")
+		for i, state := range stateMachine.states {
+			fmt.Printf("[%d] %s\n", i, state.name)
+		}
+	}
+
 	return nil
 }
 
 // Build the gadget tree
 func (stateMachine *StateMachine) buildGadgetTree() error {
-	// currently a no-op pending implementation of the classic image redesign
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// make the gadget directory under scratch
+	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+
+	err := osMkdir(gadgetDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating scratch/gadget directory: %s", err.Error())
+	}
+
+	var sourceDir string
+	switch classicStateMachine.ImageDef.Gadget.GadgetType {
+	case "git":
+		err := cloneGitRepo(classicStateMachine.ImageDef, gadgetDir)
+		if err != nil {
+			return fmt.Errorf("Error cloning gadget repository: \"%s\"", err.Error())
+		}
+		sourceDir = gadgetDir
+		break
+	case "directory":
+		// no need to check error here as the validity of the URL
+		// has been confirmed by the schema validation
+		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
+
+		// copy the source tree to the workdir
+		err := osutilCopySpecialFile(sourceURL.Path, gadgetDir)
+		if err != nil {
+			return fmt.Errorf("Error copying gadget source: %s", err.Error())
+		}
+
+		sourceDir = filepath.Join(gadgetDir, path.Base(sourceURL.Path))
+		break
+	}
+
+	// now run "make" to build the gadget tree
+	makeCmd := execCommand("make")
+	makeCmd.Dir = sourceDir
+
+	makeOutput, err := makeCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Error running \"make\" in gadget source. "+
+			"Error is \"%s\". Full output below:\n%s",
+			err.Error(), makeOutput)
+	}
+
 	return nil
 }
 

@@ -183,6 +183,8 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestFailedGerminate":
 		fallthrough
 	case "TestFailedSetupLiveBuildCommands":
+		fallthrough
+	case "TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
 		break

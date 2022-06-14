@@ -1,3 +1,9 @@
+ubuntu-image (2.2+22.04ubuntu4) UNRELEASED; urgency=medium
+
+  * Add support for uc20 preseeding-related options.
+
+ -- Pawel Stolowski <pawel.stolowski@ubuntu.com>  Wed, 11 May 2022 08:16:21 +0000
+
 ubuntu-image (2.2+22.04ubuntu3) jammy; urgency=medium
 
   [ William 'jawn-smith' Wilson ]

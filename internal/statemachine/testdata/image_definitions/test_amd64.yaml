@@ -8,7 +8,7 @@ kernel:
   name: linux
 gadget:
   url: "https://github.com/snapcore/pc-amd64-gadget.git"
-  branch: classic
+  branch: "20"
   type: "git"
 rootfs:
   seed:

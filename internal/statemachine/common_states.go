@@ -34,9 +34,14 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
 	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
 	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
+	stateMachine.tempDirs.scratch = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "scratch")
 
-	if err := osMkdir(stateMachine.tempDirs.rootfs, 0755); err != nil {
-		return fmt.Errorf("Error creating temporary directory: %s", err.Error())
+	tempDirs := []string{stateMachine.tempDirs.scratch, stateMachine.tempDirs.rootfs}
+	for _, tempDir := range tempDirs {
+		err := osMkdir(tempDir, 0755)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating temporary directory \"%s\": \"%s\"", tempDir, err.Error())
+		}
 	}
 
 	return nil
@@ -78,15 +83,15 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 		}
 	}
 
-	if err := stateMachine.postProcessGadgetYaml(); err != nil {
-		return err
-	}
-
 	// for the --image-size argument, the order of the volumes specified in gadget.yaml
 	// must be preserved. However, since gadget.Info stores the volumes as a map, the
 	// order is not preserved. We use the already read-in gadget.yaml file to store the
 	// order of the volumes as an array in the StateMachine struct
 	stateMachine.saveVolumeOrder(string(gadgetYamlBytes))
+
+	if err := stateMachine.postProcessGadgetYaml(); err != nil {
+		return err
+	}
 
 	if err := stateMachine.parseImageSizes(); err != nil {
 		return err
@@ -253,7 +258,8 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 		return nil
 	}
 	// iterate through all the volumes
-	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+	for _, volumeName := range stateMachine.VolumeOrder {
+		volume := stateMachine.GadgetInfo.Volumes[volumeName]
 		if err := stateMachine.handleLkBootloader(volume); err != nil {
 			return err
 		}
