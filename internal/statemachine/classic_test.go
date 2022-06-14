@@ -899,259 +899,259 @@ func TestCheckEmptyFields(t *testing.T) {
 
 // TestGerminate tests the germinate state and ensures some necessary packages are included
 func TestGerminate(t *testing.T) {
-        testCases := []struct {
-                name             string
-                archive          string
-                seedURLs         []string
-                seedNames        []string
-                expectedPackages []string
-        }{
-                {
-                        "git",
-                        "ubuntu",
-                        []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
-                        []string{"server", "minimal", "standard", "cloud-image"},
-                        []string{"python3", "sudo", "cloud-init", "ubuntu-server"},
-                },
-                {
-                        "http",
-                        "ubuntu",
-                        []string{"https://people.canonical.com/~ubuntu-archive/seeds/"},
-                        []string{"server", "minimal", "standard", "cloud-image"},
-                        []string{"python3", "sudo", "cloud-init", "ubuntu-server"},
-                },
-                {
-                        "bzr+git",
-                        "ubuntu",
-                        []string{"http://bazaar.launchpad.net/~ubuntu-mate-dev/ubuntu-seeds/",
-                                "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
-                        []string{"desktop-common", "standard", "minimal"},
-                        []string{"xorg", "wget", "ubuntu-minimal"},
-                },
-        }
-        for _, tc := range testCases {
-                t.Run("test_germinate_"+tc.name, func(t *testing.T) {
-                        asserter := helper.Asserter{T: t}
-                        saveCWD := helper.SaveCWD()
-                        defer saveCWD()
+	testCases := []struct {
+		name             string
+		archive          string
+		seedURLs         []string
+		seedNames        []string
+		expectedPackages []string
+	}{
+		{
+			"git",
+			"ubuntu",
+			[]string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
+			[]string{"server", "minimal", "standard", "cloud-image"},
+			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
+		},
+		{
+			"http",
+			"ubuntu",
+			[]string{"https://people.canonical.com/~ubuntu-archive/seeds/"},
+			[]string{"server", "minimal", "standard", "cloud-image"},
+			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
+		},
+		{
+			"bzr+git",
+			"ubuntu",
+			[]string{"http://bazaar.launchpad.net/~ubuntu-mate-dev/ubuntu-seeds/",
+				"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
+			[]string{"desktop-common", "standard", "minimal"},
+			[]string{"xorg", "wget", "ubuntu-minimal"},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_germinate_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
 
-                        var stateMachine ClassicStateMachine
-                        stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-                        stateMachine.parent = &stateMachine
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
 
-                        // need workdir set up for this
-                        err := stateMachine.makeTemporaryDirectories()
-                        asserter.AssertErrNil(err, true)
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
 
-                        hostArch := getHostArch()
-                        hostSuite := getHostSuite()
-                        imageDef := ImageDefinition{
-                                Architecture: hostArch,
-                                Series:       hostSuite,
-                                Rootfs: &RootfsType{
-                                        Archive: tc.archive,
-                                        Seed: &SeedType{
-                                                SeedURLs:   tc.seedURLs,
-                                                SeedBranch: hostSuite,
-                                                Names:      tc.seedNames,
-                                        },
-                                },
-                        }
+			hostArch := getHostArch()
+			hostSuite := getHostSuite()
+			imageDef := ImageDefinition{
+				Architecture: hostArch,
+				Series:       hostSuite,
+				Rootfs: &RootfsType{
+					Archive: tc.archive,
+					Seed: &SeedType{
+						SeedURLs:   tc.seedURLs,
+						SeedBranch: hostSuite,
+						Names:      tc.seedNames,
+					},
+				},
+			}
 
-                        stateMachine.ImageDef = imageDef
+			stateMachine.ImageDef = imageDef
 
-                        err = stateMachine.germinate()
-                        asserter.AssertErrNil(err, true)
+			err = stateMachine.germinate()
+			asserter.AssertErrNil(err, true)
 
-                        // spot check some packages that should remain seeded for a long time
-                        for _, expectedPackage := range tc.expectedPackages {
-                                found := false
-                                for _, seedPackage := range stateMachine.Packages {
-                                        if expectedPackage == seedPackage {
-                                                found = true
-                                        }
-                                }
-                                if !found {
-                                        t.Errorf("Expected to find %s in list of packages: %v",
-                                                expectedPackage, stateMachine.Packages)
-                                }
-                        }
-                })
-        }
+			// spot check some packages that should remain seeded for a long time
+			for _, expectedPackage := range tc.expectedPackages {
+				found := false
+				for _, seedPackage := range stateMachine.Packages {
+					if expectedPackage == seedPackage {
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("Expected to find %s in list of packages: %v",
+						expectedPackage, stateMachine.Packages)
+				}
+			}
+		})
+	}
 }
 
 // TestFailedGerminate mocks function calls to test
 // failure cases in the germinate state
 func TestFailedGerminate(t *testing.T) {
-        t.Run("test_failed_germinate", func(t *testing.T) {
-                asserter := helper.Asserter{T: t}
-                saveCWD := helper.SaveCWD()
-                defer saveCWD()
+	t.Run("test_failed_germinate", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
 
-                var stateMachine ClassicStateMachine
-                stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-                stateMachine.parent = &stateMachine
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
 
-                // create a valid imageDefinition
-                hostArch := getHostArch()
-                hostSuite := getHostSuite()
-                imageDef := ImageDefinition{
-                        Architecture: hostArch,
-                        Series:       hostSuite,
-                        Rootfs: &RootfsType{
-                                Archive: "ubuntu",
-                                Seed: &SeedType{
-                                        SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
-                                        SeedBranch: hostSuite,
-                                        Names:      []string{"server", "minimal", "standard", "cloud-image"},
-                                },
-                        },
-                }
-                stateMachine.ImageDef = imageDef
+		// create a valid imageDefinition
+		hostArch := getHostArch()
+		hostSuite := getHostSuite()
+		imageDef := ImageDefinition{
+			Architecture: hostArch,
+			Series:       hostSuite,
+			Rootfs: &RootfsType{
+				Archive: "ubuntu",
+				Seed: &SeedType{
+					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
+					SeedBranch: hostSuite,
+					Names:      []string{"server", "minimal", "standard", "cloud-image"},
+				},
+			},
+		}
+		stateMachine.ImageDef = imageDef
 
-                // mock os.Mkdir
-                osMkdir = mockMkdir
-                defer func() {
-                        osMkdir = os.Mkdir
-                }()
-                err := stateMachine.germinate()
-                asserter.AssertErrContains(err, "Error creating germinate directory")
-                osMkdir = os.Mkdir
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err := stateMachine.germinate()
+		asserter.AssertErrContains(err, "Error creating germinate directory")
+		osMkdir = os.Mkdir
 
-                // Setup the exec.Command mock
-                testCaseName = "TestFailedGerminate"
-                execCommand = fakeExecCommand
-                defer func() {
-                        execCommand = exec.Command
-                }()
-                err = stateMachine.germinate()
-                asserter.AssertErrContains(err, "Error running germinate command")
-                execCommand = exec.Command
+		// Setup the exec.Command mock
+		testCaseName = "TestFailedGerminate"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err = stateMachine.germinate()
+		asserter.AssertErrContains(err, "Error running germinate command")
+		execCommand = exec.Command
 
-                // mock os.Open
-                osOpen = mockOpen
-                defer func() {
-                        osOpen = os.Open
-                }()
-                err = stateMachine.germinate()
-                asserter.AssertErrContains(err, "Error opening seed file")
-                osOpen = os.Open
-        })
+		// mock os.Open
+		osOpen = mockOpen
+		defer func() {
+			osOpen = os.Open
+		}()
+		err = stateMachine.germinate()
+		asserter.AssertErrContains(err, "Error opening seed file")
+		osOpen = os.Open
+	})
 }
 
 // TestBuildGadgetTree tests the successful build of a gadget tree
 func TestBuildGadgetTree(t *testing.T) {
-        t.Run("test_build_gadget_tree", func(t *testing.T) {
-                asserter := helper.Asserter{T: t}
-                saveCWD := helper.SaveCWD()
-                defer saveCWD()
+	t.Run("test_build_gadget_tree", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
 
-                var stateMachine ClassicStateMachine
-                stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-                stateMachine.parent = &stateMachine
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
 
-                // need workdir set up for this
-                err := stateMachine.makeTemporaryDirectories()
-                asserter.AssertErrNil(err, true)
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
-                // test the directory method
-                wd, _ := os.Getwd()
-                sourcePath := filepath.Join(wd, "testdata", "gadget_source")
-                sourcePath = "file://" + sourcePath
-                imageDef := ImageDefinition{
-                        Gadget: &GadgetType{
-                                GadgetURL:  sourcePath,
-                                GadgetType: "directory",
-                        },
-                }
+		// test the directory method
+		wd, _ := os.Getwd()
+		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
+		sourcePath = "file://" + sourcePath
+		imageDef := ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:  sourcePath,
+				GadgetType: "directory",
+			},
+		}
 
-                stateMachine.ImageDef = imageDef
+		stateMachine.ImageDef = imageDef
 
-                err = stateMachine.buildGadgetTree()
-                asserter.AssertErrNil(err, true)
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrNil(err, true)
 
-                // test the git methdo
-                imageDef = ImageDefinition{
-                        Gadget: &GadgetType{
-                                GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
-                                GadgetType:   "git",
-                                GadgetBranch: "20",
-                        },
-                }
+		// test the git methdo
+		imageDef = ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
+				GadgetType:   "git",
+				GadgetBranch: "20",
+			},
+		}
 
-                stateMachine.ImageDef = imageDef
+		stateMachine.ImageDef = imageDef
 
-                err = stateMachine.buildGadgetTree()
-                asserter.AssertErrNil(err, true)
-        })
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrNil(err, true)
+	})
 }
 
 // TestFailedBuildGadgetTree tests failures in the  buildGadgetTree function
 func TestFailedBuildGadgetTree(t *testing.T) {
-        t.Run("test_failed_build_gadget_tree", func(t *testing.T) {
-                asserter := helper.Asserter{T: t}
-                saveCWD := helper.SaveCWD()
-                defer saveCWD()
+	t.Run("test_failed_build_gadget_tree", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
 
-                var stateMachine ClassicStateMachine
-                stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-                stateMachine.parent = &stateMachine
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
 
-                // need workdir set up for this
-                err := stateMachine.makeTemporaryDirectories()
-                asserter.AssertErrNil(err, true)
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
-                // mock os.MkdirAll
-                osMkdir = mockMkdir
-                defer func() {
-                        osMkdir = os.Mkdir
-                }()
-                err = stateMachine.buildGadgetTree()
-                asserter.AssertErrContains(err, "Error creating scratch/gadget")
-                osMkdir = os.Mkdir
+		// mock os.MkdirAll
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrContains(err, "Error creating scratch/gadget")
+		osMkdir = os.Mkdir
 
-                // try to clone a repo that doesn't exist
-                imageDef := ImageDefinition{
-                        Gadget: &GadgetType{
-                                GadgetURL:  "http://fakerepo.git",
-                                GadgetType: "git",
-                        },
-                }
-                stateMachine.ImageDef = imageDef
+		// try to clone a repo that doesn't exist
+		imageDef := ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:  "http://fakerepo.git",
+				GadgetType: "git",
+			},
+		}
+		stateMachine.ImageDef = imageDef
 
-                err = stateMachine.buildGadgetTree()
-                asserter.AssertErrContains(err, "Error cloning gadget repository")
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrContains(err, "Error cloning gadget repository")
 
-                // try to copy a file that doesn't exist
-                imageDef = ImageDefinition{
-                        Gadget: &GadgetType{
-                                GadgetURL:  "file:///fake/file/that/does/not/exist",
-                                GadgetType: "directory",
-                        },
-                }
-                stateMachine.ImageDef = imageDef
+		// try to copy a file that doesn't exist
+		imageDef = ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:  "file:///fake/file/that/does/not/exist",
+				GadgetType: "directory",
+			},
+		}
+		stateMachine.ImageDef = imageDef
 
-                err = stateMachine.buildGadgetTree()
-                asserter.AssertErrContains(err, "Error copying gadget source")
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrContains(err, "Error copying gadget source")
 
-                // run a "make" command that will fail by mocking exec.Command
-                testCaseName = "TestFailedBuildGadgetTree"
-                execCommand = fakeExecCommand
-                defer func() {
-                        execCommand = exec.Command
-                }()
-                wd, _ := os.Getwd()
-                sourcePath := filepath.Join(wd, "testdata", "gadget_source")
-                sourcePath = "file://" + sourcePath
-                imageDef = ImageDefinition{
-                        Gadget: &GadgetType{
-                                GadgetURL:  sourcePath,
-                                GadgetType: "directory",
-                        },
-                }
-                stateMachine.ImageDef = imageDef
+		// run a "make" command that will fail by mocking exec.Command
+		testCaseName = "TestFailedBuildGadgetTree"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		wd, _ := os.Getwd()
+		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
+		sourcePath = "file://" + sourcePath
+		imageDef = ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetURL:  sourcePath,
+				GadgetType: "directory",
+			},
+		}
+		stateMachine.ImageDef = imageDef
 
-                err = stateMachine.buildGadgetTree()
-                asserter.AssertErrContains(err, "Error running \"make\" in gadget source")
-        })
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrContains(err, "Error running \"make\" in gadget source")
+	})
 }
