@@ -925,14 +925,14 @@ func TestGerminate(t *testing.T) {
 		},
 		{
 			"bzr+git",
-			"ubuntu-mate",
+			"ubuntu",
 			[]string{"http://bazaar.launchpad.net/~ubuntu-mate-dev/ubuntu-seeds/",
 				"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/",
 				"https://people.canonical.com/~ubuntu-archive/seeds/",
 			},
 			[]string{"desktop", "desktop-common", "standard", "minimal"},
 			[]string{"xorg", "wget", "ubuntu-minimal"},
-			[]string{"ubuntu-mate-welcome"},
+			[]string{},
 		},
 	}
 	for _, tc := range testCases {
