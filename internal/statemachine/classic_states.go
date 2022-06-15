@@ -298,25 +298,31 @@ func (stateMachine *StateMachine) germinate() error {
 			germinateCmd.String(), err.Error(), string(germinateOutput))
 	}
 
-	for _, fileName := range classicStateMachine.ImageDef.Rootfs.Seed.Names {
-		seedFilePath := filepath.Join(germinateDir, fileName+".seed")
-		seedFile, err := osOpen(seedFilePath)
-		if err != nil {
-			return fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
-		}
-		defer seedFile.Close()
+	packageMap := make(map[string]*[]string)
+	packageMap[".seed"] = &classicStateMachine.Packages
+	packageMap[".snaps"] = &classicStateMachine.Snaps
+	for fileExtension, packageList := range packageMap {
+		for _, fileName := range classicStateMachine.ImageDef.Rootfs.Seed.Names {
+			seedFilePath := filepath.Join(germinateDir, fileName+fileExtension)
+			seedFile, err := osOpen(seedFilePath)
+			if err != nil {
+				return fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
+			}
+			defer seedFile.Close()
 
-		seedScanner := bufio.NewScanner(seedFile)
-		for seedScanner.Scan() {
-			seedLine := seedScanner.Bytes()
-			matched, _ := regexp.Match(`^[a-z].*`, seedLine)
-			if matched {
-				packageName := strings.Split(string(seedLine), " ")[0]
-				classicStateMachine.Packages = append(classicStateMachine.Packages, packageName)
+			seedScanner := bufio.NewScanner(seedFile)
+			for seedScanner.Scan() {
+				seedLine := seedScanner.Bytes()
+				matched, _ := regexp.Match(`^[a-z].*`, seedLine)
+				if matched {
+					packageName := strings.Split(string(seedLine), " ")[0]
+					*packageList = append(*packageList, packageName)
+				}
 			}
 		}
 	}
 
+	fmt.Println(classicStateMachine.Snaps)
 	return nil
 }
 

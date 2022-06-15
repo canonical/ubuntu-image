@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	//"strings"
+	"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -905,6 +905,7 @@ func TestGerminate(t *testing.T) {
 		seedURLs         []string
 		seedNames        []string
 		expectedPackages []string
+		expectedSnaps    []string
 	}{
 		{
 			"git",
@@ -912,6 +913,7 @@ func TestGerminate(t *testing.T) {
 			[]string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 			[]string{"server", "minimal", "standard", "cloud-image"},
 			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
+			[]string{"lxd"},
 		},
 		{
 			"http",
@@ -919,14 +921,18 @@ func TestGerminate(t *testing.T) {
 			[]string{"https://people.canonical.com/~ubuntu-archive/seeds/"},
 			[]string{"server", "minimal", "standard", "cloud-image"},
 			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
+			[]string{"lxd"},
 		},
 		{
 			"bzr+git",
-			"ubuntu",
+			"ubuntu-mate",
 			[]string{"http://bazaar.launchpad.net/~ubuntu-mate-dev/ubuntu-seeds/",
-				"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
-			[]string{"desktop-common", "standard", "minimal"},
+				"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/",
+				"https://people.canonical.com/~ubuntu-archive/seeds/",
+			},
+			[]string{"desktop", "desktop-common", "standard", "minimal"},
 			[]string{"xorg", "wget", "ubuntu-minimal"},
+			[]string{"ubuntu-mate-welcome"},
 		},
 	}
 	for _, tc := range testCases {
@@ -974,6 +980,20 @@ func TestGerminate(t *testing.T) {
 				if !found {
 					t.Errorf("Expected to find %s in list of packages: %v",
 						expectedPackage, stateMachine.Packages)
+				}
+			}
+			// spot check some snaps that should remain seeded for a long time
+			for _, expectedSnap := range tc.expectedSnaps {
+				found := false
+				for _, seedSnap := range stateMachine.Snaps {
+					snapName := strings.Split(seedSnap, "=")[0]
+					if expectedSnap == snapName {
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("Expected to find %s in list of snaps: %v",
+						expectedSnap, stateMachine.Snaps)
 				}
 			}
 		})

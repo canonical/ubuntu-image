@@ -36,6 +36,7 @@ type ClassicStateMachine struct {
 	Opts     commands.ClassicOpts
 	Args     commands.ClassicArgs
 	Packages []string
+	Snaps    []string
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run()
