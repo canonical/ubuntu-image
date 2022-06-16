@@ -322,7 +322,6 @@ func (stateMachine *StateMachine) germinate() error {
 		}
 	}
 
-	fmt.Println(classicStateMachine.Snaps)
 	return nil
 }
 
