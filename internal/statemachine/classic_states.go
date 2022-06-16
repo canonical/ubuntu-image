@@ -313,7 +313,7 @@ func (stateMachine *StateMachine) germinate() error {
 			seedScanner := bufio.NewScanner(seedFile)
 			for seedScanner.Scan() {
 				seedLine := seedScanner.Bytes()
-				matched, _ := regexp.Match(`^[a-z].*`, seedLine)
+				matched, _ := regexp.Match(`^[a-z0-9].*`, seedLine)
 				if matched {
 					packageName := strings.Split(string(seedLine), " ")[0]
 					*packageList = append(*packageList, packageName)
