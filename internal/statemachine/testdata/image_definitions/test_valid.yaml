@@ -12,8 +12,8 @@ gadget:
   type: "git"
 model-assertion: pi-generic.model
 rootfs:
-  apt-config:
-    archive: ubuntu
+  archive: ubuntu
+  mirror: "http://ports.ubuntu.com/ubuntu/"
   seed:
     urls:
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"

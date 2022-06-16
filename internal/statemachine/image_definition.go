@@ -40,6 +40,7 @@ type RootfsType struct {
 	Components   []string     `yaml:"components"    json:"Components,omitempty"`
 	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
 	Pocket       string       `yaml:"pocket"        json:"Pocket"                 default:"release"`
+	Mirror       string       `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
 	Seed         *SeedType    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
 	Tarball      *TarballType `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
 	ArchiveTasks []string     `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
@@ -49,8 +50,9 @@ type RootfsType struct {
 // build a rootfs via seed germination
 type SeedType struct {
 	SeedBranch string   `yaml:"branch" json:"SeedBranch,omitempty"`
-	SeedURLs   []string `yaml:"urls"   json:"SeedURLs"    jsonschema:"type=array,format=uri"`
+	SeedURLs   []string `yaml:"urls"   json:"SeedURLs"             jsonschema:"type=array,format=uri"`
 	Names      []string `yaml:"names"  json:"Names"`
+	Vcs        bool     `yaml:"vcs"    json:"Vcs"                  default:"true"`
 }
 
 // TarballType defines the tarball section of rootfs, which is used

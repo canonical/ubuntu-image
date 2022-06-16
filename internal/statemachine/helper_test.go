@@ -793,6 +793,7 @@ func TestGenerateGerminateCmd(t *testing.T) {
 			imageDef := ImageDefinition{
 				Architecture: tc.name,
 				Rootfs: &RootfsType{
+					Mirror: tc.mirror,
 					Seed: &SeedType{
 						SeedURLs:   []string{"git://test.git"},
 						SeedBranch: "testbranch",

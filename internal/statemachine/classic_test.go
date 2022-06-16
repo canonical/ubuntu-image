@@ -906,6 +906,7 @@ func TestGerminate(t *testing.T) {
 		seedNames        []string
 		expectedPackages []string
 		expectedSnaps    []string
+		vcs              bool
 	}{
 		{
 			"git",
@@ -914,6 +915,7 @@ func TestGerminate(t *testing.T) {
 			[]string{"server", "minimal", "standard", "cloud-image"},
 			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
 			[]string{"lxd"},
+			true,
 		},
 		{
 			"http",
@@ -922,6 +924,7 @@ func TestGerminate(t *testing.T) {
 			[]string{"server", "minimal", "standard", "cloud-image"},
 			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
 			[]string{"lxd"},
+			false,
 		},
 		{
 			"bzr+git",
@@ -933,6 +936,7 @@ func TestGerminate(t *testing.T) {
 			[]string{"desktop", "desktop-common", "standard", "minimal"},
 			[]string{"xorg", "wget", "ubuntu-minimal"},
 			[]string{},
+			true,
 		},
 	}
 	for _, tc := range testCases {
@@ -956,10 +960,12 @@ func TestGerminate(t *testing.T) {
 				Series:       hostSuite,
 				Rootfs: &RootfsType{
 					Archive: tc.archive,
+					Mirror:  "http://archive.ubuntu.com/ubuntu/",
 					Seed: &SeedType{
 						SeedURLs:   tc.seedURLs,
 						SeedBranch: hostSuite,
 						Names:      tc.seedNames,
+						Vcs:        tc.vcs,
 					},
 				},
 			}
@@ -1012,6 +1018,10 @@ func TestFailedGerminate(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
 		// create a valid imageDefinition
 		hostArch := getHostArch()
 		hostSuite := getHostSuite()
@@ -1020,10 +1030,12 @@ func TestFailedGerminate(t *testing.T) {
 			Series:       hostSuite,
 			Rootfs: &RootfsType{
 				Archive: "ubuntu",
+				Mirror:  "http://archive.ubuntu.com/ubuntu/",
 				Seed: &SeedType{
 					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 					SeedBranch: hostSuite,
 					Names:      []string{"server", "minimal", "standard", "cloud-image"},
+					Vcs:        true,
 				},
 			},
 		}
@@ -1034,7 +1046,7 @@ func TestFailedGerminate(t *testing.T) {
 		defer func() {
 			osMkdir = os.Mkdir
 		}()
-		err := stateMachine.germinate()
+		err = stateMachine.germinate()
 		asserter.AssertErrContains(err, "Error creating germinate directory")
 		osMkdir = os.Mkdir
 
