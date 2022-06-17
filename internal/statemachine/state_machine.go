@@ -37,6 +37,7 @@ var ioutilReadFile = ioutil.ReadFile
 var ioutilWriteFile = ioutil.WriteFile
 var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
+var osOpen = os.Open
 var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
 var osRename = os.Rename
@@ -74,6 +75,7 @@ type temporaryDirectories struct {
 	unpack  string
 	volumes string
 	chroot  string
+	scratch string
 }
 
 // StateMachine will hold the command line data, track the current state, and handle all function calls

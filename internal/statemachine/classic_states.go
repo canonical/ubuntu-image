@@ -1,9 +1,15 @@
 package statemachine
 
 import (
+	"bufio"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"
@@ -56,11 +62,11 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	}
 
 	// do some custom validation
-	if imageDefinition.Gadget.GadgetType == "git" && imageDefinition.Gadget.GadgetURL == "" {
+	if imageDefinition.Gadget.GadgetType != "prebuilt" && imageDefinition.Gadget.GadgetURL == "" {
 		jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
 		errDetail := gojsonschema.ErrorDetails{
 			"key":   "gadget:type",
-			"value": "git",
+			"value": imageDefinition.Gadget.GadgetType,
 		}
 		result.AddError(
 			newMissingURLError(
@@ -123,8 +129,7 @@ func (stateMachine *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"create_chroot", (*StateMachine).createChroot})
+		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
@@ -177,7 +182,52 @@ func (stateMachine *StateMachine) calculateStates() error {
 
 // Build the gadget tree
 func (stateMachine *StateMachine) buildGadgetTree() error {
-	// currently a no-op pending implementation of the classic image redesign
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// make the gadget directory under scratch
+	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+
+	err := osMkdir(gadgetDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating scratch/gadget directory: %s", err.Error())
+	}
+
+	var sourceDir string
+	switch classicStateMachine.ImageDef.Gadget.GadgetType {
+	case "git":
+		err := cloneGitRepo(classicStateMachine.ImageDef, gadgetDir)
+		if err != nil {
+			return fmt.Errorf("Error cloning gadget repository: \"%s\"", err.Error())
+		}
+		sourceDir = gadgetDir
+		break
+	case "directory":
+		// no need to check error here as the validity of the URL
+		// has been confirmed by the schema validation
+		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
+
+		// copy the source tree to the workdir
+		err := osutilCopySpecialFile(sourceURL.Path, gadgetDir)
+		if err != nil {
+			return fmt.Errorf("Error copying gadget source: %s", err.Error())
+		}
+
+		sourceDir = filepath.Join(gadgetDir, path.Base(sourceURL.Path))
+		break
+	}
+
+	// now run "make" to build the gadget tree
+	makeCmd := execCommand("make")
+	makeCmd.Dir = sourceDir
+
+	makeOutput, err := makeCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Error running \"make\" in gadget source. "+
+			"Error is \"%s\". Full output below:\n%s",
+			err.Error(), makeOutput)
+	}
+
 	return nil
 }
 
@@ -259,6 +309,54 @@ func (stateMachine *StateMachine) buildRootfsFromTasks() error {
 // Extract the rootfs from a tar archive
 func (stateMachine *StateMachine) extractRootfsTar() error {
 	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// germinate runs the germinate binary and parses the output to create
+// a list of packages from the seed section of the image definition
+func (stateMachine *StateMachine) germinate() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// create a scratch directory to run germinate in
+	germinateDir := filepath.Join(classicStateMachine.stateMachineFlags.WorkDir, "germinate")
+	err := osMkdir(germinateDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating germinate directory: \"%s\"", err.Error())
+	}
+
+	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
+	germinateCmd.Dir = germinateDir
+
+	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
+			germinateCmd.String(), err.Error(), string(germinateOutput))
+	}
+
+	packageMap := make(map[string]*[]string)
+	packageMap[".seed"] = &classicStateMachine.Packages
+	packageMap[".snaps"] = &classicStateMachine.Snaps
+	for fileExtension, packageList := range packageMap {
+		for _, fileName := range classicStateMachine.ImageDef.Rootfs.Seed.Names {
+			seedFilePath := filepath.Join(germinateDir, fileName+fileExtension)
+			seedFile, err := osOpen(seedFilePath)
+			if err != nil {
+				return fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
+			}
+			defer seedFile.Close()
+
+			seedScanner := bufio.NewScanner(seedFile)
+			for seedScanner.Scan() {
+				seedLine := seedScanner.Bytes()
+				matched, _ := regexp.Match(`^[a-z0-9].*`, seedLine)
+				if matched {
+					packageName := strings.Split(string(seedLine), " ")[0]
+					*packageList = append(*packageList, packageName)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -16,7 +16,8 @@ import (
 	"github.com/diskfs/go-diskfs/partition"
 	"github.com/diskfs/go-diskfs/partition/gpt"
 	"github.com/diskfs/go-diskfs/partition/mbr"
-
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/seed"
@@ -576,6 +577,62 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 		return seededSnaps, err
 	}
 	return seededSnaps, nil
+}
+
+// generateGerminateCmd creates the appropriate germinate command for the
+// values configured in the image definition yaml file
+func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
+	// determine the value for the seed-dist in the form of <archive>.<series>
+	seedDist := imageDefinition.Rootfs.Archive
+	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
+		seedDist = seedDist + "." + imageDefinition.Rootfs.Seed.SeedBranch
+	}
+
+	var seedSource string
+	for _, seedURL := range imageDefinition.Rootfs.Seed.SeedURLs {
+		seedSource = seedSource + seedURL + ","
+	}
+
+	germinateCmd := execCommand("germinate",
+		"--mirror", imageDefinition.Rootfs.Mirror,
+		"--arch", imageDefinition.Architecture,
+		"--dist", imageDefinition.Series,
+		"--seed-source", seedSource,
+		"--seed-dist", seedDist,
+		"--no-rdepends",
+	)
+
+	if imageDefinition.Rootfs.Seed.Vcs {
+		germinateCmd.Args = append(germinateCmd.Args, "--vcs=auto")
+	}
+
+	if len(imageDefinition.Rootfs.Components) > 0 {
+		var components string
+		for _, component := range imageDefinition.Rootfs.Components {
+			components = components + component + ","
+		}
+		germinateCmd.Args = append(germinateCmd.Args, "--components="+components)
+	}
+
+	return germinateCmd
+}
+
+// cloneGitRepo takes options from the image definition and clones the git
+// repo with the corresponding options
+func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
+	// clone the repo
+	cloneOptions := &git.CloneOptions{
+		URL:          imageDefinition.Gadget.GadgetURL,
+		SingleBranch: true,
+	}
+	if imageDefinition.Gadget.GadgetBranch != "" {
+		cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(imageDefinition.Gadget.GadgetBranch)
+	}
+
+	cloneOptions.Validate()
+
+	_, err := git.PlainClone(workDir, false, cloneOptions)
+	return err
 }
 
 // generateDebootstrapCmd generates the debootstrap command used to create a chroot

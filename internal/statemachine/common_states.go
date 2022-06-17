@@ -35,9 +35,14 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
 	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
 	stateMachine.tempDirs.chroot = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "chroot")
+	stateMachine.tempDirs.scratch = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "scratch")
 
-	if err := osMkdir(stateMachine.tempDirs.rootfs, 0755); err != nil {
-		return fmt.Errorf("Error creating temporary directory: %s", err.Error())
+	tempDirs := []string{stateMachine.tempDirs.scratch, stateMachine.tempDirs.rootfs}
+	for _, tempDir := range tempDirs {
+		err := osMkdir(tempDir, 0755)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating temporary directory \"%s\": \"%s\"", tempDir, err.Error())
+		}
 	}
 
 	return nil
