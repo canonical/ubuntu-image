@@ -13,9 +13,9 @@ var startingClassicStates = []stateFunc{
 
 var rootfsSeedStates = []stateFunc{
 	{"germinate", (*StateMachine).germinate},
-	/*{"create_chroot", (*StateMachine).createChroot},
-	{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+	{"create_chroot", (*StateMachine).createChroot},
 	{"install_packages", (*StateMachine).installPackages},
+	/*{"add_extra_ppas", (*StateMachine).addExtraPPAs},
 	{"apply_customization", (*StateMachine).applyCustomization},*/
 }
 
