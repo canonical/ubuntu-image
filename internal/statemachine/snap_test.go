@@ -22,22 +22,34 @@ import (
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
-func TestFailedValidateInputSnap(t *testing.T) {
-	t.Run("test_failed_validate_input", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+func TestFailedSnapSetup(t *testing.T) {
+	testCases := []struct {
+		name   string
+		until  string
+		thru   string
+		errMsg string
+	}{
+		{"invalid_until_name", "fake step", "", "not a valid state name"},
+		{"invalid_thru_name", "", "fake step", "not a valid state name"},
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", "cannot specify both --until and --thru"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_failed_snap_setup_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
 
-		// use both --until and --thru to trigger this failure
-		var stateMachine SnapStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.stateMachineFlags.Until = "until-test"
-		stateMachine.stateMachineFlags.Thru = "thru-test"
+			// use both --until and --thru to trigger this failure
+			var stateMachine SnapStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.stateMachineFlags.Until = tc.until
+			stateMachine.stateMachineFlags.Thru = tc.thru
 
-		err := stateMachine.Setup()
-		asserter.AssertErrContains(err, "cannot specify both --until and --thru")
-	})
+			err := stateMachine.Setup()
+			asserter.AssertErrContains(err, tc.errMsg)
+		})
+	}
 }
 
 // TestFailedReadMetadataSnap tests a failed metadata read by passing --resume with no previous partial state machine run
