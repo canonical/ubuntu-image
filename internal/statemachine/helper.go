@@ -577,3 +577,41 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 	}
 	return seededSnaps, nil
 }
+
+// generateDebootstrapCmd generates the debootstrap command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
+	var includeFlag string
+	for _, includePackage := range includeList {
+		includeFlag = includeFlag + includePackage + ","
+	}
+
+	debootstrapCmd := execCommand("debootstrap",
+		"--arch", imageDefinition.Architecture,
+		"--include", includeFlag,
+		imageDefinition.Series,
+		targetDir,
+	)
+
+        if len(imageDefinition.Rootfs.Components) > 0 {
+                var components string
+                for _, component := range imageDefinition.Rootfs.Components {
+                        components = components + component + ","
+                }
+                debootstrapCmd.Args = append(debootstrapCmd.Args, "--components="+components)
+        }
+
+	return debootstrapCmd
+}
+
+// generateAptCmd generates the apt command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+/*func generateAptCmd(imageDefinition ImageDefinition, targetDir string) *exec.Cmd {
+	aptCmd := execCommand("apt", "install")
+		"--arch", imageDefinition.Architecture,
+		imageDefinition.Series,
+		targetDir,
+	)
+
+	return aptCmd
+}*/

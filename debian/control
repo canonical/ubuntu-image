@@ -19,6 +19,7 @@ Architecture: any
 Built-Using: ${misc:Built-Using},
 Depends: ${shlibs:Depends},
          ${misc:Depends},
+         debootstrap,
          fdisk,
          gdisk,
          livecd-rootfs,
