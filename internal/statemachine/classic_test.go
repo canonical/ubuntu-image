@@ -19,7 +19,7 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-//TestClassicSetup tests a successful run of the polymorphed Setup function
+// TestClassicSetup tests a successful run of the polymorphed Setup function
 func TestClassicSetup(t *testing.T) {
 	t.Run("test_classic_setup", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
@@ -901,7 +901,7 @@ func TestCheckEmptyFields(t *testing.T) {
 func TestGerminate(t *testing.T) {
 	testCases := []struct {
 		name             string
-		flavor          string
+		flavor           string
 		seedURLs         []string
 		seedNames        []string
 		expectedPackages []string
@@ -960,7 +960,7 @@ func TestGerminate(t *testing.T) {
 				Series:       hostSuite,
 				Rootfs: &RootfsType{
 					Flavor: tc.flavor,
-					Mirror:  "http://archive.ubuntu.com/ubuntu/",
+					Mirror: "http://archive.ubuntu.com/ubuntu/",
 					Seed: &SeedType{
 						SeedURLs:   tc.seedURLs,
 						SeedBranch: hostSuite,
@@ -1029,8 +1029,8 @@ func TestFailedGerminate(t *testing.T) {
 			Architecture: hostArch,
 			Series:       hostSuite,
 			Rootfs: &RootfsType{
-				Flavor:  "ubuntu",
-				Mirror:  "http://archive.ubuntu.com/ubuntu/",
+				Flavor: "ubuntu",
+				Mirror: "http://archive.ubuntu.com/ubuntu/",
 				Seed: &SeedType{
 					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 					SeedBranch: hostSuite,
