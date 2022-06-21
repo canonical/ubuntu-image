@@ -901,7 +901,7 @@ func TestCheckEmptyFields(t *testing.T) {
 func TestGerminate(t *testing.T) {
 	testCases := []struct {
 		name             string
-		archive          string
+		flavor          string
 		seedURLs         []string
 		seedNames        []string
 		expectedPackages []string
@@ -959,7 +959,7 @@ func TestGerminate(t *testing.T) {
 				Architecture: hostArch,
 				Series:       hostSuite,
 				Rootfs: &RootfsType{
-					Archive: tc.archive,
+					Flavor: tc.flavor,
 					Mirror:  "http://archive.ubuntu.com/ubuntu/",
 					Seed: &SeedType{
 						SeedURLs:   tc.seedURLs,
@@ -1029,7 +1029,7 @@ func TestFailedGerminate(t *testing.T) {
 			Architecture: hostArch,
 			Series:       hostSuite,
 			Rootfs: &RootfsType{
-				Archive: "ubuntu",
+				Flavor:  "ubuntu",
 				Mirror:  "http://archive.ubuntu.com/ubuntu/",
 				Seed: &SeedType{
 					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},

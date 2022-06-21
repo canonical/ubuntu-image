@@ -583,7 +583,7 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 // values configured in the image definition yaml file
 func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 	// determine the value for the seed-dist in the form of <archive>.<series>
-	seedDist := imageDefinition.Rootfs.Archive
+	seedDist := imageDefinition.Rootfs.Flavor
 	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
 		seedDist = seedDist + "." + imageDefinition.Rootfs.Seed.SeedBranch
 	}
