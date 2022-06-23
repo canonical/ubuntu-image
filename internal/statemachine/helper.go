@@ -295,7 +295,7 @@ func WriteSnapManifest(snapsDir string, outputPath string) error {
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".snap") {
 			split := strings.SplitN(file.Name(), "_", 2)
-			fmt.Fprintf(manifest, "%s %s\n", split[0], split[1])
+			fmt.Fprintf(manifest, "%s %s\n", split[0], strings.TrimSuffix(split[1], ".snap"))
 		}
 	}
 	return nil
