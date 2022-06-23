@@ -724,3 +724,38 @@ func TestFailedRemovePreseeding(t *testing.T) {
 		//os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
+
+// We had a bug where the snap manifest would contain ".snap" in the
+// revision field. This test ensures that bug stays fixed
+func TestManifestRevisionFormat(t *testing.T) {
+	t.Run("test_manifest_revision_format", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		// generate temporary directory
+		tempDir := filepath.Join("/tmp", "manifest-revision-format-"+uuid.NewString())
+		err := os.Mkdir(tempDir, 0755)
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(tempDir)
+
+		fakeSnaps := []string{"test1_123.snap", "test2_456.snap", "test3_789.snap"}
+		for _, fakeSnap := range fakeSnaps {
+			fullPath := filepath.Join(tempDir, fakeSnap)
+			_, err := os.Create(fullPath)
+			asserter.AssertErrNil(err, true)
+		}
+
+		manifestOutput := filepath.Join(tempDir, "test.manifest")
+		err = WriteSnapManifest(tempDir, manifestOutput)
+		asserter.AssertErrNil(err, true)
+
+		expectedManifestData := "test1 123\ntest2 456\ntest3 789\n"
+
+		manifestData, err := ioutil.ReadFile(manifestOutput)
+		asserter.AssertErrNil(err, true)
+
+		if string(manifestData) != expectedManifestData {
+			t.Errorf("Expected manifest file to be:\n%s\nBut got \n%s",
+				expectedManifestData, manifestData)
+		}
+	})
+}
