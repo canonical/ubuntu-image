@@ -239,6 +239,14 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			lastOffset = offset + quantity.Offset(structure.Size)
 			farthestOffset = maxOffset(lastOffset, farthestOffset)
 			structure.Offset = &offset
+
+			// system-data and system-seed do not always have content defined.
+			// this makes Content be a nil slice and lead copyStructureContent() skip the rootfs copying later.
+			// so we need to make an empty slice here to avoid this situation.
+			if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Content == nil {
+				structure.Content = make([]gadget.VolumeContent, 0)
+			}
+
 			// we've manually updated the offset, but since structure is
 			// not a pointer we need to overwrite the value in volume.Structure
 			volume.Structure[ii] = structure
