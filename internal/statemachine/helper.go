@@ -588,10 +588,7 @@ func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 		seedDist = seedDist + "." + imageDefinition.Rootfs.Seed.SeedBranch
 	}
 
-	var seedSource string
-	for _, seedURL := range imageDefinition.Rootfs.Seed.SeedURLs {
-		seedSource = seedSource + seedURL + ","
-	}
+	seedSource := strings.Join(imageDefinition.Rootfs.Seed.SeedURLs, ",")
 
 	germinateCmd := execCommand("germinate",
 		"--mirror", imageDefinition.Rootfs.Mirror,
@@ -607,10 +604,7 @@ func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 	}
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
-		var components string
-		for _, component := range imageDefinition.Rootfs.Components {
-			components = components + component + ","
-		}
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
 		germinateCmd.Args = append(germinateCmd.Args, "--components="+components)
 	}
 
