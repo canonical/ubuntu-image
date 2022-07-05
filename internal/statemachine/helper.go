@@ -35,6 +35,12 @@ func (stateMachine *StateMachine) validateInput() error {
 		return fmt.Errorf("must specify workdir when using --resume flag")
 	}
 
+	return nil
+}
+
+// validateUntilThru validates that the the state passed as --until
+// or --thru exists in the state machine's list of states
+func (stateMachine *StateMachine) validateUntilThru() error {
 	// if --until or --thru was given, make sure the specified state exists
 	var searchState string
 	var stateFound bool = false
@@ -583,15 +589,12 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 // values configured in the image definition yaml file
 func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 	// determine the value for the seed-dist in the form of <archive>.<series>
-	seedDist := imageDefinition.Rootfs.Archive
+	seedDist := imageDefinition.Rootfs.Flavor
 	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
 		seedDist = seedDist + "." + imageDefinition.Rootfs.Seed.SeedBranch
 	}
 
-	var seedSource string
-	for _, seedURL := range imageDefinition.Rootfs.Seed.SeedURLs {
-		seedSource = seedSource + seedURL + ","
-	}
+	seedSource := strings.Join(imageDefinition.Rootfs.Seed.SeedURLs, ",")
 
 	germinateCmd := execCommand("germinate",
 		"--mirror", imageDefinition.Rootfs.Mirror,
@@ -607,12 +610,7 @@ func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 	}
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
-		var components string
-		for _, component := range imageDefinition.Rootfs.Components {
-			components = components + component + ","
-		}
-		// trim the trailing comma
-		components = strings.TrimRight(components, ",")
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
 		germinateCmd.Args = append(germinateCmd.Args, "--components="+components)
 	}
 

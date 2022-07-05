@@ -176,6 +176,10 @@ func (stateMachine *StateMachine) calculateStates() error {
 		}
 	}
 
+	if err := stateMachine.validateUntilThru(); err != nil {
+		return err
+	}
+
 	return nil
 }
 

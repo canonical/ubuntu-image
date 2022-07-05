@@ -120,6 +120,7 @@ func TestFailedParseImageDefinition(t *testing.T) {
 
 // TestCalculateStates reads in a variety of yaml files and ensures
 // that the correct states are added to the state machine
+// TODO: manually assemble the image definitions instead of relying on the parseImageDefinition() function to make this more of a unit test
 func TestCalculateStates(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -164,6 +165,36 @@ func TestCalculateStates(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFailedCalculateStates tests that the calculateStates
+// function fails if the value of --until or --thru is not
+// in the calculated list of states
+func TestFailedCalculateStates(t *testing.T) {
+	t.Run("test_failed_calcluate_states", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetType: "git",
+			},
+			Rootfs: &RootfsType{
+				ArchiveTasks: []string{"test"},
+			},
+			Customization: &CustomizationType{},
+		}
+
+		stateMachine.stateMachineFlags.Thru = "fake_state"
+
+		// now calculate the states and ensure that the expected states are in the slice
+		err := stateMachine.calculateStates()
+		asserter.AssertErrContains(err, "not a valid state name")
+	})
 }
 
 // TestPrintStates ensures the states are printed to stdout when the flag is set
@@ -888,7 +919,7 @@ func TestCheckEmptyFields(t *testing.T) {
 func TestGerminate(t *testing.T) {
 	testCases := []struct {
 		name             string
-		archive          string
+		flavor           string
 		seedURLs         []string
 		seedNames        []string
 		expectedPackages []string
@@ -946,8 +977,8 @@ func TestGerminate(t *testing.T) {
 				Architecture: hostArch,
 				Series:       hostSuite,
 				Rootfs: &RootfsType{
-					Archive: tc.archive,
-					Mirror:  "http://archive.ubuntu.com/ubuntu/",
+					Flavor: tc.flavor,
+					Mirror: "http://archive.ubuntu.com/ubuntu/",
 					Seed: &SeedType{
 						SeedURLs:   tc.seedURLs,
 						SeedBranch: hostSuite,
@@ -1016,8 +1047,8 @@ func TestFailedGerminate(t *testing.T) {
 			Architecture: hostArch,
 			Series:       hostSuite,
 			Rootfs: &RootfsType{
-				Archive: "ubuntu",
-				Mirror:  "http://archive.ubuntu.com/ubuntu/",
+				Flavor: "ubuntu",
+				Mirror: "http://archive.ubuntu.com/ubuntu/",
 				Seed: &SeedType{
 					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 					SeedBranch: hostSuite,

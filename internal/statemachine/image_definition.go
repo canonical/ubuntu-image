@@ -39,6 +39,7 @@ type GadgetType struct {
 type RootfsType struct {
 	Components   []string     `yaml:"components"    json:"Components,omitempty"`
 	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
+	Flavor       string       `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
 	Pocket       string       `yaml:"pocket"        json:"Pocket"                 default:"release"`
 	Mirror       string       `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
 	Seed         *SeedType    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
