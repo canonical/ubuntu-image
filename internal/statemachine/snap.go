@@ -41,6 +41,11 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 		return err
 	}
 
+	// validate values of until and thru
+	if err := snapStateMachine.validateUntilThru(); err != nil {
+		return err
+	}
+
 	// if --resume was passed, figure out where to start
 	if err := snapStateMachine.readMetadata(); err != nil {
 		return err

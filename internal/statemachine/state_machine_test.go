@@ -275,36 +275,6 @@ func TestUntilThru(t *testing.T) {
 	}
 }
 
-// TestInvalidStateMachineArgs tests that invalid state machine command line arguments result in a failure
-func TestInvalidStateMachineArgs(t *testing.T) {
-	testCases := []struct {
-		name   string
-		until  string
-		thru   string
-		resume bool
-		errMsg string
-	}{
-		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, "cannot specify both --until and --thru"},
-		{"invalid_until_name", "fake step", "", false, "not a valid state name"},
-		{"invalid_thru_name", "", "fake step", false, "not a valid state name"},
-		{"resume_with_no_workdir", "", "", true, "must specify workdir when using --resume flag"},
-	}
-
-	for _, tc := range testCases {
-		t.Run("test "+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.stateMachineFlags.Until = tc.until
-			stateMachine.stateMachineFlags.Thru = tc.thru
-			stateMachine.stateMachineFlags.Resume = tc.resume
-
-			err := stateMachine.validateInput()
-			asserter.AssertErrContains(err, tc.errMsg)
-		})
-	}
-}
-
 // TestDebug ensures that the name of the states is printed when the --debug flag is used
 func TestDebug(t *testing.T) {
 	t.Run("test_debug", func(t *testing.T) {

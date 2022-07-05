@@ -35,6 +35,12 @@ func (stateMachine *StateMachine) validateInput() error {
 		return fmt.Errorf("must specify workdir when using --resume flag")
 	}
 
+	return nil
+}
+
+// validateUntilThru validates that the the state passed as --until
+// or --thru exists in the state machine's list of states
+func (stateMachine *StateMachine) validateUntilThru() error {
 	// if --until or --thru was given, make sure the specified state exists
 	var searchState string
 	var stateFound bool = false

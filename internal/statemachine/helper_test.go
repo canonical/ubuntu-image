@@ -815,3 +815,56 @@ func TestGenerateGerminateCmd(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateInput tests that invalid state machine command line arguments result in a failure
+func TestValidateInput(t *testing.T) {
+	testCases := []struct {
+		name   string
+		until  string
+		thru   string
+		resume bool
+		errMsg string
+	}{
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, "cannot specify both --until and --thru"},
+		{"resume_with_no_workdir", "", "", true, "must specify workdir when using --resume flag"},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.Until = tc.until
+			stateMachine.stateMachineFlags.Thru = tc.thru
+			stateMachine.stateMachineFlags.Resume = tc.resume
+
+			err := stateMachine.validateInput()
+			asserter.AssertErrContains(err, tc.errMsg)
+		})
+	}
+}
+
+// TestValidateUntilThru ensures that using invalid value for --thru
+// or --until returns an error
+func TestValidateUntilThru(t *testing.T) {
+	testCases := []struct {
+		name  string
+		until string
+		thru  string
+	}{
+		{"invalid_until_name", "fake step", ""},
+		{"invalid_thru_name", "", "fake step"},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.Until = tc.until
+			stateMachine.stateMachineFlags.Thru = tc.thru
+
+			err := stateMachine.validateUntilThru()
+			asserter.AssertErrContains(err, "not a valid state name")
+
+		})
+	}
+}
