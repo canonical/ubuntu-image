@@ -641,7 +641,6 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
-		"--no-resolve-deps",
 	)
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
