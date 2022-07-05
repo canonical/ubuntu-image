@@ -585,6 +585,38 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 	return seededSnaps, nil
 }
 
+// generateGerminateCmd creates the appropriate germinate command for the
+// values configured in the image definition yaml file
+func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
+	// determine the value for the seed-dist in the form of <archive>.<series>
+	seedDist := imageDefinition.Rootfs.Flavor
+	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
+		seedDist = seedDist + "." + imageDefinition.Rootfs.Seed.SeedBranch
+	}
+
+	seedSource := strings.Join(imageDefinition.Rootfs.Seed.SeedURLs, ",")
+
+	germinateCmd := execCommand("germinate",
+		"--mirror", imageDefinition.Rootfs.Mirror,
+		"--arch", imageDefinition.Architecture,
+		"--dist", imageDefinition.Series,
+		"--seed-source", seedSource,
+		"--seed-dist", seedDist,
+		"--no-rdepends",
+	)
+
+	if imageDefinition.Rootfs.Seed.Vcs {
+		germinateCmd.Args = append(germinateCmd.Args, "--vcs=auto")
+	}
+
+	if len(imageDefinition.Rootfs.Components) > 0 {
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
+		germinateCmd.Args = append(germinateCmd.Args, "--components="+components)
+	}
+
+	return germinateCmd
+}
+
 // cloneGitRepo takes options from the image definition and clones the git
 // repo with the corresponding options
 func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {

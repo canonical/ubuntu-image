@@ -778,6 +778,44 @@ func TestRemovePreseeding(t *testing.T) {
 	})
 }
 
+// TestGenerateGerminateCmd unit tests the generateGerminateCmd function
+func TestGenerateGerminateCmd(t *testing.T) {
+	testCases := []struct {
+		name   string
+		mirror string
+	}{
+		{"amd64", "http://archive.ubuntu.com/ubuntu/"},
+		{"armhf", "http://ports.ubuntu.com/ubuntu/"},
+		{"arm64", "http://ports.ubuntu.com/ubuntu/"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_germinate_cmd_"+tc.name, func(t *testing.T) {
+			imageDef := ImageDefinition{
+				Architecture: tc.name,
+				Rootfs: &RootfsType{
+					Mirror: tc.mirror,
+					Seed: &SeedType{
+						SeedURLs:   []string{"git://test.git"},
+						SeedBranch: "testbranch",
+					},
+					Components: []string{"main", "universe"},
+				},
+			}
+			germinateCmd := generateGerminateCmd(imageDef)
+
+			if !strings.Contains(germinateCmd.String(), tc.mirror) {
+				t.Errorf("germinate command \"%s\" has incorrect mirror. Expected \"%s\"",
+					germinateCmd.String(), tc.mirror)
+			}
+
+			if !strings.Contains(germinateCmd.String(), "--components=main,universe") {
+				t.Errorf("Expected germinate command \"%s\" to contain "+
+					"\"--components=main,universe\"", germinateCmd.String())
+			}
+		})
+	}
+}
+
 // TestValidateInput tests that invalid state machine command line arguments result in a failure
 func TestValidateInput(t *testing.T) {
 	testCases := []struct {

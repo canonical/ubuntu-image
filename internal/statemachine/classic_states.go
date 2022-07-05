@@ -1,11 +1,14 @@
 package statemachine
 
 import (
+	"bufio"
 	"fmt"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"
@@ -125,8 +128,7 @@ func (stateMachine *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"build_rootfs_from_seed", (*StateMachine).buildRootfsFromSeed})
+		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
@@ -276,6 +278,54 @@ func (stateMachine *StateMachine) buildRootfsFromTasks() error {
 // Extract the rootfs from a tar archive
 func (stateMachine *StateMachine) extractRootfsTar() error {
 	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// germinate runs the germinate binary and parses the output to create
+// a list of packages from the seed section of the image definition
+func (stateMachine *StateMachine) germinate() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// create a scratch directory to run germinate in
+	germinateDir := filepath.Join(classicStateMachine.stateMachineFlags.WorkDir, "germinate")
+	err := osMkdir(germinateDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating germinate directory: \"%s\"", err.Error())
+	}
+
+	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
+	germinateCmd.Dir = germinateDir
+
+	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
+			germinateCmd.String(), err.Error(), string(germinateOutput))
+	}
+
+	packageMap := make(map[string]*[]string)
+	packageMap[".seed"] = &classicStateMachine.Packages
+	packageMap[".snaps"] = &classicStateMachine.Snaps
+	for fileExtension, packageList := range packageMap {
+		for _, fileName := range classicStateMachine.ImageDef.Rootfs.Seed.Names {
+			seedFilePath := filepath.Join(germinateDir, fileName+fileExtension)
+			seedFile, err := osOpen(seedFilePath)
+			if err != nil {
+				return fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
+			}
+			defer seedFile.Close()
+
+			seedScanner := bufio.NewScanner(seedFile)
+			for seedScanner.Scan() {
+				seedLine := seedScanner.Bytes()
+				matched, _ := regexp.Match(`^[a-z0-9].*`, seedLine)
+				if matched {
+					packageName := strings.Split(string(seedLine), " ")[0]
+					*packageList = append(*packageList, packageName)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

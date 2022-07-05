@@ -12,8 +12,12 @@ gadget:
   type: "git"
 model-assertion: pi-generic.model
 rootfs:
+  archive: ubuntu
+  mirror: "http://ports.ubuntu.com/ubuntu/"
   seed:
-    url: "https://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/ubuntu"
+    urls:
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
     branch: jammy
     names:
       - server

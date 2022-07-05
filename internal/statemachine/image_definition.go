@@ -37,26 +37,23 @@ type GadgetType struct {
 
 // RootfsType defines the rootfs section of the image definition file
 type RootfsType struct {
-	AptConfig    *AptConfigType `yaml:"apt-config"    json:"AptConfig,omitempty"`
-	Seed         *SeedType      `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
-	Tarball      *TarballType   `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
-	ArchiveTasks []string       `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
-}
-
-// AptConfigType defines the apt configuration to use while
-// building the rootfs
-type AptConfigType struct {
-	Components []*string `yaml:"components"    json:"Components,omitempty"`
-	Archive    string    `yaml:"archive"       json:"Archive"                default:"ubuntu"`
-	Pocket     string    `yaml:"pocket"        json:"Pocket"                 default:"release"`
+	Components   []string     `yaml:"components"    json:"Components,omitempty"`
+	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
+	Flavor       string       `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
+	Pocket       string       `yaml:"pocket"        json:"Pocket"                 default:"release"`
+	Mirror       string       `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
+	Seed         *SeedType    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
+	Tarball      *TarballType `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
+	ArchiveTasks []string     `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
 }
 
 // SeedType defines the seed section of rootfs, which is used to
 // build a rootfs via seed germination
 type SeedType struct {
-	SeedURL    string   `yaml:"url"    json:"SeedURL"    jsonschema:"type=string,format=uri"`
 	SeedBranch string   `yaml:"branch" json:"SeedBranch,omitempty"`
+	SeedURLs   []string `yaml:"urls"   json:"SeedURLs"             jsonschema:"type=array,format=uri"`
 	Names      []string `yaml:"names"  json:"Names"`
+	Vcs        bool     `yaml:"vcs"    json:"Vcs"                  default:"true"`
 }
 
 // TarballType defines the tarball section of rootfs, which is used

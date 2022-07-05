@@ -37,6 +37,7 @@ var ioutilReadFile = ioutil.ReadFile
 var ioutilWriteFile = ioutil.WriteFile
 var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
+var osOpen = os.Open
 var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
 var osRename = os.Rename
