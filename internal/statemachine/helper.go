@@ -645,12 +645,7 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 	)
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
-		var components string
-		for _, component := range imageDefinition.Rootfs.Components {
-			components = components + component + ","
-		}
-		// trim the trailing comma
-		components = strings.TrimRight(components, ",")
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
 		debootstrapCmd.Args = append(debootstrapCmd.Args, "--components="+components)
 	}
 
