@@ -640,6 +640,7 @@ func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
 func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
 	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
+		"--variant=minbase",
 	)
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
@@ -647,7 +648,12 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 		debootstrapCmd.Args = append(debootstrapCmd.Args, "--components="+components)
 	}
 
-	debootstrapCmd.Args = append(debootstrapCmd.Args, []string{imageDefinition.Series, targetDir}...)
+	// add the SUITE TARGET and MIRROR arguments
+	debootstrapCmd.Args = append(debootstrapCmd.Args, []string{
+		imageDefinition.Series,
+		targetDir,
+		imageDefinition.Rootfs.Mirror,
+	}...)
 
 	return debootstrapCmd
 }
