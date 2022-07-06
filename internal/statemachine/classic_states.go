@@ -287,22 +287,6 @@ func (stateMachine *StateMachine) createChroot() error {
 	return nil
 }
 
-// Install packages in the chroot environment
-func (stateMachine *StateMachine) installPackages() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
-
-	aptCmd := generateAptCmd(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
-
-	aptOutput, err := aptCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("Error running apt command \"%s\". Error is \"%s\". Output is: \n%s",
-			aptCmd.String(), err.Error(), string(aptOutput))
-	}
-
-	return nil
-}
-
 // Build a rootfs from a list of archive tasks
 func (stateMachine *StateMachine) buildRootfsFromTasks() error {
 	// currently a no-op pending implementation of the classic image redesign

@@ -1288,31 +1288,3 @@ func TestFailedCreateChroot(t *testing.T) {
 		execCommand = exec.Command
 	})
 }
-
-// TestFailedInstallPackages tests failure cases in installPackages
-func TestFailedInstallPackages(t *testing.T) {
-	t.Run("test_failed_install_packages", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs:       &RootfsType{},
-		}
-
-		// Setup the exec.Command mock
-		testCaseName = "TestFailedInstallPackages"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		err := stateMachine.installPackages()
-		asserter.AssertErrContains(err, "Error running apt command")
-		execCommand = exec.Command
-	})
-}

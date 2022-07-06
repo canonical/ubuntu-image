@@ -657,15 +657,3 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 
 	return debootstrapCmd
 }
-
-// generateAptCmd generates the apt command used to create a chroot
-// environment that will eventually become the rootfs of the resulting image
-func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
-	aptCmd := execCommand("chroot", targetDir, "apt", "install", "-y")
-
-	for _, aptPackage := range packageList {
-		aptCmd.Args = append(aptCmd.Args, aptPackage)
-	}
-
-	return aptCmd
-}
