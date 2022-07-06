@@ -231,17 +231,16 @@ func TestPrintStates(t *testing.T) {
 [2] load_gadget_yaml
 [3] germinate
 [4] create_chroot
-[5] install_packages
-[6] populate_rootfs_contents
-[7] customize_cloud_init
-[8] install_extra_packages
-[9] generate_disk_info
-[10] calculate_rootfs_size
-[11] populate_bootfs_contents
-[12] populate_prepare_partitions
-[13] make_disk
-[14] generate_manifest
-[15] finish
+[5] populate_rootfs_contents
+[6] customize_cloud_init
+[7] install_extra_packages
+[8] generate_disk_info
+[9] calculate_rootfs_size
+[10] populate_bootfs_contents
+[11] populate_prepare_partitions
+[12] make_disk
+[13] generate_manifest
+[14] finish
 `
 		if string(readStdout) != expectedStates {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
