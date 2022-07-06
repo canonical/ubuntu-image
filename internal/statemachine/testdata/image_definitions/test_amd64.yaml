@@ -8,9 +8,13 @@ kernel:
   name: linux
 gadget:
   url: "https://github.com/snapcore/pc-amd64-gadget.git"
-  branch: "20"
+  branch: classic
   type: "git"
 rootfs:
+  components:
+    - main
+    - universe
+    - restricted
   seed:
     urls:
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"

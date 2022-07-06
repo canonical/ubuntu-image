@@ -14,8 +14,6 @@ var startingClassicStates = []stateFunc{
 var rootfsSeedStates = []stateFunc{
 	{"germinate", (*StateMachine).germinate},
 	{"create_chroot", (*StateMachine).createChroot},
-	{"install_packages", (*StateMachine).installPackages},
-	//{"apply_customization", (*StateMachine).applyCustomization},
 }
 
 var imageCreationStates = []stateFunc{
