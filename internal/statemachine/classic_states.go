@@ -129,6 +129,10 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
+		if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+		}
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
@@ -263,9 +267,60 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	return nil
 }
 
-// Build a rootfs via seed germination
-func (stateMachine *StateMachine) buildRootfsFromSeed() error {
-	// currently a no-op pending implementation of the classic image redesign
+// Bootstrap a chroot environment to install packages in. It will eventually
+// become the rootfs of the image
+func (stateMachine *StateMachine) createChroot() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	if err := osMkdir(stateMachine.tempDirs.chroot, 0755); err != nil {
+		return fmt.Errorf("Failed to create chroot directory: %s", err.Error())
+	}
+
+	debootstrapCmd := generateDebootstrapCmd(classicStateMachine.ImageDef,
+		stateMachine.tempDirs.chroot,
+		classicStateMachine.Packages,
+	)
+
+	debootstrapOutput, err := debootstrapCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
+			debootstrapCmd.String(), err.Error(), string(debootstrapOutput))
+	}
+
+	return nil
+}
+
+// add PPAs to the apt sources list
+func (stateMachine *StateMachine) addExtraPPAs() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	ppaCmds := generatePPACmds(stateMachine.tempDirs.chroot, classicStateMachine.ImageDef)
+
+	for _, ppaCmd := range ppaCmds {
+		ppaCmdOutput, err := ppaCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error adding ppa with cmd: \"%s\". Error is \"%s\". Output is: \n%s",
+				ppaCmd.String(), err.Error(), string(ppaCmdOutput))
+		}
+	}
+	return nil
+}
+
+// Install packages in the chroot environment
+func (stateMachine *StateMachine) installPackages() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	aptCmd := generateAptCmd(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+
+	aptOutput, err := aptCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Error running apt command \"%s\". Error is \"%s\". Output is: \n%s",
+			aptCmd.String(), err.Error(), string(aptOutput))
+	}
+
 	return nil
 }
 

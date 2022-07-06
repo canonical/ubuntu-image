@@ -634,3 +634,56 @@ func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
 	_, err := git.PlainClone(workDir, false, cloneOptions)
 	return err
 }
+
+// generateDebootstrapCmd generates the debootstrap command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
+	debootstrapCmd := execCommand("debootstrap",
+		"--arch", imageDefinition.Architecture,
+		"--variant=minbase",
+	)
+
+	if len(imageDefinition.Rootfs.Components) > 0 {
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
+		debootstrapCmd.Args = append(debootstrapCmd.Args, "--components="+components)
+	}
+
+	// add the SUITE TARGET and MIRROR arguments
+	debootstrapCmd.Args = append(debootstrapCmd.Args, []string{
+		imageDefinition.Series,
+		targetDir,
+		imageDefinition.Rootfs.Mirror,
+	}...)
+
+	return debootstrapCmd
+}
+
+// generateAptCmd generates the apt command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
+	aptCmd := execCommand("chroot", targetDir, "apt", "install", "-y")
+
+	for _, aptPackage := range packageList {
+		aptCmd.Args = append(aptCmd.Args, aptPackage)
+	}
+
+	return aptCmd
+}
+
+// generateAddAptRepoCmd generates the add-apt-repository command
+// used to add PPAs to a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generatePPACmds(targetDir string, imageDefinition ImageDefinition) []*exec.Cmd {
+	var ppaCmds = make([]*exec.Cmd, 0)
+
+	for _, ppa := range imageDefinition.Customization.ExtraPPAs {
+		ppaCmd := execCommand("chroot", targetDir,
+			"add-apt-repository",
+			"-y", "--ppa",
+			ppa.PPAName,
+		)
+		ppaCmds = append(ppaCmds, ppaCmd)
+	}
+
+	return ppaCmds
+}
