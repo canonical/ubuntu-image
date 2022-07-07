@@ -868,3 +868,68 @@ func TestValidateUntilThru(t *testing.T) {
 		})
 	}
 }
+
+// TestGenerateAptCmd unit tests the generateAptCmd function
+func TestGenerateAptCmd(t *testing.T) {
+	testCases := []struct {
+		name        string
+		targetDir   string
+		packageList []string
+		expected    string
+	}{
+		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install -y test"},
+		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install -y test1 test2"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
+			aptCmd := generateAptCmd(tc.targetDir, tc.packageList)
+			if !strings.Contains(aptCmd.String(), tc.expected) {
+				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmd.String())
+			}
+		})
+	}
+}
+
+// TestCreatePPAInfo unit tests the createPPAInfo function
+func TestCreatePPAInfo(t *testing.T) {
+	testCases := []struct {
+		name             string
+		ppa              *PPAType
+		series           string
+		expectedName     string
+		expectedContents string
+	}{
+		{
+			"public_ppa",
+			&PPAType{
+				PPAName: "public/ppa",
+			},
+			"focal",
+			"public-ubuntu-ppa-focal.list",
+			"deb https://ppa.launchpadcontent.net/public/ppa/ubuntu focal main",
+		},
+		{
+			"private_ppa",
+			&PPAType{
+				PPAName: "private/ppa",
+				Auth:    "testuser:testpass",
+			},
+			"jammy",
+			"private-ubuntu-ppa-jammy.list",
+			"deb https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubuntu jammy main",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_create_ppa_info_"+tc.name, func(t *testing.T) {
+			fileName, fileContents := createPPAInfo(tc.ppa, tc.series)
+			if fileName != tc.expectedName {
+				t.Errorf("Expected PPA filename \"%s\" but got \"%s\"",
+					tc.expectedName, fileName)
+			}
+			if fileContents != tc.expectedContents {
+				t.Errorf("Expected PPA file contents \"%s\" but got \"%s\"",
+					tc.expectedContents, fileContents)
+			}
+		})
+	}
+}

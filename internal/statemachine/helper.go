@@ -670,20 +670,25 @@ func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
 	return aptCmd
 }
 
-// generateAddAptRepoCmd generates the add-apt-repository command
-// used to add PPAs to a chroot
-// environment that will eventually become the rootfs of the resulting image
-func generatePPACmds(targetDir string, imageDefinition ImageDefinition) []*exec.Cmd {
-	var ppaCmds = make([]*exec.Cmd, 0)
+// createPPAInfo generates the name for a PPA sources.list file
+// in the convention of add-apt-repository, and the contents
+// that define the sources.list
+// TODO: figure out what to do with fingerprint
+func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents string) {
+	splitName := strings.Split(ppa.PPAName, "/")
+	user := splitName[0]
+	ppaName := splitName[1]
 
-	for _, ppa := range imageDefinition.Customization.ExtraPPAs {
-		ppaCmd := execCommand("chroot", targetDir,
-			"add-apt-repository",
-			"-y", "--ppa",
-			ppa.PPAName,
-		)
-		ppaCmds = append(ppaCmds, ppaCmd)
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.list", user, ppaName, series)
+
+	var domain string
+	if ppa.Auth == "" {
+		domain = "https://ppa.launchpadcontent.net"
+	} else {
+		domain = fmt.Sprintf("https://%s@private-ppa.launchpadcontent.net", ppa.Auth)
 	}
 
-	return ppaCmds
+	fileContents = fmt.Sprintf("deb %s/%s/ubuntu %s main", domain, ppa.PPAName, series)
+
+	return fileName, fileContents
 }

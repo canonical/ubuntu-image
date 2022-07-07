@@ -60,7 +60,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return fmt.Errorf("Schema validation returned an error: %s", err.Error())
 	}
 
-	// do some custom validation
+	// do custom validation for gadgetURL being required if gadget is not pre-built
 	if imageDefinition.Gadget.GadgetType != "prebuilt" && imageDefinition.Gadget.GadgetURL == "" {
 		jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
 		errDetail := gojsonschema.ErrorDetails{
@@ -133,6 +133,8 @@ func (stateMachine *StateMachine) calculateStates() error {
 			rootfsCreationStates = append(rootfsCreationStates,
 				stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
 		}
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"install_packages", (*StateMachine).installPackages})
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
@@ -147,18 +149,6 @@ func (stateMachine *StateMachine) calculateStates() error {
 	if classicStateMachine.ImageDef.Customization.CloudInit != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
-	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"configure_extra_ppas", (*StateMachine).setupExtraPPAs})
-	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraPackages) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"install_extra_packages", (*StateMachine).installExtraPackages})
-	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"install_extra_snaps", (*StateMachine).prepareClassicImage})
 	}
 	if classicStateMachine.ImageDef.Customization.Manual != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
@@ -296,15 +286,27 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	ppaCmds := generatePPACmds(stateMachine.tempDirs.chroot, classicStateMachine.ImageDef)
-
-	for _, ppaCmd := range ppaCmds {
-		ppaCmdOutput, err := ppaCmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("Error adding ppa with cmd: \"%s\". Error is \"%s\". Output is: \n%s",
-				ppaCmd.String(), err.Error(), string(ppaCmdOutput))
-		}
+	// create /etc/apt/sources.list.d in the chroot if it doesn't already exist
+	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
+	err := osMkdir(sourcesListD, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
 	}
+
+	// now create the ppa sources.list files
+	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		ppaFileName, ppaFileContents := createPPAInfo(ppa,
+			classicStateMachine.ImageDef.Series)
+
+		ppaFile := filepath.Join(sourcesListD, ppaFileName)
+		ppaIO, err := osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
+		}
+		ppaIO.Write([]byte(ppaFileContents))
+		ppaIO.Close()
+	}
+
 	return nil
 }
 

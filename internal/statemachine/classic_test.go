@@ -47,6 +47,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"valid_image_definition", "test_valid.yaml", true, ""},
 		{"invalid_class", "test_bad_class.yaml", false, "Class must be one of the following"},
 		{"invalid_url", "test_bad_url.yaml", false, "Does not match format 'uri'"},
+		{"invalid_ppa_name", "test_bad_ppa_name.yaml", false, "Does not match pattern"},
 		{"both_seed_and_tasks", "test_both_seed_and_tasks.yaml", false, "Must validate one and only one schema"},
 		{"git_gadget_without_url", "test_git_gadget_without_url.yaml", false, "When key gadget:type is specified as git, a URL must be provided"},
 		{"file_doesnt_exist", "test_not_exist.yaml", false, "no such file or directory"},
@@ -231,9 +232,9 @@ func TestPrintStates(t *testing.T) {
 [2] load_gadget_yaml
 [3] germinate
 [4] create_chroot
-[5] populate_rootfs_contents
-[6] customize_cloud_init
-[7] install_extra_packages
+[5] install_packages
+[6] populate_rootfs_contents
+[7] customize_cloud_init
 [8] generate_disk_info
 [9] calculate_rootfs_size
 [10] populate_bootfs_contents
@@ -1313,5 +1314,55 @@ func TestFailedInstallPackages(t *testing.T) {
 		err := stateMachine.installPackages()
 		asserter.AssertErrContains(err, "Error running apt command")
 		execCommand = exec.Command
+	})
+}
+
+// TestFailedAddExtraPPAs tests failure cases in addExtraPPAs
+func TestFailedAddExtraPPAs(t *testing.T) {
+	t.Run("test_failed_add_extra_ppas", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs:       &RootfsType{},
+			Customization: &CustomizationType{
+				ExtraPPAs: []*PPAType{
+					&PPAType{
+						PPAName: "test1/ppa",
+					},
+				},
+			},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// create the /etc/apt/ dir in workdir
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt"), 0755)
+
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Failed to create apt sources.list.d")
+		osMkdir = os.Mkdir
+
+		// mock os.OpenFile
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error creating")
+		osOpenFile = os.OpenFile
 	})
 }
