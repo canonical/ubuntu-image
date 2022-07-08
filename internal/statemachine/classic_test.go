@@ -1333,7 +1333,7 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 			Rootfs:       &RootfsType{},
 			Customization: &CustomizationType{
 				ExtraPPAs: []*PPAType{
-					&PPAType{
+					{
 						PPAName: "test1/ppa",
 					},
 				},
