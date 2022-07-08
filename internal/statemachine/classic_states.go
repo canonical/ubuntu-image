@@ -263,9 +263,27 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	return nil
 }
 
-// Build a rootfs via seed germination
-func (stateMachine *StateMachine) buildRootfsFromSeed() error {
-	// currently a no-op pending implementation of the classic image redesign
+// Bootstrap a chroot environment to install packages in. It will eventually
+// become the rootfs of the image
+func (stateMachine *StateMachine) createChroot() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	if err := osMkdir(stateMachine.tempDirs.chroot, 0755); err != nil {
+		return fmt.Errorf("Failed to create chroot directory: %s", err.Error())
+	}
+
+	debootstrapCmd := generateDebootstrapCmd(classicStateMachine.ImageDef,
+		stateMachine.tempDirs.chroot,
+		classicStateMachine.Packages,
+	)
+
+	debootstrapOutput, err := debootstrapCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
+			debootstrapCmd.String(), err.Error(), string(debootstrapOutput))
+	}
+
 	return nil
 }
 

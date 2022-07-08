@@ -74,6 +74,7 @@ type temporaryDirectories struct {
 	rootfs  string
 	unpack  string
 	volumes string
+	chroot  string
 	scratch string
 }
 

@@ -230,20 +230,21 @@ func TestPrintStates(t *testing.T) {
 [1] prepare_gadget_tree
 [2] load_gadget_yaml
 [3] germinate
-[4] populate_rootfs_contents
-[5] customize_cloud_init
-[6] install_extra_packages
-[7] generate_disk_info
-[8] calculate_rootfs_size
-[9] populate_bootfs_contents
-[10] populate_prepare_partitions
-[11] make_disk
-[12] generate_manifest
-[13] finish
+[4] create_chroot
+[5] populate_rootfs_contents
+[6] customize_cloud_init
+[7] install_extra_packages
+[8] generate_disk_info
+[9] calculate_rootfs_size
+[10] populate_bootfs_contents
+[11] populate_prepare_partitions
+[12] make_disk
+[13] generate_manifest
+[14] finish
 `
 		if string(readStdout) != expectedStates {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
-				string(readStdout), expectedStates)
+				expectedStates, string(readStdout))
 		}
 	})
 }
@@ -311,21 +312,6 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 		// gadget tree rather than relying on the user
 		// to have done this ahead of time
 		t.Skip()
-	})
-}
-
-// TestBuildRootfsFromSeed unit tests the buildRootfsFromSeed function
-func TestBuildRootfsFromSeed(t *testing.T) {
-	t.Run("test_build_rootfs_from_seed", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		err := stateMachine.buildRootfsFromSeed()
-		asserter.AssertErrNil(err, true)
 	})
 }
 
@@ -1216,5 +1202,88 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 
 		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrContains(err, "Error running \"make\" in gadget source")
+	})
+}
+
+// TestCreateChroot runs the createChroot step and spot checks that some
+// expected files in the chroot exist
+func TestCreateChroot(t *testing.T) {
+	t.Run("test_create_chroot", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs:       &RootfsType{},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.createChroot()
+		asserter.AssertErrNil(err, true)
+
+		expectedFiles := []string{
+			"etc",
+			"home",
+			"boot",
+			"var",
+		}
+		for _, expectedFile := range expectedFiles {
+			fullPath := filepath.Join(stateMachine.tempDirs.chroot, expectedFile)
+			_, err := os.Stat(fullPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("File \"%s\" should exist, but does not", fullPath)
+				}
+			}
+		}
+	})
+}
+
+// TestFailedCreateChroot tests failure cases in createChroot
+func TestFailedCreateChroot(t *testing.T) {
+	t.Run("test_failed_create_chroot", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs:       &RootfsType{},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err = stateMachine.createChroot()
+		asserter.AssertErrContains(err, "Failed to create chroot")
+		osMkdir = os.Mkdir
+
+		// Setup the exec.Command mock
+		testCaseName = "TestFailedCreateChroot"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err = stateMachine.createChroot()
+		asserter.AssertErrContains(err, "Error running debootstrap command")
+		execCommand = exec.Command
 	})
 }

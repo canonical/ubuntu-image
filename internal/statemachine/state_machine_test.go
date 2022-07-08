@@ -184,6 +184,10 @@ func TestExecHelperProcess(t *testing.T) {
 		fallthrough
 	case "TestFailedSetupLiveBuildCommands":
 		fallthrough
+	case "TestFailedCreateChroot":
+		fallthrough
+	case "TestFailedInstallPackages":
+		fallthrough
 	case "TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)

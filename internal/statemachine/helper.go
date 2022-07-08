@@ -634,3 +634,26 @@ func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
 	_, err := git.PlainClone(workDir, false, cloneOptions)
 	return err
 }
+
+// generateDebootstrapCmd generates the debootstrap command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
+	debootstrapCmd := execCommand("debootstrap",
+		"--arch", imageDefinition.Architecture,
+		"--variant=minbase",
+	)
+
+	if len(imageDefinition.Rootfs.Components) > 0 {
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
+		debootstrapCmd.Args = append(debootstrapCmd.Args, "--components="+components)
+	}
+
+	// add the SUITE TARGET and MIRROR arguments
+	debootstrapCmd.Args = append(debootstrapCmd.Args, []string{
+		imageDefinition.Series,
+		targetDir,
+		imageDefinition.Rootfs.Mirror,
+	}...)
+
+	return debootstrapCmd
+}
