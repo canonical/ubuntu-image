@@ -133,7 +133,7 @@ func TestCalculateStates(t *testing.T) {
 		{"extract_rootfs_tar", "test_extract_rootfs_tar.yaml", []string{"extract_rootfs_tar"}},
 		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"germinate"}},
 		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
-		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "configure_extra_ppas", "install_extra_packages", "install_extra_snaps", "perform_manual_customization"}},
+		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "perform_manual_customization"}},
 	}
 	for _, tc := range testCases {
 		t.Run("test_calcluate_states_"+tc.name, func(t *testing.T) {
