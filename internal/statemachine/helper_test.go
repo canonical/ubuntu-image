@@ -5,9 +5,7 @@ import (
 	"crypto/rand"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -18,7 +16,6 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
-	"github.com/snapcore/snapd/seed"
 )
 
 // TestMaxOffset tests the functionality of the maxOffset function
@@ -585,76 +582,6 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 	}
 }
 
-// TestFailedRemovePreseeding tests various failure scenarios in the removePreseeding function
-func TestFailedRemovePreseeding(t *testing.T) {
-	t.Run("test_failed_remove_preseeding", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "snapd", "seed")
-		err = os.MkdirAll(seedDir, 0755)
-		asserter.AssertErrNil(err, true)
-
-		// call "snap prepare image" to preseed the filesystem.
-		// Doing the preseed at the time of the test allows it to
-		// run on each architecture and keeps the github repository
-		// free of large .snap files
-		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
-			filepath.Join("testdata", "modelAssertionClassic"),
-			stateMachine.tempDirs.rootfs)
-		err = snapPrepareImage.Run()
-		asserter.AssertErrNil(err, true)
-
-		// mock os.RemoveAll so the directory isn't cleared out every time
-		osRemoveAll = mockRemoveAll
-		defer func() {
-			osRemoveAll = os.RemoveAll
-		}()
-
-		// mock seed.Open
-		seedOpen = mockSeedOpen
-		defer func() {
-			seedOpen = seed.Open
-		}()
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Test error")
-		seedOpen = seed.Open
-
-		// move the model from var/lib/snapd/seed/assertions to cause an error
-		err = os.Rename(filepath.Join(seedDir, "assertions", "model"),
-			filepath.Join(stateMachine.tempDirs.rootfs, "model"))
-		asserter.AssertErrNil(err, true)
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "seed must have a model assertion")
-		err = os.Rename(filepath.Join(stateMachine.tempDirs.rootfs, "model"),
-			filepath.Join(seedDir, "assertions", "model"))
-		asserter.AssertErrNil(err, true)
-
-		// move seed.yaml to cause an error in LoadMeta
-		err = os.Rename(filepath.Join(seedDir, "seed.yaml"),
-			filepath.Join(seedDir, "seed.yaml.bak"))
-		asserter.AssertErrNil(err, true)
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "no seed metadata")
-		err = os.Rename(filepath.Join(seedDir, "seed.yaml.bak"),
-			filepath.Join(seedDir, "seed.yaml"))
-		asserter.AssertErrNil(err, true)
-
-		// the files have been restored, just test the failure in os.RemoveAll
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Test error")
-		osRemoveAll = os.RemoveAll
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}
-
 // TestGetHostArch unit tests the getHostArch function
 func TestGetHostArch(t *testing.T) {
 	t.Run("test_get_host_arch", func(t *testing.T) {
@@ -738,46 +665,6 @@ func TestGetQemuStaticForArch(t *testing.T) {
 	}
 }
 
-// TestRemovePreseeding unit tests the removePreseeding function
-func TestRemovePreseeding(t *testing.T) {
-	t.Run("test_remove_preseeding", func(t *testing.T) {
-		if runtime.GOARCH != "amd64" {
-			t.Skip("Test for amd64 only")
-		}
-		asserter := helper.Asserter{T: t}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-
-		// copy the filesystem over before attempting to preseed it
-		osutil.CopySpecialFile(filepath.Join("testdata", "filesystem"), stateMachine.tempDirs.rootfs)
-
-		// call "snap prepare image" to preseed the filesystem.
-		// Doing the preseed at the time of the test keeps the
-		// github repository free of large .snap files
-		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20=candidate", "--snap=snapd=beta", "--snap=lxd",
-			filepath.Join("testdata", "modelAssertionClassic"),
-			stateMachine.tempDirs.rootfs)
-		err := snapPrepareImage.Run()
-		asserter.AssertErrNil(err, true)
-
-		seededSnaps, err := removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrNil(err, true)
-
-		// make sure the correct snaps were returned by removePreseeding
-		expectedSnaps := map[string]string{
-			"core20": "candidate",
-			"snapd":  "beta",
-			"lxd":    "stable",
-		}
-
-		if !reflect.DeepEqual(seededSnaps, expectedSnaps) {
-			t.Error("removePreseeding did not find the correct snap/channel mappings")
-		}
-	})
-}
-
 // TestGenerateGerminateCmd unit tests the generateGerminateCmd function
 func TestGenerateGerminateCmd(t *testing.T) {
 	testCases := []struct {
@@ -811,6 +698,124 @@ func TestGenerateGerminateCmd(t *testing.T) {
 			if !strings.Contains(germinateCmd.String(), "--components=main,universe") {
 				t.Errorf("Expected germinate command \"%s\" to contain "+
 					"\"--components=main,universe\"", germinateCmd.String())
+			}
+		})
+	}
+}
+
+// TestValidateInput tests that invalid state machine command line arguments result in a failure
+func TestValidateInput(t *testing.T) {
+	testCases := []struct {
+		name   string
+		until  string
+		thru   string
+		resume bool
+		errMsg string
+	}{
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, "cannot specify both --until and --thru"},
+		{"resume_with_no_workdir", "", "", true, "must specify workdir when using --resume flag"},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.Until = tc.until
+			stateMachine.stateMachineFlags.Thru = tc.thru
+			stateMachine.stateMachineFlags.Resume = tc.resume
+
+			err := stateMachine.validateInput()
+			asserter.AssertErrContains(err, tc.errMsg)
+		})
+	}
+}
+
+// TestValidateUntilThru ensures that using invalid value for --thru
+// or --until returns an error
+func TestValidateUntilThru(t *testing.T) {
+	testCases := []struct {
+		name  string
+		until string
+		thru  string
+	}{
+		{"invalid_until_name", "fake step", ""},
+		{"invalid_thru_name", "", "fake step"},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.Until = tc.until
+			stateMachine.stateMachineFlags.Thru = tc.thru
+
+			err := stateMachine.validateUntilThru()
+			asserter.AssertErrContains(err, "not a valid state name")
+
+		})
+	}
+}
+
+// TestGenerateAptCmd unit tests the generateAptCmd function
+func TestGenerateAptCmd(t *testing.T) {
+	testCases := []struct {
+		name        string
+		targetDir   string
+		packageList []string
+		expected    string
+	}{
+		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install -y test"},
+		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install -y test1 test2"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
+			aptCmd := generateAptCmd(tc.targetDir, tc.packageList)
+			if !strings.Contains(aptCmd.String(), tc.expected) {
+				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmd.String())
+			}
+		})
+	}
+}
+
+// TestCreatePPAInfo unit tests the createPPAInfo function
+func TestCreatePPAInfo(t *testing.T) {
+	testCases := []struct {
+		name             string
+		ppa              *PPAType
+		series           string
+		expectedName     string
+		expectedContents string
+	}{
+		{
+			"public_ppa",
+			&PPAType{
+				PPAName: "public/ppa",
+			},
+			"focal",
+			"public-ubuntu-ppa-focal.list",
+			"deb https://ppa.launchpadcontent.net/public/ppa/ubuntu focal main",
+		},
+		{
+			"private_ppa",
+			&PPAType{
+				PPAName: "private/ppa",
+				Auth:    "testuser:testpass",
+			},
+			"jammy",
+			"private-ubuntu-ppa-jammy.list",
+			"deb https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubuntu jammy main",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_create_ppa_info_"+tc.name, func(t *testing.T) {
+			fileName, fileContents := createPPAInfo(tc.ppa, tc.series)
+			if fileName != tc.expectedName {
+				t.Errorf("Expected PPA filename \"%s\" but got \"%s\"",
+					tc.expectedName, fileName)
+			}
+			if fileContents != tc.expectedContents {
+				t.Errorf("Expected PPA file contents \"%s\" but got \"%s\"",
+					tc.expectedContents, fileContents)
 			}
 		})
 	}

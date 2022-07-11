@@ -22,22 +22,34 @@ import (
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
-func TestFailedValidateInputSnap(t *testing.T) {
-	t.Run("test_failed_validate_input", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+func TestFailedSnapSetup(t *testing.T) {
+	testCases := []struct {
+		name   string
+		until  string
+		thru   string
+		errMsg string
+	}{
+		{"invalid_until_name", "fake step", "", "not a valid state name"},
+		{"invalid_thru_name", "", "fake step", "not a valid state name"},
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", "cannot specify both --until and --thru"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_failed_snap_setup_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
 
-		// use both --until and --thru to trigger this failure
-		var stateMachine SnapStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.stateMachineFlags.Until = "until-test"
-		stateMachine.stateMachineFlags.Thru = "thru-test"
+			// use both --until and --thru to trigger this failure
+			var stateMachine SnapStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.stateMachineFlags.Until = tc.until
+			stateMachine.stateMachineFlags.Thru = tc.thru
 
-		err := stateMachine.Setup()
-		asserter.AssertErrContains(err, "cannot specify both --until and --thru")
-	})
+			err := stateMachine.Setup()
+			asserter.AssertErrContains(err, tc.errMsg)
+		})
+	}
 }
 
 // TestFailedReadMetadataSnap tests a failed metadata read by passing --resume with no previous partial state machine run
@@ -110,8 +122,8 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 		stateMachine.Opts.DisableConsoleConf = true
 		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.commonFlags.Snaps = []string{"hello-world"}
 		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
+		stateMachine.Opts.Snaps = []string{"hello-world"}
 		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
@@ -426,7 +438,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 
 			// use core18 because it builds the fastest
 			stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
-			stateMachine.commonFlags.Snaps = tc.snapArgs
+			stateMachine.Opts.Snaps = tc.snapArgs
 			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
@@ -548,7 +560,7 @@ func TestGadgetEdgeCases(t *testing.T) {
 		stateMachine.stateMachineFlags.WorkDir = workDir
 		// use the custom snap with a complicated gadget.yaml
 		customSnap := filepath.Join("testdata", "pc_20-gadget-edge-cases.snap")
-		stateMachine.commonFlags.Snaps = []string{customSnap}
+		stateMachine.Opts.Snaps = []string{customSnap}
 
 		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)

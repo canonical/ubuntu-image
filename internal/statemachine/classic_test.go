@@ -47,6 +47,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"valid_image_definition", "test_valid.yaml", true, ""},
 		{"invalid_class", "test_bad_class.yaml", false, "Class must be one of the following"},
 		{"invalid_url", "test_bad_url.yaml", false, "Does not match format 'uri'"},
+		{"invalid_ppa_name", "test_bad_ppa_name.yaml", false, "Does not match pattern"},
 		{"both_seed_and_tasks", "test_both_seed_and_tasks.yaml", false, "Must validate one and only one schema"},
 		{"git_gadget_without_url", "test_git_gadget_without_url.yaml", false, "When key gadget:type is specified as git, a URL must be provided"},
 		{"file_doesnt_exist", "test_not_exist.yaml", false, "no such file or directory"},
@@ -120,6 +121,7 @@ func TestFailedParseImageDefinition(t *testing.T) {
 
 // TestCalculateStates reads in a variety of yaml files and ensures
 // that the correct states are added to the state machine
+// TODO: manually assemble the image definitions instead of relying on the parseImageDefinition() function to make this more of a unit test
 func TestCalculateStates(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -131,7 +133,7 @@ func TestCalculateStates(t *testing.T) {
 		{"extract_rootfs_tar", "test_extract_rootfs_tar.yaml", []string{"extract_rootfs_tar"}},
 		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"germinate"}},
 		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
-		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "configure_extra_ppas", "install_extra_packages", "install_extra_snaps", "perform_manual_customization"}},
+		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "perform_manual_customization"}},
 	}
 	for _, tc := range testCases {
 		t.Run("test_calcluate_states_"+tc.name, func(t *testing.T) {
@@ -164,6 +166,36 @@ func TestCalculateStates(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFailedCalculateStates tests that the calculateStates
+// function fails if the value of --until or --thru is not
+// in the calculated list of states
+func TestFailedCalculateStates(t *testing.T) {
+	t.Run("test_failed_calcluate_states", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Gadget: &GadgetType{
+				GadgetType: "git",
+			},
+			Rootfs: &RootfsType{
+				ArchiveTasks: []string{"test"},
+			},
+			Customization: &CustomizationType{},
+		}
+
+		stateMachine.stateMachineFlags.Thru = "fake_state"
+
+		// now calculate the states and ensure that the expected states are in the slice
+		err := stateMachine.calculateStates()
+		asserter.AssertErrContains(err, "not a valid state name")
+	})
 }
 
 // TestPrintStates ensures the states are printed to stdout when the flag is set
@@ -201,9 +233,9 @@ func TestPrintStates(t *testing.T) {
 [3] germinate
 [4] create_chroot
 [5] install_packages
-[6] populate_rootfs_contents
-[7] customize_cloud_init
-[8] install_extra_packages
+[6] preseed_image
+[7] populate_rootfs_contents
+[8] customize_cloud_init
 [9] generate_disk_info
 [10] calculate_rootfs_size
 [11] populate_bootfs_contents
@@ -376,7 +408,7 @@ func TestManualCustomization(t *testing.T) {
 }
 
 // TestPrepareClassicImage unit tests the prepareClassicImage function
-func TestPrepareClassicImage(t *testing.T) {
+/*func TestPrepareClassicImage(t *testing.T) {
 	t.Run("test_prepare_classic_image", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
@@ -388,7 +420,7 @@ func TestPrepareClassicImage(t *testing.T) {
 		err := stateMachine.prepareClassicImage()
 		asserter.AssertErrNil(err, true)
 	})
-}
+}*/
 
 // TODO replace this with fakeExecCommand that sil2100 wrote
 // TestFailedLiveBuildCommands tests the scenario where calls to `lb` fail
@@ -888,7 +920,7 @@ func TestCheckEmptyFields(t *testing.T) {
 func TestGerminate(t *testing.T) {
 	testCases := []struct {
 		name             string
-		archive          string
+		flavor           string
 		seedURLs         []string
 		seedNames        []string
 		expectedPackages []string
@@ -946,8 +978,8 @@ func TestGerminate(t *testing.T) {
 				Architecture: hostArch,
 				Series:       hostSuite,
 				Rootfs: &RootfsType{
-					Archive: tc.archive,
-					Mirror:  "http://archive.ubuntu.com/ubuntu/",
+					Flavor: tc.flavor,
+					Mirror: "http://archive.ubuntu.com/ubuntu/",
 					Seed: &SeedType{
 						SeedURLs:   tc.seedURLs,
 						SeedBranch: hostSuite,
@@ -1016,8 +1048,8 @@ func TestFailedGerminate(t *testing.T) {
 			Architecture: hostArch,
 			Series:       hostSuite,
 			Rootfs: &RootfsType{
-				Archive: "ubuntu",
-				Mirror:  "http://archive.ubuntu.com/ubuntu/",
+				Flavor: "ubuntu",
+				Mirror: "http://archive.ubuntu.com/ubuntu/",
 				Seed: &SeedType{
 					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 					SeedBranch: hostSuite,
@@ -1283,5 +1315,55 @@ func TestFailedInstallPackages(t *testing.T) {
 		err := stateMachine.installPackages()
 		asserter.AssertErrContains(err, "Error running apt command")
 		execCommand = exec.Command
+	})
+}
+
+// TestFailedAddExtraPPAs tests failure cases in addExtraPPAs
+func TestFailedAddExtraPPAs(t *testing.T) {
+	t.Run("test_failed_add_extra_ppas", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs:       &RootfsType{},
+			Customization: &CustomizationType{
+				ExtraPPAs: []*PPAType{
+					{
+						PPAName: "test1/ppa",
+					},
+				},
+			},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// create the /etc/apt/ dir in workdir
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt"), 0755)
+
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Failed to create apt sources.list.d")
+		osMkdir = os.Mkdir
+
+		// mock os.OpenFile
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error creating")
+		osOpenFile = os.OpenFile
 	})
 }

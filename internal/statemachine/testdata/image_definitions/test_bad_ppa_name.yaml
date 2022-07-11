@@ -31,16 +31,14 @@ customization:
       -
         name: ubuntu
         password: ubuntu
-  extra-snaps:
-    -
-      name: hello
-      channel: candidate
   extra-ppas:
     -
-      name: "testuser/testppa"
+      name: "jawn-smith/devel-proposed"
     -
-      name: "testauth/secret"
-      auth: "testuser:testpassword"
+      name: "ubuntu-advantage/fips"
+      auth: "testpassword"
+    -
+      name: "testfailure"
 artifacts:
   img:
       path: pc-amd64.img

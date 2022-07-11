@@ -62,7 +62,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return fmt.Errorf("Schema validation returned an error: %s", err.Error())
 	}
 
-	// do some custom validation
+	// do custom validation for gadgetURL being required if gadget is not pre-built
 	if imageDefinition.Gadget.GadgetType != "prebuilt" && imageDefinition.Gadget.GadgetURL == "" {
 		jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
 		errDetail := gojsonschema.ErrorDetails{
@@ -131,6 +131,16 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
+		if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+		}
+		rootfsCreationStates = append(rootfsCreationStates,
+			[]stateFunc{
+				stateFunc{"install_packages", (*StateMachine).installPackages},
+				stateFunc{"preseed_image", (*StateMachine).prepareClassicImage},
+			}...
+		)
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
@@ -146,16 +156,6 @@ func (stateMachine *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
 	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"configure_extra_ppas", (*StateMachine).setupExtraPPAs})
-	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraPackages) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"install_extra_packages", (*StateMachine).installExtraPackages})
-	}
-	rootfsCreationStates = append(rootfsCreationStates,
-		stateFunc{"preseed_image", (*StateMachine).prepareClassicImage})
 	if classicStateMachine.ImageDef.Customization.Manual != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
@@ -174,6 +174,10 @@ func (stateMachine *StateMachine) calculateStates() error {
 		for i, state := range stateMachine.states {
 			fmt.Printf("[%d] %s\n", i, state.name)
 		}
+	}
+
+	if err := stateMachine.validateUntilThru(); err != nil {
+		return err
 	}
 
 	return nil
@@ -283,6 +287,35 @@ func (stateMachine *StateMachine) createChroot() error {
 	return nil
 }
 
+// add PPAs to the apt sources list
+func (stateMachine *StateMachine) addExtraPPAs() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// create /etc/apt/sources.list.d in the chroot if it doesn't already exist
+	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
+	err := osMkdir(sourcesListD, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
+	}
+
+	// now create the ppa sources.list files
+	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		ppaFileName, ppaFileContents := createPPAInfo(ppa,
+			classicStateMachine.ImageDef.Series)
+
+		ppaFile := filepath.Join(sourcesListD, ppaFileName)
+		ppaIO, err := osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
+		}
+		ppaIO.Write([]byte(ppaFileContents))
+		ppaIO.Close()
+	}
+
+	return nil
+}
+
 // Install packages in the chroot environment
 func (stateMachine *StateMachine) installPackages() error {
 	var classicStateMachine *ClassicStateMachine
@@ -290,7 +323,10 @@ func (stateMachine *StateMachine) installPackages() error {
 
 	aptCmd := generateAptCmd(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
 
-	aptOutput, err := aptCmd.CombinedOutput()
+	aptCmd.Stdout = os.Stdout
+	aptCmd.Stderr = os.Stderr
+	err := aptCmd.Run()
+	aptOutput := "test"
 	if err != nil {
 		return fmt.Errorf("Error running apt command \"%s\". Error is \"%s\". Output is: \n%s",
 			aptCmd.String(), err.Error(), string(aptOutput))

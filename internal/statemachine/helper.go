@@ -33,6 +33,12 @@ func (stateMachine *StateMachine) validateInput() error {
 		return fmt.Errorf("must specify workdir when using --resume flag")
 	}
 
+	return nil
+}
+
+// validateUntilThru validates that the the state passed as --until
+// or --thru exists in the state machine's list of states
+func (stateMachine *StateMachine) validateUntilThru() error {
 	// if --until or --thru was given, make sure the specified state exists
 	var searchState string
 	var stateFound bool = false
@@ -547,15 +553,12 @@ func parseSnapsAndChannels(snaps []string) (snapNames []string, snapChannels map
 // values configured in the image definition yaml file
 func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 	// determine the value for the seed-dist in the form of <archive>.<series>
-	seedDist := imageDefinition.Rootfs.Archive
+	seedDist := imageDefinition.Rootfs.Flavor
 	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
 		seedDist = seedDist + "." + imageDefinition.Rootfs.Seed.SeedBranch
 	}
 
-	var seedSource string
-	for _, seedURL := range imageDefinition.Rootfs.Seed.SeedURLs {
-		seedSource = seedSource + seedURL + ","
-	}
+	seedSource := strings.Join(imageDefinition.Rootfs.Seed.SeedURLs, ",")
 
 	germinateCmd := execCommand("germinate",
 		"--mirror", imageDefinition.Rootfs.Mirror,
@@ -571,12 +574,7 @@ func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 	}
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
-		var components string
-		for _, component := range imageDefinition.Rootfs.Components {
-			components = components + component + ","
-		}
-		// trim the trailing comma
-		components = strings.TrimRight(components, ",")
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
 		germinateCmd.Args = append(germinateCmd.Args, "--components="+components)
 	}
 
@@ -606,19 +604,20 @@ func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
 func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
 	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
+		"--variant=minbase",
 	)
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
-		var components string
-		for _, component := range imageDefinition.Rootfs.Components {
-			components = components + component + ","
-		}
-		// trim the trailing comma
-		components = strings.TrimRight(components, ",")
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
 		debootstrapCmd.Args = append(debootstrapCmd.Args, "--components="+components)
 	}
 
-	debootstrapCmd.Args = append(debootstrapCmd.Args, []string{imageDefinition.Series, targetDir}...)
+	// add the SUITE TARGET and MIRROR arguments
+	debootstrapCmd.Args = append(debootstrapCmd.Args, []string{
+		imageDefinition.Series,
+		targetDir,
+		imageDefinition.Rootfs.Mirror,
+	}...)
 
 	return debootstrapCmd
 }
@@ -633,4 +632,27 @@ func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
 	}
 
 	return aptCmd
+}
+
+// createPPAInfo generates the name for a PPA sources.list file
+// in the convention of add-apt-repository, and the contents
+// that define the sources.list
+// TODO: figure out what to do with fingerprint
+func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents string) {
+	splitName := strings.Split(ppa.PPAName, "/")
+	user := splitName[0]
+	ppaName := splitName[1]
+
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.list", user, ppaName, series)
+
+	var domain string
+	if ppa.Auth == "" {
+		domain = "https://ppa.launchpadcontent.net"
+	} else {
+		domain = fmt.Sprintf("https://%s@private-ppa.launchpadcontent.net", ppa.Auth)
+	}
+
+	fileContents = fmt.Sprintf("deb %s/%s/ubuntu %s main", domain, ppa.PPAName, series)
+
+	return fileName, fileContents
 }
