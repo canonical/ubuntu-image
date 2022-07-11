@@ -18,7 +18,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 	var err error
 	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
-		snapStateMachine.commonFlags.Snaps)
+		snapStateMachine.Opts.Snaps)
 	if err != nil {
 		return err
 	}

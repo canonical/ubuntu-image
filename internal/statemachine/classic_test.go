@@ -1186,10 +1186,10 @@ func TestCreateChroot(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition {
+		stateMachine.ImageDef = ImageDefinition{
 			Architecture: getHostArch(),
-			Series: getHostSuite(),
-			Rootfs: &RootfsType {},
+			Series:       getHostSuite(),
+			Rootfs:       &RootfsType{},
 		}
 
 		// need workdir set up for this
@@ -1227,10 +1227,10 @@ func TestFailedCreateChroot(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition {
+		stateMachine.ImageDef = ImageDefinition{
 			Architecture: getHostArch(),
-			Series: getHostSuite(),
-			Rootfs: &RootfsType {},
+			Series:       getHostSuite(),
+			Rootfs:       &RootfsType{},
 		}
 
 		// need workdir set up for this
@@ -1268,10 +1268,10 @@ func TestFailedInstallPackages(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition {
+		stateMachine.ImageDef = ImageDefinition{
 			Architecture: getHostArch(),
-			Series: getHostSuite(),
-			Rootfs: &RootfsType {},
+			Series:       getHostSuite(),
+			Rootfs:       &RootfsType{},
 		}
 
 		// Setup the exec.Command mock

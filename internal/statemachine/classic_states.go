@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/invopop/jsonschema"
+	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/snap"
 	"github.com/xeipuuv/gojsonschema"
 
 	"gopkg.in/yaml.v2"
@@ -152,10 +154,8 @@ func (stateMachine *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"install_extra_packages", (*StateMachine).installExtraPackages})
 	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"install_extra_snaps", (*StateMachine).prepareClassicImage})
-	}
+	rootfsCreationStates = append(rootfsCreationStates,
+		stateFunc{"preseed_image", (*StateMachine).prepareClassicImage})
 	if classicStateMachine.ImageDef.Customization.Manual != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
@@ -326,6 +326,7 @@ func (stateMachine *StateMachine) germinate() error {
 
 	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
 	germinateCmd.Dir = germinateDir
+	fmt.Println(germinateCmd.String())
 
 	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
@@ -388,81 +389,41 @@ func (stateMachine *StateMachine) manualCustomization() error {
 // prepareClassicImage calls image.Prepare to seed extra snaps in classic images
 // currently only used when --filesystem is provided
 func (stateMachine *StateMachine) prepareClassicImage() error {
-	// currently a no-op pending implementation of the classic image redesign
-	/*
-		var classicStateMachine *ClassicStateMachine
-		classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-		// TODO: Move preseeding logic from livecd-rootfs to ubuntu-image
-		// for all builds
-		if classicStateMachine.Opts.Filesystem != "" &&
-			len(classicStateMachine.commonFlags.Snaps) > 0 {
-			var imageOpts image.Options
+		var imageOpts image.Options
 
-			var err error
-			imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
-				classicStateMachine.commonFlags.Snaps)
-			if err != nil {
-				return err
-			}
+		var err error
+		imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
+			classicStateMachine.Snaps)
+		if err != nil {
+			return err
+		}
 
-			// If the rootfs has already been pre-seeded, we need to delete the
-			// pre-seeded snaps and redo the preseed with all of the snaps
-			stateFile := filepath.Join(classicStateMachine.tempDirs.rootfs,
-				"var", "lib", "snapd", "seed", "seed.yaml")
-			if _, err := os.Stat(stateFile); err == nil {
-				// check for an existing model assertion file, otherwise snapd will use
-				// a generic model assertion
-				modelFile := filepath.Join(classicStateMachine.tempDirs.rootfs,
-					"var", "lib", "snapd", "seed", "assertions", "model")
-				if _, err := os.Stat(modelFile); err == nil {
-					// create a copy of the model file because it will be deleted soon
-					newModelFile := filepath.Join(classicStateMachine.stateMachineFlags.WorkDir,
-						"model")
-					if err := osutilCopyFile(modelFile, newModelFile, 0); err != nil {
-						return fmt.Errorf("Error copying modelFile from preseeded filesystem: %s",
-							err.Error())
-					}
-					imageOpts.ModelFile = newModelFile
-				}
-
-				// Now remove all of the seeded snaps
-				preseededSnaps, err := removePreseeding(
-					classicStateMachine.tempDirs.rootfs)
-				if err != nil {
-					return fmt.Errorf("Error removing preseeded snaps from existing rootfs: %s",
-						err.Error())
-				}
-				for snap, channel := range preseededSnaps {
-					// if a channel is specified on the command line for a snap that was already
-					// preseeded, use the channel from the command line instead of the channel
-					// that was originally used for the preseeding
-					if _, found := imageOpts.SnapChannels[snap]; !found {
-						imageOpts.Snaps = append(imageOpts.Snaps, snap)
-						imageOpts.SnapChannels[snap] = channel
-					}
-				}
-			}
-
-			imageOpts.Classic = true
-			imageOpts.Architecture = classicStateMachine.Opts.Arch
-			if imageOpts.Architecture == "" {
-				imageOpts.Architecture = getHostArch()
-			}
-
-			imageOpts.PrepareDir = classicStateMachine.tempDirs.rootfs
-
-			customizations := *new(image.Customizations)
-			imageOpts.Customizations = customizations
-
-			// plug/slot sanitization not used by snap image.Prepare, make it no-op.
-			snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
-
-			if err := imagePrepare(&imageOpts); err != nil {
-				return fmt.Errorf("Error preparing image: %s", err.Error())
+		// add any extra snaps from the image definition to the list
+		for _, snap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
+			imageOpts.Snaps = append(imageOpts.Snaps, snap.SnapName)
+			if snap.Channel != "" {
+				imageOpts.SnapChannels[snap.SnapName] = snap.Channel
 			}
 		}
-	*/
+
+		imageOpts.Classic = true
+		imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
+
+		imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot
+
+		customizations := *new(image.Customizations)
+		imageOpts.Customizations = customizations
+
+		// plug/slot sanitization not used by snap image.Prepare, make it no-op.
+		snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+
+		fmt.Println(imageOpts.Snaps)
+		if err := imagePrepare(&imageOpts); err != nil {
+			return fmt.Errorf("Error preparing image: %s", err.Error())
+		}
 	return nil
 }
 

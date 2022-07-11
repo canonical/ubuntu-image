@@ -31,6 +31,10 @@ customization:
       -
         name: ubuntu
         password: ubuntu
+  extra-snaps:
+    -
+      name: hello
+      channel: candidate
 artifacts:
   img:
       path: pc-amd64.img
