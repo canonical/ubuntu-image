@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -10,9 +11,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/snap"
+	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
 
 	"gopkg.in/yaml.v2"
@@ -137,9 +140,9 @@ func (stateMachine *StateMachine) calculateStates() error {
 		}
 		rootfsCreationStates = append(rootfsCreationStates,
 			[]stateFunc{
-				stateFunc{"install_packages", (*StateMachine).installPackages},
-				stateFunc{"preseed_image", (*StateMachine).prepareClassicImage},
-			}...
+				{"install_packages", (*StateMachine).installPackages},
+				{"preseed_image", (*StateMachine).preseedClassicImage},
+			}...,
 		)
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates,
@@ -323,8 +326,6 @@ func (stateMachine *StateMachine) installPackages() error {
 
 	aptCmd := generateAptCmd(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
 
-	aptCmd.Stdout = os.Stdout
-	aptCmd.Stderr = os.Stderr
 	err := aptCmd.Run()
 	aptOutput := "test"
 	if err != nil {
@@ -362,7 +363,6 @@ func (stateMachine *StateMachine) germinate() error {
 
 	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
 	germinateCmd.Dir = germinateDir
-	fmt.Println(germinateCmd.String())
 
 	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
@@ -422,44 +422,60 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	return nil
 }
 
-// prepareClassicImage calls image.Prepare to seed extra snaps in classic images
+// preseedClassicImage calls image.Prepare to seed extra snaps in classic images
 // currently only used when --filesystem is provided
-func (stateMachine *StateMachine) prepareClassicImage() error {
+func (stateMachine *StateMachine) preseedClassicImage() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-		var imageOpts image.Options
+	var imageOpts image.Options
 
-		var err error
-		imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
-			classicStateMachine.Snaps)
+	var err error
+	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(classicStateMachine.Snaps)
+	if err != nil {
+		return err
+	}
+
+	// add any extra snaps from the image definition to the list
+	for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
+		if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
+			imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
+		}
+		if extraSnap.Channel != "" {
+			imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
+		}
+	}
+
+	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
+	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+
+	// iterate through the list of snaps and ensure that all of their bases
+	// are also set to be installed
+	for _, seededSnap := range imageOpts.Snaps {
+		snapStore := store.New(nil, nil)
+		snapSpec := store.SnapSpec{Name: seededSnap}
+		snapContext := context.TODO() //context can be empty, just not nil
+		snapInfo, err := snapStore.SnapInfo(snapContext, snapSpec, nil)
 		if err != nil {
-			return err
+			return fmt.Errorf("Error getting info for snap %s: \"%s\"",
+				seededSnap, err.Error())
 		}
-
-		// add any extra snaps from the image definition to the list
-		for _, snap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
-			imageOpts.Snaps = append(imageOpts.Snaps, snap.SnapName)
-			if snap.Channel != "" {
-				imageOpts.SnapChannels[snap.SnapName] = snap.Channel
-			}
+		if !helper.SliceHasElement(imageOpts.Snaps, snapInfo.Base) {
+			imageOpts.Snaps = append(imageOpts.Snaps, snapInfo.Base)
 		}
+	}
 
-		imageOpts.Classic = true
-		imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
+	imageOpts.Classic = true
+	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
 
-		imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot
+	imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot
 
-		customizations := *new(image.Customizations)
-		imageOpts.Customizations = customizations
+	customizations := *new(image.Customizations)
+	imageOpts.Customizations = customizations
 
-		// plug/slot sanitization not used by snap image.Prepare, make it no-op.
-		snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
-
-		fmt.Println(imageOpts.Snaps)
-		if err := imagePrepare(&imageOpts); err != nil {
-			return fmt.Errorf("Error preparing image: %s", err.Error())
-		}
+	if err := imagePrepare(&imageOpts); err != nil {
+		return fmt.Errorf("Error preparing image: %s", err.Error())
+	}
 	return nil
 }
 

@@ -234,3 +234,15 @@ func newMissingFieldError(context *gojsonschema.JsonContext, value interface{}, 
 type MissingFieldError struct {
 	gojsonschema.ResultErrorFields
 }
+
+// SliceHasElement searches for a string in a slice of strings and returns whether it
+// is found
+func SliceHasElement(haystack []string, needle string) bool {
+	found := false
+	for _, element := range haystack {
+		if element == needle {
+			found = true
+		}
+	}
+	return found
+}

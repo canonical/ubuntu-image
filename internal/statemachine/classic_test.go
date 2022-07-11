@@ -3,6 +3,8 @@
 package statemachine
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -13,9 +15,10 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
-	//"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/image"
 	//"github.com/snapcore/snapd/osutil"
 	//"github.com/snapcore/snapd/seed"
+	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -407,20 +410,110 @@ func TestManualCustomization(t *testing.T) {
 	})
 }
 
-// TestPrepareClassicImage unit tests the prepareClassicImage function
-/*func TestPrepareClassicImage(t *testing.T) {
-	t.Run("test_prepare_classic_image", func(t *testing.T) {
+// TestPreseedClassicImage unit tests the preseedClassicImage function
+func TestPreseedClassicImage(t *testing.T) {
+	t.Run("test_preseed_classic_image", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Snaps = []string{"lxd"}
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Customization: &CustomizationType{
+				ExtraSnaps: []*SnapType{
+					{
+						SnapName: "hello",
+						Channel:  "candidate",
+					},
+				},
+			},
+		}
 
-		err := stateMachine.prepareClassicImage()
+		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrNil(err, true)
+
+		// check that the lxd and hello snaps, as well as lxd's base, core20
+		// were preseeded in the correct location
+		snaps := map[string]string{"lxd": "stable", "hello": "candidate", "core20": "stable"}
+		for snapName, snapChannel := range snaps {
+			// reach out to the snap store to find the revision
+			// of the snap for the specified channel
+			snapStore := store.New(nil, nil)
+			snapSpec := store.SnapSpec{Name: snapName}
+			context := context.TODO() //context can be empty, just not nil
+			snapInfo, err := snapStore.SnapInfo(context, snapSpec, nil)
+			asserter.AssertErrNil(err, true)
+
+			var storeRevision int
+			storeRevision = snapInfo.Channels["latest/"+snapChannel].Revision.N
+			snapFileName := fmt.Sprintf("%s_%d.snap", snapName, storeRevision)
+
+			snapPath := filepath.Join(stateMachine.tempDirs.chroot,
+				"var", "lib", "snapd", "seed", "snaps", snapFileName)
+			_, err = os.Stat(snapPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("File %s should exist, but does not", snapPath)
+				}
+			}
+		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
-}*/
+}
+
+// TestFailedPreseedClassicImage tests failures in the preseedClassicImage function
+func TestFailedPreseedClassicImage(t *testing.T) {
+	t.Run("test_failed_preseed_classic_image", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Customization: &CustomizationType{
+				ExtraSnaps: []*SnapType{},
+			},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// include an invalid snap snap name to trigger a failure in
+		// parseSnapsAndChannels
+		stateMachine.Snaps = []string{"lxd=test=invalid=name"}
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrContains(err, "Invalid syntax")
+
+		// try to include a non-existant snap to trigger a failure
+		// in snapStore.SnapInfo
+		stateMachine.Snaps = []string{"test-this-snap-name-should-never-exist"}
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrContains(err, "Error getting info for snap")
+
+		// mock image.Prepare
+		stateMachine.Snaps = []string{"hello"}
+		imagePrepare = mockImagePrepare
+		defer func() {
+			imagePrepare = image.Prepare
+		}()
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrContains(err, "Error preparing image")
+		imagePrepare = image.Prepare
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
 
 // TODO replace this with fakeExecCommand that sil2100 wrote
 // TestFailedLiveBuildCommands tests the scenario where calls to `lb` fail
