@@ -667,6 +667,8 @@ func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
 		aptCmd.Args = append(aptCmd.Args, aptPackage)
 	}
 
+	aptCmd.Env = append(aptCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+
 	return aptCmd
 }
 
