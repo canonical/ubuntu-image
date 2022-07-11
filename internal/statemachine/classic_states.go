@@ -2,7 +2,9 @@ package statemachine
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path"
@@ -224,11 +226,19 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	makeCmd := execCommand("make")
 	makeCmd.Dir = sourceDir
 
-	makeOutput, err := makeCmd.CombinedOutput()
-	if err != nil {
+	var makeOutput bytes.Buffer
+	makeCmd.Stdout = &makeOutput
+	makeCmd.Stderr = &makeOutput
+	if classicStateMachine.commonFlags.SubCmdOutput {
+		mwriter := io.MultiWriter(os.Stdout, &makeOutput)
+		makeCmd.Stdout = mwriter
+		makeCmd.Stderr = mwriter
+	}
+
+	if err := makeCmd.Run(); err != nil {
 		return fmt.Errorf("Error running \"make\" in gadget source. "+
 			"Error is \"%s\". Full output below:\n%s",
-			err.Error(), makeOutput)
+			err.Error(), makeOutput.String())
 	}
 
 	return nil
@@ -278,10 +288,18 @@ func (stateMachine *StateMachine) createChroot() error {
 		classicStateMachine.Packages,
 	)
 
-	debootstrapOutput, err := debootstrapCmd.CombinedOutput()
-	if err != nil {
+	var debootstrapOutput bytes.Buffer
+	debootstrapCmd.Stdout = &debootstrapOutput
+	debootstrapCmd.Stderr = &debootstrapOutput
+	if classicStateMachine.commonFlags.SubCmdOutput {
+		mwriter := io.MultiWriter(os.Stdout, &debootstrapOutput)
+		debootstrapCmd.Stdout = mwriter
+		debootstrapCmd.Stderr = mwriter
+	}
+
+	if err := debootstrapCmd.Run(); err != nil {
 		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
-			debootstrapCmd.String(), err.Error(), string(debootstrapOutput))
+			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
 	}
 
 	return nil
@@ -315,9 +333,19 @@ func (stateMachine *StateMachine) germinate() error {
 	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
 	germinateCmd.Dir = germinateDir
 
-	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
+	var germinateOutput bytes.Buffer
+	germinateCmd.Stdout = &germinateOutput
+	germinateCmd.Stderr = &germinateOutput
+	if classicStateMachine.commonFlags.SubCmdOutput {
+		mwriter := io.MultiWriter(os.Stdout, &germinateOutput)
+		germinateCmd.Stdout = mwriter
+		germinateCmd.Stderr = mwriter
+	}
+
+	//if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
+	if err := germinateCmd.Run(); err != nil {
 		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
-			germinateCmd.String(), err.Error(), string(germinateOutput))
+			germinateCmd.String(), err.Error(), germinateOutput.String())
 	}
 
 	packageMap := make(map[string]*[]string)
