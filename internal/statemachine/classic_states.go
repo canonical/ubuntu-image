@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"
 
@@ -224,11 +225,12 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	makeCmd := execCommand("make")
 	makeCmd.Dir = sourceDir
 
-	makeOutput, err := makeCmd.CombinedOutput()
-	if err != nil {
+	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.SubCmdOutput)
+
+	if err := makeCmd.Run(); err != nil {
 		return fmt.Errorf("Error running \"make\" in gadget source. "+
 			"Error is \"%s\". Full output below:\n%s",
-			err.Error(), makeOutput)
+			err.Error(), makeOutput.String())
 	}
 
 	return nil
@@ -278,10 +280,11 @@ func (stateMachine *StateMachine) createChroot() error {
 		classicStateMachine.Packages,
 	)
 
-	debootstrapOutput, err := debootstrapCmd.CombinedOutput()
-	if err != nil {
+	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, classicStateMachine.commonFlags.SubCmdOutput)
+
+	if err := debootstrapCmd.Run(); err != nil {
 		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
-			debootstrapCmd.String(), err.Error(), string(debootstrapOutput))
+			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
 	}
 
 	return nil
@@ -315,9 +318,12 @@ func (stateMachine *StateMachine) germinate() error {
 	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
 	germinateCmd.Dir = germinateDir
 
-	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
+	germinateOutput := helper.SetCommandOutput(germinateCmd, classicStateMachine.commonFlags.SubCmdOutput)
+
+	//if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
+	if err := germinateCmd.Run(); err != nil {
 		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
-			germinateCmd.String(), err.Error(), string(germinateOutput))
+			germinateCmd.String(), err.Error(), germinateOutput.String())
 	}
 
 	packageMap := make(map[string]*[]string)
