@@ -95,7 +95,7 @@ type UserDataType struct {
 
 // PPAType contains information about a public or private PPA
 type PPAType struct {
-	PPAName     string `yaml:"name"         json:"PPAName"               jsonschema:"pattern=[a-zA-Z0-9]/[a-zA-Z0-9]"`
+	PPAName     string `yaml:"name"         json:"PPAName"               jsonschema:"pattern=^[a-zA-Z0-9_.+-]+/[a-zA-Z0-9_.+-]+$"`
 	Auth        string `yaml:"auth"         json:"Auth,omitempty"`
 	Fingerprint string `yaml:"fingerprint"  json:"Fingerprint,omitempty"`
 	KeepEnabled bool   `yaml:"keep-enabled" json:"KeepEnabled"           default:"true"`

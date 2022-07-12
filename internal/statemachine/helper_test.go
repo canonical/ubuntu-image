@@ -877,8 +877,8 @@ func TestGenerateAptCmd(t *testing.T) {
 		packageList []string
 		expected    string
 	}{
-		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install -y test"},
-		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install -y test1 test2"},
+		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test"},
+		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test1 test2"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {

@@ -661,12 +661,22 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 // generateAptCmd generates the apt command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
 func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
-	aptCmd := execCommand("chroot", targetDir, "apt", "install", "-y")
+	aptCmd := execCommand("chroot", targetDir, "apt", "install",
+		"--assume-yes",
+		"--quiet",
+		"--option=Dpkg::options::=--force-unsafe-io",
+		"--option=Dpkg::Options::=--force-confold",
+	)
 
 	for _, aptPackage := range packageList {
 		aptCmd.Args = append(aptCmd.Args, aptPackage)
 	}
 
+	// Env is sometimes used for mocking command calls in tests,
+	// so only overwrite env if it is nil
+	if aptCmd.Env == nil {
+		aptCmd.Env = os.Environ()
+	}
 	aptCmd.Env = append(aptCmd.Env, "DEBIAN_FRONTEND=noninteractive")
 
 	return aptCmd
