@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -233,4 +234,17 @@ func newMissingFieldError(context *gojsonschema.JsonContext, value interface{}, 
 // MissingFieldError is used when the fields exist but are the zero value for their type
 type MissingFieldError struct {
 	gojsonschema.ResultErrorFields
+}
+
+// SetCommandOutput sets the output of a command to either use a multiwriter
+// or behave as a normal command and store the output in a buffer
+func SetCommandOutput(cmd *exec.Cmd, liveOutput bool) (cmdOutput bytes.Buffer) {
+	cmd.Stdout = &cmdOutput
+	cmd.Stderr = &cmdOutput
+	if liveOutput {
+		mwriter := io.MultiWriter(os.Stdout, &cmdOutput)
+		cmd.Stdout = mwriter
+		cmd.Stderr = mwriter
+	}
+	return cmdOutput
 }

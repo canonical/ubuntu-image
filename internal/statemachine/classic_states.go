@@ -2,9 +2,7 @@ package statemachine
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"path"
@@ -12,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"
 
@@ -226,14 +225,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	makeCmd := execCommand("make")
 	makeCmd.Dir = sourceDir
 
-	var makeOutput bytes.Buffer
-	makeCmd.Stdout = &makeOutput
-	makeCmd.Stderr = &makeOutput
-	if classicStateMachine.commonFlags.SubCmdOutput {
-		mwriter := io.MultiWriter(os.Stdout, &makeOutput)
-		makeCmd.Stdout = mwriter
-		makeCmd.Stderr = mwriter
-	}
+	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.SubCmdOutput)
 
 	if err := makeCmd.Run(); err != nil {
 		return fmt.Errorf("Error running \"make\" in gadget source. "+
@@ -288,14 +280,7 @@ func (stateMachine *StateMachine) createChroot() error {
 		classicStateMachine.Packages,
 	)
 
-	var debootstrapOutput bytes.Buffer
-	debootstrapCmd.Stdout = &debootstrapOutput
-	debootstrapCmd.Stderr = &debootstrapOutput
-	if classicStateMachine.commonFlags.SubCmdOutput {
-		mwriter := io.MultiWriter(os.Stdout, &debootstrapOutput)
-		debootstrapCmd.Stdout = mwriter
-		debootstrapCmd.Stderr = mwriter
-	}
+	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, classicStateMachine.commonFlags.SubCmdOutput)
 
 	if err := debootstrapCmd.Run(); err != nil {
 		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
@@ -333,14 +318,7 @@ func (stateMachine *StateMachine) germinate() error {
 	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
 	germinateCmd.Dir = germinateDir
 
-	var germinateOutput bytes.Buffer
-	germinateCmd.Stdout = &germinateOutput
-	germinateCmd.Stderr = &germinateOutput
-	if classicStateMachine.commonFlags.SubCmdOutput {
-		mwriter := io.MultiWriter(os.Stdout, &germinateOutput)
-		germinateCmd.Stdout = mwriter
-		germinateCmd.Stderr = mwriter
-	}
+	germinateOutput := helper.SetCommandOutput(germinateCmd, classicStateMachine.commonFlags.SubCmdOutput)
 
 	//if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
 	if err := germinateCmd.Run(); err != nil {
