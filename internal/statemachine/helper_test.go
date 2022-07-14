@@ -801,7 +801,7 @@ func TestLP1981720(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// now check that the resulting .img file has the contents of test.txt in it
-		structureContent, err := os.ReadFile(contentRoot+".img")
+		structureContent, err := os.ReadFile(contentRoot + ".img")
 		asserter.AssertErrNil(err, true)
 
 		if !bytes.Contains(structureContent, testData) {
