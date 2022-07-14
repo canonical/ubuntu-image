@@ -216,18 +216,24 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 					partImg, err.Error())
 			}
 		}
+		// check if any content exists in unpack
+		contentFiles, err := ioutilReadDir(contentRoot)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("Error listing contents of volume \"%s\": %s",
+				contentRoot, err.Error())
+		}
 		// use mkfs functions from snapd to create the filesystems
-		if structure.Content == nil {
-			err := mkfsMake(structure.Filesystem, partImg, structure.Label,
-				structure.Size, stateMachine.SectorSize)
-			if err != nil {
-				return fmt.Errorf("Error running mkfs: %s", err.Error())
-			}
-		} else {
+		if structure.Content != nil || len(contentFiles) > 0 {
 			err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
 				contentRoot, structure.Size, stateMachine.SectorSize)
 			if err != nil {
 				return fmt.Errorf("Error running mkfs with content: %s", err.Error())
+			}
+		} else {
+			err := mkfsMake(structure.Filesystem, partImg, structure.Label,
+				structure.Size, stateMachine.SectorSize)
+			if err != nil {
+				return fmt.Errorf("Error running mkfs: %s", err.Error())
 			}
 		}
 	}
