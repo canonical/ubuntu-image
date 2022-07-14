@@ -1337,7 +1337,7 @@ func TestFailedInstallPackages(t *testing.T) {
 			Series:       getHostSuite(),
 			Rootfs:       &RootfsType{},
 			Customization: &CustomizationType{
-				ExtraPackages: []*PackageType {
+				ExtraPackages: []*PackageType{
 					{
 						PackageName: "test1",
 					},
