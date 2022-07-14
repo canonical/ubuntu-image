@@ -1303,6 +1303,13 @@ func TestFailedInstallPackages(t *testing.T) {
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Rootfs:       &RootfsType{},
+			Customization: &CustomizationType{
+				ExtraPackages: []*PackageType {
+					{
+						PackageName: "test1",
+					},
+				},
+			},
 		}
 
 		// Setup the exec.Command mock

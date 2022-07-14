@@ -660,28 +660,40 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 
 // generateAptCmd generates the apt command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
-	aptCmd := execCommand("chroot", targetDir, "apt", "install", "-y")
+func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
+	updateCmd := execCommand("chroot", targetDir, "apt", "update")
+
+	installCmd := execCommand("chroot", targetDir, "apt", "install",
+		"--assume-yes",
+		"--quiet",
+		"--option=Dpkg::options::=--force-unsafe-io",
+		"--option=Dpkg::Options::=--force-confold",
+	)
 
 	for _, aptPackage := range packageList {
-		aptCmd.Args = append(aptCmd.Args, aptPackage)
+		installCmd.Args = append(installCmd.Args, aptPackage)
 	}
 
-	aptCmd.Env = append(aptCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+	// Env is sometimes used for mocking command calls in tests,
+	// so only overwrite env if it is nil
+	if installCmd.Env == nil {
+		installCmd.Env = os.Environ()
+	}
+	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
 
-	return aptCmd
+	return []*exec.Cmd{updateCmd, installCmd}
 }
 
 // createPPAInfo generates the name for a PPA sources.list file
 // in the convention of add-apt-repository, and the contents
-// that define the sources.list
+// that define the sources.list in the DEB822 format
 // TODO: figure out what to do with fingerprint
 func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents string) {
 	splitName := strings.Split(ppa.PPAName, "/")
 	user := splitName[0]
 	ppaName := splitName[1]
 
-	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.list", user, ppaName, series)
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.sources", user, ppaName, series)
 
 	var domain string
 	if ppa.Auth == "" {
@@ -690,7 +702,9 @@ func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents s
 		domain = fmt.Sprintf("https://%s@private-ppa.launchpadcontent.net", ppa.Auth)
 	}
 
-	fileContents = fmt.Sprintf("deb %s/%s/ubuntu %s main", domain, ppa.PPAName, series)
+	fileContents = fmt.Sprintf("X-Repolib-Name: %s\nEnabled: yes\nTypes: deb\n"+
+		"URIS: %s\nSuites: %s\nComponents: main",
+		ppa.PPAName, domain, series)
 
 	return fileName, fileContents
 }

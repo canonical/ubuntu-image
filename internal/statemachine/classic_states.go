@@ -315,12 +315,21 @@ func (stateMachine *StateMachine) installPackages() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	aptCmd := generateAptCmd(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+	if classicStateMachine.ImageDef.Customization != nil {
+		for _, packageInfo := range classicStateMachine.ImageDef.Customization.ExtraPackages {
+			classicStateMachine.Packages = append(classicStateMachine.Packages,
+				packageInfo.PackageName)
+		}
+	}
 
-	aptOutput, err := aptCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("Error running apt command \"%s\". Error is \"%s\". Output is: \n%s",
-			aptCmd.String(), err.Error(), string(aptOutput))
+	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+
+	for _, aptCmd := range aptCmds {
+		aptOutput, err := aptCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error running apt command \"%s\". Error is \"%s\". Output is: \n%s",
+				aptCmd.String(), err.Error(), string(aptOutput))
+		}
 	}
 
 	return nil

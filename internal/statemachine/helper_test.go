@@ -870,21 +870,21 @@ func TestValidateUntilThru(t *testing.T) {
 }
 
 // TestGenerateAptCmd unit tests the generateAptCmd function
-func TestGenerateAptCmd(t *testing.T) {
+func TestGenerateAptCmds(t *testing.T) {
 	testCases := []struct {
 		name        string
 		targetDir   string
 		packageList []string
 		expected    string
 	}{
-		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install -y test"},
-		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install -y test1 test2"},
+		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test"},
+		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test1 test2"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
-			aptCmd := generateAptCmd(tc.targetDir, tc.packageList)
-			if !strings.Contains(aptCmd.String(), tc.expected) {
-				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmd.String())
+			aptCmds := generateAptCmds(tc.targetDir, tc.packageList)
+			if !strings.Contains(aptCmds[1].String(), tc.expected) {
+				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmds[1].String())
 			}
 		})
 	}
@@ -905,8 +905,13 @@ func TestCreatePPAInfo(t *testing.T) {
 				PPAName: "public/ppa",
 			},
 			"focal",
-			"public-ubuntu-ppa-focal.list",
-			"deb https://ppa.launchpadcontent.net/public/ppa/ubuntu focal main",
+			"public-ubuntu-ppa-focal.sources",
+			`X-Repolib-Name: public/ppa
+Enabled: yes
+Types: deb
+URIS: https://ppa.launchpadcontent.net
+Suites: focal
+Components: main`,
 		},
 		{
 			"private_ppa",
@@ -915,8 +920,13 @@ func TestCreatePPAInfo(t *testing.T) {
 				Auth:    "testuser:testpass",
 			},
 			"jammy",
-			"private-ubuntu-ppa-jammy.list",
-			"deb https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubuntu jammy main",
+			"private-ubuntu-ppa-jammy.sources",
+			`X-Repolib-Name: private/ppa
+Enabled: yes
+Types: deb
+URIS: https://testuser:testpass@private-ppa.launchpadcontent.net
+Suites: jammy
+Components: main`,
 		},
 	}
 	for _, tc := range testCases {
