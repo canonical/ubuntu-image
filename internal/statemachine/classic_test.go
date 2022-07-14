@@ -301,6 +301,8 @@ func TestPrepareGadgetTree(t *testing.T) {
 
 		err := stateMachine.prepareGadgetTree()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -328,6 +330,8 @@ func TestBuildRootfsFromTasks(t *testing.T) {
 
 		err := stateMachine.buildRootfsFromTasks()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -343,6 +347,8 @@ func TestExtractRootfsTar(t *testing.T) {
 
 		err := stateMachine.extractRootfsTar()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -358,6 +364,8 @@ func TestCustomizeCloudInit(t *testing.T) {
 
 		err := stateMachine.customizeCloudInit()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -373,6 +381,8 @@ func TestSetupExtraPPAs(t *testing.T) {
 
 		err := stateMachine.setupExtraPPAs()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -388,6 +398,8 @@ func TestInstallExtraPackages(t *testing.T) {
 
 		err := stateMachine.installExtraPackages()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -403,6 +415,8 @@ func TestManualCustomization(t *testing.T) {
 
 		err := stateMachine.manualCustomization()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -418,6 +432,8 @@ func TestPrepareClassicImage(t *testing.T) {
 
 		err := stateMachine.prepareClassicImage()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -499,6 +515,8 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 
 		err := stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 		// check the files before Teardown
 		/*fileList := []string{filepath.Join("etc", "shadow"),
@@ -678,6 +696,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 		err = stateMachine.generatePackageManifest()
 		asserter.AssertErrNil(err, true)
 
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		// Check if manifest file got generated and if it has expected contents
 		/*manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
 		manifestBytes, err := ioutil.ReadFile(manifestPath)
@@ -866,6 +885,8 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1020,6 +1041,8 @@ func TestGerminate(t *testing.T) {
 						expectedSnap, stateMachine.Snaps)
 				}
 			}
+
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
 }
@@ -1086,6 +1109,8 @@ func TestFailedGerminate(t *testing.T) {
 		err = stateMachine.germinate()
 		asserter.AssertErrContains(err, "Error opening seed file")
 		osOpen = os.Open
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1133,6 +1158,8 @@ func TestBuildGadgetTree(t *testing.T) {
 
 		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1203,6 +1230,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 
 		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrContains(err, "Error running \"make\" in gadget source")
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1245,6 +1274,8 @@ func TestCreateChroot(t *testing.T) {
 				}
 			}
 		}
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1286,6 +1317,8 @@ func TestFailedCreateChroot(t *testing.T) {
 		err = stateMachine.createChroot()
 		asserter.AssertErrContains(err, "Error running debootstrap command")
 		execCommand = exec.Command
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1321,6 +1354,8 @@ func TestFailedInstallPackages(t *testing.T) {
 		err := stateMachine.installPackages()
 		asserter.AssertErrContains(err, "Error running apt command")
 		execCommand = exec.Command
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
