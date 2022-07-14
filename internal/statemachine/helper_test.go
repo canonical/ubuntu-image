@@ -395,6 +395,16 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		asserter.AssertErrContains(err, "Error zeroing image file")
 		helperCopyBlob = helper.CopyBlob
 
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
+			filepath.Join("/tmp", uuid.NewString()+".img"))
+		asserter.AssertErrContains(err, "Error listing contents of volume")
+		ioutilReadDir = ioutil.ReadDir
+
 		// mock gadget.MkfsWithContent
 		mkfsMakeWithContent = mockMkfsWithContent
 		defer func() {
