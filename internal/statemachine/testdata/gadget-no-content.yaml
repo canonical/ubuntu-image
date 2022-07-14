@@ -1,0 +1,21 @@
+volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        content:
+          - image: pc-boot.img
+      - name: BIOS Boot
+        type: DA,21686148-6449-6E6F-744E-656564454649
+        size: 1M
+        offset: 1M
+        offset-write: mbr+92
+        content:
+          - image: pc-core.img
+      - name: system-boot
+        type: 0C,EBD0A0A2-B9E5-4433-87C0-68B6B72699C7
+        filesystem: vfat
+        filesystem-label: system-boot
+        size: 50M

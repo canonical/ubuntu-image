@@ -265,7 +265,6 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 			return err
 		}
 		var farthestOffset quantity.Offset = 0
-		//for structureNumber, structure := range volume.Structure {
 		for structureNumber, structure := range volume.Structure {
 			var contentRoot string
 			if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
