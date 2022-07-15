@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	diskfs "github.com/diskfs/go-diskfs"
@@ -138,29 +139,72 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 // on a 100MiB filesystem, ext4 takes a little over 7MiB for the
 // metadata. Use 8MB as a minimum padding here
 func (stateMachine *StateMachine) calculateRootfsSize() error {
-	rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
-	if err != nil {
-		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
+	if stateMachine.commonFlags.Size != "" {
+		var parsedSize quantity.Size
+
+		// identify which structure has the rootfs
+		var rootfsVolume *gadget.Volume
+		var rootfsVolumeName string
+		for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+			for _, structure := range volume.Structure {
+				if structure.Size == 0 {
+					rootfsVolume = volume
+					rootfsVolumeName = volumeName
+				}
+			}
+		}
+
+		if !strings.Contains(stateMachine.commonFlags.Size, ":") {
+			// this scenario has just one size for each volume
+			// no need to check error as it has already been done by
+			// the parseImageSizes function
+			parsedSize, _ = quantity.ParseSize(stateMachine.commonFlags.Size)
+		} else {
+			parsedSize = stateMachine.ImageSizes[rootfsVolumeName]
+		}
+
+		// subtract the size and offsets of the existing volumes
+		if rootfsVolume != nil {
+			for _, structure := range rootfsVolume.Structure {
+				parsedSize -= structure.Size
+				if structure.Offset != nil {
+					parsedSize -= quantity.Size(*structure.Offset)
+				}
+			}
+		}
+
+		// align the size of the rootfs to sector size
+		parsedSize = quantity.Size(math.Ceil(float64(parsedSize)/float64(stateMachine.SectorSize))) *
+			quantity.Size(stateMachine.SectorSize)
+
+		stateMachine.RootfsSize = parsedSize
+	} else {
+		// if the size isn't specified, use `du` to calculate one
+		rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
+		if err != nil {
+			return fmt.Errorf("Error getting rootfs size: %s", err.Error())
+		}
+		var rootfsQuantity quantity.Size = rootfsSize
+
+		// fudge factor for incidentals
+		rootfsPadding := 8 * quantity.SizeMiB
+		rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity) * 1.5))
+		rootfsQuantity += rootfsPadding
+
+		// align the size of the rootfs to sector size
+		rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity)/float64(stateMachine.SectorSize))) *
+			quantity.Size(stateMachine.SectorSize)
+
+		stateMachine.RootfsSize = rootfsQuantity
+
 	}
-	var rootfsQuantity quantity.Size = rootfsSize
-	rootfsPadding := 8 * quantity.SizeMiB
-
-	// fudge factor for incidentals
-	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity) * 1.5))
-	rootfsQuantity += rootfsPadding
-
-	// align the size of the rootfs to sector size
-	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity)/float64(stateMachine.SectorSize))) *
-		quantity.Size(stateMachine.SectorSize)
-
-	stateMachine.RootfsSize = rootfsQuantity
 
 	// we have already saved the rootfs size in the state machine struct, but we
 	// should also set it in the gadget.Structure that represents the rootfs
 	for _, volume := range stateMachine.GadgetInfo.Volumes {
 		for structureNumber, structure := range volume.Structure {
 			if structure.Size == 0 {
-				structure.Size = rootfsQuantity
+				structure.Size = stateMachine.RootfsSize
 			}
 			volume.Structure[structureNumber] = structure
 		}
