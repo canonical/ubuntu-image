@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -656,4 +657,85 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 	}...)
 
 	return debootstrapCmd
+}
+
+// manualCopyFile copies a file into the chroot
+func manualCopyFile(copyFileInterfaces interface{}, targetDir string) error {
+	copyFileSlice := reflect.ValueOf(copyFileInterfaces)
+	for i := 0; i < copyFileSlice.Len(); i++ {
+		copyFile := copyFileSlice.Index(i).Interface().(*CopyFileType)
+
+		// Copy the file into the specified location in the chroot
+		dest := filepath.Join(targetDir, copyFile.Dest)
+		if err := osutilCopySpecialFile(copyFile.Source, dest); err != nil {
+			return fmt.Errorf("Error copying file \"%s\" into chroot: %s",
+				copyFile.Source, err.Error())
+		}
+	}
+	return nil
+}
+
+// manualExecute executes an executable file in the chroot
+func manualExecute(executeInterfaces interface{}, targetDir string) error {
+	executeSlice := reflect.ValueOf(executeInterfaces)
+	for i := 0; i < executeSlice.Len(); i++ {
+		execute := executeSlice.Index(i).Interface().(*ExecuteType)
+		executeCmd := execCommand("chroot", targetDir, execute.ExecutePath)
+		executeOutput, err := executeCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error running script \"%s\". Error is %s. Full output below:\n%s",
+				executeCmd.String(), err.Error(), string(executeOutput))
+		}
+	}
+	return nil
+}
+
+// manualTouchFile touches a file in the chroot
+func manualTouchFile(touchFileInterfaces interface{}, targetDir string) error {
+	touchFileSlice := reflect.ValueOf(touchFileInterfaces)
+	for i := 0; i < touchFileSlice.Len(); i++ {
+		touchFile := touchFileSlice.Index(i).Interface().(*TouchFileType)
+		fullPath := filepath.Join(targetDir, touchFile.TouchPath)
+		_, err := osCreate(fullPath)
+		if err != nil {
+			return fmt.Errorf("Error creating file in chroot: %s", err.Error())
+		}
+	}
+	return nil
+}
+
+// manualAddGroup adds a group in the chroot
+func manualAddGroup(addGroupInterfaces interface{}, targetDir string) error {
+	addGroupSlice := reflect.ValueOf(addGroupInterfaces)
+	for i := 0; i < addGroupSlice.Len(); i++ {
+		addGroup := addGroupSlice.Index(i).Interface().(*AddGroupType)
+		addGroupCmd := execCommand("chroot", targetDir, "addgroup", addGroup.GroupName)
+		if addGroup.GroupID != "" {
+			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", addGroup.GroupID}...)
+		}
+		addGroupOutput, err := addGroupCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error adding group. Command used is \"%s\". Error is %s. Full output below:\n%s",
+				addGroupCmd.String(), err.Error(), string(addGroupOutput))
+		}
+	}
+	return nil
+}
+
+// manualAddUser adds a group in the chroot
+func manualAddUser(addUserInterfaces interface{}, targetDir string) error {
+	addUserSlice := reflect.ValueOf(addUserInterfaces)
+	for i := 0; i < addUserSlice.Len(); i++ {
+		addUser := addUserSlice.Index(i).Interface().(*AddUserType)
+		addUserCmd := execCommand("chroot", targetDir, "adduser", addUser.UserName)
+		if addUser.UserID != "" {
+			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", addUser.UserID}...)
+		}
+		addUserOutput, err := addUserCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error adding user. Command used is \"%s\". Error is %s. Full output below:\n%s",
+				addUserCmd.String(), err.Error(), string(addUserOutput))
+		}
+	}
+	return nil
 }

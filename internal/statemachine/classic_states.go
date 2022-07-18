@@ -369,7 +369,45 @@ func (stateMachine *StateMachine) installExtraPackages() error {
 
 // Handle any manual customizations specified in the image definition
 func (stateMachine *StateMachine) manualCustomization() error {
-	// currently a no-op pending implementation of the classic image redesign
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	type customizationHandler struct {
+		inputData interface{}
+		handlerFunc func(interface{}, string) error
+	}
+	//customizationHandlers := map[interface{}](func(interface{}, string) error){
+	customizationHandlers := []customizationHandler {
+		{
+
+			inputData: classicStateMachine.ImageDef.Customization.Manual.CopyFile,
+			handlerFunc: manualCopyFile,
+		},
+		{
+			inputData: classicStateMachine.ImageDef.Customization.Manual.Execute,
+			handlerFunc: manualExecute,
+		},
+		{
+			inputData: classicStateMachine.ImageDef.Customization.Manual.TouchFile,
+			handlerFunc: manualTouchFile,
+		},
+		{
+			inputData: classicStateMachine.ImageDef.Customization.Manual.AddGroup,
+			handlerFunc: manualAddGroup,
+		},
+		{
+			inputData: classicStateMachine.ImageDef.Customization.Manual.AddUser,
+			handlerFunc: manualAddUser,
+		},
+	}
+
+	for _, customization := range customizationHandlers {
+		err := customization.handlerFunc(customization.inputData, stateMachine.tempDirs.chroot)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

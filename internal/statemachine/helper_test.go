@@ -868,3 +868,81 @@ func TestValidateUntilThru(t *testing.T) {
 		})
 	}
 }
+
+// TestFailedManualCopyFile tests the fail case of the manualCopyFile function
+func TestFailedManualCopyFile(t *testing.T) {
+	t.Run("test_failed_manual_copy_file", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		
+		copyFiles := []*CopyFileType {
+			{
+				Dest: "/test/does/not/exist",
+				Source: "/test/does/not/exist",
+			},
+		}
+		err := manualCopyFile(copyFiles, "fakedir")
+		asserter.AssertErrContains(err, "Error copying file")
+	})
+}
+
+// TestFailedManualTouchFile tests the fail case of the manualTouchFile function
+func TestFailedManualTouchFile(t *testing.T) {
+	t.Run("test_failed_manual_touch_file", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		
+		touchFiles := []*TouchFileType {
+			{
+				TouchPath: "/test/does/not/exist",
+			},
+		}
+		err := manualTouchFile(touchFiles, "fakedir")
+		asserter.AssertErrContains(err, "Error creating file")
+	})
+}
+
+// TestFailedManualExecute tests the fail case of the manualExecute function
+func TestFailedManualExecute(t *testing.T) {
+	t.Run("test_failed_manual_execute", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		
+		executes := []*ExecuteType {
+			{
+				ExecutePath: "/test/does/not/exist",
+			},
+		}
+		err := manualExecute(executes, "fakedir")
+		asserter.AssertErrContains(err, "Error running script")
+	})
+}
+
+// TestFailedManualAddGroup tests the fail case of the manualAddGroup function
+func TestFailedManualAddGroup(t *testing.T) {
+	t.Run("test_failed_manual_add_group", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		
+		addGroups := []*AddGroupType {
+			{
+				GroupName: "testgroup",
+				GroupID: "123",
+			},
+		}
+		err := manualAddGroup(addGroups, "fakedir")
+		asserter.AssertErrContains(err, "Error adding group")
+	})
+}
+
+// TestFailedManualAddUser tests the fail case of the manualAddUser function
+func TestFailedManualAddUser(t *testing.T) {
+	t.Run("test_failed_manual_add_user", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		
+		addUsers := []*AddUserType {
+			{
+				UserName: "testuser",
+				UserID: "123",
+			},
+		}
+		err := manualAddUser(addUsers, "fakedir")
+		asserter.AssertErrContains(err, "Error adding user")
+	})
+}
