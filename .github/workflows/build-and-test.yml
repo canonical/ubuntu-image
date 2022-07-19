@@ -16,7 +16,7 @@ jobs:
       - name: apt-update
         run: sudo apt update
       - name: install-test-dependencies
-        run: sudo apt install -y snapd germinate mtools debootstrap fdisk gdisk qemu-system-aarch64 qemu-user-static
+        run: sudo apt install -y snapd germinate mtools debootstrap fdisk gdisk qemu-system-aarch64 qemu-user-static ubuntu-dev-tools
       - name: test
         run: sudo go test -timeout 0 -v -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage to Codecov
