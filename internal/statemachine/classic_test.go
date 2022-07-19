@@ -53,6 +53,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"file_doesnt_exist", "test_not_exist.yaml", false, "no such file or directory"},
 		{"not_valid_yaml", "test_invalid_yaml.yaml", false, "yaml: unmarshal errors"},
 		{"missing_yaml_fields", "test_missing_name.yaml", false, "Key \"name\" is required in struct \"ImageDefinition\", but is not in the YAML file!"},
+		{"private_ppa_without_fingerprint", "test_private_ppa_without_fingerprint.yaml", false, "Fingerprint is required for private PPAs"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_yaml_schema_"+tc.name, func(t *testing.T) {

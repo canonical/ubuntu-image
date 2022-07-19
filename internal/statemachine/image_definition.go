@@ -217,3 +217,20 @@ func newMissingURLError(context *gojsonschema.JsonContext, value interface{}, de
 type MissingURLError struct {
 	gojsonschema.ResultErrorFields
 }
+
+func newInvalidPPAError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *InvalidPPAError {
+	err := InvalidPPAError{}
+	err.SetContext(context)
+	err.SetType("private_ppa_without_fingerprint")
+	err.SetDescriptionFormat("Fingerprint is required for private PPAs")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// InvalidPPAError implements gojsonschema.ErrorType. It is used for custom errors
+// when a private PPA does not have a fingerprint specified
+type InvalidPPAError struct {
+	gojsonschema.ResultErrorFields
+}

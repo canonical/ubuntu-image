@@ -905,8 +905,13 @@ func TestCreatePPAInfo(t *testing.T) {
 				PPAName: "public/ppa",
 			},
 			"focal",
-			"public-ubuntu-ppa-focal.list",
-			"deb https://ppa.launchpadcontent.net/public/ppa/ubuntu focal main",
+			"public-ubuntu-ppa-focal.sources",
+			`X-Repolib-Name: public/ppa
+Enabled: yes
+Types: deb
+URIS: https://ppa.launchpadcontent.net
+Suites: focal
+Components: main`,
 		},
 		{
 			"private_ppa",
@@ -915,8 +920,13 @@ func TestCreatePPAInfo(t *testing.T) {
 				Auth:    "testuser:testpass",
 			},
 			"jammy",
-			"private-ubuntu-ppa-jammy.list",
-			"deb https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubuntu jammy main",
+			"private-ubuntu-ppa-jammy.sources",
+			`X-Repolib-Name: private/ppa
+Enabled: yes
+Types: deb
+URIS: https://testuser:testpass@private-ppa.launchpadcontent.net
+Suites: jammy
+Components: main`,
 		},
 	}
 	for _, tc := range testCases {

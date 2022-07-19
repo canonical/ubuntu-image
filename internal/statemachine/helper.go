@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io/ioutil"
 	"math"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -684,14 +686,14 @@ func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
 
 // createPPAInfo generates the name for a PPA sources.list file
 // in the convention of add-apt-repository, and the contents
-// that define the sources.list
+// that define the sources.list in the DEB822 format
 // TODO: figure out what to do with fingerprint
 func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents string) {
 	splitName := strings.Split(ppa.PPAName, "/")
 	user := splitName[0]
 	ppaName := splitName[1]
 
-	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.list", user, ppaName, series)
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.sources", user, ppaName, series)
 
 	var domain string
 	if ppa.Auth == "" {
@@ -700,7 +702,46 @@ func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents s
 		domain = fmt.Sprintf("https://%s@private-ppa.launchpadcontent.net", ppa.Auth)
 	}
 
-	fileContents = fmt.Sprintf("deb %s/%s/ubuntu %s main", domain, ppa.PPAName, series)
+	fileContents = fmt.Sprintf("X-Repolib-Name: %s\nEnabled: yes\nTypes: deb\n"+
+		"URIS: %s\nSuites: %s\nComponents: main",
+		ppa.PPAName, domain, series)
 
 	return fileName, fileContents
+}
+
+// handleFingerprints imports keys for ppas with specified fingerprints.
+// The schema parsing has already validated that either Fingerprint is
+// specified or the PPA is public
+func handleFingerprints(ppa *PPAType, targetDir string) error {
+	if ppa.Fingerprint != "" {
+		gpgCmd := execCommand("chroot", targetDir, "gpg", "--receive-keys", ppa.Fingerprint)
+		gpgOutput, err := gpgCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error running gpg command \"%s\". Error is %s. Full output below:\n%s",
+				gpgCmd.String(), err.Error(), string(gpgOutput))
+		}
+	} else {
+		splitName := strings.Split(ppa.PPAName, "/")
+		signingKeyURL := fmt.Sprintf("https://api.launchpad.net/devel/~%s/+archive/ubuntu/%s?ws.op=getSigningKeyData", splitName[0], splitName[1])
+		resp, err := http.Get(signingKeyURL)
+		if err != nil {
+			return fmt.Errorf("Error getting signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("Error reading signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+		fmt.Println(string(body))
+
+		/*gpgIO, err := osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
+		}*/
+
+	}
+
+	return nil
 }

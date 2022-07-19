@@ -37,6 +37,7 @@ customization:
     -
       name: "testauth/secret"
       auth: "testuser:testpassword"
+      fingerprint: "asdf"
 artifacts:
   img:
       path: pc-amd64.img

@@ -76,6 +76,26 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 			errDetail,
 		)
 	}
+	// do custom validation for private PPAs requiring fingerprint
+	if imageDefinition.Customization != nil {
+		for _, ppa := range imageDefinition.Customization.ExtraPPAs {
+			if ppa.Auth != "" && ppa.Fingerprint == "" {
+				jsonContext := gojsonschema.NewJsonContext("ppa_validation", nil)
+				errDetail := gojsonschema.ErrorDetails{
+					"ppaName": ppa.PPAName,
+				}
+				result.AddError(
+					newInvalidPPAError(
+						gojsonschema.NewJsonContext("missingPrivatePPAFingerprint",
+							jsonContext),
+						52,
+						errDetail,
+					),
+					errDetail,
+				)
+			}
+		}
+	}
 
 	// TODO: I've created a PR upstream in xeipuuv/gojsonschema
 	// https://github.com/xeipuuv/gojsonschema/pull/352
@@ -305,6 +325,12 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 		}
 		ppaIO.Write([]byte(ppaFileContents))
 		ppaIO.Close()
+
+		// handle any fingerprints that are specified
+		if err = handleFingerprints(ppa, classicStateMachine.tempDirs.chroot); err != nil {
+			return fmt.Errorf("Error adding fingerpint for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
 	}
 
 	return nil
@@ -314,6 +340,14 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 func (stateMachine *StateMachine) installPackages() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// if any extra packages are specified, install them alongside the seeded packages
+	if classicStateMachine.ImageDef.Customization != nil {
+		for _, packageInfo := range classicStateMachine.ImageDef.Customization.ExtraPackages {
+			classicStateMachine.Packages = append(classicStateMachine.Packages,
+				packageInfo.PackageName)
+		}
+	}
 
 	aptCmd := generateAptCmd(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
 
