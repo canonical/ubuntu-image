@@ -34,6 +34,7 @@ customization:
   extra-ppas:
     -
       name: "testfailure"
+      auth: "testfailure"
 artifacts:
   img:
       path: pc-amd64.img
