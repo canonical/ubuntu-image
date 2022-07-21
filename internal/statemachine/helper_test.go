@@ -395,6 +395,16 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		asserter.AssertErrContains(err, "Error zeroing image file")
 		helperCopyBlob = helper.CopyBlob
 
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
+			filepath.Join("/tmp", uuid.NewString()+".img"))
+		asserter.AssertErrContains(err, "Error listing contents of volume")
+		ioutilReadDir = ioutil.ReadDir
+
 		// mock gadget.MkfsWithContent
 		mkfsMakeWithContent = mockMkfsWithContent
 		defer func() {
@@ -757,5 +767,57 @@ func TestManifestRevisionFormat(t *testing.T) {
 			t.Errorf("Expected manifest file to be:\n%s\nBut got \n%s",
 				expectedManifestData, manifestData)
 		}
+	})
+}
+
+// TestLP1981720 tests a bug that occurred when a structure had no content specified,
+// but the content was created by an earlier step of ubuntu-image
+// https://bugs.launchpad.net/ubuntu-image/+bug/1981720
+func TestLP1981720(t *testing.T) {
+	t.Run("test_lp1981720", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-no-content.yaml")
+
+		// need workdir and loaded gadget.yaml set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		var bootStruct gadget.VolumeStructure
+		var volume *gadget.Volume = stateMachine.GadgetInfo.Volumes["pc"]
+		for _, structure := range volume.Structure {
+			if structure.Name == "system-boot" {
+				bootStruct = structure
+			}
+		}
+
+		// create a temporary file for contentRoot
+		contentRoot := filepath.Join("/tmp", uuid.NewString())
+		err = os.Mkdir(contentRoot, 0755)
+		defer os.RemoveAll(contentRoot)
+		asserter.AssertErrNil(err, true)
+		testFile, err := os.Create(filepath.Join(contentRoot, "test.txt"))
+		asserter.AssertErrNil(err, true)
+		testData := []byte("Test string that we will search the resulting image for")
+		_, err = testFile.Write(testData)
+		asserter.AssertErrNil(err, true)
+
+		// now execute copyStructureContent
+		err = stateMachine.copyStructureContent(volume, bootStruct, 0, contentRoot,
+			contentRoot+".img")
+		asserter.AssertErrNil(err, true)
+
+		// now check that the resulting .img file has the contents of test.txt in it
+		structureContent, err := os.ReadFile(contentRoot + ".img")
+		asserter.AssertErrNil(err, true)
+
+		if !bytes.Contains(structureContent, testData) {
+			t.Errorf("Test data is missing from output of copyStructureContent")
+		}
+
+		os.RemoveAll(contentRoot)
 	})
 }
