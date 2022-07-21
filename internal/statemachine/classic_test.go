@@ -884,6 +884,16 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		err = stateMachine.Run()
 		asserter.AssertErrNil(err, true)
 
+		// make sure packages were successfully installed from public and private ppas
+		files := []string{
+			filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-public"),
+			filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-private"),
+		}
+		for _, file := range files {
+			_, err = os.Stat(file)
+			asserter.AssertErrNil(err, true)
+		}
+
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
 
