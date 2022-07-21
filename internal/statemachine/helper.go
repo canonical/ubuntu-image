@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"math"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -643,6 +641,7 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
+		"--include=ca-certificates", // ca-certificates is needed to use PPAs
 	)
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
@@ -662,8 +661,10 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 
 // generateAptCmd generates the apt command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
-	aptCmd := execCommand("chroot", targetDir, "apt", "install",
+func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
+	updateCmd := execCommand("chroot", targetDir, "apt", "update")
+
+	installCmd := execCommand("chroot", targetDir, "apt", "install",
 		"--assume-yes",
 		"--quiet",
 		"--option=Dpkg::options::=--force-unsafe-io",
@@ -671,23 +672,22 @@ func generateAptCmd(targetDir string, packageList []string) *exec.Cmd {
 	)
 
 	for _, aptPackage := range packageList {
-		aptCmd.Args = append(aptCmd.Args, aptPackage)
+		installCmd.Args = append(installCmd.Args, aptPackage)
 	}
 
 	// Env is sometimes used for mocking command calls in tests,
 	// so only overwrite env if it is nil
-	if aptCmd.Env == nil {
-		aptCmd.Env = os.Environ()
+	if installCmd.Env == nil {
+		installCmd.Env = os.Environ()
 	}
-	aptCmd.Env = append(aptCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
 
-	return aptCmd
+	return []*exec.Cmd{updateCmd, installCmd}
 }
 
 // createPPAInfo generates the name for a PPA sources.list file
 // in the convention of add-apt-repository, and the contents
 // that define the sources.list in the DEB822 format
-// TODO: figure out what to do with fingerprint
 func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents string) {
 	splitName := strings.Split(ppa.PPAName, "/")
 	user := splitName[0]
@@ -702,45 +702,80 @@ func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents s
 		domain = fmt.Sprintf("https://%s@private-ppa.launchpadcontent.net", ppa.Auth)
 	}
 
+	fullDomain := fmt.Sprintf("%s/%s/%s/ubuntu", domain, user, ppaName)
 	fileContents = fmt.Sprintf("X-Repolib-Name: %s\nEnabled: yes\nTypes: deb\n"+
 		"URIS: %s\nSuites: %s\nComponents: main",
-		ppa.PPAName, domain, series)
+		ppa.PPAName, fullDomain, series)
 
 	return fileName, fileContents
 }
 
-// handleFingerprints imports keys for ppas with specified fingerprints.
+// importPPAKeys imports keys for ppas with specified fingerprints.
 // The schema parsing has already validated that either Fingerprint is
-// specified or the PPA is public
-func handleFingerprints(ppa *PPAType, targetDir string) error {
-	if ppa.Fingerprint != "" {
-		gpgCmd := execCommand("chroot", targetDir, "gpg", "--receive-keys", ppa.Fingerprint)
-		gpgOutput, err := gpgCmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("Error running gpg command \"%s\". Error is %s. Full output below:\n%s",
-				gpgCmd.String(), err.Error(), string(gpgOutput))
+// specified or the PPA is public. If no fingerprint is provided, this
+// function reaches out to the Launchpad API to get the signing key
+func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string) error {
+	if ppa.Fingerprint == "" {
+		// The YAML schema has already validated that if no fingerprint is
+		// provided, then this is a public PPA. We will get the fingerprint
+		// from the Launchpad API
+		type launchpadAPI struct {
+			SigningKeyFingerprint string `json:"signing_key_fingerprint"`
+			// plus many other fields that aren't needed at the moment
 		}
-	} else {
+		launchpadInstance := launchpadAPI{}
+
 		splitName := strings.Split(ppa.PPAName, "/")
-		signingKeyURL := fmt.Sprintf("https://api.launchpad.net/devel/~%s/+archive/ubuntu/%s?ws.op=getSigningKeyData", splitName[0], splitName[1])
-		resp, err := http.Get(signingKeyURL)
+		launchpadURL := fmt.Sprintf("https://api.launchpad.net/devel/~%s/+archive/ubuntu/%s",
+			splitName[0], splitName[1])
+		resp, err := httpGet(launchpadURL)
 		if err != nil {
 			return fmt.Errorf("Error getting signing key for ppa \"%s\": %s",
 				ppa.PPAName, err.Error())
 		}
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := ioutilReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("Error reading signing key for ppa \"%s\": %s",
 				ppa.PPAName, err.Error())
 		}
-		fmt.Println(string(body))
 
-		/*gpgIO, err := osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+		err = jsonUnmarshal(body, &launchpadInstance)
 		if err != nil {
-			return fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
-		}*/
+			return fmt.Errorf("Error unmarshalling launchpad API response: %s", err.Error())
+		}
 
+		ppa.Fingerprint = launchpadInstance.SigningKeyFingerprint
+	}
+	commonGPGArgs := []string{
+		"--no-default-keyring",
+		"--no-options",
+		"--homedir",
+		tmpGPGDir,
+		"--secret-keyring",
+		filepath.Join(tmpGPGDir, "tempring.gpg"),
+		"--keyserver",
+		"hkp://keyserver.ubuntu.com:80",
+	}
+	recvKeyArgs := append(commonGPGArgs, []string{"--recv-keys", ppa.Fingerprint}...)
+	exportKeyArgs := append(commonGPGArgs, []string{"--output", keyFilePath, "--export", ppa.Fingerprint}...)
+	gpgCmds := []*exec.Cmd{
+		execCommand(
+			"gpg",
+			recvKeyArgs...,
+		),
+		execCommand(
+			"gpg",
+			exportKeyArgs...,
+		),
+	}
+
+	for _, gpgCmd := range gpgCmds {
+		gpgOutput, err := gpgCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error running gpg command \"%s\". Error is \"%s\". Full output below:\n%s",
+				gpgCmd.String(), err.Error(), string(gpgOutput))
+		}
 	}
 
 	return nil

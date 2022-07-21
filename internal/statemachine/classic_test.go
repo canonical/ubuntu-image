@@ -1337,6 +1337,13 @@ func TestFailedInstallPackages(t *testing.T) {
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Rootfs:       &RootfsType{},
+			Customization: &CustomizationType{
+				ExtraPackages: []*PackageType{
+					{
+						PackageName: "test1",
+					},
+				},
+			},
 		}
 
 		// Setup the exec.Command mock
@@ -1360,6 +1367,13 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
+		validPPA := &PPAType{
+			PPAName: "canonical-foundations/ubuntu-image",
+		}
+		invalidPPA := &PPAType{
+			PPAName:     "canonical-foundations/ubuntu-image",
+			Fingerprint: "TEST FINGERPRINT",
+		}
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
@@ -1369,9 +1383,7 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 			Rootfs:       &RootfsType{},
 			Customization: &CustomizationType{
 				ExtraPPAs: []*PPAType{
-					{
-						PPAName: "test1/ppa",
-					},
+					validPPA,
 				},
 			},
 		}
@@ -1381,7 +1393,7 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// create the /etc/apt/ dir in workdir
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt"), 0755)
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d"), 0755)
 
 		// mock os.Mkdir
 		osMkdir = mockMkdir
@@ -1392,6 +1404,15 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		asserter.AssertErrContains(err, "Failed to create apt sources.list.d")
 		osMkdir = os.Mkdir
 
+		// mock os.MkdirTemp
+		osMkdirTemp = mockMkdirTemp
+		defer func() {
+			osMkdirTemp = os.MkdirTemp
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error creating temp dir for gpg")
+		osMkdirTemp = os.MkdirTemp
+
 		// mock os.OpenFile
 		osOpenFile = mockOpenFile
 		defer func() {
@@ -1400,5 +1421,22 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		err = stateMachine.addExtraPPAs()
 		asserter.AssertErrContains(err, "Error creating")
 		osOpenFile = os.OpenFile
+
+		// Use an invalid PPA to trigger a failure in importPPAKeys
+		stateMachine.ImageDef.Customization.ExtraPPAs = []*PPAType{invalidPPA}
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error retrieving signing key")
+		stateMachine.ImageDef.Customization.ExtraPPAs = []*PPAType{validPPA}
+
+		// mock os.RemoveAll
+		osRemoveAll = mockRemoveAll
+		defer func() {
+			osRemoveAll = os.RemoveAll
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error removing temporary gpg directory")
+		osRemoveAll = os.RemoveAll
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

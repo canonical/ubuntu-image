@@ -314,6 +314,11 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 	}
 
 	// now create the ppa sources.list files
+	tmpGPGDir, err := osMkdirTemp("/tmp", "ubuntu-image-gpg")
+	if err != nil {
+		return fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
+	}
+	defer osRemoveAll(tmpGPGDir)
 	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
 		ppaFileName, ppaFileContents := createPPAInfo(ppa,
 			classicStateMachine.ImageDef.Series)
@@ -326,11 +331,18 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 		ppaIO.Write([]byte(ppaFileContents))
 		ppaIO.Close()
 
-		// handle any fingerprints that are specified
-		if err = handleFingerprints(ppa, classicStateMachine.tempDirs.chroot); err != nil {
-			return fmt.Errorf("Error adding fingerpint for ppa \"%s\": %s",
+		// Import keys either from the specified fingerprint or via the Launchpad API
+		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
+		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
+			"etc", "apt", "trusted.gpg.d", keyFileName)
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		if err != nil {
+			return fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
 				ppa.PPAName, err.Error())
 		}
+	}
+	if err := osRemoveAll(tmpGPGDir); err != nil {
+		return fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
 	}
 
 	return nil
@@ -349,12 +361,14 @@ func (stateMachine *StateMachine) installPackages() error {
 		}
 	}
 
-	aptCmd := generateAptCmd(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
 
-	aptOutput, err := aptCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("Error running apt command \"%s\". Error is \"%s\". Output is: \n%s",
-			aptCmd.String(), err.Error(), string(aptOutput))
+	for _, aptCmd := range aptCmds {
+		aptOutput, err := aptCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error running apt command \"%s\". Error is \"%s\". Output is: \n%s",
+				aptCmd.String(), err.Error(), string(aptOutput))
+		}
 	}
 
 	return nil
