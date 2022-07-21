@@ -139,6 +139,24 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 // on a 100MiB filesystem, ext4 takes a little over 7MiB for the
 // metadata. Use 8MB as a minimum padding here
 func (stateMachine *StateMachine) calculateRootfsSize() error {
+	// use `du` to calculate the size of the rootfs
+	rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
+	if err != nil {
+		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
+	}
+	var rootfsQuantity quantity.Size = rootfsSize
+
+	// fudge factor for incidentals
+	rootfsPadding := 8 * quantity.SizeMiB
+	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity) * 1.5))
+	rootfsQuantity += rootfsPadding
+
+	// align the size of the rootfs to sector size
+	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity)/float64(stateMachine.SectorSize))) *
+		quantity.Size(stateMachine.SectorSize)
+
+	stateMachine.RootfsSize = rootfsQuantity
+
 	if stateMachine.commonFlags.Size != "" {
 		var parsedSize quantity.Size
 
@@ -150,6 +168,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 				if structure.Size == 0 {
 					rootfsVolume = volume
 					rootfsVolumeName = volumeName
+					break
 				}
 			}
 		}
@@ -166,37 +185,27 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 		// subtract the size and offsets of the existing volumes
 		if rootfsVolume != nil {
 			for _, structure := range rootfsVolume.Structure {
-				parsedSize -= structure.Size
+				parsedSize = helper.SafeQuantitySubtraction(parsedSize, structure.Size)
 				if structure.Offset != nil {
-					parsedSize -= quantity.Size(*structure.Offset)
+					parsedSize = helper.SafeQuantitySubtraction(parsedSize,
+						quantity.Size(*structure.Offset))
 				}
 			}
+
+			// align the size of the rootfs to sector size
+			parsedSize = quantity.Size(math.Ceil(float64(parsedSize)/float64(stateMachine.SectorSize))) *
+				quantity.Size(stateMachine.SectorSize)
+
+			if parsedSize < stateMachine.RootfsSize {
+				return fmt.Errorf("Error: calculated rootfs partition size %d is smaller "+
+					"than actual rootfs contents (%d). Try using a larger value of "+
+					"--image-size",
+					parsedSize, stateMachine.RootfsSize,
+				)
+			}
+
+			stateMachine.RootfsSize = parsedSize
 		}
-
-		// align the size of the rootfs to sector size
-		parsedSize = quantity.Size(math.Ceil(float64(parsedSize)/float64(stateMachine.SectorSize))) *
-			quantity.Size(stateMachine.SectorSize)
-
-		stateMachine.RootfsSize = parsedSize
-	} else {
-		// if the size isn't specified, use `du` to calculate one
-		rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
-		if err != nil {
-			return fmt.Errorf("Error getting rootfs size: %s", err.Error())
-		}
-		var rootfsQuantity quantity.Size = rootfsSize
-
-		// fudge factor for incidentals
-		rootfsPadding := 8 * quantity.SizeMiB
-		rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity) * 1.5))
-		rootfsQuantity += rootfsPadding
-
-		// align the size of the rootfs to sector size
-		rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity)/float64(stateMachine.SectorSize))) *
-			quantity.Size(stateMachine.SectorSize)
-
-		stateMachine.RootfsSize = rootfsQuantity
-
 	}
 
 	// we have already saved the rootfs size in the state machine struct, but we
