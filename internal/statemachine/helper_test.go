@@ -949,9 +949,9 @@ Components: main`,
 // TestImportPPAKeys unit tests the importPPAKeys function
 func TestImportPPAKeys(t *testing.T) {
 	testCases := []struct {
-		name             string
-		ppa              *PPAType
-		keyFileName      string
+		name        string
+		ppa         *PPAType
+		keyFileName string
 	}{
 		{
 			"public_ppa",
