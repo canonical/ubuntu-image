@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -298,6 +299,15 @@ func (stateMachine *StateMachine) createChroot() error {
 			debootstrapCmd.String(), err.Error(), string(debootstrapOutput))
 	}
 
+	// add any extra apt sources to /etc/apt/sources.list
+	aptSources := classicStateMachine.ImageDef.generatePocketList()
+
+	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+	sourcesListFile, _ := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
+	for _, aptSource := range aptSources {
+		sourcesListFile.WriteString(aptSource)
+	}
+
 	return nil
 }
 
@@ -348,7 +358,12 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 	return nil
 }
 
-// Install packages in the chroot environment
+// Install packages in the chroot environment. This is accomplished by
+// running commands to do the following:
+// 1. Mount /proc /sys and /dev in the chroot
+// 2. Run `apt update` in the chroot
+// 3. Run `apt install <package list>` in the chroot
+// 4. Unmount /proc /sys and /dev
 func (stateMachine *StateMachine) installPackages() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
@@ -361,13 +376,30 @@ func (stateMachine *StateMachine) installPackages() error {
 		}
 	}
 
-	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+	// Slice used to store all the commands that need to be run
+	// to install the packages
+	var installPackagesCmds []*exec.Cmd
 
-	for _, aptCmd := range aptCmds {
-		aptOutput, err := aptCmd.CombinedOutput()
+	// mount some necessary partitions from the host in the chroot
+	mounts := []string{"/dev", "/proc", "/sys"}
+	var umounts []*exec.Cmd
+	for _, mount := range mounts {
+		mountCmd, umountCmd := mountFromHost(stateMachine.tempDirs.chroot, mount)
+		defer umountCmd.Run()
+		installPackagesCmds = append(installPackagesCmds, mountCmd)
+		umounts = append(umounts, umountCmd)
+	}
+
+	// generate the apt update/install commands and append them to the slice of commands
+	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+	installPackagesCmds = append(installPackagesCmds, aptCmds...)
+	installPackagesCmds = append(installPackagesCmds, umounts...) // don't forget to unmount!
+
+	for _, cmd := range installPackagesCmds {
+		cmdOutput, err := cmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("Error running apt command \"%s\". Error is \"%s\". Output is: \n%s",
-				aptCmd.String(), err.Error(), string(aptOutput))
+			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+				cmd.String(), err.Error(), string(cmdOutput))
 		}
 	}
 

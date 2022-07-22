@@ -780,3 +780,11 @@ func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string) error {
 
 	return nil
 }
+
+// mountFromHost mounts mountpoints from the host system in the chroot
+// for certain operations that require this
+func mountFromHost(targetDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd) {
+	mountCmd = execCommand("mount", "--bind", mountpoint, filepath.Join(targetDir, mountpoint))
+	umountCmd = execCommand("umount", filepath.Join(targetDir, mountpoint))
+	return mountCmd, umountCmd
+}

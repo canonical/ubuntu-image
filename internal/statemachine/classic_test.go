@@ -1364,7 +1364,7 @@ func TestFailedInstallPackages(t *testing.T) {
 			execCommand = exec.Command
 		}()
 		err := stateMachine.installPackages()
-		asserter.AssertErrContains(err, "Error running apt command")
+		asserter.AssertErrContains(err, "Error running command")
 		execCommand = exec.Command
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
