@@ -2,7 +2,9 @@ package statemachine
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,6 +75,9 @@ func mockMkfsWithContent(typ, img, label, contentRootDir string, deviceSize, sec
 func mockMkfs(typ, img, label string, deviceSize, sectorSize quantity.Size) error {
 	return fmt.Errorf("Test Error")
 }
+func mockReadAll(io.Reader) ([]byte, error) {
+	return []byte{}, fmt.Errorf("Test Error")
+}
 func mockReadDir(string) ([]os.FileInfo, error) {
 	return []os.FileInfo{}, fmt.Errorf("Test Error")
 }
@@ -87,6 +92,9 @@ func mockMkdir(string, os.FileMode) error {
 }
 func mockMkdirAll(string, os.FileMode) error {
 	return fmt.Errorf("Test error")
+}
+func mockMkdirTemp(string, string) (string, error) {
+	return "", fmt.Errorf("Test error")
 }
 func mockOpen(string) (*os.File, error) {
 	return nil, fmt.Errorf("Test error")
@@ -128,6 +136,12 @@ func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
 	return nil, fmt.Errorf("Test error")
 }
 func mockImagePrepare(*image.Options) error {
+	return fmt.Errorf("Test Error")
+}
+func mockGet(string) (*http.Response, error) {
+	return nil, fmt.Errorf("Test Error")
+}
+func mockUnmarshal([]byte, any) error {
 	return fmt.Errorf("Test Error")
 }
 func mockGojsonschemaValidateError(gojsonschema.JSONLoader, gojsonschema.JSONLoader) (*gojsonschema.Result, error) {

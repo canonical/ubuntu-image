@@ -5,8 +5,10 @@ package statemachine
 import (
 	"crypto/rand"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,11 +34,13 @@ var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 var helperCopyBlob = helper.CopyBlob
 var helperSetDefaults = helper.SetDefaults
 var helperCheckEmptyFields = helper.CheckEmptyFields
+var ioutilReadAll = ioutil.ReadAll
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile
 var ioutilWriteFile = ioutil.WriteFile
 var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
+var osMkdirTemp = os.MkdirTemp
 var osOpen = os.Open
 var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
@@ -52,6 +56,8 @@ var diskfsCreate = diskfs.Create
 var randRead = rand.Read
 var seedOpen = seed.Open
 var imagePrepare = image.Prepare
+var httpGet = http.Get
+var jsonUnmarshal = json.Unmarshal
 var gojsonschemaValidate = gojsonschema.Validate
 
 var mockableBlockSize string = "1" //used for mocking dd calls
