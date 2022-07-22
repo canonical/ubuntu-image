@@ -344,7 +344,7 @@ func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Off
 	} else {
 		if volumeSize < calculated {
 			fmt.Printf("WARNING: ignoring image size smaller than "+
-				"minimum required size: vol:%s %d < %d",
+				"minimum required size: vol:%s %d < %d\n",
 				volumeName, uint64(volumeSize), uint64(calculated))
 			stateMachine.ImageSizes[volumeName] = calculated
 		} else {

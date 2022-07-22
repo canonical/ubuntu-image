@@ -86,3 +86,11 @@ func CopyBlob(ddArgs []string) error {
 	}
 	return nil
 }
+
+// SafeQuantitySubtraction subtracts quantities while checking for integer underflow
+func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
+	if subtract > orig {
+		return 0
+	}
+	return orig - subtract
+}
