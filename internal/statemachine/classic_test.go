@@ -1220,7 +1220,7 @@ func TestCreateChroot(t *testing.T) {
 		stateMachine.ImageDef = ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs:       &RootfsType{
+			Rootfs: &RootfsType{
 				Pocket: "proposed",
 			},
 		}
