@@ -44,7 +44,7 @@ type RootfsType struct {
 	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
 	Flavor       string       `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
 	Mirror       string       `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
-	Pocket       string       `yaml:"pocket"        json:"Pocket"                 jsonschema:"enum=release,enum=updates,enum=security,enum=proposed" default:"release"`
+	Pocket       string       `yaml:"pocket"        json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
 	Seed         *SeedType    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
 	Tarball      *TarballType `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
 	ArchiveTasks []string     `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
@@ -227,15 +227,12 @@ type MissingURLError struct {
 func (ImageDef ImageDefinition) generatePocketList() []string {
 	pocketMap := map[string][]string{
 		"release": []string{},
-		"updates": []string{
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
-			),
+		"security": []string{
 			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),
 		},
-		"security": []string{
+		"updates": []string{
 			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),
@@ -257,5 +254,5 @@ func (ImageDef ImageDefinition) generatePocketList() []string {
 	}
 
 	// Schema validation has already confirmed the Pocket is a valid value
-	return pocketMap[ImageDef.Rootfs.Pocket]
+	return pocketMap[strings.ToLower(ImageDef.Rootfs.Pocket)]
 }
