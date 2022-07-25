@@ -7,8 +7,7 @@ type ClassicArgs struct {
 
 // ClassicOpts holds all flags that are specific to the classic command
 type ClassicOpts struct {
-	AptParams   []string `long:"apt-params" description:"Any additional APT specific configuration needed for the image build."`
-	PrintStates bool     `long:"print-states" description:"An additional debug logging option to print the states that will be executed by the state machine after they have been determined"`
+	AptParams []string `long:"apt-params" description:"Any additional APT specific configuration needed for the image build."` // TODO: is this used?
 }
 
 type classicCommand struct {

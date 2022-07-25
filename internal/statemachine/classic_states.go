@@ -169,12 +169,13 @@ func (stateMachine *StateMachine) calculateStates() error {
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	stateMachine.states = append(stateMachine.states, rootfsCreationStates...)
 
-	// if the --print-states option was passed, print the calculated states
-	if classicStateMachine.Opts.PrintStates {
-		fmt.Println("The calculated states are as follows:")
+	// if the --debug option was passed, print the calculated states
+	if stateMachine.commonFlags.Debug {
+		fmt.Println("\nThe calculated states are as follows:")
 		for i, state := range stateMachine.states {
 			fmt.Printf("[%d] %s\n", i, state.name)
 		}
+		fmt.Println("\n\nContinuing")
 	}
 
 	if err := stateMachine.validateUntilThru(); err != nil {
@@ -225,7 +226,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	makeCmd := execCommand("make")
 	makeCmd.Dir = sourceDir
 
-	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.SubCmdOutput)
+	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.Debug)
 
 	if err := makeCmd.Run(); err != nil {
 		return fmt.Errorf("Error running \"make\" in gadget source. "+
@@ -280,7 +281,7 @@ func (stateMachine *StateMachine) createChroot() error {
 		classicStateMachine.Packages,
 	)
 
-	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, classicStateMachine.commonFlags.SubCmdOutput)
+	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, classicStateMachine.commonFlags.Debug)
 
 	if err := debootstrapCmd.Run(); err != nil {
 		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
@@ -318,7 +319,7 @@ func (stateMachine *StateMachine) germinate() error {
 	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
 	germinateCmd.Dir = germinateDir
 
-	germinateOutput := helper.SetCommandOutput(germinateCmd, classicStateMachine.commonFlags.SubCmdOutput)
+	germinateOutput := helper.SetCommandOutput(germinateCmd, classicStateMachine.commonFlags.Debug)
 
 	//if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
 	if err := germinateCmd.Run(); err != nil {

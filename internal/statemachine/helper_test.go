@@ -819,14 +819,17 @@ func TestGenerateGerminateCmd(t *testing.T) {
 // TestValidateInput tests that invalid state machine command line arguments result in a failure
 func TestValidateInput(t *testing.T) {
 	testCases := []struct {
-		name   string
-		until  string
-		thru   string
-		resume bool
-		errMsg string
+		name    string
+		until   string
+		thru    string
+		debug   bool
+		verbose bool
+		resume  bool
+		errMsg  string
 	}{
-		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, "cannot specify both --until and --thru"},
-		{"resume_with_no_workdir", "", "", true, "must specify workdir when using --resume flag"},
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, false, false, "cannot specify both --until and --thru"},
+		{"resume_with_no_workdir", "", "", false, false, true, "must specify workdir when using --resume flag"},
+		{"both_debug_and_verbose", "", "", true, true, false, "--quiet, --verbose, and --debug flags are mutually exclusive"},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
@@ -836,6 +839,8 @@ func TestValidateInput(t *testing.T) {
 			stateMachine.stateMachineFlags.Until = tc.until
 			stateMachine.stateMachineFlags.Thru = tc.thru
 			stateMachine.stateMachineFlags.Resume = tc.resume
+			stateMachine.commonFlags.Debug = tc.debug
+			stateMachine.commonFlags.Verbose = tc.verbose
 
 			err := stateMachine.validateInput()
 			asserter.AssertErrContains(err, tc.errMsg)

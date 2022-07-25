@@ -35,6 +35,22 @@ func (stateMachine *StateMachine) validateInput() error {
 		return fmt.Errorf("must specify workdir when using --resume flag")
 	}
 
+	logLevelFlags := []bool{stateMachine.commonFlags.Debug,
+		stateMachine.commonFlags.Verbose,
+		stateMachine.commonFlags.Quiet,
+	}
+
+	logLevels := 0
+	for _, logLevelFlag := range logLevelFlags {
+		if logLevelFlag {
+			logLevels++
+		}
+	}
+
+	if logLevels > 1 {
+		return fmt.Errorf("--quiet, --verbose, and --debug flags are mutually exclusive")
+	}
+
 	return nil
 }
 
@@ -91,7 +107,7 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 
 		for _, hookScript := range hookScripts {
 			hookScriptPath := filepath.Join(hooksDirectoryd, hookScript.Name())
-			if stateMachine.commonFlags.Debug {
+			if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
 				fmt.Printf("Running hook script: %s\n", hookScriptPath)
 			}
 			if err := helper.RunScript(hookScriptPath); err != nil {
@@ -103,7 +119,7 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 		hookScript := filepath.Join(hooksDir, hookName)
 		_, err = os.Stat(hookScript)
 		if err == nil {
-			if stateMachine.commonFlags.Debug {
+			if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
 				fmt.Printf("Running hook script: %s\n", hookScript)
 			}
 			if err := helper.RunScript(hookScript); err != nil {
@@ -198,10 +214,12 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			// system-data and system-seed structures are not required to have
 			// an explicit size set in the yaml file
 			if structure.Size < stateMachine.RootfsSize {
-				fmt.Printf("WARNING: rootfs structure size %s smaller "+
-					"than actual rootfs contents %s\n",
-					structure.Size.IECString(),
-					stateMachine.RootfsSize.IECString())
+				if !stateMachine.commonFlags.Quiet {
+					fmt.Printf("WARNING: rootfs structure size %s smaller "+
+						"than actual rootfs contents %s\n",
+						structure.Size.IECString(),
+						stateMachine.RootfsSize.IECString())
+				}
 				blockSize = stateMachine.RootfsSize
 				structure.Size = stateMachine.RootfsSize
 				volume.Structure[structureNumber] = structure

@@ -238,11 +238,13 @@ type MissingFieldError struct {
 
 // SetCommandOutput sets the output of a command to either use a multiwriter
 // or behave as a normal command and store the output in a buffer
-func SetCommandOutput(cmd *exec.Cmd, liveOutput bool) (cmdOutput bytes.Buffer) {
-	cmd.Stdout = &cmdOutput
-	cmd.Stderr = &cmdOutput
+func SetCommandOutput(cmd *exec.Cmd, liveOutput bool) (cmdOutput *bytes.Buffer) {
+	var cmdOutputBuffer bytes.Buffer
+	cmdOutput = &cmdOutputBuffer
+	cmd.Stdout = cmdOutput
+	cmd.Stderr = cmdOutput
 	if liveOutput {
-		mwriter := io.MultiWriter(os.Stdout, &cmdOutput)
+		mwriter := io.MultiWriter(os.Stdout, cmdOutput)
 		cmd.Stdout = mwriter
 		cmd.Stderr = mwriter
 	}
