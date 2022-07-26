@@ -3,6 +3,7 @@
 package statemachine
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -1261,7 +1262,9 @@ func TestCreateChroot(t *testing.T) {
 		stateMachine.ImageDef = ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs:       &RootfsType{},
+			Rootfs: &RootfsType{
+				Pocket: "proposed",
+			},
 		}
 
 		// need workdir set up for this
@@ -1287,6 +1290,22 @@ func TestCreateChroot(t *testing.T) {
 			}
 		}
 
+		// check that security, updates, and proposed were added to /etc/apt/sources.list
+		sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+		sourcesListData, err := os.ReadFile(sourcesList)
+		asserter.AssertErrNil(err, true)
+
+		pockets := []string{
+			fmt.Sprintf("%s-updates", stateMachine.ImageDef.Series),
+			fmt.Sprintf("%s-security", stateMachine.ImageDef.Series),
+			fmt.Sprintf("%s-proposed", stateMachine.ImageDef.Series),
+		}
+
+		for _, pocket := range pockets {
+			if !strings.Contains(string(sourcesListData), pocket) {
+				t.Errorf("%s is not present in /etc/apt/sources.list", pocket)
+			}
+		}
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
