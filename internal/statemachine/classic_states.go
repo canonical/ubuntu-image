@@ -299,6 +299,15 @@ func (stateMachine *StateMachine) createChroot() error {
 			debootstrapCmd.String(), err.Error(), string(debootstrapOutput))
 	}
 
+	// add any extra apt sources to /etc/apt/sources.list
+	aptSources := classicStateMachine.ImageDef.generatePocketList()
+
+	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+	sourcesListFile, _ := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
+	for _, aptSource := range aptSources {
+		sourcesListFile.WriteString(aptSource)
+	}
+
 	return nil
 }
 
