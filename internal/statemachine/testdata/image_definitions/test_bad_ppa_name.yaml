@@ -33,12 +33,8 @@ customization:
         password: ubuntu
   extra-ppas:
     -
-      name: "jawn-smith/devel-proposed"
-    -
-      name: "ubuntu-advantage/fips"
-      auth: "testpassword"
-    -
       name: "testfailure"
+      auth: "testfailure"
 artifacts:
   img:
       path: pc-amd64.img

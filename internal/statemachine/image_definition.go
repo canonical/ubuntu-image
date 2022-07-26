@@ -1,6 +1,9 @@
 package statemachine
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -40,8 +43,8 @@ type RootfsType struct {
 	Components   []string     `yaml:"components"    json:"Components,omitempty"`
 	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
 	Flavor       string       `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
-	Pocket       string       `yaml:"pocket"        json:"Pocket"                 default:"release"`
 	Mirror       string       `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
+	Pocket       string       `yaml:"pocket"        json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
 	Seed         *SeedType    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
 	Tarball      *TarballType `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
 	ArchiveTasks []string     `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
@@ -95,8 +98,8 @@ type UserDataType struct {
 
 // PPAType contains information about a public or private PPA
 type PPAType struct {
-	PPAName     string `yaml:"name"         json:"PPAName"               jsonschema:"pattern=[a-zA-Z0-9]/[a-zA-Z0-9]"`
-	Auth        string `yaml:"auth"         json:"Auth,omitempty"`
+	PPAName     string `yaml:"name"         json:"PPAName"               jsonschema:"pattern=^[a-zA-Z0-9_.+-]+/[a-zA-Z0-9_.+-]+$"`
+	Auth        string `yaml:"auth"         json:"Auth,omitempty"        jsonschema:"pattern=^[a-zA-Z0-9_.+-]+:[a-zA-Z0-9]+$"`
 	Fingerprint string `yaml:"fingerprint"  json:"Fingerprint,omitempty"`
 	KeepEnabled bool   `yaml:"keep-enabled" json:"KeepEnabled"           default:"true"`
 }
@@ -216,4 +219,57 @@ func newMissingURLError(context *gojsonschema.JsonContext, value interface{}, de
 // based on the values in other fields
 type MissingURLError struct {
 	gojsonschema.ResultErrorFields
+}
+
+func newInvalidPPAError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *InvalidPPAError {
+	err := InvalidPPAError{}
+	err.SetContext(context)
+	err.SetType("private_ppa_without_fingerprint")
+	err.SetDescriptionFormat("Fingerprint is required for private PPAs")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// InvalidPPAError implements gojsonschema.ErrorType. It is used for custom errors
+// when a private PPA does not have a fingerprint specified
+type InvalidPPAError struct {
+	gojsonschema.ResultErrorFields
+}
+
+// generatePocketList returns a slice of strings that need to be added to
+// /etc/apt/sources.list in the chroot based on the value of "pocket"
+// in the rootfs section of the image definition
+func (ImageDef ImageDefinition) generatePocketList() []string {
+	pocketMap := map[string][]string{
+		"release": []string{},
+		"security": []string{
+			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+		},
+		"updates": []string{
+			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+		},
+		"proposed": []string{
+			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-proposed %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+		},
+	}
+
+	// Schema validation has already confirmed the Pocket is a valid value
+	return pocketMap[strings.ToLower(ImageDef.Rootfs.Pocket)]
 }
