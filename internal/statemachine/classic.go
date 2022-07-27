@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"github.com/canonical/ubuntu-image/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/commands"
 )
 
@@ -32,7 +33,7 @@ var imageCreationStates = []stateFunc{
 // ClassicStateMachine embeds StateMachine and adds the command line flags specific to classic images
 type ClassicStateMachine struct {
 	StateMachine
-	ImageDef ImageDefinition
+	ImageDef imagedefinition.ImageDefinition
 	Opts     commands.ClassicOpts
 	Args     commands.ClassicArgs
 	Packages []string

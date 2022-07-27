@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/canonical/ubuntu-image/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/partition"
@@ -22,6 +23,7 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 // validateInput ensures that command line flags for the state machine are valid. These
@@ -587,7 +589,7 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 
 // generateGerminateCmd creates the appropriate germinate command for the
 // values configured in the image definition yaml file
-func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
+func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec.Cmd {
 	// determine the value for the seed-dist in the form of <archive>.<series>
 	seedDist := imageDefinition.Rootfs.Flavor
 	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
@@ -619,7 +621,7 @@ func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 
 // cloneGitRepo takes options from the image definition and clones the git
 // repo with the corresponding options
-func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
+func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir string) error {
 	// clone the repo
 	cloneOptions := &git.CloneOptions{
 		URL:          imageDefinition.Gadget.GadgetURL,
@@ -637,7 +639,7 @@ func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
 
 // generateDebootstrapCmd generates the debootstrap command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
+func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
 	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
@@ -656,4 +658,58 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 	}...)
 
 	return debootstrapCmd
+}
+
+func newMissingURLError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingURLError {
+	err := MissingURLError{}
+	err.SetContext(context)
+	err.SetType("missing_url_error")
+	err.SetDescriptionFormat("When key {{.key}} is specified as {{.value}}, a URL must be provided")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// MissingURLError implements gojsonschema.ErrorType. It is used for custom errors for
+// fields that require a url based on the value of other fields
+// based on the values in other fields
+type MissingURLError struct {
+	gojsonschema.ResultErrorFields
+}
+
+// generatePocketList returns a slice of strings that need to be added to
+// /etc/apt/sources.list in the chroot based on the value of "pocket"
+// in the rootfs section of the image definition
+func generatePocketList(imageDef imagedefinition.ImageDefinition) []string {
+	pocketMap := map[string][]string{
+		"release": {},
+		"security": {
+			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
+				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
+			),
+		},
+		"updates": {
+			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
+				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
+			),
+			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
+				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
+			),
+		},
+		"proposed": {
+			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
+				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
+			),
+			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
+				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
+			),
+			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-proposed %s\n",
+				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
+			),
+		},
+	}
+
+	// Schema validation has already confirmed the Pocket is a valid value
+	return pocketMap[strings.ToLower(imageDef.Rootfs.Pocket)]
 }

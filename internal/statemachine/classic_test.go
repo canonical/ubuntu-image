@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/canonical/ubuntu-image/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	//"github.com/snapcore/snapd/image"
@@ -180,14 +181,14 @@ func TestFailedCalculateStates(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
-			Gadget: &GadgetType{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetType: "git",
 			},
-			Rootfs: &RootfsType{
+			Rootfs: &imagedefinition.Rootfs{
 				ArchiveTasks: []string{"test"},
 			},
-			Customization: &CustomizationType{},
+			Customization: &imagedefinition.Customization{},
 		}
 
 		stateMachine.stateMachineFlags.Thru = "fake_state"
@@ -973,13 +974,13 @@ func TestGerminate(t *testing.T) {
 
 			hostArch := getHostArch()
 			hostSuite := getHostSuite()
-			imageDef := ImageDefinition{
+			imageDef := imagedefinition.ImageDefinition{
 				Architecture: hostArch,
 				Series:       hostSuite,
-				Rootfs: &RootfsType{
+				Rootfs: &imagedefinition.Rootfs{
 					Flavor: tc.flavor,
 					Mirror: "http://archive.ubuntu.com/ubuntu/",
-					Seed: &SeedType{
+					Seed: &imagedefinition.Seed{
 						SeedURLs:   tc.seedURLs,
 						SeedBranch: hostSuite,
 						Names:      tc.seedNames,
@@ -1043,13 +1044,13 @@ func TestFailedGerminate(t *testing.T) {
 		// create a valid imageDefinition
 		hostArch := getHostArch()
 		hostSuite := getHostSuite()
-		imageDef := ImageDefinition{
+		imageDef := imagedefinition.ImageDefinition{
 			Architecture: hostArch,
 			Series:       hostSuite,
-			Rootfs: &RootfsType{
+			Rootfs: &imagedefinition.Rootfs{
 				Flavor: "ubuntu",
 				Mirror: "http://archive.ubuntu.com/ubuntu/",
-				Seed: &SeedType{
+				Seed: &imagedefinition.Seed{
 					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 					SeedBranch: hostSuite,
 					Names:      []string{"server", "minimal", "standard", "cloud-image"},
@@ -1108,8 +1109,8 @@ func TestBuildGadgetTree(t *testing.T) {
 		wd, _ := os.Getwd()
 		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
 		sourcePath = "file://" + sourcePath
-		imageDef := ImageDefinition{
-			Gadget: &GadgetType{
+		imageDef := imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  sourcePath,
 				GadgetType: "directory",
 			},
@@ -1120,9 +1121,9 @@ func TestBuildGadgetTree(t *testing.T) {
 		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrNil(err, true)
 
-		// test the git methdo
-		imageDef = ImageDefinition{
-			Gadget: &GadgetType{
+		// test the git method
+		imageDef = imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
 				GadgetType:   "git",
 				GadgetBranch: "20",
@@ -1161,8 +1162,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 		osMkdir = os.Mkdir
 
 		// try to clone a repo that doesn't exist
-		imageDef := ImageDefinition{
-			Gadget: &GadgetType{
+		imageDef := imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  "http://fakerepo.git",
 				GadgetType: "git",
 			},
@@ -1173,8 +1174,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 		asserter.AssertErrContains(err, "Error cloning gadget repository")
 
 		// try to copy a file that doesn't exist
-		imageDef = ImageDefinition{
-			Gadget: &GadgetType{
+		imageDef = imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  "file:///fake/file/that/does/not/exist",
 				GadgetType: "directory",
 			},
@@ -1193,8 +1194,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 		wd, _ := os.Getwd()
 		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
 		sourcePath = "file://" + sourcePath
-		imageDef = ImageDefinition{
-			Gadget: &GadgetType{
+		imageDef = imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  sourcePath,
 				GadgetType: "directory",
 			},
@@ -1217,10 +1218,10 @@ func TestCreateChroot(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs: &RootfsType{
+			Rootfs: &imagedefinition.Rootfs{
 				Pocket: "proposed",
 			},
 		}
@@ -1277,10 +1278,10 @@ func TestFailedCreateChroot(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs:       &RootfsType{},
+			Rootfs:       &imagedefinition.Rootfs{},
 		}
 
 		// need workdir set up for this
