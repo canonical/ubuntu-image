@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	//"github.com/snapcore/snapd/image"

@@ -1,7 +1,7 @@
 package statemachine
 
 import (
-	"github.com/canonical/ubuntu-image/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/commands"
 )
 

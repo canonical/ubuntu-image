@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/partition"

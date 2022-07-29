@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"
 
