@@ -14,6 +14,7 @@ type CommonOpts struct {
 	Version          bool     `long:"version" description:"Print the version number of ubuntu-image and exit"`
 	Channel          string   `short:"c" long:"channel" description:"The default snap channel to use" value-name:"CHANNEL"`
 	SectorSize       string   `long:"sector-size" description:"Sector size to use when creating the disk image. Only 512 and 4k sector sizes are supported." choice:"512" choice:"4096" value-name:"SECTOR-SIZE" default:"512"`
+	Validation       string   `long:"validation" description:"Control whether validations should be ignored or enforced" choice:"ignore" choice:"enforce"`
 }
 
 // StateMachineOpts stores the options that are related to the state machine

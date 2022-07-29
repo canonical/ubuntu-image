@@ -522,7 +522,7 @@ func TestValidationFlag(t *testing.T) {
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
 		stateMachine.stateMachineFlags.Thru = "prepare_image"
-		stateMachine.Opts.Validation = "enforce"
+		stateMachine.commonFlags.Validation = "enforce"
 
 		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)

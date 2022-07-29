@@ -501,8 +501,7 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	return nil
 }
 
-// preseedClassicImage calls image.Prepare to seed extra snaps in classic images
-// currently only used when --filesystem is provided
+// preseedClassicImage calls image.Prepare to seed snaps in classic images
 func (stateMachine *StateMachine) preseedClassicImage() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
@@ -546,11 +545,9 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 
 	imageOpts.Classic = true
 	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
-
 	imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot
-
-	customizations := *new(image.Customizations)
-	imageOpts.Customizations = customizations
+	imageOpts.Customizations = *new(image.Customizations)
+	imageOpts.Customizations.Validation = stateMachine.commonFlags.Validation
 
 	if err := imagePrepare(&imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
