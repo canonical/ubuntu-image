@@ -349,7 +349,7 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
 		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
 			"etc", "apt", "trusted.gpg.d", keyFileName)
-		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, stateMachine.commonFlags.Debug)
 		if err != nil {
 			return fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
 				ppa.PPAName, err.Error())
@@ -400,10 +400,11 @@ func (stateMachine *StateMachine) installPackages() error {
 	installPackagesCmds = append(installPackagesCmds, umounts...) // don't forget to unmount!
 
 	for _, cmd := range installPackagesCmds {
-		cmdOutput, err := cmd.CombinedOutput()
+		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
+		err := cmd.Run()
 		if err != nil {
 			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-				cmd.String(), err.Error(), string(cmdOutput))
+				cmd.String(), err.Error(), cmdOutput.String())
 		}
 	}
 
@@ -440,7 +441,6 @@ func (stateMachine *StateMachine) germinate() error {
 
 	germinateOutput := helper.SetCommandOutput(germinateCmd, classicStateMachine.commonFlags.Debug)
 
-	//if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
 	if err := germinateCmd.Run(); err != nil {
 		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
 			germinateCmd.String(), err.Error(), germinateOutput.String())

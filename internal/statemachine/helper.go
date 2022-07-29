@@ -732,7 +732,7 @@ func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents s
 // The schema parsing has already validated that either Fingerprint is
 // specified or the PPA is public. If no fingerprint is provided, this
 // function reaches out to the Launchpad API to get the signing key
-func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string) error {
+func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string, debug bool) error {
 	if ppa.Fingerprint == "" {
 		// The YAML schema has already validated that if no fingerprint is
 		// provided, then this is a public PPA. We will get the fingerprint
@@ -789,10 +789,11 @@ func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string) error {
 	}
 
 	for _, gpgCmd := range gpgCmds {
-		gpgOutput, err := gpgCmd.CombinedOutput()
+		gpgOutput := helper.SetCommandOutput(gpgCmd, debug)
+		err := gpgCmd.Run()
 		if err != nil {
 			return fmt.Errorf("Error running gpg command \"%s\". Error is \"%s\". Full output below:\n%s",
-				gpgCmd.String(), err.Error(), string(gpgOutput))
+				gpgCmd.String(), err.Error(), gpgOutput.String())
 		}
 	}
 
