@@ -967,7 +967,7 @@ func TestImportPPAKeys(t *testing.T) {
 				Auth:        "testuser:testpass",
 				Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
 			},
-			"privatee-canonical-foundations-ubuntu-image-private-test.key",
+			"private-canonical-foundations-ubuntu-image-private-test.key",
 		},
 	}
 	for _, tc := range testCases {
@@ -1004,7 +1004,7 @@ func TestImportPPAKeys(t *testing.T) {
 
 			// create a temporary gpg keyring directory
 			tmpGPGDir, err := os.MkdirTemp("/tmp", "ubuntu-image-gpg-test")
-			//defer os.RemoveAll(tmpGPGDir)
+			defer os.RemoveAll(tmpGPGDir)
 			asserter.AssertErrNil(err, true)
 
 			// create a temporary trusted.gpg.d directory
