@@ -3,7 +3,9 @@ package statemachine
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -867,4 +869,219 @@ func TestValidateUntilThru(t *testing.T) {
 
 		})
 	}
+}
+
+// TestGenerateAptCmd unit tests the generateAptCmd function
+func TestGenerateAptCmds(t *testing.T) {
+	testCases := []struct {
+		name        string
+		targetDir   string
+		packageList []string
+		expected    string
+	}{
+		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test"},
+		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test1 test2"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
+			aptCmds := generateAptCmds(tc.targetDir, tc.packageList)
+			if !strings.Contains(aptCmds[1].String(), tc.expected) {
+				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmds[1].String())
+			}
+		})
+	}
+}
+
+// TestCreatePPAInfo unit tests the createPPAInfo function
+func TestCreatePPAInfo(t *testing.T) {
+	testCases := []struct {
+		name             string
+		ppa              *PPAType
+		series           string
+		expectedName     string
+		expectedContents string
+	}{
+		{
+			"public_ppa",
+			&PPAType{
+				PPAName: "public/ppa",
+			},
+			"focal",
+			"public-ubuntu-ppa-focal.sources",
+			`X-Repolib-Name: public/ppa
+Enabled: yes
+Types: deb
+URIS: https://ppa.launchpadcontent.net/public/ppa/ubuntu
+Suites: focal
+Components: main`,
+		},
+		{
+			"private_ppa",
+			&PPAType{
+				PPAName: "private/ppa",
+				Auth:    "testuser:testpass",
+			},
+			"jammy",
+			"private-ubuntu-ppa-jammy.sources",
+			`X-Repolib-Name: private/ppa
+Enabled: yes
+Types: deb
+URIS: https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubuntu
+Suites: jammy
+Components: main`,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_create_ppa_info_"+tc.name, func(t *testing.T) {
+			fileName, fileContents := createPPAInfo(tc.ppa, tc.series)
+			if fileName != tc.expectedName {
+				t.Errorf("Expected PPA filename \"%s\" but got \"%s\"",
+					tc.expectedName, fileName)
+			}
+			if fileContents != tc.expectedContents {
+				t.Errorf("Expected PPA file contents \"%s\" but got \"%s\"",
+					tc.expectedContents, fileContents)
+			}
+		})
+	}
+}
+
+// TestImportPPAKeys unit tests the importPPAKeys function
+func TestImportPPAKeys(t *testing.T) {
+	testCases := []struct {
+		name        string
+		ppa         *PPAType
+		keyFileName string
+	}{
+		{
+			"public_ppa",
+			&PPAType{
+				PPAName: "canonical-foundations/ubuntu-image",
+			},
+			"public-canonical-foundations-ubuntu-image.key",
+		},
+		{
+			"private_ppa",
+			&PPAType{
+				PPAName:     "canonical-foundations/ubuntu-image-private-test",
+				Auth:        "testuser:testpass",
+				Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
+			},
+			"private-canonical-foundations-ubuntu-image-private-test.key",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_import_ppa_keys_"+tc.name, func(t *testing.T) {
+			// a byte representation of the canonical-foundations public key
+			expectedContents := []byte{152, 141, 4, 80, 190, 39, 112, 1, 4, 0,
+				230, 108, 176, 170, 73, 12, 198, 74, 110, 107, 31, 246, 81, 240,
+				148, 160, 52, 188, 222, 178, 67, 75, 14, 32, 247, 57, 211, 76, 26,
+				31, 124, 83, 11, 75, 21, 150, 164, 28, 222, 149, 49, 8, 135, 97, 83,
+				234, 138, 214, 97, 246, 15, 157, 69, 24, 112, 219, 231, 78, 36, 208,
+				186, 91, 248, 177, 57, 233, 53, 154, 253, 125, 241, 173, 154, 148,
+				65, 125, 20, 15, 87, 242, 144, 74, 238, 71, 133, 182, 9, 217, 23, 93,
+				155, 230, 52, 19, 90, 180, 79, 70, 186, 180, 122, 167, 141, 59, 95,
+				148, 196, 15, 231, 101, 80, 175, 225, 32, 163, 66, 111, 155, 167,
+				76, 72, 165, 5, 190, 22, 192, 10, 241, 0, 17, 1, 0, 1, 180, 44, 76,
+				97, 117, 110, 99, 104, 112, 97, 100, 32, 80, 80, 65, 32, 102, 111,
+				114, 32, 67, 97, 110, 111, 110, 105, 99, 97, 108, 32, 70, 111, 117,
+				110, 100, 97, 116, 105, 111, 110, 115, 32, 84, 101, 97, 109, 136,
+				184, 4, 19, 1, 2, 0, 34, 5, 2, 80, 190, 39, 112, 2, 27, 3, 6, 11, 9, 8,
+				7, 3, 2, 6, 21, 8, 2, 9, 10, 11, 4, 22, 2, 3, 1, 2, 30, 1, 2, 23, 128, 0,
+				10, 9, 16, 212, 192, 182, 104, 253, 76, 145, 57, 187, 243, 3, 255,
+				104, 246, 106, 227, 175, 235, 102, 20, 23, 4, 251, 60, 236, 165,
+				143, 184, 161, 133, 147, 154, 172, 228, 130, 18, 36, 6, 138, 214,
+				188, 32, 142, 251, 143, 144, 40, 43, 147, 187, 230, 224, 254, 161,
+				7, 57, 165, 220, 85, 55, 99, 70, 96, 62, 81, 208, 249, 131, 8, 241,
+				77, 213, 22, 252, 235, 214, 35, 182, 195, 224, 45, 231, 196, 7, 238,
+				147, 115, 81, 142, 71, 216, 96, 159, 11, 146, 83, 153, 107, 194, 167,
+				80, 30, 223, 236, 146, 29, 176, 101, 33, 237, 38, 7, 163, 183, 217,
+				42, 32, 163, 33, 163, 92, 45, 99, 62, 217, 78, 163, 45, 55, 209, 137,
+				43, 69, 78, 53, 177, 207, 209, 123, 186,
+			}
+
+			asserter := helper.Asserter{T: t}
+
+			// create a temporary gpg keyring directory
+			tmpGPGDir, err := os.MkdirTemp("/tmp", "ubuntu-image-gpg-test")
+			defer os.RemoveAll(tmpGPGDir)
+			asserter.AssertErrNil(err, true)
+
+			// create a temporary trusted.gpg.d directory
+			tmpTrustedDir, err := os.MkdirTemp("/tmp", "ubuntu-image-trusted.gpg.d")
+			//defer os.RemoveAll(tmpTrustedDir)
+			asserter.AssertErrNil(err, true)
+
+			keyFilePath := filepath.Join(tmpTrustedDir, tc.keyFileName)
+			err = importPPAKeys(tc.ppa, tmpGPGDir, keyFilePath)
+			asserter.AssertErrNil(err, true)
+
+			keyData, err := os.ReadFile(keyFilePath)
+			asserter.AssertErrNil(err, true)
+
+			if !reflect.DeepEqual(keyData, expectedContents) {
+				t.Errorf("Expected key file to be:\n%d\n\nbut got\n%d",
+					expectedContents, keyData)
+			}
+		})
+	}
+}
+
+// TestFailedImportPPAKeys tests failures in the importPPAKeys function
+func TestFailedImportPPAKeys(t *testing.T) {
+	t.Run("test_failed_import_ppa_keys", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		// create a temporary gpg keyring directory
+		tmpGPGDir, err := os.MkdirTemp("/tmp", "ubuntu-image-gpg-test")
+		defer os.RemoveAll(tmpGPGDir)
+		asserter.AssertErrNil(err, true)
+
+		// create a temporary trusted.gpg.d directory
+		tmpTrustedDir, err := os.MkdirTemp("/tmp", "ubuntu-image-trusted.gpg.d")
+		defer os.RemoveAll(tmpTrustedDir)
+		asserter.AssertErrNil(err, true)
+		keyFilePath := filepath.Join(tmpTrustedDir, "test.key")
+
+		// try to import an invalid gpg fingerprint
+		ppa := &PPAType{
+			PPAName:     "test-bad/fingerprint",
+			Fingerprint: "testfakefingperint",
+		}
+
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		asserter.AssertErrContains(err, "Error running gpg command")
+
+		// now use a valid PPA and mock some functions
+		ppa = &PPAType{
+			PPAName: "canonical-foundations/ubuntu-image",
+		}
+
+		// mock http.Get
+		httpGet = mockGet
+		defer func() {
+			httpGet = http.Get
+		}()
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		asserter.AssertErrContains(err, "Error getting signing key")
+		httpGet = http.Get
+
+		// mock ioutil.ReadAll
+		ioutilReadAll = mockReadAll
+		defer func() {
+			ioutilReadAll = ioutil.ReadAll
+		}()
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		asserter.AssertErrContains(err, "Error reading signing key")
+		ioutilReadAll = ioutil.ReadAll
+
+		// mock json.Unmarshal
+		jsonUnmarshal = mockUnmarshal
+		defer func() {
+			jsonUnmarshal = json.Unmarshal
+		}()
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		asserter.AssertErrContains(err, "Error unmarshalling launchpad API response")
+		jsonUnmarshal = json.Unmarshal
+	})
 }
