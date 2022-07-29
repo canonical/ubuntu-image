@@ -33,17 +33,8 @@ customization:
         password: ubuntu
   extra-ppas:
     -
-      name: "canonical-foundations/ubuntu-image"
-      fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139"
-    -
-      name: "canonical-foundations/ubuntu-image-private-test"
-      auth: "jawn-smith:2NmzdXp7Ccmjt7v9Z1nq"
-      fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139"
-  extra-packages:
-    -
-      name: "hello-ubuntu-image-public"
-    -
-      name: "hello-ubuntu-image-private"
+      name: "testfailure"
+      auth: "testfailure"
 artifacts:
   img:
       path: pc-amd64.img

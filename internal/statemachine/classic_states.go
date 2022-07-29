@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -61,7 +62,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return fmt.Errorf("Schema validation returned an error: %s", err.Error())
 	}
 
-	// do some custom validation
+	// do custom validation for gadgetURL being required if gadget is not pre-built
 	if imageDefinition.Gadget.GadgetType != "prebuilt" && imageDefinition.Gadget.GadgetURL == "" {
 		jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
 		errDetail := gojsonschema.ErrorDetails{
@@ -76,6 +77,26 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 			),
 			errDetail,
 		)
+	}
+	// do custom validation for private PPAs requiring fingerprint
+	if imageDefinition.Customization != nil {
+		for _, ppa := range imageDefinition.Customization.ExtraPPAs {
+			if ppa.Auth != "" && ppa.Fingerprint == "" {
+				jsonContext := gojsonschema.NewJsonContext("ppa_validation", nil)
+				errDetail := gojsonschema.ErrorDetails{
+					"ppaName": ppa.PPAName,
+				}
+				result.AddError(
+					newInvalidPPAError(
+						gojsonschema.NewJsonContext("missingPrivatePPAFingerprint",
+							jsonContext),
+						52,
+						errDetail,
+					),
+					errDetail,
+				)
+			}
+		}
 	}
 
 	// TODO: I've created a PR upstream in xeipuuv/gojsonschema
@@ -130,6 +151,12 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
+		if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+		}
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"install_packages", (*StateMachine).installPackages})
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
@@ -144,18 +171,6 @@ func (stateMachine *StateMachine) calculateStates() error {
 	if classicStateMachine.ImageDef.Customization.CloudInit != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
-	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"configure_extra_ppas", (*StateMachine).setupExtraPPAs})
-	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraPackages) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"install_extra_packages", (*StateMachine).installExtraPackages})
-	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"install_extra_snaps", (*StateMachine).prepareClassicImage})
 	}
 	if classicStateMachine.ImageDef.Customization.Manual != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
@@ -286,6 +301,110 @@ func (stateMachine *StateMachine) createChroot() error {
 	if err := debootstrapCmd.Run(); err != nil {
 		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
 			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
+	}
+
+	// add any extra apt sources to /etc/apt/sources.list
+	aptSources := classicStateMachine.ImageDef.generatePocketList()
+
+	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+	sourcesListFile, _ := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
+	for _, aptSource := range aptSources {
+		sourcesListFile.WriteString(aptSource)
+	}
+
+	return nil
+}
+
+// add PPAs to the apt sources list
+func (stateMachine *StateMachine) addExtraPPAs() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// create /etc/apt/sources.list.d in the chroot if it doesn't already exist
+	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
+	err := osMkdir(sourcesListD, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
+	}
+
+	// now create the ppa sources.list files
+	tmpGPGDir, err := osMkdirTemp("/tmp", "ubuntu-image-gpg")
+	if err != nil {
+		return fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
+	}
+	defer osRemoveAll(tmpGPGDir)
+	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		ppaFileName, ppaFileContents := createPPAInfo(ppa,
+			classicStateMachine.ImageDef.Series)
+
+		ppaFile := filepath.Join(sourcesListD, ppaFileName)
+		ppaIO, err := osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
+		}
+		ppaIO.Write([]byte(ppaFileContents))
+		ppaIO.Close()
+
+		// Import keys either from the specified fingerprint or via the Launchpad API
+		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
+		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
+			"etc", "apt", "trusted.gpg.d", keyFileName)
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		if err != nil {
+			return fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+	}
+	if err := osRemoveAll(tmpGPGDir); err != nil {
+		return fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
+	}
+
+	return nil
+}
+
+// Install packages in the chroot environment. This is accomplished by
+// running commands to do the following:
+// 1. Mount /proc /sys and /dev in the chroot
+// 2. Run `apt update` in the chroot
+// 3. Run `apt install <package list>` in the chroot
+// 4. Unmount /proc /sys and /dev
+func (stateMachine *StateMachine) installPackages() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// if any extra packages are specified, install them alongside the seeded packages
+	if classicStateMachine.ImageDef.Customization != nil {
+		for _, packageInfo := range classicStateMachine.ImageDef.Customization.ExtraPackages {
+			classicStateMachine.Packages = append(classicStateMachine.Packages,
+				packageInfo.PackageName)
+		}
+	}
+
+	// Slice used to store all the commands that need to be run
+	// to install the packages
+	var installPackagesCmds []*exec.Cmd
+
+	// mount some necessary partitions from the host in the chroot
+	mounts := []string{"/dev", "/proc", "/sys"}
+	var umounts []*exec.Cmd
+	for _, mount := range mounts {
+		mountCmd, umountCmd := mountFromHost(stateMachine.tempDirs.chroot, mount)
+		defer umountCmd.Run()
+		installPackagesCmds = append(installPackagesCmds, mountCmd)
+		umounts = append(umounts, umountCmd)
+	}
+
+	// generate the apt update/install commands and append them to the slice of commands
+	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+	installPackagesCmds = append(installPackagesCmds, aptCmds...)
+	installPackagesCmds = append(installPackagesCmds, umounts...) // don't forget to unmount!
+
+	for _, cmd := range installPackagesCmds {
+		cmdOutput, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+				cmd.String(), err.Error(), string(cmdOutput))
+		}
 	}
 
 	return nil
