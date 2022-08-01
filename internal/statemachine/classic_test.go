@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	//"github.com/snapcore/snapd/image"
 	//"github.com/snapcore/snapd/osutil"
@@ -49,11 +49,14 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"valid_image_definition", "test_valid.yaml", true, ""},
 		{"invalid_class", "test_bad_class.yaml", false, "Class must be one of the following"},
 		{"invalid_url", "test_bad_url.yaml", false, "Does not match format 'uri'"},
+		{"invalid_ppa_name", "test_bad_ppa_name.yaml", false, "PPAName: Does not match pattern"},
+		{"invalid_ppa_auth", "test_bad_ppa_name.yaml", false, "Auth: Does not match pattern"},
 		{"both_seed_and_tasks", "test_both_seed_and_tasks.yaml", false, "Must validate one and only one schema"},
 		{"git_gadget_without_url", "test_git_gadget_without_url.yaml", false, "When key gadget:type is specified as git, a URL must be provided"},
 		{"file_doesnt_exist", "test_not_exist.yaml", false, "no such file or directory"},
 		{"not_valid_yaml", "test_invalid_yaml.yaml", false, "yaml: unmarshal errors"},
 		{"missing_yaml_fields", "test_missing_name.yaml", false, "Key \"name\" is required in struct \"ImageDefinition\", but is not in the YAML file!"},
+		{"private_ppa_without_fingerprint", "test_private_ppa_without_fingerprint.yaml", false, "Fingerprint is required for private PPAs"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_yaml_schema_"+tc.name, func(t *testing.T) {
@@ -134,7 +137,7 @@ func TestCalculateStates(t *testing.T) {
 		{"extract_rootfs_tar", "test_extract_rootfs_tar.yaml", []string{"extract_rootfs_tar"}},
 		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"germinate"}},
 		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
-		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "configure_extra_ppas", "install_extra_packages", "install_extra_snaps", "perform_manual_customization"}},
+		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "perform_manual_customization"}},
 	}
 	for _, tc := range testCases {
 		t.Run("test_calcluate_states_"+tc.name, func(t *testing.T) {
@@ -233,9 +236,9 @@ func TestPrintStates(t *testing.T) {
 [2] load_gadget_yaml
 [3] germinate
 [4] create_chroot
-[5] populate_rootfs_contents
-[6] customize_cloud_init
-[7] install_extra_packages
+[5] install_packages
+[6] populate_rootfs_contents
+[7] customize_cloud_init
 [8] generate_disk_info
 [9] calculate_rootfs_size
 [10] populate_bootfs_contents
@@ -302,6 +305,8 @@ func TestPrepareGadgetTree(t *testing.T) {
 
 		err := stateMachine.prepareGadgetTree()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -329,6 +334,8 @@ func TestBuildRootfsFromTasks(t *testing.T) {
 
 		err := stateMachine.buildRootfsFromTasks()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -344,6 +351,8 @@ func TestExtractRootfsTar(t *testing.T) {
 
 		err := stateMachine.extractRootfsTar()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -359,6 +368,8 @@ func TestCustomizeCloudInit(t *testing.T) {
 
 		err := stateMachine.customizeCloudInit()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -374,6 +385,8 @@ func TestSetupExtraPPAs(t *testing.T) {
 
 		err := stateMachine.setupExtraPPAs()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -389,6 +402,8 @@ func TestInstallExtraPackages(t *testing.T) {
 
 		err := stateMachine.installExtraPackages()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -404,6 +419,8 @@ func TestManualCustomization(t *testing.T) {
 
 		err := stateMachine.manualCustomization()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -419,6 +436,8 @@ func TestPrepareClassicImage(t *testing.T) {
 
 		err := stateMachine.prepareClassicImage()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -500,6 +519,8 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 
 		err := stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 		// check the files before Teardown
 		/*fileList := []string{filepath.Join("etc", "shadow"),
@@ -679,6 +700,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 		err = stateMachine.generatePackageManifest()
 		asserter.AssertErrNil(err, true)
 
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		// Check if manifest file got generated and if it has expected contents
 		/*manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
 		manifestBytes, err := ioutil.ReadFile(manifestPath)
@@ -865,8 +887,20 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		err = stateMachine.Run()
 		asserter.AssertErrNil(err, true)
 
+		// make sure packages were successfully installed from public and private ppas
+		files := []string{
+			filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-public"),
+			filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-private"),
+		}
+		for _, file := range files {
+			_, err = os.Stat(file)
+			asserter.AssertErrNil(err, true)
+		}
+
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1021,6 +1055,8 @@ func TestGerminate(t *testing.T) {
 						expectedSnap, stateMachine.Snaps)
 				}
 			}
+
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
 }
@@ -1087,6 +1123,8 @@ func TestFailedGerminate(t *testing.T) {
 		err = stateMachine.germinate()
 		asserter.AssertErrContains(err, "Error opening seed file")
 		osOpen = os.Open
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1124,7 +1162,7 @@ func TestBuildGadgetTree(t *testing.T) {
 		// test the git method
 		imageDef = imagedefinition.ImageDefinition{
 			Gadget: &imagedefinition.Gadget{
-				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
+				GadgetURL:    "https://github.com/jawn-smith/pc-amd64-gadget",
 				GadgetType:   "git",
 				GadgetBranch: "20",
 			},
@@ -1134,6 +1172,8 @@ func TestBuildGadgetTree(t *testing.T) {
 
 		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1204,6 +1244,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 
 		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrContains(err, "Error running \"make\" in gadget source")
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1265,6 +1307,7 @@ func TestCreateChroot(t *testing.T) {
 				t.Errorf("%s is not present in /etc/apt/sources.list", pocket)
 			}
 		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -1306,5 +1349,125 @@ func TestFailedCreateChroot(t *testing.T) {
 		err = stateMachine.createChroot()
 		asserter.AssertErrContains(err, "Error running debootstrap command")
 		execCommand = exec.Command
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestFailedInstallPackages tests failure cases in installPackages
+func TestFailedInstallPackages(t *testing.T) {
+	t.Run("test_failed_install_packages", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs:       &imagedefinition.Rootfs{},
+			Customization: &imagedefinition.Customization{
+				ExtraPackages: []*imagedefinition.Package{
+					{
+						PackageName: "test1",
+					},
+				},
+			},
+		}
+
+		// Setup the exec.Command mock
+		testCaseName = "TestFailedInstallPackages"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err := stateMachine.installPackages()
+		asserter.AssertErrContains(err, "Error running command")
+		execCommand = exec.Command
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestFailedAddExtraPPAs tests failure cases in addExtraPPAs
+func TestFailedAddExtraPPAs(t *testing.T) {
+	t.Run("test_failed_add_extra_ppas", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		validPPA := &imagedefinition.PPA{
+			PPAName: "canonical-foundations/ubuntu-image",
+		}
+		invalidPPA := &imagedefinition.PPA{
+			PPAName:     "canonical-foundations/ubuntu-image",
+			Fingerprint: "TEST FINGERPRINT",
+		}
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs:       &imagedefinition.Rootfs{},
+			Customization: &imagedefinition.Customization{
+				ExtraPPAs: []*imagedefinition.PPA{
+					validPPA,
+				},
+			},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// create the /etc/apt/ dir in workdir
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d"), 0755)
+
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Failed to create apt sources.list.d")
+		osMkdir = os.Mkdir
+
+		// mock os.MkdirTemp
+		osMkdirTemp = mockMkdirTemp
+		defer func() {
+			osMkdirTemp = os.MkdirTemp
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error creating temp dir for gpg")
+		osMkdirTemp = os.MkdirTemp
+
+		// mock os.OpenFile
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error creating")
+		osOpenFile = os.OpenFile
+
+		// Use an invalid PPA to trigger a failure in importPPAKeys
+		stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{invalidPPA}
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error retrieving signing key")
+		stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{validPPA}
+
+		// mock os.RemoveAll
+		osRemoveAll = mockRemoveAll
+		defer func() {
+			osRemoveAll = os.RemoveAll
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error removing temporary gpg directory")
+		osRemoveAll = os.RemoveAll
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

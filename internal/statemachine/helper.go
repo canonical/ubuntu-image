@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/partition"
 	"github.com/diskfs/go-diskfs/partition/gpt"
@@ -23,7 +23,6 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
-	"github.com/xeipuuv/gojsonschema"
 )
 
 // validateInput ensures that command line flags for the state machine are valid. These
@@ -643,6 +642,7 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
+		"--include=ca-certificates", // ca-certificates is needed to use PPAs
 	)
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
@@ -658,24 +658,6 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 	}...)
 
 	return debootstrapCmd
-}
-
-func newMissingURLError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingURLError {
-	err := MissingURLError{}
-	err.SetContext(context)
-	err.SetType("missing_url_error")
-	err.SetDescriptionFormat("When key {{.key}} is specified as {{.value}}, a URL must be provided")
-	err.SetValue(value)
-	err.SetDetails(details)
-
-	return &err
-}
-
-// MissingURLError implements gojsonschema.ErrorType. It is used for custom errors for
-// fields that require a url based on the value of other fields
-// based on the values in other fields
-type MissingURLError struct {
-	gojsonschema.ResultErrorFields
 }
 
 // generatePocketList returns a slice of strings that need to be added to
@@ -712,4 +694,134 @@ func generatePocketList(imageDef imagedefinition.ImageDefinition) []string {
 
 	// Schema validation has already confirmed the Pocket is a valid value
 	return pocketMap[strings.ToLower(imageDef.Rootfs.Pocket)]
+}
+
+// generateAptCmd generates the apt command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
+	updateCmd := execCommand("chroot", targetDir, "apt", "update")
+
+	installCmd := execCommand("chroot", targetDir, "apt", "install",
+		"--assume-yes",
+		"--quiet",
+		"--option=Dpkg::options::=--force-unsafe-io",
+		"--option=Dpkg::Options::=--force-confold",
+	)
+
+	for _, aptPackage := range packageList {
+		installCmd.Args = append(installCmd.Args, aptPackage)
+	}
+
+	// Env is sometimes used for mocking command calls in tests,
+	// so only overwrite env if it is nil
+	if installCmd.Env == nil {
+		installCmd.Env = os.Environ()
+	}
+	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+
+	return []*exec.Cmd{updateCmd, installCmd}
+}
+
+// createPPAInfo generates the name for a PPA sources.list file
+// in the convention of add-apt-repository, and the contents
+// that define the sources.list in the DEB822 format
+func createPPAInfo(ppa *imagedefinition.PPA, series string) (fileName string, fileContents string) {
+	splitName := strings.Split(ppa.PPAName, "/")
+	user := splitName[0]
+	ppaName := splitName[1]
+
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.sources", user, ppaName, series)
+
+	var domain string
+	if ppa.Auth == "" {
+		domain = "https://ppa.launchpadcontent.net"
+	} else {
+		domain = fmt.Sprintf("https://%s@private-ppa.launchpadcontent.net", ppa.Auth)
+	}
+
+	fullDomain := fmt.Sprintf("%s/%s/%s/ubuntu", domain, user, ppaName)
+	fileContents = fmt.Sprintf("X-Repolib-Name: %s\nEnabled: yes\nTypes: deb\n"+
+		"URIS: %s\nSuites: %s\nComponents: main",
+		ppa.PPAName, fullDomain, series)
+
+	return fileName, fileContents
+}
+
+// importPPAKeys imports keys for ppas with specified fingerprints.
+// The schema parsing has already validated that either Fingerprint is
+// specified or the PPA is public. If no fingerprint is provided, this
+// function reaches out to the Launchpad API to get the signing key
+func importPPAKeys(ppa *imagedefinition.PPA, tmpGPGDir, keyFilePath string) error {
+	if ppa.Fingerprint == "" {
+		// The YAML schema has already validated that if no fingerprint is
+		// provided, then this is a public PPA. We will get the fingerprint
+		// from the Launchpad API
+		type launchpadAPI struct {
+			SigningKeyFingerprint string `json:"signing_key_fingerprint"`
+			// plus many other fields that aren't needed at the moment
+		}
+		launchpadInstance := launchpadAPI{}
+
+		splitName := strings.Split(ppa.PPAName, "/")
+		launchpadURL := fmt.Sprintf("https://api.launchpad.net/devel/~%s/+archive/ubuntu/%s",
+			splitName[0], splitName[1])
+		resp, err := httpGet(launchpadURL)
+		if err != nil {
+			return fmt.Errorf("Error getting signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+
+		body, err := ioutilReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("Error reading signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+
+		err = jsonUnmarshal(body, &launchpadInstance)
+		if err != nil {
+			return fmt.Errorf("Error unmarshalling launchpad API response: %s", err.Error())
+		}
+
+		ppa.Fingerprint = launchpadInstance.SigningKeyFingerprint
+	}
+	commonGPGArgs := []string{
+		"--no-default-keyring",
+		"--no-options",
+		"--homedir",
+		tmpGPGDir,
+		"--secret-keyring",
+		filepath.Join(tmpGPGDir, "tempring.gpg"),
+		"--keyserver",
+		"hkp://keyserver.ubuntu.com:80",
+	}
+	recvKeyArgs := append(commonGPGArgs, []string{"--recv-keys", ppa.Fingerprint}...)
+	exportKeyArgs := append(commonGPGArgs, []string{"--output", keyFilePath, "--export", ppa.Fingerprint}...)
+	gpgCmds := []*exec.Cmd{
+		execCommand(
+			"gpg",
+			recvKeyArgs...,
+		),
+		execCommand(
+			"gpg",
+			exportKeyArgs...,
+		),
+	}
+
+	for _, gpgCmd := range gpgCmds {
+		gpgOutput, err := gpgCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Error running gpg command \"%s\". Error is \"%s\". Full output below:\n%s",
+				gpgCmd.String(), err.Error(), string(gpgOutput))
+		}
+	}
+
+	return nil
+}
+
+// mountFromHost mounts mountpoints from the host system in the chroot
+// for certain operations that require this
+func mountFromHost(targetDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd) {
+	mountCmd = execCommand("mount", "--bind", mountpoint, filepath.Join(targetDir, mountpoint))
+	umountCmd = execCommand("umount", filepath.Join(targetDir, mountpoint))
+	return mountCmd, umountCmd
 }

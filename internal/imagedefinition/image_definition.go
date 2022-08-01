@@ -4,13 +4,20 @@ image definition that will be parsed from a YAML file.
 */
 package imagedefinition
 
+import (
+	"fmt"
+	"strings"
+
+	"github.com/xeipuuv/gojsonschema"
+)
+
 // ImageDefinition is the parent struct for the data
 // contained within a classic image definition file
 type ImageDefinition struct {
 	ImageName      string         `yaml:"name"            json:"ImageName"`
 	DisplayName    string         `yaml:"display-name"    json:"DisplayName"`
 	Revision       int            `yaml:"revision"        json:"Revision,omitempty"`
-	Architecture   string         `yaml:"architecture"    json:"Architecture" jsonschema:"enum=amd64,enum=arm64,enum=armhf,enum=ppc64el,enum=s390x,enum=riscv64"`
+	Architecture   string         `yaml:"architecture"    json:"Architecture"`
 	Series         string         `yaml:"series"          json:"Series"`
 	Kernel         *Kernel        `yaml:"kernel"          json:"Kernel"`
 	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget"`
@@ -18,7 +25,7 @@ type ImageDefinition struct {
 	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *Customization `yaml:"customization"   json:"Customization"`
 	Artifacts      *Artifact      `yaml:"artifacts"       json:"Artifacts"`
-	Class          string         `yaml:"class"           json:"Class"        jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
+	Class          string         `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
 }
 
 // Kernel defines the kernel section of the image definition file
@@ -95,8 +102,8 @@ type UserData struct {
 
 // PPA contains information about a public or private PPA
 type PPA struct {
-	PPAName     string `yaml:"name"         json:"PPAName"`
-	Auth        string `yaml:"auth"         json:"Auth,omitempty"`
+	PPAName     string `yaml:"name"         json:"PPAName"               jsonschema:"pattern=^[a-zA-Z0-9_.+-]+/[a-zA-Z0-9_.+-]+$"`
+	Auth        string `yaml:"auth"         json:"Auth,omitempty"        jsonschema:"pattern=^[a-zA-Z0-9_.+-]+:[a-zA-Z0-9]+$"`
 	Fingerprint string `yaml:"fingerprint"  json:"Fingerprint,omitempty"`
 	KeepEnabled bool   `yaml:"keep-enabled" json:"KeepEnabled"           default:"true"`
 }
@@ -198,4 +205,75 @@ type Filelist struct {
 // If left emtpy no changelog file will be created
 type Changelog struct {
 	ChangelogPath string `yaml:"path" json:"ChangelogPath"`
+}
+
+func NewMissingURLError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingURLError {
+	err := MissingURLError{}
+	err.SetContext(context)
+	err.SetType("missing_url_error")
+	err.SetDescriptionFormat("When key {{.key}} is specified as {{.value}}, a URL must be provided")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// MissingURLError implements gojsonschema.ErrorType. It is used for custom errors for
+// fields that require a url based on the value of other fields
+// based on the values in other fields
+type MissingURLError struct {
+	gojsonschema.ResultErrorFields
+}
+
+func NewInvalidPPAError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *InvalidPPAError {
+	err := InvalidPPAError{}
+	err.SetContext(context)
+	err.SetType("private_ppa_without_fingerprint")
+	err.SetDescriptionFormat("Fingerprint is required for private PPAs")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// InvalidPPAError implements gojsonschema.ErrorType. It is used for custom errors
+// when a private PPA does not have a fingerprint specified
+type InvalidPPAError struct {
+	gojsonschema.ResultErrorFields
+}
+
+// generatePocketList returns a slice of strings that need to be added to
+// /etc/apt/sources.list in the chroot based on the value of "pocket"
+// in the rootfs section of the image definition
+func (ImageDef ImageDefinition) GeneratePocketList() []string {
+	pocketMap := map[string][]string{
+		"release": []string{},
+		"security": []string{
+			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+		},
+		"updates": []string{
+			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+		},
+		"proposed": []string{
+			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-proposed %s\n",
+				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			),
+		},
+	}
+
+	// Schema validation has already confirmed the Pocket is a valid value
+	return pocketMap[strings.ToLower(ImageDef.Rootfs.Pocket)]
 }

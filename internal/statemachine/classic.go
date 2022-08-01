@@ -1,8 +1,8 @@
 package statemachine
 
 import (
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 // classicStates are the names and function variables to be executed by the state machine for classic images
@@ -15,9 +15,6 @@ var startingClassicStates = []stateFunc{
 var rootfsSeedStates = []stateFunc{
 	{"germinate", (*StateMachine).germinate},
 	{"create_chroot", (*StateMachine).createChroot},
-	/*{"install_packages", (*StateMachine).installPackages},
-	{"add_extra_ppas", (*StateMachine).addExtraPPAs},
-	{"apply_customization", (*StateMachine).applyCustomization},*/
 }
 
 var imageCreationStates = []stateFunc{
