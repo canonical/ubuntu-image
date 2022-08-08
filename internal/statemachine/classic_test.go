@@ -513,7 +513,7 @@ func TestFailedPreseedClassicImage(t *testing.T) {
 		err = stateMachine.preseedClassicImage()
 		asserter.AssertErrContains(err, "Invalid syntax")
 
-		// try to include a non-existant snap to trigger a failure
+		// try to include a nonexistent snap to trigger a failure
 		// in snapStore.SnapInfo
 		stateMachine.Snaps = []string{"test-this-snap-name-should-never-exist"}
 		err = stateMachine.preseedClassicImage()
@@ -1285,7 +1285,7 @@ func TestBuildGadgetTree(t *testing.T) {
 		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrNil(err, true)
 
-		// test the git methdo
+		// test the git method
 		imageDef = ImageDefinition{
 			Gadget: &GadgetType{
 				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
