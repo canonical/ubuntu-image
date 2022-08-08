@@ -342,7 +342,12 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 		ppaIO.Close()
 
 		// Import keys either from the specified fingerprint or via the Launchpad API
+		/* TODO: this is the logic for deb822 sources. When other projects
+		(software-properties, ubuntu-release-upgrader) are ready, update
+		to this logic instead.
 		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
+		*/
+		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
 		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
 			"etc", "apt", "trusted.gpg.d", keyFileName)
 		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)

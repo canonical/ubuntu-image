@@ -1163,7 +1163,7 @@ func TestBuildGadgetTree(t *testing.T) {
 			Gadget: &GadgetType{
 				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
 				GadgetType:   "git",
-				GadgetBranch: "20",
+				GadgetBranch: "classic",
 			},
 		}
 
