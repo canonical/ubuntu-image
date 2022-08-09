@@ -229,9 +229,11 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 		// look for the rootfs and check if the image is seeded
 		for ii, structure := range volume.Structure {
 			if structure.Role == "" && structure.Label == gadget.SystemBoot {
-				fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
-					"used for defining partition roles; use role instead\n",
-					volumeName, ii)
+				if !stateMachine.commonFlags.Quiet {
+					fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
+						"used for defining partition roles; use role instead\n",
+						volumeName, ii)
+				}
 			} else if structure.Role == gadget.SystemData {
 				rootfsSeen = true
 			} else if structure.Role == gadget.SystemSeed {
@@ -370,7 +372,7 @@ func (stateMachine *StateMachine) Run() error {
 		if stateFunc.name == stateMachine.stateMachineFlags.Until {
 			break
 		}
-		if stateMachine.commonFlags.Debug {
+		if !stateMachine.commonFlags.Quiet {
 			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
 		}
 		if err := stateFunc.function(stateMachine); err != nil {
