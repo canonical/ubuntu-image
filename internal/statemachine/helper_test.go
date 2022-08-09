@@ -822,14 +822,17 @@ func TestGenerateGerminateCmd(t *testing.T) {
 // TestValidateInput tests that invalid state machine command line arguments result in a failure
 func TestValidateInput(t *testing.T) {
 	testCases := []struct {
-		name   string
-		until  string
-		thru   string
-		resume bool
-		errMsg string
+		name    string
+		until   string
+		thru    string
+		debug   bool
+		verbose bool
+		resume  bool
+		errMsg  string
 	}{
-		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, "cannot specify both --until and --thru"},
-		{"resume_with_no_workdir", "", "", true, "must specify workdir when using --resume flag"},
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, false, false, "cannot specify both --until and --thru"},
+		{"resume_with_no_workdir", "", "", false, false, true, "must specify workdir when using --resume flag"},
+		{"both_debug_and_verbose", "", "", true, true, false, "--quiet, --verbose, and --debug flags are mutually exclusive"},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
@@ -839,6 +842,8 @@ func TestValidateInput(t *testing.T) {
 			stateMachine.stateMachineFlags.Until = tc.until
 			stateMachine.stateMachineFlags.Thru = tc.thru
 			stateMachine.stateMachineFlags.Resume = tc.resume
+			stateMachine.commonFlags.Debug = tc.debug
+			stateMachine.commonFlags.Verbose = tc.verbose
 
 			err := stateMachine.validateInput()
 			asserter.AssertErrContains(err, tc.errMsg)
@@ -1091,7 +1096,7 @@ func TestImportPPAKeys(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			keyFilePath := filepath.Join(tmpTrustedDir, tc.keyFileName)
-			err = importPPAKeys(tc.ppa, tmpGPGDir, keyFilePath)
+			err = importPPAKeys(tc.ppa, tmpGPGDir, keyFilePath, false)
 			asserter.AssertErrNil(err, true)
 
 			keyData, err := os.ReadFile(keyFilePath)
@@ -1127,7 +1132,7 @@ func TestFailedImportPPAKeys(t *testing.T) {
 			Fingerprint: "testfakefingperint",
 		}
 
-		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 		asserter.AssertErrContains(err, "Error running gpg command")
 
 		// now use a valid PPA and mock some functions
@@ -1140,7 +1145,7 @@ func TestFailedImportPPAKeys(t *testing.T) {
 		defer func() {
 			httpGet = http.Get
 		}()
-		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 		asserter.AssertErrContains(err, "Error getting signing key")
 		httpGet = http.Get
 
@@ -1149,7 +1154,7 @@ func TestFailedImportPPAKeys(t *testing.T) {
 		defer func() {
 			ioutilReadAll = ioutil.ReadAll
 		}()
-		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 		asserter.AssertErrContains(err, "Error reading signing key")
 		ioutilReadAll = ioutil.ReadAll
 
@@ -1158,7 +1163,7 @@ func TestFailedImportPPAKeys(t *testing.T) {
 		defer func() {
 			jsonUnmarshal = json.Unmarshal
 		}()
-		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 		asserter.AssertErrContains(err, "Error unmarshalling launchpad API response")
 		jsonUnmarshal = json.Unmarshal
 	})
