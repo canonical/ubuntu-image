@@ -1163,9 +1163,9 @@ func TestBuildGadgetTree(t *testing.T) {
 		// test the git method
 		imageDef = imagedefinition.ImageDefinition{
 			Gadget: &imagedefinition.Gadget{
-				GadgetURL:    "https://github.com/jawn-smith/pc-amd64-gadget",
+				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
 				GadgetType:   "git",
-				GadgetBranch: "20",
+				GadgetBranch: "classic",
 			},
 		}
 
