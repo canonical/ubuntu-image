@@ -201,7 +201,7 @@ func TestFailedCalculateStates(t *testing.T) {
 	})
 }
 
-// TestPrintStates ensures the states are printed to stdout when the flag is set
+// TestPrintStates ensures the states are printed to stdout when the --debug flag is set
 func TestPrintStates(t *testing.T) {
 	t.Run("test_print_states", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
@@ -211,7 +211,7 @@ func TestPrintStates(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.Opts.PrintStates = true
+		stateMachine.commonFlags.Debug = true
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions", "test_valid.yaml")
 		err := stateMachine.parseImageDefinition()
 		asserter.AssertErrNil(err, true)
@@ -246,7 +246,7 @@ func TestPrintStates(t *testing.T) {
 [13] generate_manifest
 [14] finish
 `
-		if string(readStdout) != expectedStates {
+		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
 				expectedStates, string(readStdout))
 		}
@@ -877,6 +877,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
+		stateMachine.commonFlags.Debug = true
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 			"test_amd64.yaml")
 

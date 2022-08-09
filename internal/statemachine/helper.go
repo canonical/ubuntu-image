@@ -35,6 +35,22 @@ func (stateMachine *StateMachine) validateInput() error {
 		return fmt.Errorf("must specify workdir when using --resume flag")
 	}
 
+	logLevelFlags := []bool{stateMachine.commonFlags.Debug,
+		stateMachine.commonFlags.Verbose,
+		stateMachine.commonFlags.Quiet,
+	}
+
+	logLevels := 0
+	for _, logLevelFlag := range logLevelFlags {
+		if logLevelFlag {
+			logLevels++
+		}
+	}
+
+	if logLevels > 1 {
+		return fmt.Errorf("--quiet, --verbose, and --debug flags are mutually exclusive")
+	}
+
 	return nil
 }
 
@@ -91,7 +107,7 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 
 		for _, hookScript := range hookScripts {
 			hookScriptPath := filepath.Join(hooksDirectoryd, hookScript.Name())
-			if stateMachine.commonFlags.Debug {
+			if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
 				fmt.Printf("Running hook script: %s\n", hookScriptPath)
 			}
 			if err := helper.RunScript(hookScriptPath); err != nil {
@@ -103,7 +119,7 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 		hookScript := filepath.Join(hooksDir, hookName)
 		_, err = os.Stat(hookScript)
 		if err == nil {
-			if stateMachine.commonFlags.Debug {
+			if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
 				fmt.Printf("Running hook script: %s\n", hookScript)
 			}
 			if err := helper.RunScript(hookScript); err != nil {
@@ -198,10 +214,12 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			// system-data and system-seed structures are not required to have
 			// an explicit size set in the yaml file
 			if structure.Size < stateMachine.RootfsSize {
-				fmt.Printf("WARNING: rootfs structure size %s smaller "+
-					"than actual rootfs contents %s\n",
-					structure.Size.IECString(),
-					stateMachine.RootfsSize.IECString())
+				if !stateMachine.commonFlags.Quiet {
+					fmt.Printf("WARNING: rootfs structure size %s smaller "+
+						"than actual rootfs contents %s\n",
+						structure.Size.IECString(),
+						stateMachine.RootfsSize.IECString())
+				}
 				blockSize = stateMachine.RootfsSize
 				structure.Size = stateMachine.RootfsSize
 				volume.Structure[structureNumber] = structure
@@ -714,7 +732,7 @@ func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents s
 // The schema parsing has already validated that either Fingerprint is
 // specified or the PPA is public. If no fingerprint is provided, this
 // function reaches out to the Launchpad API to get the signing key
-func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string) error {
+func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string, debug bool) error {
 	if ppa.Fingerprint == "" {
 		// The YAML schema has already validated that if no fingerprint is
 		// provided, then this is a public PPA. We will get the fingerprint
@@ -771,10 +789,11 @@ func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string) error {
 	}
 
 	for _, gpgCmd := range gpgCmds {
-		gpgOutput, err := gpgCmd.CombinedOutput()
+		gpgOutput := helper.SetCommandOutput(gpgCmd, debug)
+		err := gpgCmd.Run()
 		if err != nil {
 			return fmt.Errorf("Error running gpg command \"%s\". Error is \"%s\". Full output below:\n%s",
-				gpgCmd.String(), err.Error(), string(gpgOutput))
+				gpgCmd.String(), err.Error(), gpgOutput.String())
 		}
 	}
 
