@@ -711,7 +711,12 @@ func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents s
 	user := splitName[0]
 	ppaName := splitName[1]
 
+	/* TODO: this is the logic for deb822 sources. When other projects
+	(software-properties, ubuntu-release-upgrader) are ready, update
+	to this logic instead.
 	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.sources", user, ppaName, series)
+	*/
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.list", user, ppaName, series)
 
 	var domain string
 	if ppa.Auth == "" {
@@ -721,9 +726,13 @@ func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents s
 	}
 
 	fullDomain := fmt.Sprintf("%s/%s/%s/ubuntu", domain, user, ppaName)
+	/* TODO: this is the logic for deb822 sources. When other projects
+	(software-properties, ubuntu-release-upgrader) are ready, update
+	to this logic instead.
 	fileContents = fmt.Sprintf("X-Repolib-Name: %s\nEnabled: yes\nTypes: deb\n"+
 		"URIS: %s\nSuites: %s\nComponents: main",
-		ppa.PPAName, fullDomain, series)
+		ppa.PPAName, fullDomain, series)*/
+	fileContents = fmt.Sprintf("deb %s %s main", fullDomain, series)
 
 	return fileName, fileContents
 }

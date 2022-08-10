@@ -898,6 +898,9 @@ func TestGenerateAptCmds(t *testing.T) {
 }
 
 // TestCreatePPAInfo unit tests the createPPAInfo function
+/* TODO: this is the logic for deb822 sources. When other projects
+(software-properties, ubuntu-release-upgrader) are ready, update
+to this logic instead.
 func TestCreatePPAInfo(t *testing.T) {
 	testCases := []struct {
 		name             string
@@ -935,6 +938,49 @@ URIS: https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubu
 Suites: jammy
 Components: main`,
 		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_create_ppa_info_"+tc.name, func(t *testing.T) {
+			fileName, fileContents := createPPAInfo(tc.ppa, tc.series)
+			if fileName != tc.expectedName {
+				t.Errorf("Expected PPA filename \"%s\" but got \"%s\"",
+					tc.expectedName, fileName)
+			}
+			if fileContents != tc.expectedContents {
+				t.Errorf("Expected PPA file contents \"%s\" but got \"%s\"",
+					tc.expectedContents, fileContents)
+			}
+		})
+	}
+}
+*/
+// TestCreatePPAInfo unit tests the createPPAInfo function
+func TestCreatePPAInfo(t *testing.T) {
+	testCases := []struct {
+		name             string
+		ppa              *PPAType
+		series           string
+		expectedName     string
+		expectedContents string
+	}{
+		{
+			"public_ppa",
+			&PPAType{
+				PPAName: "public/ppa",
+			},
+			"focal",
+			"public-ubuntu-ppa-focal.list",
+			"deb https://ppa.launchpadcontent.net/public/ppa/ubuntu focal main",
+		},
+		{
+			"private_ppa",
+			&PPAType{
+				PPAName: "private/ppa",
+				Auth:    "testuser:testpass",
+			},
+			"jammy",
+			"private-ubuntu-ppa-jammy.list",
+			"deb https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubuntu jammy main"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_create_ppa_info_"+tc.name, func(t *testing.T) {
