@@ -108,7 +108,7 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 // Run hooks specified by --hooks-directory after populating rootfs contents
 func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
 	if stateMachine.IsSeeded {
-		if stateMachine.commonFlags.Debug {
+		if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
 			fmt.Println("Building from a seeded gadget - " +
 				"skipping the post-populate-rootfs hook execution: unsupported")
 		}
