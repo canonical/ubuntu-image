@@ -110,10 +110,6 @@ type StateMachine struct {
 	// image sizes for parsing the --image-size flags
 	ImageSizes  map[string]quantity.Size
 	VolumeOrder []string
-
-	// TODO: this is a temporary way to skip states while we implement
-	// the classic image redesign
-	stateSkip bool
 }
 
 // SetCommonOpts stores the common options for all image types in the struct

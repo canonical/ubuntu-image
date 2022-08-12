@@ -50,11 +50,6 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 
 // Load gadget.yaml, do some validation, and store the relevant info in the StateMachine struct
 func (stateMachine *StateMachine) loadGadgetYaml() error {
-	// TODO: this is a temporary way to skip this state for classic image builds while we
-	// work on the redesign. Remove it.
-	if stateMachine.stateSkip {
-		return nil
-	}
 	gadgetYamlDst := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "gadget.yaml")
 	if err := osutilCopyFile(stateMachine.YamlFilePath,
 		gadgetYamlDst, osutil.CopyFlagOverwrite); err != nil {
@@ -149,11 +144,6 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 // on a 100MiB filesystem, ext4 takes a little over 7MiB for the
 // metadata. Use 8MB as a minimum padding here
 func (stateMachine *StateMachine) calculateRootfsSize() error {
-	// TODO: this is a temporary way to skip this state for classic image builds while we
-	// work on the redesign. Remove it.
-	if stateMachine.stateSkip {
-		return nil
-	}
 	rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
 	if err != nil {
 		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
@@ -186,11 +176,6 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 
 // Populate the Bootfs Contents by using snapd's MountedFilesystemWriter
 func (stateMachine *StateMachine) populateBootfsContents() error {
-	// TODO: this is a temporary way to skip this state for classic image builds while we
-	// work on the redesign. Remove it.
-	if stateMachine.stateSkip {
-		return nil
-	}
 	var preserve []string
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
@@ -253,11 +238,6 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 // partitions that do have filesystem: specified, we use the Mkfs functions from snapd.
 // Throughout this process, the offset is tracked to ensure partitions are not overlapping.
 func (stateMachine *StateMachine) populatePreparePartitions() error {
-	// TODO: this is a temporary way to skip this state for classic image builds while we
-	// work on the redesign. Remove it.
-	if stateMachine.stateSkip {
-		return nil
-	}
 	// iterate through all the volumes
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
@@ -296,11 +276,6 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 
 // Make the disk
 func (stateMachine *StateMachine) makeDisk() error {
-	// TODO: this is a temporary way to skip this state for classic image builds while we
-	// work on the redesign. Remove it.
-	if stateMachine.stateSkip {
-		return nil
-	}
 	// ensure the output dir exists
 	if stateMachine.commonFlags.OutputDir == "" {
 		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd

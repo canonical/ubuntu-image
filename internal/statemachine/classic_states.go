@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -15,6 +16,8 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/osutil"
+	//"github.com/snapcore/snapd/progress"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -260,8 +263,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 
 // Prepare the gadget tree
 func (stateMachine *StateMachine) prepareGadgetTree() error {
-	// currently a no-op pending implementation of the classic image redesign
-	/*var classicStateMachine *ClassicStateMachine
+	var classicStateMachine *ClassicStateMachine
 	  classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 	  gadgetDir := filepath.Join(classicStateMachine.tempDirs.unpack, "gadget")
 	  err := osMkdirAll(gadgetDir, 0755)
@@ -269,20 +271,19 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	          return fmt.Errorf("Error creating unpack directory: %s", err.Error())
 	  }
 	  // recursively copy the gadget tree to unpack/gadget
-	  files, err := ioutilReadDir(classicStateMachine.Args.GadgetTree)
+	  gadgetTree := filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+	  files, err := ioutilReadDir(gadgetTree)
 	  if err != nil {
 	          return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 	  }
 	  for _, gadgetFile := range files {
-	          srcFile := filepath.Join(classicStateMachine.Args.GadgetTree, gadgetFile.Name())
+	          srcFile := filepath.Join(gadgetTree, gadgetFile.Name())
 	          if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
 	                  return fmt.Errorf("Error copying gadget tree: %s", err.Error())
 	          }
 	  }
 
-	  // We assume the gadget tree was built from a gadget source tree using
-	  // snapcraft prime so the gadget.yaml file is expected in the meta directory
-	  classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "meta", "gadget.yaml")*/
+	  classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "gadget.yaml")
 
 	return nil
 }
@@ -549,6 +550,21 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	imageOpts.Customizations = *new(image.Customizations)
 	imageOpts.Customizations.Validation = stateMachine.commonFlags.Validation
 
+	// image.Prepare automatically has some output that we only want for
+	// verbose or greater logging
+	if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
+		oldImageStdout := image.Stdout
+		image.Stdout = ioutil.Discard
+		defer func() {
+			image.Stdout = oldImageStdout
+		}()
+		/*oldProgressStdout := progress.Stdout
+		progress.Stdout = ioutil.Discard
+		defer func() {
+			progress.Stdout = oldProgressStdout
+		}()*/
+	}
+
 	if err := imagePrepare(&imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
@@ -558,68 +574,62 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 // populateClassicRootfsContents copies over the staged rootfs
 // to rootfs. It also changes fstab and handles the --cloud-init flag
 func (stateMachine *StateMachine) populateClassicRootfsContents() error {
-	/*	var classicStateMachine *ClassicStateMachine
-		classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-		var src string
-		if classicStateMachine.Opts.Filesystem != "" {
-			src = classicStateMachine.Opts.Filesystem
-		} else {
-			src = filepath.Join(classicStateMachine.tempDirs.unpack, "chroot")
+	src := stateMachine.tempDirs.chroot
+
+	files, err := ioutilReadDir(src)
+	if err != nil {
+		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
+	}
+
+	for _, srcFile := range files {
+		srcFile := filepath.Join(src, srcFile.Name())
+		if err := osutilCopySpecialFile(srcFile, classicStateMachine.tempDirs.rootfs); err != nil {
+			return fmt.Errorf("Error copying rootfs: %s", err.Error())
 		}
+	}
 
-		files, err := ioutilReadDir(src)
+	fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
+	fstabBytes, err := ioutilReadFile(fstabPath)
+	if err == nil {
+		if !strings.Contains(string(fstabBytes), "LABEL=writable") {
+			re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
+			newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
+			if !strings.Contains(string(newContents), "LABEL=writable") {
+				newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
+			}
+			err := ioutilWriteFile(fstabPath, newContents, 0644)
+			if err != nil {
+				return fmt.Errorf("Error writing to fstab: %s", err.Error())
+			}
+		}
+	}
+
+	if classicStateMachine.commonFlags.CloudInit != "" {
+		seedDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
+		cloudDir := filepath.Join(seedDir, "nocloud-net")
+		err := osMkdirAll(cloudDir, 0756)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
+		}
+		metadataFile := filepath.Join(cloudDir, "meta-data")
+		metadataIO, err := osOpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
+			return fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
 		}
+		metadataIO.Write([]byte("instance-id: nocloud-static"))
+		metadataIO.Close()
 
-		for _, srcFile := range files {
-			srcFile := filepath.Join(src, srcFile.Name())
-			if err := osutilCopySpecialFile(srcFile, classicStateMachine.tempDirs.rootfs); err != nil {
-				return fmt.Errorf("Error copying rootfs: %s", err.Error())
-			}
+		userdataFile := filepath.Join(cloudDir, "user-data")
+		err = osutilCopyFile(classicStateMachine.commonFlags.CloudInit,
+			userdataFile, osutil.CopyFlagDefault)
+		if err != nil {
+			return fmt.Errorf("Error copying cloud-init: %s", err.Error())
 		}
+	}
 
-		fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
-		fstabBytes, err := ioutilReadFile(fstabPath)
-		if err == nil {
-			if !strings.Contains(string(fstabBytes), "LABEL=writable") {
-				re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
-				newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
-				if !strings.Contains(string(newContents), "LABEL=writable") {
-					newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
-				}
-				err := ioutilWriteFile(fstabPath, newContents, 0644)
-				if err != nil {
-					return fmt.Errorf("Error writing to fstab: %s", err.Error())
-				}
-			}
-		}
-
-		if classicStateMachine.commonFlags.CloudInit != "" {
-			seedDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
-			cloudDir := filepath.Join(seedDir, "nocloud-net")
-			err := osMkdirAll(cloudDir, 0756)
-			if err != nil && !os.IsExist(err) {
-				return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
-			}
-			metadataFile := filepath.Join(cloudDir, "meta-data")
-			metadataIO, err := osOpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
-			if err != nil {
-				return fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
-			}
-			metadataIO.Write([]byte("instance-id: nocloud-static"))
-			metadataIO.Close()
-
-			userdataFile := filepath.Join(cloudDir, "user-data")
-			err = osutilCopyFile(classicStateMachine.commonFlags.CloudInit,
-				userdataFile, osutil.CopyFlagDefault)
-			if err != nil {
-				return fmt.Errorf("Error copying cloud-init: %s", err.Error())
-			}
-		}*/
-
-	// currently a no-op pending implementation of the classic image redesign
 	return nil
 }
 
