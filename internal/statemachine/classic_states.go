@@ -195,12 +195,13 @@ func (stateMachine *StateMachine) calculateStates() error {
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	stateMachine.states = append(stateMachine.states, rootfsCreationStates...)
 
-	// if the --print-states option was passed, print the calculated states
-	if classicStateMachine.Opts.PrintStates {
-		fmt.Println("The calculated states are as follows:")
+	// if the --debug option was passed, print the calculated states
+	if stateMachine.commonFlags.Debug {
+		fmt.Println("\nThe calculated states are as follows:")
 		for i, state := range stateMachine.states {
 			fmt.Printf("[%d] %s\n", i, state.name)
 		}
+		fmt.Println("\n\nContinuing")
 	}
 
 	if err := stateMachine.validateUntilThru(); err != nil {
@@ -251,11 +252,12 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	makeCmd := execCommand("make")
 	makeCmd.Dir = sourceDir
 
-	makeOutput, err := makeCmd.CombinedOutput()
-	if err != nil {
+	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.Debug)
+
+	if err := makeCmd.Run(); err != nil {
 		return fmt.Errorf("Error running \"make\" in gadget source. "+
 			"Error is \"%s\". Full output below:\n%s",
-			err.Error(), makeOutput)
+			err.Error(), makeOutput.String())
 	}
 
 	return nil
@@ -303,10 +305,11 @@ func (stateMachine *StateMachine) createChroot() error {
 		classicStateMachine.Packages,
 	)
 
-	debootstrapOutput, err := debootstrapCmd.CombinedOutput()
-	if err != nil {
+	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, classicStateMachine.commonFlags.Debug)
+
+	if err := debootstrapCmd.Run(); err != nil {
 		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
-			debootstrapCmd.String(), err.Error(), string(debootstrapOutput))
+			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
 	}
 
 	// add any extra apt sources to /etc/apt/sources.list
@@ -352,10 +355,15 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 		ppaIO.Close()
 
 		// Import keys either from the specified fingerprint or via the Launchpad API
+		/* TODO: this is the logic for deb822 sources. When other projects
+		(software-properties, ubuntu-release-upgrader) are ready, update
+		to this logic instead.
 		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
+		*/
+		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
 		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
 			"etc", "apt", "trusted.gpg.d", keyFileName)
-		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath)
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, stateMachine.commonFlags.Debug)
 		if err != nil {
 			return fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
 				ppa.PPAName, err.Error())
@@ -406,10 +414,11 @@ func (stateMachine *StateMachine) installPackages() error {
 	installPackagesCmds = append(installPackagesCmds, umounts...) // don't forget to unmount!
 
 	for _, cmd := range installPackagesCmds {
-		cmdOutput, err := cmd.CombinedOutput()
+		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
+		err := cmd.Run()
 		if err != nil {
 			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-				cmd.String(), err.Error(), string(cmdOutput))
+				cmd.String(), err.Error(), cmdOutput.String())
 		}
 	}
 
@@ -444,9 +453,11 @@ func (stateMachine *StateMachine) germinate() error {
 	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
 	germinateCmd.Dir = germinateDir
 
-	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
+	germinateOutput := helper.SetCommandOutput(germinateCmd, classicStateMachine.commonFlags.Debug)
+
+	if err := germinateCmd.Run(); err != nil {
 		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
-			germinateCmd.String(), err.Error(), string(germinateOutput))
+			germinateCmd.String(), err.Error(), germinateOutput.String())
 	}
 
 	packageMap := make(map[string]*[]string)
