@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"
 
@@ -60,7 +62,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return fmt.Errorf("Schema validation returned an error: %s", err.Error())
 	}
 
-	// do some custom validation
+	// do custom validation for gadgetURL being required if gadget is not pre-built
 	if imageDefinition.Gadget.GadgetType != "prebuilt" && imageDefinition.Gadget.GadgetURL == "" {
 		jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
 		errDetail := gojsonschema.ErrorDetails{
@@ -75,6 +77,26 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 			),
 			errDetail,
 		)
+	}
+	// do custom validation for private PPAs requiring fingerprint
+	if imageDefinition.Customization != nil {
+		for _, ppa := range imageDefinition.Customization.ExtraPPAs {
+			if ppa.Auth != "" && ppa.Fingerprint == "" {
+				jsonContext := gojsonschema.NewJsonContext("ppa_validation", nil)
+				errDetail := gojsonschema.ErrorDetails{
+					"ppaName": ppa.PPAName,
+				}
+				result.AddError(
+					newInvalidPPAError(
+						gojsonschema.NewJsonContext("missingPrivatePPAFingerprint",
+							jsonContext),
+						52,
+						errDetail,
+					),
+					errDetail,
+				)
+			}
+		}
 	}
 
 	// TODO: I've created a PR upstream in xeipuuv/gojsonschema
@@ -129,6 +151,12 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
+		if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+		}
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"install_packages", (*StateMachine).installPackages})
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
@@ -144,18 +172,6 @@ func (stateMachine *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
 	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"configure_extra_ppas", (*StateMachine).setupExtraPPAs})
-	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraPackages) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"install_extra_packages", (*StateMachine).installExtraPackages})
-	}
-	if len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"install_extra_snaps", (*StateMachine).prepareClassicImage})
-	}
 	if classicStateMachine.ImageDef.Customization.Manual != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
@@ -168,12 +184,13 @@ func (stateMachine *StateMachine) calculateStates() error {
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	stateMachine.states = append(stateMachine.states, rootfsCreationStates...)
 
-	// if the --print-states option was passed, print the calculated states
-	if classicStateMachine.Opts.PrintStates {
-		fmt.Println("The calculated states are as follows:")
+	// if the --debug option was passed, print the calculated states
+	if stateMachine.commonFlags.Debug {
+		fmt.Println("\nThe calculated states are as follows:")
 		for i, state := range stateMachine.states {
 			fmt.Printf("[%d] %s\n", i, state.name)
 		}
+		fmt.Println("\n\nContinuing")
 	}
 
 	if err := stateMachine.validateUntilThru(); err != nil {
@@ -224,11 +241,12 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	makeCmd := execCommand("make")
 	makeCmd.Dir = sourceDir
 
-	makeOutput, err := makeCmd.CombinedOutput()
-	if err != nil {
+	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.Debug)
+
+	if err := makeCmd.Run(); err != nil {
 		return fmt.Errorf("Error running \"make\" in gadget source. "+
 			"Error is \"%s\". Full output below:\n%s",
-			err.Error(), makeOutput)
+			err.Error(), makeOutput.String())
 	}
 
 	return nil
@@ -278,10 +296,121 @@ func (stateMachine *StateMachine) createChroot() error {
 		classicStateMachine.Packages,
 	)
 
-	debootstrapOutput, err := debootstrapCmd.CombinedOutput()
-	if err != nil {
+	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, classicStateMachine.commonFlags.Debug)
+
+	if err := debootstrapCmd.Run(); err != nil {
 		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
-			debootstrapCmd.String(), err.Error(), string(debootstrapOutput))
+			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
+	}
+
+	// add any extra apt sources to /etc/apt/sources.list
+	aptSources := classicStateMachine.ImageDef.generatePocketList()
+
+	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+	sourcesListFile, _ := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
+	for _, aptSource := range aptSources {
+		sourcesListFile.WriteString(aptSource)
+	}
+
+	return nil
+}
+
+// add PPAs to the apt sources list
+func (stateMachine *StateMachine) addExtraPPAs() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// create /etc/apt/sources.list.d in the chroot if it doesn't already exist
+	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
+	err := osMkdir(sourcesListD, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
+	}
+
+	// now create the ppa sources.list files
+	tmpGPGDir, err := osMkdirTemp("/tmp", "ubuntu-image-gpg")
+	if err != nil {
+		return fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
+	}
+	defer osRemoveAll(tmpGPGDir)
+	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		ppaFileName, ppaFileContents := createPPAInfo(ppa,
+			classicStateMachine.ImageDef.Series)
+
+		ppaFile := filepath.Join(sourcesListD, ppaFileName)
+		ppaIO, err := osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
+		}
+		ppaIO.Write([]byte(ppaFileContents))
+		ppaIO.Close()
+
+		// Import keys either from the specified fingerprint or via the Launchpad API
+		/* TODO: this is the logic for deb822 sources. When other projects
+		(software-properties, ubuntu-release-upgrader) are ready, update
+		to this logic instead.
+		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
+		*/
+		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
+		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
+			"etc", "apt", "trusted.gpg.d", keyFileName)
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, stateMachine.commonFlags.Debug)
+		if err != nil {
+			return fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+	}
+	if err := osRemoveAll(tmpGPGDir); err != nil {
+		return fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
+	}
+
+	return nil
+}
+
+// Install packages in the chroot environment. This is accomplished by
+// running commands to do the following:
+// 1. Mount /proc /sys and /dev in the chroot
+// 2. Run `apt update` in the chroot
+// 3. Run `apt install <package list>` in the chroot
+// 4. Unmount /proc /sys and /dev
+func (stateMachine *StateMachine) installPackages() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// if any extra packages are specified, install them alongside the seeded packages
+	if classicStateMachine.ImageDef.Customization != nil {
+		for _, packageInfo := range classicStateMachine.ImageDef.Customization.ExtraPackages {
+			classicStateMachine.Packages = append(classicStateMachine.Packages,
+				packageInfo.PackageName)
+		}
+	}
+
+	// Slice used to store all the commands that need to be run
+	// to install the packages
+	var installPackagesCmds []*exec.Cmd
+
+	// mount some necessary partitions from the host in the chroot
+	mounts := []string{"/dev", "/proc", "/sys"}
+	var umounts []*exec.Cmd
+	for _, mount := range mounts {
+		mountCmd, umountCmd := mountFromHost(stateMachine.tempDirs.chroot, mount)
+		defer umountCmd.Run()
+		installPackagesCmds = append(installPackagesCmds, mountCmd)
+		umounts = append(umounts, umountCmd)
+	}
+
+	// generate the apt update/install commands and append them to the slice of commands
+	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+	installPackagesCmds = append(installPackagesCmds, aptCmds...)
+	installPackagesCmds = append(installPackagesCmds, umounts...) // don't forget to unmount!
+
+	for _, cmd := range installPackagesCmds {
+		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
+		err := cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+				cmd.String(), err.Error(), cmdOutput.String())
+		}
 	}
 
 	return nil
@@ -315,9 +444,11 @@ func (stateMachine *StateMachine) germinate() error {
 	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
 	germinateCmd.Dir = germinateDir
 
-	if germinateOutput, err := germinateCmd.CombinedOutput(); err != nil {
+	germinateOutput := helper.SetCommandOutput(germinateCmd, classicStateMachine.commonFlags.Debug)
+
+	if err := germinateCmd.Run(); err != nil {
 		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
-			germinateCmd.String(), err.Error(), string(germinateOutput))
+			germinateCmd.String(), err.Error(), germinateOutput.String())
 	}
 
 	packageMap := make(map[string]*[]string)

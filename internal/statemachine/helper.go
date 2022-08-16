@@ -36,6 +36,22 @@ func (stateMachine *StateMachine) validateInput() error {
 		return fmt.Errorf("must specify workdir when using --resume flag")
 	}
 
+	logLevelFlags := []bool{stateMachine.commonFlags.Debug,
+		stateMachine.commonFlags.Verbose,
+		stateMachine.commonFlags.Quiet,
+	}
+
+	logLevels := 0
+	for _, logLevelFlag := range logLevelFlags {
+		if logLevelFlag {
+			logLevels++
+		}
+	}
+
+	if logLevels > 1 {
+		return fmt.Errorf("--quiet, --verbose, and --debug flags are mutually exclusive")
+	}
+
 	return nil
 }
 
@@ -92,7 +108,7 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 
 		for _, hookScript := range hookScripts {
 			hookScriptPath := filepath.Join(hooksDirectoryd, hookScript.Name())
-			if stateMachine.commonFlags.Debug {
+			if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
 				fmt.Printf("Running hook script: %s\n", hookScriptPath)
 			}
 			if err := helper.RunScript(hookScriptPath); err != nil {
@@ -104,7 +120,7 @@ func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) erro
 		hookScript := filepath.Join(hooksDir, hookName)
 		_, err = os.Stat(hookScript)
 		if err == nil {
-			if stateMachine.commonFlags.Debug {
+			if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
 				fmt.Printf("Running hook script: %s\n", hookScript)
 			}
 			if err := helper.RunScript(hookScript); err != nil {
@@ -199,10 +215,12 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			// system-data and system-seed structures are not required to have
 			// an explicit size set in the yaml file
 			if structure.Size < stateMachine.RootfsSize {
-				fmt.Printf("WARNING: rootfs structure size %s smaller "+
-					"than actual rootfs contents %s\n",
-					structure.Size.IECString(),
-					stateMachine.RootfsSize.IECString())
+				if !stateMachine.commonFlags.Quiet {
+					fmt.Printf("WARNING: rootfs structure size %s smaller "+
+						"than actual rootfs contents %s\n",
+						structure.Size.IECString(),
+						stateMachine.RootfsSize.IECString())
+				}
 				blockSize = stateMachine.RootfsSize
 				structure.Size = stateMachine.RootfsSize
 				volume.Structure[structureNumber] = structure
@@ -642,6 +660,7 @@ func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, i
 	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
+		"--include=ca-certificates", // ca-certificates is needed to use PPAs
 	)
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
@@ -738,4 +757,144 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string) error {
 		}
 	}
 	return nil
+}
+
+// generateAptCmd generates the apt command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
+	updateCmd := execCommand("chroot", targetDir, "apt", "update")
+
+	installCmd := execCommand("chroot", targetDir, "apt", "install",
+		"--assume-yes",
+		"--quiet",
+		"--option=Dpkg::options::=--force-unsafe-io",
+		"--option=Dpkg::Options::=--force-confold",
+	)
+
+	for _, aptPackage := range packageList {
+		installCmd.Args = append(installCmd.Args, aptPackage)
+	}
+
+	// Env is sometimes used for mocking command calls in tests,
+	// so only overwrite env if it is nil
+	if installCmd.Env == nil {
+		installCmd.Env = os.Environ()
+	}
+	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+
+	return []*exec.Cmd{updateCmd, installCmd}
+}
+
+// createPPAInfo generates the name for a PPA sources.list file
+// in the convention of add-apt-repository, and the contents
+// that define the sources.list in the DEB822 format
+func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents string) {
+	splitName := strings.Split(ppa.PPAName, "/")
+	user := splitName[0]
+	ppaName := splitName[1]
+
+	/* TODO: this is the logic for deb822 sources. When other projects
+	(software-properties, ubuntu-release-upgrader) are ready, update
+	to this logic instead.
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.sources", user, ppaName, series)
+	*/
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.list", user, ppaName, series)
+
+	var domain string
+	if ppa.Auth == "" {
+		domain = "https://ppa.launchpadcontent.net"
+	} else {
+		domain = fmt.Sprintf("https://%s@private-ppa.launchpadcontent.net", ppa.Auth)
+	}
+
+	fullDomain := fmt.Sprintf("%s/%s/%s/ubuntu", domain, user, ppaName)
+	/* TODO: this is the logic for deb822 sources. When other projects
+	(software-properties, ubuntu-release-upgrader) are ready, update
+	to this logic instead.
+	fileContents = fmt.Sprintf("X-Repolib-Name: %s\nEnabled: yes\nTypes: deb\n"+
+		"URIS: %s\nSuites: %s\nComponents: main",
+		ppa.PPAName, fullDomain, series)*/
+	fileContents = fmt.Sprintf("deb %s %s main", fullDomain, series)
+
+	return fileName, fileContents
+}
+
+// importPPAKeys imports keys for ppas with specified fingerprints.
+// The schema parsing has already validated that either Fingerprint is
+// specified or the PPA is public. If no fingerprint is provided, this
+// function reaches out to the Launchpad API to get the signing key
+func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string, debug bool) error {
+	if ppa.Fingerprint == "" {
+		// The YAML schema has already validated that if no fingerprint is
+		// provided, then this is a public PPA. We will get the fingerprint
+		// from the Launchpad API
+		type launchpadAPI struct {
+			SigningKeyFingerprint string `json:"signing_key_fingerprint"`
+			// plus many other fields that aren't needed at the moment
+		}
+		launchpadInstance := launchpadAPI{}
+
+		splitName := strings.Split(ppa.PPAName, "/")
+		launchpadURL := fmt.Sprintf("https://api.launchpad.net/devel/~%s/+archive/ubuntu/%s",
+			splitName[0], splitName[1])
+		resp, err := httpGet(launchpadURL)
+		if err != nil {
+			return fmt.Errorf("Error getting signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+
+		body, err := ioutilReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("Error reading signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+
+		err = jsonUnmarshal(body, &launchpadInstance)
+		if err != nil {
+			return fmt.Errorf("Error unmarshalling launchpad API response: %s", err.Error())
+		}
+
+		ppa.Fingerprint = launchpadInstance.SigningKeyFingerprint
+	}
+	commonGPGArgs := []string{
+		"--no-default-keyring",
+		"--no-options",
+		"--homedir",
+		tmpGPGDir,
+		"--secret-keyring",
+		filepath.Join(tmpGPGDir, "tempring.gpg"),
+		"--keyserver",
+		"hkp://keyserver.ubuntu.com:80",
+	}
+	recvKeyArgs := append(commonGPGArgs, []string{"--recv-keys", ppa.Fingerprint}...)
+	exportKeyArgs := append(commonGPGArgs, []string{"--output", keyFilePath, "--export", ppa.Fingerprint}...)
+	gpgCmds := []*exec.Cmd{
+		execCommand(
+			"gpg",
+			recvKeyArgs...,
+		),
+		execCommand(
+			"gpg",
+			exportKeyArgs...,
+		),
+	}
+
+	for _, gpgCmd := range gpgCmds {
+		gpgOutput := helper.SetCommandOutput(gpgCmd, debug)
+		err := gpgCmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running gpg command \"%s\". Error is \"%s\". Full output below:\n%s",
+				gpgCmd.String(), err.Error(), gpgOutput.String())
+		}
+	}
+
+	return nil
+}
+
+// mountFromHost mounts mountpoints from the host system in the chroot
+// for certain operations that require this
+func mountFromHost(targetDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd) {
+	mountCmd = execCommand("mount", "--bind", mountpoint, filepath.Join(targetDir, mountpoint))
+	umountCmd = execCommand("umount", filepath.Join(targetDir, mountpoint))
+	return mountCmd, umountCmd
 }
