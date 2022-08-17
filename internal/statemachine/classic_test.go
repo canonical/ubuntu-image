@@ -417,41 +417,41 @@ func TestManualCustomization(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
-		stateMachine.ImageDef = ImageDefinition {
+		stateMachine.ImageDef = ImageDefinition{
 			Architecture: getHostArch(),
-			Series: getHostSuite(),
-			Rootfs: &RootfsType {
+			Series:       getHostSuite(),
+			Rootfs: &RootfsType{
 				Archive: "ubuntu",
 			},
-			Customization: &CustomizationType {
-				Manual: &ManualType {
-					CopyFile: []*CopyFileType {
+			Customization: &CustomizationType{
+				Manual: &ManualType{
+					CopyFile: []*CopyFileType{
 						{
 							Source: filepath.Join("testdata", "test_script"),
-							Dest: "/test_copy_file",
+							Dest:   "/test_copy_file",
 						},
 					},
-					TouchFile: []*TouchFileType {
+					TouchFile: []*TouchFileType{
 						{
 							TouchPath: "/test_touch_file",
 						},
 					},
-					Execute: []*ExecuteType {
+					Execute: []*ExecuteType{
 						{
 							// the file we already copied creates a file /test_execute
 							ExecutePath: "/test_copy_file",
 						},
 					},
-					AddUser: []*AddUserType {
+					AddUser: []*AddUserType{
 						{
 							UserName: "testuser",
-							UserID: "123456",
+							UserID:   "123456",
 						},
 					},
-					AddGroup: []*AddGroupType {
+					AddGroup: []*AddGroupType{
 						{
 							GroupName: "testgroup",
-							GroupID: "456789",
+							GroupID:   "456789",
 						},
 					},
 				},
@@ -509,10 +509,10 @@ func TestFailedManualCustomization(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
-		stateMachine.ImageDef = ImageDefinition {
-			Customization: &CustomizationType {
-				Manual: &ManualType {
-					TouchFile: []*TouchFileType {
+		stateMachine.ImageDef = ImageDefinition{
+			Customization: &CustomizationType{
+				Manual: &ManualType{
+					TouchFile: []*TouchFileType{
 						{
 							TouchPath: filepath.Join("this", "path", "does", "not", "exist"),
 						},

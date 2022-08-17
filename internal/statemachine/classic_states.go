@@ -504,29 +504,29 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
 	type customizationHandler struct {
-		inputData interface{}
+		inputData   interface{}
 		handlerFunc func(interface{}, string, bool) error
 	}
-	customizationHandlers := []customizationHandler {
+	customizationHandlers := []customizationHandler{
 		{
 
-			inputData: classicStateMachine.ImageDef.Customization.Manual.CopyFile,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.CopyFile,
 			handlerFunc: manualCopyFile,
 		},
 		{
-			inputData: classicStateMachine.ImageDef.Customization.Manual.Execute,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.Execute,
 			handlerFunc: manualExecute,
 		},
 		{
-			inputData: classicStateMachine.ImageDef.Customization.Manual.TouchFile,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.TouchFile,
 			handlerFunc: manualTouchFile,
 		},
 		{
-			inputData: classicStateMachine.ImageDef.Customization.Manual.AddGroup,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.AddGroup,
 			handlerFunc: manualAddGroup,
 		},
 		{
-			inputData: classicStateMachine.ImageDef.Customization.Manual.AddUser,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.AddUser,
 			handlerFunc: manualAddUser,
 		},
 	}

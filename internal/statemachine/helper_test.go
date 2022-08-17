@@ -880,10 +880,10 @@ func TestValidateUntilThru(t *testing.T) {
 func TestFailedManualCopyFile(t *testing.T) {
 	t.Run("test_failed_manual_copy_file", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		
-		copyFiles := []*CopyFileType {
+
+		copyFiles := []*CopyFileType{
 			{
-				Dest: "/test/does/not/exist",
+				Dest:   "/test/does/not/exist",
 				Source: "/test/does/not/exist",
 			},
 		}
@@ -896,8 +896,8 @@ func TestFailedManualCopyFile(t *testing.T) {
 func TestFailedManualTouchFile(t *testing.T) {
 	t.Run("test_failed_manual_touch_file", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		
-		touchFiles := []*TouchFileType {
+
+		touchFiles := []*TouchFileType{
 			{
 				TouchPath: "/test/does/not/exist",
 			},
@@ -911,8 +911,8 @@ func TestFailedManualTouchFile(t *testing.T) {
 func TestFailedManualExecute(t *testing.T) {
 	t.Run("test_failed_manual_execute", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		
-		executes := []*ExecuteType {
+
+		executes := []*ExecuteType{
 			{
 				ExecutePath: "/test/does/not/exist",
 			},
@@ -926,11 +926,11 @@ func TestFailedManualExecute(t *testing.T) {
 func TestFailedManualAddGroup(t *testing.T) {
 	t.Run("test_failed_manual_add_group", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		
-		addGroups := []*AddGroupType {
+
+		addGroups := []*AddGroupType{
 			{
 				GroupName: "testgroup",
-				GroupID: "123",
+				GroupID:   "123",
 			},
 		}
 		err := manualAddGroup(addGroups, "fakedir", true)
@@ -942,11 +942,11 @@ func TestFailedManualAddGroup(t *testing.T) {
 func TestFailedManualAddUser(t *testing.T) {
 	t.Run("test_failed_manual_add_user", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		
-		addUsers := []*AddUserType {
+
+		addUsers := []*AddUserType{
 			{
 				UserName: "testuser",
-				UserID: "123",
+				UserID:   "123",
 			},
 		}
 		err := manualAddUser(addUsers, "fakedir", true)
