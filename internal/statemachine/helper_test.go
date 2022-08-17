@@ -887,7 +887,7 @@ func TestFailedManualCopyFile(t *testing.T) {
 				Source: "/test/does/not/exist",
 			},
 		}
-		err := manualCopyFile(copyFiles, "fakedir")
+		err := manualCopyFile(copyFiles, "fakedir", true)
 		asserter.AssertErrContains(err, "Error copying file")
 	})
 }
@@ -902,7 +902,7 @@ func TestFailedManualTouchFile(t *testing.T) {
 				TouchPath: "/test/does/not/exist",
 			},
 		}
-		err := manualTouchFile(touchFiles, "fakedir")
+		err := manualTouchFile(touchFiles, "fakedir", true)
 		asserter.AssertErrContains(err, "Error creating file")
 	})
 }
@@ -917,7 +917,7 @@ func TestFailedManualExecute(t *testing.T) {
 				ExecutePath: "/test/does/not/exist",
 			},
 		}
-		err := manualExecute(executes, "fakedir")
+		err := manualExecute(executes, "fakedir", true)
 		asserter.AssertErrContains(err, "Error running script")
 	})
 }
@@ -933,7 +933,7 @@ func TestFailedManualAddGroup(t *testing.T) {
 				GroupID: "123",
 			},
 		}
-		err := manualAddGroup(addGroups, "fakedir")
+		err := manualAddGroup(addGroups, "fakedir", true)
 		asserter.AssertErrContains(err, "Error adding group")
 	})
 }
@@ -949,7 +949,7 @@ func TestFailedManualAddUser(t *testing.T) {
 				UserID: "123",
 			},
 		}
-		err := manualAddUser(addUsers, "fakedir")
+		err := manualAddUser(addUsers, "fakedir", true)
 		asserter.AssertErrContains(err, "Error adding user")
 	})
 }

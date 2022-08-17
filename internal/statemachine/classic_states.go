@@ -505,9 +505,8 @@ func (stateMachine *StateMachine) manualCustomization() error {
 
 	type customizationHandler struct {
 		inputData interface{}
-		handlerFunc func(interface{}, string) error
+		handlerFunc func(interface{}, string, bool) error
 	}
-	//customizationHandlers := map[interface{}](func(interface{}, string) error){
 	customizationHandlers := []customizationHandler {
 		{
 
@@ -533,7 +532,7 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	}
 
 	for _, customization := range customizationHandlers {
-		err := customization.handlerFunc(customization.inputData, stateMachine.tempDirs.chroot)
+		err := customization.handlerFunc(customization.inputData, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 		if err != nil {
 			return err
 		}
