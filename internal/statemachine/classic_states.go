@@ -16,7 +16,6 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
-	"github.com/snapcore/snapd/progress"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -569,11 +568,6 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 		image.Stdout = ioutil.Discard
 		defer func() {
 			image.Stdout = oldImageStdout
-		}()
-		oldProgressStdout := progress.Stdout
-		progress.Stdout = ioutil.Discard
-		defer func() {
-			progress.Stdout = oldProgressStdout
 		}()
 	}
 
