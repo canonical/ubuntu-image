@@ -516,7 +516,6 @@ func (stateMachine *StateMachine) manualCustomization() error {
 		inputData interface{}
 		handlerFunc func(interface{}, string) error
 	}
-	//customizationHandlers := map[interface{}](func(interface{}, string) error){
 	customizationHandlers := []customizationHandler {
 		{
 

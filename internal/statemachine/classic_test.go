@@ -18,7 +18,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
-	//"github.com/snapcore/snapd/osutil"
+	"github.com/snapcore/snapd/osutil"
 	//"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -239,17 +239,18 @@ func TestPrintStates(t *testing.T) {
 [2] load_gadget_yaml
 [3] germinate
 [4] create_chroot
-[5] install_packages
-[6] preseed_image
-[7] populate_rootfs_contents
-[8] customize_cloud_init
-[9] generate_disk_info
-[10] calculate_rootfs_size
-[11] populate_bootfs_contents
-[12] populate_prepare_partitions
-[13] make_disk
-[14] generate_manifest
-[15] finish
+[5] add_extra_ppas
+[6] install_packages
+[7] preseed_image
+[8] populate_rootfs_contents
+[9] customize_cloud_init
+[10] generate_disk_info
+[11] calculate_rootfs_size
+[12] populate_bootfs_contents
+[13] populate_prepare_partitions
+[14] make_disk
+[15] generate_manifest
+[16] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -306,10 +307,28 @@ func TestPrepareGadgetTree(t *testing.T) {
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
 
-		err := stateMachine.prepareGadgetTree()
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
+		// place a test gadget tree in the  scratch directory so we don't have to build one
+		gadgetSource := filepath.Join("testdata", "gadget_tree")
+		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrNil(err, true)
+
+		gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
+		for _, file := range gadgetTreeFiles {
+			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
+			if err != nil {
+				t.Errorf("File %s should be in unpack, but is missing", file)
+			}
+		}
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
@@ -636,65 +655,6 @@ func TestFailedPreseedClassicImage(t *testing.T) {
 	})
 }
 
-// TODO replace this with fakeExecCommand that sil2100 wrote
-// TestFailedLiveBuildCommands tests the scenario where calls to `lb` fail
-// this is accomplished by temporarily replacing lb on disk with a test script
-/*func TestFailedLiveBuildCommands(t *testing.T) {
-	testCases := []struct {
-		name       string
-		testScript string
-	}{
-		{"failed_lb_config", "lb_config_fail"},
-		{"failed_lb_build", "lb_build_fail"},
-	}
-	for _, tc := range testCases {
-		t.Run("test_"+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
-
-			var stateMachine ClassicStateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.Opts.Project = "ubuntu-cpc"
-			stateMachine.Opts.Subproject = "fakeproject"
-			stateMachine.Opts.Subarch = "fakearch"
-			stateMachine.Opts.WithProposed = true
-			stateMachine.Opts.ExtraPPAs = []string{"ppa:fake_user/fakeppa"}
-			stateMachine.Args.GadgetTree = filepath.Join("testdata", "gadget_tree")
-			stateMachine.parent = &stateMachine
-
-			scriptPath := filepath.Join("testscripts", tc.testScript)
-			// save the original lb
-			whichLb := *exec.Command("which", "lb")
-			lbLocationBytes, _ := whichLb.Output()
-			lbLocation := strings.TrimSpace(string(lbLocationBytes))
-			// ensure the backup doesn't exist
-			os.Remove(lbLocation + ".bak")
-			err := os.Rename(lbLocation, lbLocation+".bak")
-			asserter.AssertErrNil(err, true)
-
-			err = osutil.CopyFile(scriptPath, lbLocation, 0)
-			asserter.AssertErrNil(err, true)
-			defer func() {
-				os.Remove(lbLocation)
-				os.Rename(lbLocation+".bak", lbLocation)
-			}()
-
-			// need workdir set up for this
-			err = stateMachine.makeTemporaryDirectories()
-			asserter.AssertErrNil(err, true)
-
-			// also need unpack set up
-			err = os.Mkdir(stateMachine.tempDirs.unpack, 0755)
-			asserter.AssertErrNil(err, true)
-
-			err = stateMachine.runLiveBuild()
-			asserter.AssertErrContains(err, "Error running command")
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		})
-	}
-}*/
-
 // TestPopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
 // the rootfs to ensure at least some of the correct file are in place
 func TestPopulateClassicRootfsContents(t *testing.T) {
@@ -710,7 +670,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
-			"test_valid.yaml")
+			"test_amd64.yaml")
 
 		err := stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrNil(err, true)
@@ -764,13 +724,12 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 
 // TestFailedPopulateClassicRootfsContents tests failed scenarios in populateClassicRootfsContents
 // this is accomplished by mocking functions
-/*func TestFailedPopulateClassicRootfsContents(t *testing.T) {
+func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_classic_rootfs_contents", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.Opts.Filesystem = filepath.Join("testdata", "filesystem")
 		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
 
 		// need workdir set up for this
@@ -833,43 +792,6 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 	})
 }
 
-// TestFilesystemFlag makes sure that with the --filesystem flag the specified filesystem is copied
-// to the rootfs directory
-func TestFilesystemFlag(t *testing.T) {
-	t.Run("test_filesystem_flag", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Opts.Filesystem = filepath.Join("testdata", "filesystem")
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrNil(err, true)
-
-		// check that the specified filesystem was copied over
-		if _, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, "testfile")); err != nil {
-			t.Errorf("Failed to copy --filesystem to rootfs")
-		}
-
-		// the included filesystem contains an invalid /etc/fstab. Make sure it
-		// was overwritten to have a valid /etc/fstab
-		fstab, err := ioutilReadFile(filepath.Join(stateMachine.tempDirs.rootfs,
-			"etc", "fstab"))
-		if err != nil {
-			t.Errorf("Error reading fstab to check regex")
-		}
-		correctLabel := "LABEL=writable   /    ext4   defaults    0 0"
-		if !strings.Contains(string(fstab), correctLabel) {
-			t.Errorf("Expected fstab contents %s to contain %s",
-				string(fstab), correctLabel)
-		}
-	})
-}
-*/
 // TestGeneratePackageManifest tests if classic image manifest generation works
 func TestGeneratePackageManifest(t *testing.T) {
 	t.Run("test_generate_package_manifest", func(t *testing.T) {
@@ -897,7 +819,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		// Check if manifest file got generated and if it has expected contents
-		/*manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
+		manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
 		manifestBytes, err := ioutil.ReadFile(manifestPath)
 		asserter.AssertErrNil(err, true)
 		// The order of packages shouldn't matter
@@ -906,11 +828,10 @@ func TestGeneratePackageManifest(t *testing.T) {
 			if !strings.Contains(string(manifestBytes), pkg) {
 				t.Errorf("filesystem.manifest does not contain expected package: %s", pkg)
 			}
-		}*/
+		}
 	})
 }
 
-/*
 // TestFailedGeneratePackageManifest tests if classic manifest generation failures are reported
 func TestFailedGeneratePackageManifest(t *testing.T) {
 	t.Run("test_failed_generate_package_manifest", func(t *testing.T) {
@@ -937,130 +858,6 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 		asserter.AssertErrContains(err, "Error creating manifest file")
 	})
 }
-
-// TestExtraSnapsWithFilesystem tests that using --snap along with --filesystem preseeds the snaps
-// in the resulting root filesystem
-func TestExtraSnapsWithFilesystem(t *testing.T) {
-	t.Run("test_extra_snaps_with_filesystem", func(t *testing.T) {
-		if runtime.GOARCH != "amd64" {
-			t.Skip("Test for amd64 only")
-		}
-		asserter := helper.Asserter{T: t}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Opts.Filesystem = filepath.Join("testdata", "filesystem")
-		stateMachine.commonFlags.Snaps = []string{"hello"}
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// copy the filesystem over before attempting to preseed it
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrNil(err, true)
-
-		// call "snap prepare image" to preseed the filesystem.
-		// Doing the preseed at the time of the test allows it to
-		// run on each architecture and keeps the github repository
-		// free of large .snap files
-		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
-			filepath.Join("testdata", "modelAssertionClassic"),
-			stateMachine.tempDirs.rootfs)
-		err = snapPrepareImage.Run()
-		asserter.AssertErrNil(err, true)
-
-		// now call prepateClassicImage to simulate using --snap with --filesystem
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrNil(err, true)
-
-		// Ensure that the hello snap was preseeded in the filesystem and the
-		// snaps that were already there haven't been removed
-		snapList := []string{"hello", "lxd", "core20", "snapd"}
-		for _, snap := range snapList {
-			snapGlob := filepath.Join(stateMachine.tempDirs.rootfs,
-				"var", "lib", "snapd", "snaps", snap+"*.snap")
-			snapFile, _ := filepath.Glob(snapGlob)
-			if len(snapFile) == 0 {
-				if os.IsNotExist(err) {
-					t.Errorf("File %s should exist, but does not", snapGlob)
-				}
-			}
-		}
-	})
-}
-
-// TestFailedPrepareClassiImage tests various failure scenarios in the prepateClassicImage function
-func TestFailedPrepareClassicImage(t *testing.T) {
-	t.Run("test_failed_prepare_classic_image", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Opts.Filesystem = filepath.Join("testdata", "filesystem")
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// copy the filesystem over before attempting to preseed it
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrNil(err, true)
-
-		// call "snap prepare image" to preseed the filesystem.
-		// Doing the preseed at the time of the test allows it to
-		// run on each architecture and keeps the github repository
-		// free of large .snap files
-		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
-			filepath.Join("testdata", "modelAssertionClassic"),
-			stateMachine.tempDirs.rootfs)
-		err = snapPrepareImage.Run()
-		asserter.AssertErrNil(err, true)
-
-		// set an invalid value for --snap to cause an error in
-		// parseSnapsAndChannels
-		stateMachine.commonFlags.Snaps = []string{"hello=test=invalid"}
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrContains(err, "Invalid syntax passed to --snap")
-		os.RemoveAll(filepath.Join(stateMachine.stateMachineFlags.WorkDir, "model"))
-
-		// set a valid value for --snap and mock seed.Open to simulate
-		// a failure reading the seed
-		stateMachine.commonFlags.Snaps = []string{"hello"}
-		seedOpen = mockSeedOpen
-		defer func() {
-			seedOpen = seed.Open
-		}()
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrContains(err, "Error removing preseeded snaps")
-		seedOpen = seed.Open
-		os.RemoveAll(filepath.Join(stateMachine.stateMachineFlags.WorkDir, "model"))
-
-		// mock osutil.CopyFile
-		osutilCopyFile = mockCopyFile
-		defer func() {
-			osutilCopyFile = osutil.CopyFile
-		}()
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrContains(err, "Error copying model")
-		osutilCopyFile = osutil.CopyFile
-		os.RemoveAll(filepath.Join(stateMachine.stateMachineFlags.WorkDir, "model"))
-
-		// mock image.Prepare
-		stateMachine.commonFlags.Snaps = []string{"hello"}
-		imagePrepare = mockImagePrepare
-		defer func() {
-			imagePrepare = image.Prepare
-		}()
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrContains(err, "Error preparing image")
-		imagePrepare = image.Prepare
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}*/
 
 // TestSuccessfulClassicRun runs through a full classic state machine run and ensures
 // it is successful
