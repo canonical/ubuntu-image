@@ -39,10 +39,6 @@ type ClassicStateMachine struct {
 
 // Setup assigns variables and calls other functions that must be executed before Run()
 func (classicStateMachine *ClassicStateMachine) Setup() error {
-	//TODO: this is a temporary way to skip some states while we
-	// implement the classic image redesign. remove it when possible
-	classicStateMachine.stateSkip = true
-
 	// set the parent pointer of the embedded struct
 	classicStateMachine.parent = classicStateMachine
 
