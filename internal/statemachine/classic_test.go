@@ -3,6 +3,7 @@
 package statemachine
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,11 +13,14 @@ import (
 	"strings"
 	"testing"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
-	//"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/image"
 	//"github.com/snapcore/snapd/osutil"
 	//"github.com/snapcore/snapd/seed"
+	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -236,15 +240,16 @@ func TestPrintStates(t *testing.T) {
 [3] germinate
 [4] create_chroot
 [5] install_packages
-[6] populate_rootfs_contents
-[7] customize_cloud_init
-[8] generate_disk_info
-[9] calculate_rootfs_size
-[10] populate_bootfs_contents
-[11] populate_prepare_partitions
-[12] make_disk
-[13] generate_manifest
-[14] finish
+[6] preseed_image
+[7] populate_rootfs_contents
+[8] customize_cloud_init
+[9] generate_disk_info
+[10] calculate_rootfs_size
+[11] populate_bootfs_contents
+[12] populate_prepare_partitions
+[13] make_disk
+[14] generate_manifest
+[15] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -527,18 +532,106 @@ func TestFailedManualCustomization(t *testing.T) {
 	})
 }
 
-// TestPrepareClassicImage unit tests the prepareClassicImage function
-func TestPrepareClassicImage(t *testing.T) {
-	t.Run("test_prepare_classic_image", func(t *testing.T) {
+// TestPreseedClassicImage unit tests the preseedClassicImage function
+func TestPreseedClassicImage(t *testing.T) {
+	t.Run("test_preseed_classic_image", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Snaps = []string{"lxd"}
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Customization: &CustomizationType{
+				ExtraSnaps: []*SnapType{
+					{
+						SnapName: "hello",
+						Channel:  "candidate",
+					},
+				},
+			},
+		}
 
-		err := stateMachine.prepareClassicImage()
+		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrNil(err, true)
+
+		// check that the lxd and hello snaps, as well as lxd's base, core20
+		// were preseeded in the correct location
+		snaps := map[string]string{"lxd": "stable", "hello": "candidate", "core20": "stable"}
+		for snapName, snapChannel := range snaps {
+			// reach out to the snap store to find the revision
+			// of the snap for the specified channel
+			snapStore := store.New(nil, nil)
+			snapSpec := store.SnapSpec{Name: snapName}
+			context := context.TODO() //context can be empty, just not nil
+			snapInfo, err := snapStore.SnapInfo(context, snapSpec, nil)
+			asserter.AssertErrNil(err, true)
+
+			var storeRevision int
+			storeRevision = snapInfo.Channels["latest/"+snapChannel].Revision.N
+			snapFileName := fmt.Sprintf("%s_%d.snap", snapName, storeRevision)
+
+			snapPath := filepath.Join(stateMachine.tempDirs.chroot,
+				"var", "lib", "snapd", "seed", "snaps", snapFileName)
+			_, err = os.Stat(snapPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("File %s should exist, but does not", snapPath)
+				}
+			}
+		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestFailedPreseedClassicImage tests failures in the preseedClassicImage function
+func TestFailedPreseedClassicImage(t *testing.T) {
+	t.Run("test_failed_preseed_classic_image", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Customization: &CustomizationType{
+				ExtraSnaps: []*SnapType{},
+			},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// include an invalid snap snap name to trigger a failure in
+		// parseSnapsAndChannels
+		stateMachine.Snaps = []string{"lxd=test=invalid=name"}
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrContains(err, "Invalid syntax")
+
+		// try to include a nonexistent snap to trigger a failure
+		// in snapStore.SnapInfo
+		stateMachine.Snaps = []string{"test-this-snap-name-should-never-exist"}
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrContains(err, "Error getting info for snap")
+
+		// mock image.Prepare
+		stateMachine.Snaps = []string{"hello"}
+		imagePrepare = mockImagePrepare
+		defer func() {
+			imagePrepare = image.Prepare
+		}()
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrContains(err, "Error preparing image")
+		imagePrepare = image.Prepare
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
@@ -1001,6 +1094,40 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 		}
 
+		// make sure snaps from the correct channel were installed
+		type snapList struct {
+			Snaps []struct {
+				Name    string `yaml:"name"`
+				Channel string `yaml:"channel"`
+			} `yaml:"snaps"`
+		}
+
+		seedYaml := filepath.Join(stateMachine.tempDirs.chroot,
+			"var", "lib", "snapd", "seed", "seed.yaml")
+
+		seedFile, err := os.Open(seedYaml)
+		defer seedFile.Close()
+		asserter.AssertErrNil(err, true)
+
+		var seededSnaps snapList
+		err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
+		asserter.AssertErrNil(err, true)
+
+		expectedSnapChannels := map[string]string{
+			"hello":  "candidate",
+			"core20": "stable",
+		}
+
+		for _, seededSnap := range seededSnaps.Snaps {
+			channel, found := expectedSnapChannels[seededSnap.Name]
+			if found {
+				if channel != seededSnap.Channel {
+					t.Errorf("Expected snap %s to be pre-seeded with channel %s, but got %s",
+						seededSnap.Name, channel, seededSnap.Channel)
+				}
+			}
+		}
+
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
 
@@ -1263,7 +1390,7 @@ func TestBuildGadgetTree(t *testing.T) {
 		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrNil(err, true)
 
-		// test the git methdo
+		// test the git method
 		imageDef = ImageDefinition{
 			Gadget: &GadgetType{
 				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
