@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -815,4 +816,107 @@ func mountFromHost(targetDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd)
 	mountCmd = execCommand("mount", "--bind", mountpoint, filepath.Join(targetDir, mountpoint))
 	umountCmd = execCommand("umount", filepath.Join(targetDir, mountpoint))
 	return mountCmd, umountCmd
+}
+
+// manualCopyFile copies a file into the chroot
+func manualCopyFile(copyFileInterfaces interface{}, targetDir string, debug bool) error {
+	copyFileSlice := reflect.ValueOf(copyFileInterfaces)
+	for i := 0; i < copyFileSlice.Len(); i++ {
+		copyFile := copyFileSlice.Index(i).Interface().(*CopyFileType)
+
+		// Copy the file into the specified location in the chroot
+		dest := filepath.Join(targetDir, copyFile.Dest)
+		if debug {
+			fmt.Printf("Copying file \"%s\" to \"%s\"", copyFile.Source, dest)
+		}
+		if err := osutilCopySpecialFile(copyFile.Source, dest); err != nil {
+			return fmt.Errorf("Error copying file \"%s\" into chroot: %s",
+				copyFile.Source, err.Error())
+		}
+	}
+	return nil
+}
+
+// manualExecute executes an executable file in the chroot
+func manualExecute(executeInterfaces interface{}, targetDir string, debug bool) error {
+	executeSlice := reflect.ValueOf(executeInterfaces)
+	for i := 0; i < executeSlice.Len(); i++ {
+		execute := executeSlice.Index(i).Interface().(*ExecuteType)
+		executeCmd := execCommand("chroot", targetDir, execute.ExecutePath)
+		if debug {
+			fmt.Printf("Executing command \"%s\"", executeCmd.String())
+		}
+		executeOutput := helper.SetCommandOutput(executeCmd, debug)
+		err := executeCmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running script \"%s\". Error is %s. Full output below:\n%s",
+				executeCmd.String(), err.Error(), executeOutput.String())
+		}
+	}
+	return nil
+}
+
+// manualTouchFile touches a file in the chroot
+func manualTouchFile(touchFileInterfaces interface{}, targetDir string, debug bool) error {
+	touchFileSlice := reflect.ValueOf(touchFileInterfaces)
+	for i := 0; i < touchFileSlice.Len(); i++ {
+		touchFile := touchFileSlice.Index(i).Interface().(*TouchFileType)
+		fullPath := filepath.Join(targetDir, touchFile.TouchPath)
+		if debug {
+			fmt.Printf("Creating empty file \"%s\"", fullPath)
+		}
+		_, err := osCreate(fullPath)
+		if err != nil {
+			return fmt.Errorf("Error creating file in chroot: %s", err.Error())
+		}
+	}
+	return nil
+}
+
+// manualAddGroup adds a group in the chroot
+func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool) error {
+	addGroupSlice := reflect.ValueOf(addGroupInterfaces)
+	for i := 0; i < addGroupSlice.Len(); i++ {
+		addGroup := addGroupSlice.Index(i).Interface().(*AddGroupType)
+		addGroupCmd := execCommand("chroot", targetDir, "addgroup", addGroup.GroupName)
+		debugStatement := fmt.Sprintf("Adding group \"%s\"", addGroup.GroupName)
+		if addGroup.GroupID != "" {
+			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", addGroup.GroupID}...)
+			debugStatement = fmt.Sprintf("%s with GID %s", debugStatement, addGroup.GroupID)
+		}
+		if debug {
+			fmt.Printf(debugStatement)
+		}
+		addGroupOutput := helper.SetCommandOutput(addGroupCmd, debug)
+		err := addGroupCmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error adding group. Command used is \"%s\". Error is %s. Full output below:\n%s",
+				addGroupCmd.String(), err.Error(), addGroupOutput.String())
+		}
+	}
+	return nil
+}
+
+// manualAddUser adds a group in the chroot
+func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) error {
+	addUserSlice := reflect.ValueOf(addUserInterfaces)
+	for i := 0; i < addUserSlice.Len(); i++ {
+		addUser := addUserSlice.Index(i).Interface().(*AddUserType)
+		addUserCmd := execCommand("chroot", targetDir, "adduser", addUser.UserName)
+		debugStatement := fmt.Sprintf("Adding user \"%s\"", addUser.UserName)
+		if addUser.UserID != "" {
+			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", addUser.UserID}...)
+			debugStatement = fmt.Sprintf("%s with UID %s", debugStatement, addUser.UserID)
+		}
+		if debug {
+			fmt.Printf(debugStatement)
+		}
+		addUserOutput := helper.SetCommandOutput(addUserCmd, debug)
+		err := addUserCmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error adding user. Command used is \"%s\". Error is %s. Full output below:\n%s",
+				addUserCmd.String(), err.Error(), addUserOutput.String())
+		}
+	}
+	return nil
 }

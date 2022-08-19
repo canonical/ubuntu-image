@@ -415,10 +415,114 @@ func TestManualCustomization(t *testing.T) {
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
 
-		err := stateMachine.manualCustomization()
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &RootfsType{
+				Archive: "ubuntu",
+			},
+			Customization: &CustomizationType{
+				Manual: &ManualType{
+					CopyFile: []*CopyFileType{
+						{
+							Source: filepath.Join("testdata", "test_script"),
+							Dest:   "/test_copy_file",
+						},
+					},
+					TouchFile: []*TouchFileType{
+						{
+							TouchPath: "/test_touch_file",
+						},
+					},
+					Execute: []*ExecuteType{
+						{
+							// the file we already copied creates a file /test_execute
+							ExecutePath: "/test_copy_file",
+						},
+					},
+					AddUser: []*AddUserType{
+						{
+							UserName: "testuser",
+							UserID:   "123456",
+						},
+					},
+					AddGroup: []*AddGroupType{
+						{
+							GroupName: "testgroup",
+							GroupID:   "456789",
+						},
+					},
+				},
+			},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
+		// also create chroot
+		err = stateMachine.createChroot()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.manualCustomization()
+		asserter.AssertErrNil(err, true)
+
+		// Check that the correct files exist
+		testFiles := []string{"test_copy_file", "test_touch_file", "test_execute"}
+		for _, fileName := range testFiles {
+			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, fileName))
+			if err != nil {
+				t.Errorf("file %s should exist, but it does not", fileName)
+			}
+		}
+
+		// Check that the test user exists with the correct uid
+		passwdFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "passwd")
+		passwdContents, err := ioutil.ReadFile(passwdFile)
+		asserter.AssertErrNil(err, true)
+		if !strings.Contains(string(passwdContents), "testuser:x:123456") {
+			t.Errorf("Test user was not created in the chroot")
+		}
+
+		// Check that the test group exists with the correct gid
+		groupFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "group")
+		groupContents, err := ioutil.ReadFile(groupFile)
+		asserter.AssertErrNil(err, true)
+		if !strings.Contains(string(groupContents), "testgroup:x:456789") {
+			t.Errorf("Test group was not created in the chroot")
+		}
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestFailedManualCustomization tests failures in the manualCustomization function
+func TestFailedManualCustomization(t *testing.T) {
+	t.Run("test_failed_manual_customization", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		stateMachine.ImageDef = ImageDefinition{
+			Customization: &CustomizationType{
+				Manual: &ManualType{
+					TouchFile: []*TouchFileType{
+						{
+							TouchPath: filepath.Join("this", "path", "does", "not", "exist"),
+						},
+					},
+				},
+			},
+		}
+
+		err := stateMachine.manualCustomization()
+		asserter.AssertErrContains(err, "no such file or directory")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

@@ -243,13 +243,13 @@ type InvalidPPAError struct {
 // in the rootfs section of the image definition
 func (ImageDef ImageDefinition) generatePocketList() []string {
 	pocketMap := map[string][]string{
-		"release": []string{},
-		"security": []string{
+		"release": {},
+		"security": {
 			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),
 		},
-		"updates": []string{
+		"updates": {
 			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),
@@ -257,7 +257,7 @@ func (ImageDef ImageDefinition) generatePocketList() []string {
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),
 		},
-		"proposed": []string{
+		"proposed": {
 			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),
