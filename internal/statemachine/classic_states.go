@@ -509,7 +509,6 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	}
 	customizationHandlers := []customizationHandler{
 		{
-
 			inputData:   classicStateMachine.ImageDef.Customization.Manual.CopyFile,
 			handlerFunc: manualCopyFile,
 		},
