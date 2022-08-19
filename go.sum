@@ -114,8 +114,8 @@ github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2/go.mod h1:D3Ss
 github.com/snapcore/secboot v0.0.0-20211018143212-802bb19ca263 h1:cq2rG4JcNBCwHvo7iNdJL4nb8Ns7L/aOUd1EFs2toFs=
 github.com/snapcore/secboot v0.0.0-20211018143212-802bb19ca263/go.mod h1:72paVOkm4sJugXt+v9ItmnjXgO921D8xqsbH2OekouY=
 github.com/snapcore/snapd v0.0.0-20201005140838-501d14ac146e/go.mod h1:3xrn7QDDKymcE5VO2rgWEQ5ZAUGb9htfwlXnoel6Io8=
-github.com/snapcore/snapd v0.0.0-20220519134046-bb2af434538a h1:10n+WM5kRE2iGToI9uQkBh86QBRplEFfrXaSEZFb9TU=
-github.com/snapcore/snapd v0.0.0-20220519134046-bb2af434538a/go.mod h1:Ab4TsNgVast9nXAN8KVydI5G/hTHncgiQ4S1sAWjIXg=
+github.com/snapcore/snapd v0.0.0-20220818093435-f83b1f15601b h1:qNv6StRK036pfC1TXzRTmR4oVSvuTvs9UciEiqPZ2YM=
+github.com/snapcore/snapd v0.0.0-20220818093435-f83b1f15601b/go.mod h1:Ab4TsNgVast9nXAN8KVydI5G/hTHncgiQ4S1sAWjIXg=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=

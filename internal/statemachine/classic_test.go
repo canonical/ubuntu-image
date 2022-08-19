@@ -336,12 +336,49 @@ func TestPrepareGadgetTree(t *testing.T) {
 // TestFailedPrepareGadgetTree tests failures in os, osutil, and ioutil libraries
 func TestFailedPrepareGadgetTree(t *testing.T) {
 	t.Run("test_failed_prepare_gadget_tree", func(t *testing.T) {
-		// currently a no-op, waiting for prepareGadgetTree
-		// to be converted to the new ubuntu-image classic
-		// design. This will have ubuntu-image build the
-		// gadget tree rather than relying on the user
-		// to have done this ahead of time
-		t.Skip()
+		asserter := helper.Asserter{T: t}
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// place a test gadget tree in the  scratch directory so we don't have to build one
+		gadgetSource := filepath.Join("testdata", "gadget_tree")
+		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+		asserter.AssertErrNil(err, true)
+
+		// mock os.Mkdir
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrContains(err, "Error creating unpack directory")
+		osMkdirAll = os.MkdirAll
+
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrContains(err, "Error reading gadget tree")
+		ioutilReadDir = ioutil.ReadDir
+
+		// mock osutil.CopySpecialFile
+		osutilCopySpecialFile = mockCopySpecialFile
+		defer func() {
+			osutilCopySpecialFile = osutil.CopySpecialFile
+		}()
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrContains(err, "Error copying gadget tree")
+		osutilCopySpecialFile = osutil.CopySpecialFile
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -441,41 +478,41 @@ func TestManualCustomization(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
-		stateMachine.ImageDef = ImageDefinition {
+		stateMachine.ImageDef = ImageDefinition{
 			Architecture: getHostArch(),
-			Series: getHostSuite(),
-			Rootfs: &RootfsType {
+			Series:       getHostSuite(),
+			Rootfs: &RootfsType{
 				Archive: "ubuntu",
 			},
-			Customization: &CustomizationType {
-				Manual: &ManualType {
-					CopyFile: []*CopyFileType {
+			Customization: &CustomizationType{
+				Manual: &ManualType{
+					CopyFile: []*CopyFileType{
 						{
 							Source: filepath.Join("testdata", "test_script"),
-							Dest: "/test_copy_file",
+							Dest:   "/test_copy_file",
 						},
 					},
-					TouchFile: []*TouchFileType {
+					TouchFile: []*TouchFileType{
 						{
 							TouchPath: "/test_touch_file",
 						},
 					},
-					Execute: []*ExecuteType {
+					Execute: []*ExecuteType{
 						{
 							// the file we already copied creates a file /test_execute
 							ExecutePath: "/test_copy_file",
 						},
 					},
-					AddUser: []*AddUserType {
+					AddUser: []*AddUserType{
 						{
 							UserName: "testuser",
-							UserID: "123456",
+							UserID:   "123456",
 						},
 					},
-					AddGroup: []*AddGroupType {
+					AddGroup: []*AddGroupType{
 						{
 							GroupName: "testgroup",
-							GroupID: "456789",
+							GroupID:   "456789",
 						},
 					},
 				},
@@ -533,10 +570,10 @@ func TestFailedManualCustomization(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
-		stateMachine.ImageDef = ImageDefinition {
-			Customization: &CustomizationType {
-				Manual: &ManualType {
-					TouchFile: []*TouchFileType {
+		stateMachine.ImageDef = ImageDefinition{
+			Customization: &CustomizationType{
+				Manual: &ManualType{
+					TouchFile: []*TouchFileType{
 						{
 							TouchPath: filepath.Join("this", "path", "does", "not", "exist"),
 						},
@@ -547,6 +584,7 @@ func TestFailedManualCustomization(t *testing.T) {
 
 		err := stateMachine.manualCustomization()
 		asserter.AssertErrContains(err, "no such file or directory")
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -669,19 +707,28 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
-			"test_amd64.yaml")
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &RootfsType{
+				Archive: "ubuntu",
+			},
+		}
 
-		err := stateMachine.populateClassicRootfsContents()
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		// also create chroot
+		err = stateMachine.createChroot()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
 
 		// check the files before Teardown
-		/*fileList := []string{filepath.Join("etc", "shadow"),
+		fileList := []string{filepath.Join("etc", "shadow"),
 			filepath.Join("etc", "systemd"),
-			filepath.Join("boot", "vmlinuz"),
-			filepath.Join("boot", "grub"),
 			filepath.Join("usr", "lib")}
 		for _, file := range fileList {
 			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
@@ -692,33 +739,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 			}
 		}
 
-		// check /etc/fstab contents to test the scenario where the regex replaced an
-		// existing filesystem label with LABEL=writable
-		fstab, err := ioutilReadFile(filepath.Join(stateMachine.tempDirs.rootfs,
-			"etc", "fstab"))
-		if err != nil {
-			t.Errorf("Error reading fstab to check regex")
-		}
-		correctLabel := "LABEL=writable"
-		if !strings.Contains(string(fstab), correctLabel) {
-			t.Errorf("Expected fstab contents %s to contain %s",
-				string(fstab), correctLabel)
-		}
-
-		// check that extra snaps were added to the rootfs
-		for _, snap := range stateMachine.commonFlags.Snaps {
-			if strings.Contains(snap, "/") {
-				snap = strings.Split(snap, "/")[0]
-			}
-			if strings.Contains(snap, "=") {
-				snap = strings.Split(snap, "=")[0]
-			}
-			filePath := filepath.Join(stateMachine.tempDirs.rootfs,
-				"var", "snap", snap)
-			if !osutil.FileExists(filePath) {
-				t.Errorf("File %s should exist but it does not", filePath)
-			}
-		}*/
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -731,9 +752,20 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &RootfsType{
+				Archive: "ubuntu",
+			},
+		}
 
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// also create chroot
+		err = stateMachine.createChroot()
 		asserter.AssertErrNil(err, true)
 
 		// mock ioutil.ReadDir
@@ -871,6 +903,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.Debug = true
+		stateMachine.commonFlags.Size = "4G"
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 			"test_amd64.yaml")
 

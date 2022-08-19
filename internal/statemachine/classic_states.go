@@ -266,26 +266,26 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 // Prepare the gadget tree
 func (stateMachine *StateMachine) prepareGadgetTree() error {
 	var classicStateMachine *ClassicStateMachine
-	  classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
-	  gadgetDir := filepath.Join(classicStateMachine.tempDirs.unpack, "gadget")
-	  err := osMkdirAll(gadgetDir, 0755)
-	  if err != nil && !os.IsExist(err) {
-	          return fmt.Errorf("Error creating unpack directory: %s", err.Error())
-	  }
-	  // recursively copy the gadget tree to unpack/gadget
-	  gadgetTree := filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
-	  files, err := ioutilReadDir(gadgetTree)
-	  if err != nil {
-	          return fmt.Errorf("Error reading gadget tree: %s", err.Error())
-	  }
-	  for _, gadgetFile := range files {
-	          srcFile := filepath.Join(gadgetTree, gadgetFile.Name())
-	          if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
-	                  return fmt.Errorf("Error copying gadget tree: %s", err.Error())
-	          }
-	  }
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	gadgetDir := filepath.Join(classicStateMachine.tempDirs.unpack, "gadget")
+	err := osMkdirAll(gadgetDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating unpack directory: %s", err.Error())
+	}
+	// recursively copy the gadget tree to unpack/gadget
+	gadgetTree := filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+	files, err := ioutilReadDir(gadgetTree)
+	if err != nil {
+		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
+	}
+	for _, gadgetFile := range files {
+		srcFile := filepath.Join(gadgetTree, gadgetFile.Name())
+		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
+			return fmt.Errorf("Error copying gadget tree: %s", err.Error())
+		}
+	}
 
-	  classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "gadget.yaml")
+	classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "gadget.yaml")
 
 	return nil
 }
@@ -513,35 +513,34 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
 	type customizationHandler struct {
-		inputData interface{}
-		handlerFunc func(interface{}, string) error
+		inputData   interface{}
+		handlerFunc func(interface{}, string, bool) error
 	}
-	customizationHandlers := []customizationHandler {
+	customizationHandlers := []customizationHandler{
 		{
-
-			inputData: classicStateMachine.ImageDef.Customization.Manual.CopyFile,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.CopyFile,
 			handlerFunc: manualCopyFile,
 		},
 		{
-			inputData: classicStateMachine.ImageDef.Customization.Manual.Execute,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.Execute,
 			handlerFunc: manualExecute,
 		},
 		{
-			inputData: classicStateMachine.ImageDef.Customization.Manual.TouchFile,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.TouchFile,
 			handlerFunc: manualTouchFile,
 		},
 		{
-			inputData: classicStateMachine.ImageDef.Customization.Manual.AddGroup,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.AddGroup,
 			handlerFunc: manualAddGroup,
 		},
 		{
-			inputData: classicStateMachine.ImageDef.Customization.Manual.AddUser,
+			inputData:   classicStateMachine.ImageDef.Customization.Manual.AddUser,
 			handlerFunc: manualAddUser,
 		},
 	}
 
 	for _, customization := range customizationHandlers {
-		err := customization.handlerFunc(customization.inputData, stateMachine.tempDirs.rootfs)
+		err := customization.handlerFunc(customization.inputData, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 		if err != nil {
 			return err
 		}
@@ -563,21 +562,13 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 		return err
 	}
 
-	// add any extra snaps from the image definition to the list
-	for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
-		if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
-			imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
-		}
-		if extraSnap.Channel != "" {
-			imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
-		}
-	}
-
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
 
 	// iterate through the list of snaps and ensure that all of their bases
-	// are also set to be installed
+	// are also set to be installed. Note we only do this for snaps that are
+	// seeded. Users are expected to specify all base and content provider
+	// snaps in the image definition.
 	for _, seededSnap := range imageOpts.Snaps {
 		snapStore := store.New(nil, nil)
 		snapSpec := store.SnapSpec{Name: seededSnap}
@@ -589,6 +580,16 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 		}
 		if !helper.SliceHasElement(imageOpts.Snaps, snapInfo.Base) {
 			imageOpts.Snaps = append(imageOpts.Snaps, snapInfo.Base)
+		}
+	}
+
+	// add any extra snaps from the image definition to the list
+	for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
+		if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
+			imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
+		}
+		if extraSnap.Channel != "" {
+			imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
 		}
 	}
 
@@ -606,16 +607,12 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 		defer func() {
 			image.Stdout = oldImageStdout
 		}()
-		/*oldProgressStdout := progress.Stdout
-		progress.Stdout = ioutil.Discard
-		defer func() {
-			progress.Stdout = oldProgressStdout
-		}()*/
 	}
 
 	if err := imagePrepare(&imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
+
 	return nil
 }
 
@@ -683,21 +680,17 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 
 // Generate the manifest
 func (stateMachine *StateMachine) generatePackageManifest() error {
-	// currently a no-op pending implementation of the classic image redesign
-	/*
-		// This is basically just a wrapper around dpkg-query
+	// This is basically just a wrapper around dpkg-query
 
-		outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
-		cmd := execCommand("sudo", "chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
-		manifest, err := os.Create(outputPath)
-		if err != nil {
-			return fmt.Errorf("Error creating manifest file: %s", err.Error())
-		}
-		defer manifest.Close()
+	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
+	cmd := execCommand("sudo", "chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
+	manifest, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("Error creating manifest file: %s", err.Error())
+	}
+	defer manifest.Close()
 
-		cmd.Stdout = manifest
-		err = cmd.Run()
-		return err
-	*/
-	return nil
+	cmd.Stdout = manifest
+	err = cmd.Run()
+	return err
 }
