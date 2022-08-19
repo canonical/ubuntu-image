@@ -542,7 +542,7 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	}
 
 	for _, customization := range customizationHandlers {
-		err := customization.handlerFunc(customization.inputData, stateMachine.tempDirs.chroot)
+		err := customization.handlerFunc(customization.inputData, stateMachine.tempDirs.rootfs)
 		if err != nil {
 			return err
 		}
