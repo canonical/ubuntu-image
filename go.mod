@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/invopop/jsonschema v0.4.0
 	github.com/jessevdk/go-flags v1.5.0
-	github.com/snapcore/snapd v0.0.0-20220510181928-39f97113c151
+	github.com/snapcore/snapd v0.0.0-20220818093435-f83b1f15601b
 	github.com/xeipuuv/gojsonschema v1.2.0
 	gopkg.in/yaml.v2 v2.4.0
 )

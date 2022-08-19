@@ -18,7 +18,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 	var err error
 	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
-		snapStateMachine.commonFlags.Snaps)
+		snapStateMachine.Opts.Snaps)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 		customizations.BootFlags = append(customizations.BootFlags, "factory")
 	}
 	customizations.CloudInitUserData = stateMachine.commonFlags.CloudInit
-	customizations.Validation = snapStateMachine.Opts.Validation
+	customizations.Validation = stateMachine.commonFlags.Validation
 	imageOpts.Customizations = customizations
 
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
