@@ -9,10 +9,12 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
+	"github.com/snapcore/snapd/gadget"
 	"github.com/xeipuuv/gojsonschema"
 
 	"gopkg.in/yaml.v2"
@@ -484,17 +486,77 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 	return nil
 }
 
-// Configure Extra PPAs
-func (stateMachine *StateMachine) setupExtraPPAs() error {
-	// currently a no-op pending implementation of the classic image redesign
-	return nil
-}
-
 // Install extra packages
 // TODO: this should probably happen during the rootfs build steps.
 // but what about extra packages with a tarball based images...
 func (stateMachine *StateMachine) installExtraPackages() error {
 	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// Install the kernel specified in the image definition into the boot
+// partition of the image, and also install a corresponding initrd
+func (stateMachine *StateMachine) addKernelAndInitrd() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// Get current working directory so we can Chdir back to it
+	curDir, err := osGetwd()
+	if err != nil {
+		return fmt.Errorf("Error getting current working directory: \"%s\"", err.Error())
+	}
+	defer func() {
+		os.Chdir(curDir)
+	}()
+
+	// cd into the scratch dir for download and extraction of kernel
+	err = osChdir(stateMachine.tempDirs.scratch)
+	if err != nil {
+		return fmt.Errorf("Error changing directories into scratch directory: \"%s\". Error is %s",
+			stateMachine.tempDirs.scratch, err.Error())
+	}
+
+	downloadCmd := execCommand("apt", "download", classicStateMachine.ImageDef.Kernel.KernelName)
+	downloadOutput := helper.SetCommandOutput(downloadCmd, classicStateMachine.commonFlags.Debug)
+	if err := downloadCmd.Run(); err != nil {
+		return fmt.Errorf("Error downloading kernel deb. "+
+			"Error is \"%s\". Full output below:\n%s",
+			err.Error(), downloadOutput.String())
+	}
+
+	kernelDeb, _ := filepath.Glob(fmt.Sprintf("%s*.deb", classicStateMachine.ImageDef.Kernel.KernelName))
+	extractCmd := execCommand("dpkg-deb", "--extract", kernelDeb[0], ".")
+	extractOutput := helper.SetCommandOutput(extractCmd, classicStateMachine.commonFlags.Debug)
+	if err := extractCmd.Run(); err != nil {
+		return fmt.Errorf("Error extracting kernel deb. "+
+			"Error is \"%s\". Full output below:\n%s",
+			err.Error(), extractOutput.String())
+	}
+
+	// now copy the kernel to the boot volume
+	fmt.Println(stateMachine.GadgetInfo)
+	fmt.Println(stateMachine.GadgetInfo.Volumes)
+	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+		for ii, structure := range volume.Structure {
+			if(structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot) {
+				// found the boot structure, now copy the kernel to it
+				kernelTarget := filepath.Join(stateMachine.tempDirs.volumes,
+					volumeName,
+					"part"+strconv.Itoa(ii),
+					classicStateMachine.ImageDef.Kernel.KernelTarget,
+				)
+				kernelSource, _ := filepath.Glob(fmt.Sprintf("%s-*",
+					classicStateMachine.ImageDef.Kernel.KernelName),
+				)
+
+				if err := osutilCopyFile(kernelSource[0], kernelTarget, 0); err != nil {
+					return fmt.Errorf("Error copying kernel \"%s\" to \"%s\". Error is %s",
+						kernelSource[0], kernelTarget, err.Error())
+				}
+			}
+		}
+	}
+	
 	return nil
 }
 

@@ -5,7 +5,7 @@ architecture: amd64
 series: jammy
 class: preinstalled
 kernel:
-  name: linux
+  name: linux-generic
 gadget:
   url: "https://github.com/snapcore/pc-amd64-gadget.git"
   branch: classic
