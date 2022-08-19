@@ -563,21 +563,13 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 		return err
 	}
 
-	// add any extra snaps from the image definition to the list
-	for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
-		if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
-			imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
-		}
-		if extraSnap.Channel != "" {
-			imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
-		}
-	}
-
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
 
 	// iterate through the list of snaps and ensure that all of their bases
-	// are also set to be installed
+	// are also set to be installed. Note we only do this for snaps that are
+	// seeded. Users are expected to specify all base and content provider
+	// snaps in the image definition.
 	for _, seededSnap := range imageOpts.Snaps {
 		snapStore := store.New(nil, nil)
 		snapSpec := store.SnapSpec{Name: seededSnap}
@@ -589,6 +581,16 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 		}
 		if !helper.SliceHasElement(imageOpts.Snaps, snapInfo.Base) {
 			imageOpts.Snaps = append(imageOpts.Snaps, snapInfo.Base)
+		}
+	}
+
+	// add any extra snaps from the image definition to the list
+	for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
+		if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
+			imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
+		}
+		if extraSnap.Channel != "" {
+			imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
 		}
 	}
 
