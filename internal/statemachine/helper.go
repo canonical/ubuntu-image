@@ -793,6 +793,11 @@ func manualCopyFile(copyFileInterfaces interface{}, targetDir string, debug bool
 		if debug {
 			fmt.Printf("Copying file \"%s\" to \"%s\"", copyFile.Source, dest)
 		}
+		absDest, _ := filepath.Abs(dest)
+		if !strings.HasPrefix(absDest, targetDir) {
+			return fmt.Errorf("Error copying file \"%s\" into chroot: destination outside of chroot (\"%s\")",
+				copyFile.Source, absDest)
+		}
 		if err := osutilCopySpecialFile(copyFile.Source, dest); err != nil {
 			return fmt.Errorf("Error copying file \"%s\" into chroot: %s",
 				copyFile.Source, err.Error())
@@ -828,6 +833,11 @@ func manualTouchFile(touchFileInterfaces interface{}, targetDir string, debug bo
 		fullPath := filepath.Join(targetDir, touchFile.TouchPath)
 		if debug {
 			fmt.Printf("Creating empty file \"%s\"", fullPath)
+		}
+		absDest, _ := filepath.Abs(fullPath)
+		if !strings.HasPrefix(absDest, targetDir) {
+			return fmt.Errorf("Error creating file in chroot: destination outside of chroot (\"%s\")",
+				absDest)
 		}
 		_, err := osCreate(fullPath)
 		if err != nil {
