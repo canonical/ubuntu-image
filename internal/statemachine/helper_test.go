@@ -806,7 +806,7 @@ func TestFailedManualTouchFile(t *testing.T) {
 				TouchPath: "/test/does/not/exist",
 			},
 		}
-		err := manualTouchFile(touchFiles, "fakedir", true)
+		err := manualTouchFile(touchFiles, "/fakedir", true)
 		asserter.AssertErrContains(err, "Error creating file")
 	})
 }
