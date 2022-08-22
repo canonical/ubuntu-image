@@ -899,7 +899,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.Debug = true
-		stateMachine.commonFlags.Size = "4G"
+		stateMachine.commonFlags.Size = "5G"
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 			"test_amd64.yaml")
 
