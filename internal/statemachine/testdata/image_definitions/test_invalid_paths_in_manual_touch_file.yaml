@@ -36,13 +36,11 @@ customization:
     - name: linux-firmware-raspi
     - name: pi-bluetooth
   manual:
-    copy-file:
-      -
-        source: /etc/hosts
-        destination: /etc/hosts
     touch-file:
       -
-        path: /etc/foo
+        path: ../../malicious
+      -
+        path: /../../malicious
 artifacts:
   img:
       path: raspi.img

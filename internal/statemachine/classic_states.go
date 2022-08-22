@@ -83,8 +83,9 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 			errDetail,
 		)
 	}
-	// do custom validation for private PPAs requiring fingerprint
+
 	if imageDefinition.Customization != nil {
+		// do custom validation for private PPAs requiring fingerprint
 		for _, ppa := range imageDefinition.Customization.ExtraPPAs {
 			if ppa.Auth != "" && ppa.Fingerprint == "" {
 				jsonContext := gojsonschema.NewJsonContext("ppa_validation", nil)
@@ -100,6 +101,52 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 					),
 					errDetail,
 				)
+			}
+		}
+		// do custom validation for manual customization paths
+		if imageDefinition.Customization.Manual != nil {
+			jsonContext := gojsonschema.NewJsonContext("manual_path_validation", nil)
+			if imageDefinition.Customization.Manual.CopyFile != nil {
+				for _, copy := range imageDefinition.Customization.Manual.CopyFile {
+					// XXX: filepath.IsAbs() does returns true for paths like /../../something
+					// and those are NOT absolute paths.
+					if !filepath.IsAbs(copy.Dest) || strings.Contains(copy.Dest, "/../") {
+						errDetail := gojsonschema.ErrorDetails{
+							"key":   "customization:manual:copy-file:destination",
+							"value": copy.Dest,
+						}
+						result.AddError(
+							newPathNotAbsoluteError(
+								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
+									jsonContext),
+								52,
+								errDetail,
+							),
+							errDetail,
+						)
+					}
+				}
+			}
+			if imageDefinition.Customization.Manual.TouchFile != nil {
+				for _, touch := range imageDefinition.Customization.Manual.TouchFile {
+					// XXX: filepath.IsAbs() does returns true for paths like /../../something
+					// and those are NOT absolute paths.
+					if !filepath.IsAbs(touch.TouchPath) || strings.Contains(touch.TouchPath, "/../") {
+						errDetail := gojsonschema.ErrorDetails{
+							"key":   "customization:manual:touch-file:path",
+							"value": touch.TouchPath,
+						}
+						result.AddError(
+							newPathNotAbsoluteError(
+								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
+									jsonContext),
+								52,
+								errDetail,
+							),
+							errDetail,
+						)
+					}
+				}
 			}
 		}
 	}

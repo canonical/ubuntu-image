@@ -38,11 +38,11 @@ customization:
   manual:
     copy-file:
       -
-        source: /etc/hosts
-        destination: /etc/hosts
-    touch-file:
+        source: /foo/bar
+        destination: /../../malicious
       -
-        path: /etc/foo
+        source: /foo/bar
+        destination: ../../malicious
 artifacts:
   img:
       path: raspi.img

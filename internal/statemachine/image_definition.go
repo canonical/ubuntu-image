@@ -238,6 +238,23 @@ type InvalidPPAError struct {
 	gojsonschema.ResultErrorFields
 }
 
+func newPathNotAbsoluteError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *PathNotAbsoluteError {
+	err := PathNotAbsoluteError{}
+	err.SetContext(context)
+	err.SetType("path_not_absolute_error")
+	err.SetDescriptionFormat("Key {{.key}} needs to be an absolute path ({{.value}})")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// PathNotAbsoluteError implements gojsonschema.ErrorType. It is used for custom errors for
+// fields that should be absolute but are not
+type PathNotAbsoluteError struct {
+	gojsonschema.ResultErrorFields
+}
+
 // generatePocketList returns a slice of strings that need to be added to
 // /etc/apt/sources.list in the chroot based on the value of "pocket"
 // in the rootfs section of the image definition

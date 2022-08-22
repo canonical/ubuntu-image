@@ -780,22 +780,6 @@ func TestFailedManualCopyFile(t *testing.T) {
 	})
 }
 
-// TestWrongPathManualCopyFile tests for failures on destination outside of the chroot
-func TestWrongPathManualCopyFile(t *testing.T) {
-	t.Run("test_wrong_path_manual_copy_file", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-
-		copyFiles := []*CopyFileType{
-			{
-				Dest:   "../etc/shadow",
-				Source: "/test/does/not/exist",
-			},
-		}
-		err := manualCopyFile(copyFiles, "/fakedir", true)
-		asserter.AssertErrContains(err, "destination outside of chroot")
-	})
-}
-
 // TestFailedManualTouchFile tests the fail case of the manualTouchFile function
 func TestFailedManualTouchFile(t *testing.T) {
 	t.Run("test_failed_manual_touch_file", func(t *testing.T) {
@@ -808,21 +792,6 @@ func TestFailedManualTouchFile(t *testing.T) {
 		}
 		err := manualTouchFile(touchFiles, "/fakedir", true)
 		asserter.AssertErrContains(err, "Error creating file")
-	})
-}
-
-// TestWrongPathManualTouchFile tests for failures on touch-path outside of the chroot
-func TestWrongPathManualTouchFile(t *testing.T) {
-	t.Run("test_wrong_path_manual_touch_file", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-
-		touchFiles := []*TouchFileType{
-			{
-				TouchPath: "../etc/malicious-file",
-			},
-		}
-		err := manualTouchFile(touchFiles, "/fakedir", true)
-		asserter.AssertErrContains(err, "destination outside of chroot")
 	})
 }
 
