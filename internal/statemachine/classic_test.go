@@ -238,13 +238,14 @@ func TestPrintStates(t *testing.T) {
 [5] install_packages
 [6] populate_rootfs_contents
 [7] customize_cloud_init
-[8] generate_disk_info
-[9] calculate_rootfs_size
-[10] populate_bootfs_contents
-[11] populate_prepare_partitions
-[12] make_disk
-[13] generate_manifest
-[14] finish
+[8] customize_fstab
+[9] generate_disk_info
+[10] calculate_rootfs_size
+[11] populate_bootfs_contents
+[12] populate_prepare_partitions
+[13] make_disk
+[14] generate_manifest
+[15] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -1469,5 +1470,149 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		osRemoveAll = os.RemoveAll
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestCustomizeFstab tests functionality of the customizeFstab function
+func TestCustomizeFstab(t *testing.T) {
+	testCases := []struct {
+		name          string
+		fstab         []*FstabType
+		expectedFstab string
+	}{
+		{
+			"one_entry",
+			[]*FstabType{
+				&FstabType{
+					Label:        "writable",
+					Mountpoint:   "/",
+					FSType:       "ext4",
+					MountOptions: "defaults",
+					Dump:         true,
+					FsckOrder:    1,
+				},
+			},
+			`LABEL=writable	/	ext4	defaults	1	1`,
+		},
+		{
+			"two_entries",
+			[]*FstabType{
+				&FstabType{
+					Label:        "writable",
+					Mountpoint:   "/",
+					FSType:       "ext4",
+					MountOptions: "defaults",
+					Dump:         false,
+					FsckOrder:    1,
+				},
+				&FstabType{
+					Label:        "system-boot",
+					Mountpoint:   "/boot/firmware",
+					FSType:       "vfat",
+					MountOptions: "defaults",
+					Dump:         false,
+					FsckOrder:    1,
+				},
+			},
+			`LABEL=writable	/	ext4	defaults	0	1
+LABEL=system-boot	/boot/firmware	vfat	defaults	0	1`,
+		},
+		{
+			"defaults_assumed",
+			[]*FstabType{
+				&FstabType{
+					Label:      "writable",
+					Mountpoint: "/",
+					FSType:     "ext4",
+					FsckOrder:  1,
+				},
+			},
+			`LABEL=writable	/	ext4	defaults	0	1`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run("test_customize_fstab_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.ImageDef = ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Rootfs:       &RootfsType{},
+				Customization: &CustomizationType{
+					Fstab: tc.fstab,
+				},
+			}
+
+			// set the defaults for the imageDef
+			err := helper.SetDefaults(&stateMachine.ImageDef)
+			asserter.AssertErrNil(err, true)
+
+			// need workdir set up for this
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			// create the <chroot>/etc directory
+			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0644)
+			asserter.AssertErrNil(err, true)
+
+			// customize the fstab, ensure no errors, and check the contents
+			err = stateMachine.customizeFstab()
+			asserter.AssertErrNil(err, true)
+
+			fstabBytes, err := ioutil.ReadFile(
+				filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
+			)
+			asserter.AssertErrNil(err, true)
+
+			if string(fstabBytes) != tc.expectedFstab {
+				t.Errorf("Expected fstab contents \"%s\", but got \"%s\"",
+					tc.expectedFstab, string(fstabBytes))
+			}
+		})
+	}
+}
+
+// TestFailedCustomizeFstab tests failures in the customizeFstab function
+func TestFailedCustomizeFstab(t *testing.T) {
+	t.Run("test_failed_customize_fstab", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs:       &RootfsType{},
+			Customization: &CustomizationType{
+				Fstab: []*FstabType{
+					&FstabType{
+						Label:        "writable",
+						Mountpoint:   "/",
+						FSType:       "ext4",
+						MountOptions: "defaults",
+						Dump:         false,
+						FsckOrder:    1,
+					},
+				},
+			},
+		}
+
+		// mock os.OpenFile
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err := stateMachine.customizeFstab()
+		asserter.AssertErrContains(err, "Error opening fstab")
+		osOpenFile = os.OpenFile
 	})
 }

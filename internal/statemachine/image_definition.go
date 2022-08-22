@@ -74,6 +74,7 @@ type CustomizationType struct {
 	ExtraPPAs     []*PPAType     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"`
 	ExtraPackages []*PackageType `yaml:"extra-packages" json:"ExtraPackages,omitempty"`
 	ExtraSnaps    []*SnapType    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"`
+	Fstab         []*FstabType   `yaml:"fstab"          json:"Fstab,omitempty"`
 	Manual        *ManualType    `yaml:"manual"         json:"Manual,omitempty"`
 }
 
@@ -115,6 +116,16 @@ type SnapType struct {
 	SnapRevision string `yaml:"revision" json:"SnapRevision,omitempty"`
 	Store        string `yaml:"store"    json:"Store"                  default:"canonical"`
 	Channel      string `yaml:"channel"  json:"Channel"                default:"stable"`
+}
+
+// FstabType defines the information that gets rendered into an fstab
+type FstabType struct {
+	Label        string `yaml:"label"           json:"Label"`
+	Mountpoint   string `yaml:"mountpoint"      json:"Mountpoint"`
+	FSType       string `yaml:"filesystem-type" json:"FSType"`
+	MountOptions string `yaml:"mount-options"   json:"MountOptions" default:"defaults"`
+	Dump         bool   `yaml:"dump"            json:"Dump,omitempty"`
+	FsckOrder    int    `yaml:"fsck-order" json:"FsckOrder"`
 }
 
 // ManualType provides manual customization options
