@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -17,6 +18,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
+	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
 	//"github.com/snapcore/snapd/seed"
@@ -247,10 +249,11 @@ func TestPrintStates(t *testing.T) {
 [10] generate_disk_info
 [11] calculate_rootfs_size
 [12] populate_bootfs_contents
-[13] populate_prepare_partitions
-[14] make_disk
-[15] generate_manifest
-[16] finish
+[13] customize_kernel_and_initrd
+[14] populate_prepare_partitions
+[15] make_disk
+[16] generate_manifest
+[17] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -308,6 +311,11 @@ func TestPrepareGadgetTree(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget:       &GadgetType{},
+		}
 
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
@@ -340,6 +348,11 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget:       &GadgetType{},
+		}
 
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
@@ -427,23 +440,6 @@ func TestCustomizeCloudInit(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 		err := stateMachine.customizeCloudInit()
-		asserter.AssertErrNil(err, true)
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}
-
-// TestSetupExtraPPAs unit tests the setupExtraPPAs function
-func TestSetupExtraPPAs(t *testing.T) {
-	t.Run("test_setup_extra_PPAs", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		err := stateMachine.setupExtraPPAs()
 		asserter.AssertErrNil(err, true)
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
@@ -957,6 +953,26 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			}
 		}
 
+		// make sure vmlinuz and initrd.img exist in the boot partition
+		bootFiles := []string{"vmlinuz", "initrd.img"}
+		for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+			for ii, structure := range volume.Structure {
+				if(structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot) {
+					for _, bootFile := range bootFiles {
+						target := filepath.Join(stateMachine.tempDirs.volumes,
+							volumeName,
+							"part"+strconv.Itoa(ii),
+							bootFile,
+						)
+						_, err := os.Stat(target)
+						if err != nil {
+							t.Errorf("File %s should exist, but it does not", target)
+						}
+					}
+				}
+			}
+		}
+
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
 
@@ -1428,6 +1444,7 @@ func TestFailedInstallPackages(t *testing.T) {
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Rootfs:       &RootfsType{},
+			Kernel:       &KernelType{},
 			Customization: &CustomizationType{
 				ExtraPackages: []*PackageType{
 					{
@@ -1529,5 +1546,65 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		osRemoveAll = os.RemoveAll
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestFailedAddKernelAndInitrd tests failures in the addKernelAndInitrd function
+func TestFailedAddKernelAndInitrd(t *testing.T) {
+	t.Run("test_failed_add_extra_ppas", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs:       &RootfsType{},
+			Kernel:       &KernelType{
+				KernelName:   "linux-image-generic",
+				KernelTarget: "vmlinuz",
+			},
+			Gadget:       &GadgetType{
+				GadgetType: "prebuilt",
+				GadgetURL:  filepath.Join("testdata", "gadget_tree"),
+			},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+		// also create a "chroot/boot" directory under workdir
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "boot"), 0755)
+		asserter.AssertErrNil(err, true)
+
+		// prepare the gadget tree and load gadget yaml
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		// first try to customize with no kernel to copy
+		err = stateMachine.addKernelAndInitrd()
+		asserter.AssertErrContains(err, "Error copying kernel. No kernel exists")
+
+		// create a "kernel" file and try to customize with no initrd
+		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "boot", "vmlinuz-test"))
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.addKernelAndInitrd()
+		asserter.AssertErrContains(err, "Error copying initrd. No initrd exists")
+
+		// create an "initrd" file and mock osutil.CopyFile
+		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "boot", "initrd.img-test"))
+		asserter.AssertErrNil(err, true)
+		osutilCopyFile = mockCopyFile
+		defer func() {
+			osutilCopyFile = osutil.CopyFile
+		}()
+		err = stateMachine.addKernelAndInitrd()
+		asserter.AssertErrContains(err, "Error copying")
+		osutilCopyFile = osutil.CopyFile
 	})
 }

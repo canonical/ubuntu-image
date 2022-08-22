@@ -26,7 +26,7 @@ type ImageDefinition struct {
 
 // KernelType defines the kernel section of the image definition file
 type KernelType struct {
-	KernelName   string `yaml:"name" json:"KernelName" default:"linux-image"`
+	KernelName   string `yaml:"name" json:"KernelName" default:"linux-image-generic"`
 	KernelTarget string `yaml:"target" json:"KernelTarget" default:"vmlinuz"`
 }
 

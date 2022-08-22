@@ -275,7 +275,12 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 		return fmt.Errorf("Error creating unpack directory: %s", err.Error())
 	}
 	// recursively copy the gadget tree to unpack/gadget
-	gadgetTree := filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+	var gadgetTree string
+	if classicStateMachine.ImageDef.Gadget.GadgetType == "prebuilt" {
+		gadgetTree = classicStateMachine.ImageDef.Gadget.GadgetURL
+	} else {
+		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+	}
 	files, err := ioutilReadDir(gadgetTree)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
@@ -396,6 +401,10 @@ func (stateMachine *StateMachine) installPackages() error {
 		}
 	}
 
+	// add the configured kernel to the list of packages
+	classicStateMachine.Packages = append(classicStateMachine.Packages,
+		classicStateMachine.ImageDef.Kernel.KernelName)
+
 	// Slice used to store all the commands that need to be run
 	// to install the packages
 	var installPackagesCmds []*exec.Cmd
@@ -509,42 +518,8 @@ func (stateMachine *StateMachine) addKernelAndInitrd() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	// Get current working directory so we can Chdir back to it
-	curDir, err := osGetwd()
-	if err != nil {
-		return fmt.Errorf("Error getting current working directory: \"%s\"", err.Error())
-	}
-	defer func() {
-		os.Chdir(curDir)
-	}()
-
-	// cd into the scratch dir for download and extraction of kernel
-	err = osChdir(stateMachine.tempDirs.scratch)
-	if err != nil {
-		return fmt.Errorf("Error changing directories into scratch directory: \"%s\". Error is %s",
-			stateMachine.tempDirs.scratch, err.Error())
-	}
-
-	downloadCmd := execCommand("apt", "download", classicStateMachine.ImageDef.Kernel.KernelName)
-	downloadOutput := helper.SetCommandOutput(downloadCmd, classicStateMachine.commonFlags.Debug)
-	if err := downloadCmd.Run(); err != nil {
-		return fmt.Errorf("Error downloading kernel deb. "+
-			"Error is \"%s\". Full output below:\n%s",
-			err.Error(), downloadOutput.String())
-	}
-
-	kernelDeb, _ := filepath.Glob(fmt.Sprintf("%s*.deb", classicStateMachine.ImageDef.Kernel.KernelName))
-	extractCmd := execCommand("dpkg-deb", "--extract", kernelDeb[0], ".")
-	extractOutput := helper.SetCommandOutput(extractCmd, classicStateMachine.commonFlags.Debug)
-	if err := extractCmd.Run(); err != nil {
-		return fmt.Errorf("Error extracting kernel deb. "+
-			"Error is \"%s\". Full output below:\n%s",
-			err.Error(), extractOutput.String())
-	}
-
-	// now copy the kernel to the boot volume
-	fmt.Println(stateMachine.GadgetInfo)
-	fmt.Println(stateMachine.GadgetInfo.Volumes)
+	// the kernel and initrd were installed during the "install_packages"
+	// state, but we still need to copy them to the boot partition
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		for ii, structure := range volume.Structure {
 			if(structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot) {
@@ -554,13 +529,50 @@ func (stateMachine *StateMachine) addKernelAndInitrd() error {
 					"part"+strconv.Itoa(ii),
 					classicStateMachine.ImageDef.Kernel.KernelTarget,
 				)
-				kernelSource, _ := filepath.Glob(fmt.Sprintf("%s-*",
-					classicStateMachine.ImageDef.Kernel.KernelName),
+				kernelSource, _ := filepath.Glob(
+					filepath.Join(classicStateMachine.tempDirs.chroot,
+						"boot", fmt.Sprintf("%s-*",
+						classicStateMachine.ImageDef.Kernel.KernelTarget),
+					),
 				)
 
-				if err := osutilCopyFile(kernelSource[0], kernelTarget, 0); err != nil {
-					return fmt.Errorf("Error copying kernel \"%s\" to \"%s\". Error is %s",
-						kernelSource[0], kernelTarget, err.Error())
+				initrdTarget := filepath.Join(stateMachine.tempDirs.volumes,
+					volumeName,
+					"part"+strconv.Itoa(ii),
+					"initrd.img",
+				)
+
+				initrdSource, _ := filepath.Glob(
+					filepath.Join(classicStateMachine.tempDirs.chroot,
+						"boot", "initrd.img-*"),
+				)
+
+				// check to make sure a kernel and initrd were found
+				if len(kernelSource) < 1 {
+					return fmt.Errorf("Error copying kernel. No kernel exists matching %s",
+						filepath.Join(classicStateMachine.tempDirs.chroot, "boot",
+							fmt.Sprintf("%s-*", classicStateMachine.ImageDef.Kernel.KernelTarget),
+						),
+					)
+				}
+
+				if len(initrdSource) < 1 {
+					return fmt.Errorf("Error copying initrd. No initrd exists matching %s",
+						filepath.Join(classicStateMachine.tempDirs.chroot, "boot", "initrd.img-*"),
+					)
+				}
+
+				// finally copy the files to the boot partition
+				fileCopies := map[string]string{
+					kernelSource[0]: kernelTarget,
+					initrdSource[0]: initrdTarget,
+				}
+
+				for source, dest := range fileCopies {
+					if err := osutilCopyFile(source, dest, 0); err != nil {
+						return fmt.Errorf("Error copying \"%s\" to \"%s\". Error is %s",
+							source, dest, err.Error())
+					}
 				}
 			}
 		}

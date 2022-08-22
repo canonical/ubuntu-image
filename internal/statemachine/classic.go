@@ -17,10 +17,10 @@ var rootfsSeedStates = []stateFunc{
 }
 
 var imageCreationStates = []stateFunc{
-	{"customize_kernel_and_initrd", (*StateMachine).addKernelAndInitrd},
 	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
+	{"customize_kernel_and_initrd", (*StateMachine).addKernelAndInitrd},
 	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
 	{"make_disk", (*StateMachine).makeDisk},
 	{"generate_manifest", (*StateMachine).generatePackageManifest},
