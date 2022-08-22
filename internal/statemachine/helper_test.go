@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -20,7 +19,6 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
-	"github.com/snapcore/snapd/seed"
 )
 
 // TestMaxOffset tests the functionality of the maxOffset function
@@ -587,76 +585,6 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 	}
 }
 
-// TestFailedRemovePreseeding tests various failure scenarios in the removePreseeding function
-func TestFailedRemovePreseeding(t *testing.T) {
-	t.Run("test_failed_remove_preseeding", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "snapd", "seed")
-		err = os.MkdirAll(seedDir, 0755)
-		asserter.AssertErrNil(err, true)
-
-		// call "snap prepare image" to preseed the filesystem.
-		// Doing the preseed at the time of the test allows it to
-		// run on each architecture and keeps the github repository
-		// free of large .snap files
-		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
-			filepath.Join("testdata", "modelAssertionClassic"),
-			stateMachine.tempDirs.rootfs)
-		err = snapPrepareImage.Run()
-		asserter.AssertErrNil(err, true)
-
-		// mock os.RemoveAll so the directory isn't cleared out every time
-		osRemoveAll = mockRemoveAll
-		defer func() {
-			osRemoveAll = os.RemoveAll
-		}()
-
-		// mock seed.Open
-		seedOpen = mockSeedOpen
-		defer func() {
-			seedOpen = seed.Open
-		}()
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Test error")
-		seedOpen = seed.Open
-
-		// move the model from var/lib/snapd/seed/assertions to cause an error
-		err = os.Rename(filepath.Join(seedDir, "assertions", "model"),
-			filepath.Join(stateMachine.tempDirs.rootfs, "model"))
-		asserter.AssertErrNil(err, true)
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "seed must have a model assertion")
-		err = os.Rename(filepath.Join(stateMachine.tempDirs.rootfs, "model"),
-			filepath.Join(seedDir, "assertions", "model"))
-		asserter.AssertErrNil(err, true)
-
-		// move seed.yaml to cause an error in LoadMeta
-		err = os.Rename(filepath.Join(seedDir, "seed.yaml"),
-			filepath.Join(seedDir, "seed.yaml.bak"))
-		asserter.AssertErrNil(err, true)
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "no seed metadata")
-		err = os.Rename(filepath.Join(seedDir, "seed.yaml.bak"),
-			filepath.Join(seedDir, "seed.yaml"))
-		asserter.AssertErrNil(err, true)
-
-		// the files have been restored, just test the failure in os.RemoveAll
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Test error")
-		osRemoveAll = os.RemoveAll
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}
-
 // TestGetHostArch unit tests the getHostArch function
 func TestGetHostArch(t *testing.T) {
 	t.Run("test_get_host_arch", func(t *testing.T) {
@@ -738,46 +666,6 @@ func TestGetQemuStaticForArch(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestRemovePreseeding unit tests the removePreseeding function
-func TestRemovePreseeding(t *testing.T) {
-	t.Run("test_remove_preseeding", func(t *testing.T) {
-		if runtime.GOARCH != "amd64" {
-			t.Skip("Test for amd64 only")
-		}
-		asserter := helper.Asserter{T: t}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-
-		// copy the filesystem over before attempting to preseed it
-		osutil.CopySpecialFile(filepath.Join("testdata", "filesystem"), stateMachine.tempDirs.rootfs)
-
-		// call "snap prepare image" to preseed the filesystem.
-		// Doing the preseed at the time of the test keeps the
-		// github repository free of large .snap files
-		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20=candidate", "--snap=snapd=beta", "--snap=lxd",
-			filepath.Join("testdata", "modelAssertionClassic"),
-			stateMachine.tempDirs.rootfs)
-		err := snapPrepareImage.Run()
-		asserter.AssertErrNil(err, true)
-
-		seededSnaps, err := removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrNil(err, true)
-
-		// make sure the correct snaps were returned by removePreseeding
-		expectedSnaps := map[string]string{
-			"core20": "candidate",
-			"snapd":  "beta",
-			"lxd":    "stable",
-		}
-
-		if !reflect.DeepEqual(seededSnaps, expectedSnaps) {
-			t.Error("removePreseeding did not find the correct snap/channel mappings")
-		}
-	})
 }
 
 // TestGenerateGerminateCmd unit tests the generateGerminateCmd function
@@ -874,6 +762,84 @@ func TestValidateUntilThru(t *testing.T) {
 
 		})
 	}
+}
+
+// TestFailedManualCopyFile tests the fail case of the manualCopyFile function
+func TestFailedManualCopyFile(t *testing.T) {
+	t.Run("test_failed_manual_copy_file", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		copyFiles := []*CopyFileType{
+			{
+				Dest:   "/test/does/not/exist",
+				Source: "/test/does/not/exist",
+			},
+		}
+		err := manualCopyFile(copyFiles, "fakedir", true)
+		asserter.AssertErrContains(err, "Error copying file")
+	})
+}
+
+// TestFailedManualTouchFile tests the fail case of the manualTouchFile function
+func TestFailedManualTouchFile(t *testing.T) {
+	t.Run("test_failed_manual_touch_file", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		touchFiles := []*TouchFileType{
+			{
+				TouchPath: "/test/does/not/exist",
+			},
+		}
+		err := manualTouchFile(touchFiles, "fakedir", true)
+		asserter.AssertErrContains(err, "Error creating file")
+	})
+}
+
+// TestFailedManualExecute tests the fail case of the manualExecute function
+func TestFailedManualExecute(t *testing.T) {
+	t.Run("test_failed_manual_execute", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		executes := []*ExecuteType{
+			{
+				ExecutePath: "/test/does/not/exist",
+			},
+		}
+		err := manualExecute(executes, "fakedir", true)
+		asserter.AssertErrContains(err, "Error running script")
+	})
+}
+
+// TestFailedManualAddGroup tests the fail case of the manualAddGroup function
+func TestFailedManualAddGroup(t *testing.T) {
+	t.Run("test_failed_manual_add_group", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		addGroups := []*AddGroupType{
+			{
+				GroupName: "testgroup",
+				GroupID:   "123",
+			},
+		}
+		err := manualAddGroup(addGroups, "fakedir", true)
+		asserter.AssertErrContains(err, "Error adding group")
+	})
+}
+
+// TestFailedManualAddUser tests the fail case of the manualAddUser function
+func TestFailedManualAddUser(t *testing.T) {
+	t.Run("test_failed_manual_add_user", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		addUsers := []*AddUserType{
+			{
+				UserName: "testuser",
+				UserID:   "123",
+			},
+		}
+		err := manualAddUser(addUsers, "fakedir", true)
+		asserter.AssertErrContains(err, "Error adding user")
+	})
 }
 
 // TestGenerateAptCmd unit tests the generateAptCmd function

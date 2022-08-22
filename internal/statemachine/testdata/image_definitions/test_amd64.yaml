@@ -31,6 +31,10 @@ customization:
       -
         name: ubuntu
         password: ubuntu
+  extra-snaps:
+    -
+      name: hello
+      channel: candidate
   extra-ppas:
     -
       name: "canonical-foundations/ubuntu-image"
