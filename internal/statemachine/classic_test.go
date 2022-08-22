@@ -247,13 +247,14 @@ func TestPrintStates(t *testing.T) {
 [6] preseed_image
 [7] populate_rootfs_contents
 [8] customize_cloud_init
-[9] generate_disk_info
-[10] calculate_rootfs_size
-[11] populate_bootfs_contents
-[12] populate_prepare_partitions
-[13] make_disk
-[14] generate_manifest
-[15] finish
+[9] perform_manual_customization
+[10] generate_disk_info
+[11] calculate_rootfs_size
+[12] populate_bootfs_contents
+[13] populate_prepare_partitions
+[14] make_disk
+[15] generate_manifest
+[16] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
