@@ -1483,7 +1483,7 @@ func TestCustomizeFstab(t *testing.T) {
 		{
 			"one_entry",
 			[]*FstabType{
-				&FstabType{
+				{
 					Label:        "writable",
 					Mountpoint:   "/",
 					FSType:       "ext4",
@@ -1497,7 +1497,7 @@ func TestCustomizeFstab(t *testing.T) {
 		{
 			"two_entries",
 			[]*FstabType{
-				&FstabType{
+				{
 					Label:        "writable",
 					Mountpoint:   "/",
 					FSType:       "ext4",
@@ -1505,7 +1505,7 @@ func TestCustomizeFstab(t *testing.T) {
 					Dump:         false,
 					FsckOrder:    1,
 				},
-				&FstabType{
+				{
 					Label:        "system-boot",
 					Mountpoint:   "/boot/firmware",
 					FSType:       "vfat",
@@ -1520,7 +1520,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1`,
 		{
 			"defaults_assumed",
 			[]*FstabType{
-				&FstabType{
+				{
 					Label:      "writable",
 					Mountpoint: "/",
 					FSType:     "ext4",
@@ -1594,7 +1594,7 @@ func TestFailedCustomizeFstab(t *testing.T) {
 			Rootfs:       &RootfsType{},
 			Customization: &CustomizationType{
 				Fstab: []*FstabType{
-					&FstabType{
+					{
 						Label:        "writable",
 						Mountpoint:   "/",
 						FSType:       "ext4",
