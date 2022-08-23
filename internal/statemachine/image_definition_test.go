@@ -18,9 +18,8 @@ func TestGeneratePocketList(t *testing.T) {
 				Rootfs: &RootfsType{
 					Pocket:     "release",
 					Components: []string{"main", "universe"},
-					Mirror: "http://archive.ubuntu.com/ubuntu/",
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
 				},
-
 			},
 			[]string{},
 		},
@@ -31,7 +30,7 @@ func TestGeneratePocketList(t *testing.T) {
 				Rootfs: &RootfsType{
 					Pocket:     "security",
 					Components: []string{"main"},
-					Mirror: "http://archive.ubuntu.com/ubuntu/",
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
 			[]string{"deb http://archive.ubuntu.com/ubuntu/ jammy-security main\n"},
@@ -43,7 +42,7 @@ func TestGeneratePocketList(t *testing.T) {
 				Rootfs: &RootfsType{
 					Pocket:     "updates",
 					Components: []string{"main", "universe", "multiverse"},
-					Mirror: "http://archive.ubuntu.com/ubuntu/",
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
 			[]string{
@@ -58,7 +57,7 @@ func TestGeneratePocketList(t *testing.T) {
 				Rootfs: &RootfsType{
 					Pocket:     "proposed",
 					Components: []string{"main", "universe", "multiverse", "restricted"},
-					Mirror: "http://archive.ubuntu.com/ubuntu/",
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
 			[]string{
