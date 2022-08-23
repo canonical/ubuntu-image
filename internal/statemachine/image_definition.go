@@ -40,7 +40,7 @@ type GadgetType struct {
 
 // RootfsType defines the rootfs section of the image definition file
 type RootfsType struct {
-	Components   []string     `yaml:"components"    json:"Components,omitempty"`
+	Components   []string     `yaml:"components"    json:"Components,omitempty"   default:"main"`
 	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
 	Flavor       string       `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
 	Mirror       string       `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
