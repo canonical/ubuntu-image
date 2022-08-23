@@ -18,7 +18,9 @@ func TestGeneratePocketList(t *testing.T) {
 				Rootfs: &RootfsType{
 					Pocket:     "release",
 					Components: []string{"main", "universe"},
+					Mirror: "http://archive.ubuntu.com/ubuntu/",
 				},
+
 			},
 			[]string{},
 		},
@@ -29,9 +31,10 @@ func TestGeneratePocketList(t *testing.T) {
 				Rootfs: &RootfsType{
 					Pocket:     "security",
 					Components: []string{"main"},
+					Mirror: "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
-			[]string{"deb http://security.ubuntu.com/ubuntu/ jammy-security main\n"},
+			[]string{"deb http://archive.ubuntu.com/ubuntu/ jammy-security main\n"},
 		},
 		{
 			"updates",
@@ -40,10 +43,11 @@ func TestGeneratePocketList(t *testing.T) {
 				Rootfs: &RootfsType{
 					Pocket:     "updates",
 					Components: []string{"main", "universe", "multiverse"},
+					Mirror: "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
 			[]string{
-				"deb http://security.ubuntu.com/ubuntu/ jammy-security main universe multiverse\n",
+				"deb http://archive.ubuntu.com/ubuntu/ jammy-security main universe multiverse\n",
 				"deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe multiverse\n",
 			},
 		},
@@ -54,10 +58,11 @@ func TestGeneratePocketList(t *testing.T) {
 				Rootfs: &RootfsType{
 					Pocket:     "proposed",
 					Components: []string{"main", "universe", "multiverse", "restricted"},
+					Mirror: "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
 			[]string{
-				"deb http://security.ubuntu.com/ubuntu/ jammy-security main universe multiverse restricted\n",
+				"deb http://archive.ubuntu.com/ubuntu/ jammy-security main universe multiverse restricted\n",
 				"deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe multiverse restricted\n",
 				"deb http://archive.ubuntu.com/ubuntu/ jammy-proposed main universe multiverse restricted\n",
 			},
@@ -74,7 +79,7 @@ func TestGeneratePocketList(t *testing.T) {
 					}
 				}
 				if !found {
-					t.Errorf("Expected %s in pockets list, but it was not", expectedPocket)
+					t.Errorf("Expected %s in pockets list %s, but it was not", expectedPocket, pocketList)
 				}
 			}
 		})
