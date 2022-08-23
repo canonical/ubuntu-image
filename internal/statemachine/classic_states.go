@@ -522,7 +522,7 @@ func (stateMachine *StateMachine) addKernelAndInitrd() error {
 	// state, but we still need to copy them to the boot partition
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		for ii, structure := range volume.Structure {
-			if(structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot) {
+			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
 				// found the boot structure, now copy the kernel to it
 				kernelTarget := filepath.Join(stateMachine.tempDirs.volumes,
 					volumeName,
@@ -532,7 +532,7 @@ func (stateMachine *StateMachine) addKernelAndInitrd() error {
 				kernelSource, _ := filepath.Glob(
 					filepath.Join(classicStateMachine.tempDirs.chroot,
 						"boot", fmt.Sprintf("%s-*",
-						classicStateMachine.ImageDef.Kernel.KernelTarget),
+							classicStateMachine.ImageDef.Kernel.KernelTarget),
 					),
 				)
 
@@ -577,7 +577,7 @@ func (stateMachine *StateMachine) addKernelAndInitrd() error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 

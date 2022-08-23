@@ -957,7 +957,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		bootFiles := []string{"vmlinuz", "initrd.img"}
 		for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 			for ii, structure := range volume.Structure {
-				if(structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot) {
+				if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
 					for _, bootFile := range bootFiles {
 						target := filepath.Join(stateMachine.tempDirs.volumes,
 							volumeName,
@@ -1563,11 +1563,11 @@ func TestFailedAddKernelAndInitrd(t *testing.T) {
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Rootfs:       &RootfsType{},
-			Kernel:       &KernelType{
+			Kernel: &KernelType{
 				KernelName:   "linux-image-generic",
 				KernelTarget: "vmlinuz",
 			},
-			Gadget:       &GadgetType{
+			Gadget: &GadgetType{
 				GadgetType: "prebuilt",
 				GadgetURL:  filepath.Join("testdata", "gadget_tree"),
 			},
