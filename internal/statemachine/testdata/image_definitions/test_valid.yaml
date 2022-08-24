@@ -33,9 +33,6 @@ rootfs:
       - standard
       - cloud-image
 customization:
-  extra-ppas:
-    -
-      name: "jawn-smith/devel-proposed"
   cloud-init:
     user-data:
       -
