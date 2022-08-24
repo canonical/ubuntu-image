@@ -2,10 +2,10 @@ name: ubuntu-server-raspi-arm64
 display-name: Ubuntu Server Raspberry Pi arm64
 revision: 2
 architecture: arm64
-series: jammy
+series: kinetic
 class: preinstalled
 kernel:
-  name: linux-raspi
+  name: linux-image-raspi
 gadget:
   url: "https://github.com/snapcore/pi-gadget.git"
   branch: "classic"
@@ -13,7 +13,13 @@ gadget:
 model-assertion: pi-generic.model
 rootfs:
   archive: ubuntu
-  mirror: "http://ports.ubuntu.com/ubuntu/"
+  components:
+    - main
+    - universe
+    - multiverse
+    - restricted
+  mirror: "http://ports.ubuntu.com/"
+  pocket: updates
   seed:
     urls:
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
@@ -21,11 +27,15 @@ rootfs:
     branch: jammy
     names:
       - server
+      - server-raspi
+      - raspi-common
       - minimal
       - standard
       - cloud-image
-      - ubuntu-server-raspi
 customization:
+  extra-ppas:
+    -
+      name: "jawn-smith/devel-proposed"
   cloud-init:
     user-data:
       -
@@ -35,6 +45,7 @@ customization:
     - name: ubuntu-minimal
     - name: linux-firmware-raspi
     - name: pi-bluetooth
+    - name: ubuntu-raspi-settings
 artifacts:
   img:
       path: raspi.img
