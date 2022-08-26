@@ -19,7 +19,7 @@ type ImageDefinition struct {
 	Gadget         *GadgetType        `yaml:"gadget"          json:"Gadget"`
 	ModelAssertion string             `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
 	Rootfs         *RootfsType        `yaml:"rootfs"          json:"Rootfs"`
-	Customization  *CustomizationType `yaml:"customization"   json:"Customization"`
+	Customization  *CustomizationType `yaml:"customization"   json:"Customization,omitempty"`
 	Artifacts      *ArtifactType      `yaml:"artifacts"       json:"Artifacts"`
 	Class          string             `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
 }
