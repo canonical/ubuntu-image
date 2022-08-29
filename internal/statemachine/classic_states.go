@@ -173,7 +173,13 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
 	}
 
+	// Determine any customization that needs to run before the image is created
+	//TODO: installer image customization... eventually.
 	if classicStateMachine.ImageDef.Customization != nil {
+		if classicStateMachine.ImageDef.Customization.CloudInit != nil {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
+		}
 		if classicStateMachine.ImageDef.Customization.Manual != nil {
 			rootfsCreationStates = append(rootfsCreationStates,
 				stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
@@ -183,15 +189,6 @@ func (stateMachine *StateMachine) calculateStates() error {
 	// The rootfs is laid out in a staging area, now populate it in the correct location
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents})
-
-	// Determine any customization that needs to run before the image is created
-	//TODO: installer image customization... eventually.
-	if classicStateMachine.ImageDef.Customization != nil {
-		if classicStateMachine.ImageDef.Customization.CloudInit != nil {
-			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
-		}
-	}
 
 	// Add the "always there" states that populate partitions, build the disk, etc.
 	// This includes the no-op "finish" state to signify successful setup
