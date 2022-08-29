@@ -241,8 +241,8 @@ func TestPrintStates(t *testing.T) {
 [4] create_chroot
 [5] install_packages
 [6] preseed_image
-[7] populate_rootfs_contents
-[8] customize_cloud_init
+[7] customize_cloud_init
+[8] populate_rootfs_contents
 [9] generate_disk_info
 [10] calculate_rootfs_size
 [11] populate_bootfs_contents
