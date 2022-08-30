@@ -125,7 +125,7 @@ type FstabType struct {
 	FSType       string `yaml:"filesystem-type" json:"FSType"`
 	MountOptions string `yaml:"mount-options"   json:"MountOptions" default:"defaults"`
 	Dump         bool   `yaml:"dump"            json:"Dump,omitempty"`
-	FsckOrder    int    `yaml:"fsck-order" json:"FsckOrder"`
+	FsckOrder    int    `yaml:"fsck-order"      json:"FsckOrder"`
 }
 
 // ManualType provides manual customization options
