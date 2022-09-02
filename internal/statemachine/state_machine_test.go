@@ -564,20 +564,20 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 						Type:       "0C",
 						Offset:     createOffsetPointer(1048576),
 						Size:       536870912,
-						Label: "system-boot",
+						Label:      "system-boot",
 						Filesystem: "vfat",
 						Content: []gadget.VolumeContent{
 							{
 								UnresolvedSource: "install/boot-assets/",
-								Target: "/",
+								Target:           "/",
 							},
 							{
 								UnresolvedSource: "../../root/boot/vmlinuz",
-								Target: "/",
+								Target:           "/",
 							},
 							{
 								UnresolvedSource: "../../root/boot/initrd.img",
-								Target: "/",
+								Target:           "/",
 							},
 						},
 					},
@@ -687,7 +687,7 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 			asserter.AssertErrNil(err, false)
 
 			if !reflect.DeepEqual(*stateMachine.GadgetInfo.Volumes["pc"], tc.expectedResult) {
-				t.Errorf("GadgetInfo after postProcessGadgetYaml:\n%+v " +
+				t.Errorf("GadgetInfo after postProcessGadgetYaml:\n%+v "+
 					"does not match expected result:\n%+v",
 					*stateMachine.GadgetInfo.Volumes["pc"],
 					tc.expectedResult,
