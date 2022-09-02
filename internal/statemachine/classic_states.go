@@ -130,6 +130,10 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 		var imageOpts image.Options
 
 		var err error
+
+		// plug/slot sanitization not used by snap image.Prepare, make it no-op.
+		snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+
 		imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
 			classicStateMachine.commonFlags.Snaps)
 		if err != nil {
@@ -184,9 +188,6 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 
 		customizations := *new(image.Customizations)
 		imageOpts.Customizations = customizations
-
-		// plug/slot sanitization not used by snap image.Prepare, make it no-op.
-		snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
 
 		if err := imagePrepare(&imageOpts); err != nil {
 			return fmt.Errorf("Error preparing image: %s", err.Error())

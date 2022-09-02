@@ -4,7 +4,12 @@ ubuntu-image (2.2+22.04ubuntu4) UNRELEASED; urgency=medium
   * Add support for uc20 preseeding-related options.
 
   [ William 'jawn-smith' Wilson ]
-  * Update to snapd 2.56
+  * Update to latest snapd that supports snapcraft v7 credentials
+    (LP: #1984014)
+  * Fix issue with partitions not being sized properly when using
+    --image-size (LP: #1981744)
+  * Create filesystems with content when the content was created by
+    ubuntu-image (LP: #1981720)
 
  -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Wed, 08 Jun 2022 10:25:57 -0500
 
