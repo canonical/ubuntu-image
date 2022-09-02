@@ -244,6 +244,21 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				}
 			}
 
+			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+				// handle special syntax of rootfs:/<file path> in
+				// structure content. This is needed to allow images
+				// such as raspberry pi to source their kernel and
+				// initrd from the staged rootfs later in the build
+				// process.
+				for jj, content := range structure.Content {
+					content.UnresolvedSource = strings.ReplaceAll(content.UnresolvedSource,
+						"rootfs:",
+						filepath.Join("..", "..", "root"),
+					)
+					volume.Structure[ii].Content[jj] = content
+				}
+			}
+
 			// update farthestOffset if needed
 			var offset quantity.Offset
 			if structure.Offset == nil {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -533,6 +534,164 @@ func TestHandleContentSizes(t *testing.T) {
 					t.Errorf("Volume %s has the wrong size set: %d. "+
 						"Should be %d", volumeName, setSize, tc.result[volumeName])
 				}
+			}
+		})
+	}
+}
+
+// TestPostProcessGadgetYaml runs through a variety of gadget.yaml files
+// and ensures the volume/structures are as expected
+func TestPostProcessGadgetYaml(t *testing.T) {
+	// helper function to define *quantity.Offsets inline
+	createOffsetPointer := func(x quantity.Offset) *quantity.Offset {
+		return &x
+	}
+	testCases := []struct {
+		name           string
+		gadgetYaml     string
+		expectedResult gadget.Volume
+	}{
+		{
+			"rootfs_gadget_source",
+			filepath.Join("testdata", "gadget_rootfs_source.yaml"),
+			gadget.Volume{
+				Schema:     "mbr",
+				Bootloader: "u-boot",
+				Name:       "pc",
+				Structure: []gadget.VolumeStructure{
+					{
+						VolumeName: "pc",
+						Type:       "0C",
+						Offset:     createOffsetPointer(1048576),
+						Size:       536870912,
+						Label: "system-boot",
+						Filesystem: "vfat",
+						Content: []gadget.VolumeContent{
+							{
+								UnresolvedSource: "install/boot-assets/",
+								Target: "/",
+							},
+							{
+								UnresolvedSource: "../../root/boot/vmlinuz",
+								Target: "/",
+							},
+							{
+								UnresolvedSource: "../../root/boot/initrd.img",
+								Target: "/",
+							},
+						},
+					},
+					{
+						Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+						Role:       "system-data",
+						Filesystem: "ext4",
+						Label:      "writable",
+						Offset:     createOffsetPointer(537919488),
+						Content:    []gadget.VolumeContent{},
+					},
+				},
+			},
+		},
+		{
+			"rootfs_unspecified",
+			filepath.Join("testdata", "gadget_no_rootfs.yaml"),
+			gadget.Volume{
+				Schema:     "gpt",
+				Bootloader: "grub",
+				Name:       "pc",
+				Structure: []gadget.VolumeStructure{
+					{
+						VolumeName: "pc",
+						Name:       "mbr",
+						Type:       "mbr",
+						Offset:     createOffsetPointer(0),
+						Role:       "mbr",
+						Size:       440,
+						Content: []gadget.VolumeContent{
+							{
+								Image:  "pc-boot.img",
+								Offset: createOffsetPointer(0),
+							},
+						},
+					},
+					{
+						VolumeName: "pc",
+						Name:       "BIOS Boot",
+						Type:       "DA,21686148-6449-6E6F-744E-656564454649",
+						Size:       1048576,
+						OffsetWrite: &gadget.RelativeOffset{
+							RelativeTo: "mbr",
+							Offset:     quantity.Offset(92),
+						},
+						Offset: createOffsetPointer(1048576),
+						Content: []gadget.VolumeContent{
+							{
+								Image: "pc-core.img",
+							},
+						},
+					},
+					{
+						VolumeName: "pc",
+						Name:       "EFI System",
+						Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+						Size:       52428800,
+						Filesystem: "vfat",
+						Offset:     createOffsetPointer(2097152),
+						Label:      "system-boot",
+						Content: []gadget.VolumeContent{
+							{
+								UnresolvedSource: "grubx64.efi",
+								Target:           "EFI/boot/grubx64.efi",
+							},
+							{
+								UnresolvedSource: "shim.efi.signed",
+								Target:           "EFI/boot/bootx64.efi",
+							},
+							{
+								UnresolvedSource: "grub-cpc.cfg",
+								Target:           "EFI/ubuntu/grub.cfg",
+							},
+						},
+					},
+					{
+						Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+						Role:       "system-data",
+						Filesystem: "ext4",
+						Label:      "writable",
+						Offset:     createOffsetPointer(54525952),
+						Content:    []gadget.VolumeContent{},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_post_process_gadget_yaml_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+			// need workdir and loaded gadget.yaml set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, false)
+
+			// load in the gadget.yaml file
+			stateMachine.YamlFilePath = tc.gadgetYaml
+
+			// ensure unpack exists and load gadget.yaml
+			os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, false)
+
+			err = stateMachine.postProcessGadgetYaml()
+			asserter.AssertErrNil(err, false)
+
+			if !reflect.DeepEqual(*stateMachine.GadgetInfo.Volumes["pc"], tc.expectedResult) {
+				t.Errorf("GadgetInfo after postProcessGadgetYaml:\n%+v " +
+					"does not match expected result:\n%+v",
+					*stateMachine.GadgetInfo.Volumes["pc"],
+					tc.expectedResult,
+				)
 			}
 		})
 	}
