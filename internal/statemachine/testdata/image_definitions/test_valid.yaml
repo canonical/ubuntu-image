@@ -43,6 +43,23 @@ customization:
     - name: linux-firmware-raspi
     - name: pi-bluetooth
     - name: ubuntu-raspi-settings
+  extra-snaps:
+    - name: core
+    - name: snapd
+  fstab:
+    -
+      label: "writable"
+      mountpoint: "/"
+      filesystem-type: "ext4"
+      dump: false
+      fsck-order: 1
+    -
+      label: "system-boot"
+      mountpoint: "/boot/firmware"
+      filesystem-type: "vfat"
+      mount-options: "defaults"
+      dump: false
+      fsck-order: 1
 artifacts:
   img:
       path: raspi.img
