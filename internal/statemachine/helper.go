@@ -797,7 +797,7 @@ func manualCopyFile(copyFileInterfaces interface{}, targetDir string, debug bool
 		// Copy the file into the specified location in the chroot
 		dest := filepath.Join(targetDir, copyFile.Dest)
 		if debug {
-			fmt.Printf("Copying file \"%s\" to \"%s\"", copyFile.Source, dest)
+			fmt.Printf("Copying file \"%s\" to \"%s\"\n", copyFile.Source, dest)
 		}
 		if err := osutilCopySpecialFile(copyFile.Source, dest); err != nil {
 			return fmt.Errorf("Error copying file \"%s\" into chroot: %s",
@@ -814,7 +814,7 @@ func manualExecute(executeInterfaces interface{}, targetDir string, debug bool) 
 		execute := executeSlice.Index(i).Interface().(*ExecuteType)
 		executeCmd := execCommand("chroot", targetDir, execute.ExecutePath)
 		if debug {
-			fmt.Printf("Executing command \"%s\"", executeCmd.String())
+			fmt.Printf("Executing command \"%s\"\n", executeCmd.String())
 		}
 		executeOutput := helper.SetCommandOutput(executeCmd, debug)
 		err := executeCmd.Run()
@@ -833,7 +833,7 @@ func manualTouchFile(touchFileInterfaces interface{}, targetDir string, debug bo
 		touchFile := touchFileSlice.Index(i).Interface().(*TouchFileType)
 		fullPath := filepath.Join(targetDir, touchFile.TouchPath)
 		if debug {
-			fmt.Printf("Creating empty file \"%s\"", fullPath)
+			fmt.Printf("Creating empty file \"%s\"\n", fullPath)
 		}
 		_, err := osCreate(fullPath)
 		if err != nil {
@@ -849,10 +849,10 @@ func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool
 	for i := 0; i < addGroupSlice.Len(); i++ {
 		addGroup := addGroupSlice.Index(i).Interface().(*AddGroupType)
 		addGroupCmd := execCommand("chroot", targetDir, "addgroup", addGroup.GroupName)
-		debugStatement := fmt.Sprintf("Adding group \"%s\"", addGroup.GroupName)
+		debugStatement := fmt.Sprintf("Adding group \"%s\"\n", addGroup.GroupName)
 		if addGroup.GroupID != "" {
 			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", addGroup.GroupID}...)
-			debugStatement = fmt.Sprintf("%s with GID %s", debugStatement, addGroup.GroupID)
+			debugStatement = fmt.Sprintf("%s with GID %s\n", strings.TrimSpace(debugStatement), addGroup.GroupID)
 		}
 		if debug {
 			fmt.Printf(debugStatement)
@@ -873,10 +873,10 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 	for i := 0; i < addUserSlice.Len(); i++ {
 		addUser := addUserSlice.Index(i).Interface().(*AddUserType)
 		addUserCmd := execCommand("chroot", targetDir, "adduser", addUser.UserName)
-		debugStatement := fmt.Sprintf("Adding user \"%s\"", addUser.UserName)
+		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", addUser.UserName)
 		if addUser.UserID != "" {
 			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", addUser.UserID}...)
-			debugStatement = fmt.Sprintf("%s with UID %s", debugStatement, addUser.UserID)
+			debugStatement = fmt.Sprintf("%s with UID %s\n", strings.TrimSpace(debugStatement), addUser.UserID)
 		}
 		if debug {
 			fmt.Printf(debugStatement)

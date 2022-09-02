@@ -183,6 +183,10 @@ func (stateMachine *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
 	}
+	if len(classicStateMachine.ImageDef.Customization.Fstab) > 0 {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"customize_fstab", (*StateMachine).customizeFstab})
+	}
 	if classicStateMachine.ImageDef.Customization.Manual != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
@@ -504,6 +508,41 @@ func (stateMachine *StateMachine) setupExtraPPAs() error {
 // but what about extra packages with a tarball based images...
 func (stateMachine *StateMachine) installExtraPackages() error {
 	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// Customize /etc/fstab based on values in the image definition
+func (stateMachine *StateMachine) customizeFstab() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// open /etc/fstab for writing
+	fstabIO, err := osOpenFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
+		os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("Error opening fstab: %s", err.Error())
+	}
+	defer fstabIO.Close()
+
+	var fstabEntries []string
+	for _, fstab := range classicStateMachine.ImageDef.Customization.Fstab {
+		var dumpString string
+		if fstab.Dump {
+			dumpString = "1"
+		} else {
+			dumpString = "0"
+		}
+		fstabEntry := fmt.Sprintf("LABEL=%s\t%s\t%s\t%s\t%s\t%d",
+			fstab.Label,
+			fstab.Mountpoint,
+			fstab.FSType,
+			fstab.MountOptions,
+			dumpString,
+			fstab.FsckOrder,
+		)
+		fstabEntries = append(fstabEntries, fstabEntry)
+	}
+	fstabIO.Write([]byte(strings.Join(fstabEntries, "\n")))
 	return nil
 }
 
