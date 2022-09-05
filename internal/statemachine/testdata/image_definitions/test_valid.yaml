@@ -35,6 +35,20 @@ customization:
     - name: ubuntu-minimal
     - name: linux-firmware-raspi
     - name: pi-bluetooth
+  fstab:
+    -
+      label: "writable"
+      mountpoint: "/"
+      filesystem-type: "ext4"
+      dump: false
+      fsck-order: 1
+    -
+      label: "system-boot"
+      mountpoint: "/boot/firmware"
+      filesystem-type: "vfat"
+      mount-options: "defaults"
+      dump: false
+      fsck-order: 1
   manual:
     copy-file:
       -
