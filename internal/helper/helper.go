@@ -266,3 +266,11 @@ func SetCommandOutput(cmd *exec.Cmd, liveOutput bool) (cmdOutput *bytes.Buffer) 
 	}
 	return cmdOutput
 }
+
+// SafeQuantitySubtraction subtracts quantities while checking for integer underflow
+func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
+	if subtract > orig {
+		return 0
+	}
+	return orig - subtract
+}

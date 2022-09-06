@@ -478,7 +478,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 
 					// compile a regex used to get revision numbers from seed.manifest
 					revRegex, err := regexp.Compile(fmt.Sprintf(
-						"%s (.*?)\\.snap", snapName))
+						"%s (.*?)\n", snapName))
 					asserter.AssertErrNil(err, true)
 					seedData, err := ioutil.ReadFile(filepath.Join(
 						stateMachine.stateMachineFlags.WorkDir, "seed.manifest"))

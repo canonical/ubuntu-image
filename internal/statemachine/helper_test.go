@@ -325,6 +325,16 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		asserter.AssertErrContains(err, "Error zeroing image file")
 		helperCopyBlob = helper.CopyBlob
 
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
+			filepath.Join("/tmp", uuid.NewString()+".img"))
+		asserter.AssertErrContains(err, "Error listing contents of volume")
+		ioutilReadDir = ioutil.ReadDir
+
 		// mock gadget.MkfsWithContent
 		mkfsMakeWithContent = mockMkfsWithContent
 		defer func() {
@@ -1100,5 +1110,92 @@ func TestFailedImportPPAKeys(t *testing.T) {
 		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 		asserter.AssertErrContains(err, "Error unmarshalling launchpad API response")
 		jsonUnmarshal = json.Unmarshal
+	})
+}
+
+// We had a bug where the snap manifest would contain ".snap" in the
+// revision field. This test ensures that bug stays fixed
+func TestManifestRevisionFormat(t *testing.T) {
+	t.Run("test_manifest_revision_format", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		// generate temporary directory
+		tempDir := filepath.Join("/tmp", "manifest-revision-format-"+uuid.NewString())
+		err := os.Mkdir(tempDir, 0755)
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(tempDir)
+
+		fakeSnaps := []string{"test1_123.snap", "test2_456.snap", "test3_789.snap"}
+		for _, fakeSnap := range fakeSnaps {
+			fullPath := filepath.Join(tempDir, fakeSnap)
+			_, err := os.Create(fullPath)
+			asserter.AssertErrNil(err, true)
+		}
+
+		manifestOutput := filepath.Join(tempDir, "test.manifest")
+		err = WriteSnapManifest(tempDir, manifestOutput)
+		asserter.AssertErrNil(err, true)
+
+		expectedManifestData := "test1 123\ntest2 456\ntest3 789\n"
+
+		manifestData, err := ioutil.ReadFile(manifestOutput)
+		asserter.AssertErrNil(err, true)
+
+		if string(manifestData) != expectedManifestData {
+			t.Errorf("Expected manifest file to be:\n%s\nBut got \n%s",
+				expectedManifestData, manifestData)
+		}
+	})
+}
+
+// TestLP1981720 tests a bug that occurred when a structure had no content specified,
+// but the content was created by an earlier step of ubuntu-image
+// https://bugs.launchpad.net/ubuntu-image/+bug/1981720
+func TestLP1981720(t *testing.T) {
+	t.Run("test_lp1981720", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-no-content.yaml")
+
+		// need workdir and loaded gadget.yaml set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		var bootStruct gadget.VolumeStructure
+		var volume *gadget.Volume = stateMachine.GadgetInfo.Volumes["pc"]
+		for _, structure := range volume.Structure {
+			if structure.Name == "system-boot" {
+				bootStruct = structure
+			}
+		}
+
+		// create a temporary file for contentRoot
+		contentRoot := filepath.Join("/tmp", uuid.NewString())
+		err = os.Mkdir(contentRoot, 0755)
+		defer os.RemoveAll(contentRoot)
+		asserter.AssertErrNil(err, true)
+		testFile, err := os.Create(filepath.Join(contentRoot, "test.txt"))
+		asserter.AssertErrNil(err, true)
+		testData := []byte("Test string that we will search the resulting image for")
+		_, err = testFile.Write(testData)
+		asserter.AssertErrNil(err, true)
+
+		// now execute copyStructureContent
+		err = stateMachine.copyStructureContent(volume, bootStruct, 0, contentRoot,
+			contentRoot+".img")
+		asserter.AssertErrNil(err, true)
+
+		// now check that the resulting .img file has the contents of test.txt in it
+		structureContent, err := os.ReadFile(contentRoot + ".img")
+		asserter.AssertErrNil(err, true)
+
+		if !bytes.Contains(structureContent, testData) {
+			t.Errorf("Test data is missing from output of copyStructureContent")
+		}
+
+		os.RemoveAll(contentRoot)
 	})
 }

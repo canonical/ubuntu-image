@@ -7,10 +7,10 @@ class: preinstalled
 kernel:
   name: linux-image-raspi
 gadget:
-  url: "https://github.com/snapcore/pi-gadget.git"
+  url: "https://github.com/jawn-smith/pi-gadget.git"
   branch: "classic"
   type: "git"
-model-assertion: pi-generic.model
+#model-assertion: pi-generic.model
 rootfs:
   archive: ubuntu
   components:
@@ -24,7 +24,7 @@ rootfs:
     urls:
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
-    branch: jammy
+    branch: kinetic
     names:
       - server
       - server-raspi
@@ -32,7 +32,11 @@ rootfs:
       - minimal
       - standard
       - cloud-image
+      - server-raspi
 customization:
+  extra-ppas:
+    -
+      name: "jawn-smith/devel-proposed"
   cloud-init:
     user-data:
       -
@@ -46,6 +50,7 @@ customization:
   extra-snaps:
     - name: core
     - name: snapd
+    - name: linux-image-raspi
   fstab:
     -
       label: "writable"
