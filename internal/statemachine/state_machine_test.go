@@ -145,6 +145,9 @@ func mockGet(string) (*http.Response, error) {
 func mockUnmarshal([]byte, any) error {
 	return fmt.Errorf("Test Error")
 }
+func mockRel(string, string) (string, error) {
+	return "", fmt.Errorf("Test error")
+}
 func mockGojsonschemaValidateError(gojsonschema.JSONLoader, gojsonschema.JSONLoader) (*gojsonschema.Result, error) {
 	return nil, fmt.Errorf("Test Error")
 }
@@ -712,6 +715,15 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
 		err := stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, false)
+
+		// mock filepath.Rel
+		filepathRel = mockRel
+		defer func() {
+			filepathRel = filepath.Rel
+		}()
+		err = stateMachine.postProcessGadgetYaml()
+		asserter.AssertErrContains(err, "Error creating relative path")
+		filepathRel = filepath.Rel
 
 		// mock os.MkdirAll
 		osMkdirAll = mockMkdirAll

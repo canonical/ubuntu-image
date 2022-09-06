@@ -59,6 +59,7 @@ var imagePrepare = image.Prepare
 var httpGet = http.Get
 var jsonUnmarshal = json.Unmarshal
 var gojsonschemaValidate = gojsonschema.Validate
+var filepathRel = filepath.Rel
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 
@@ -250,10 +251,18 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				// such as raspberry pi to source their kernel and
 				// initrd from the staged rootfs later in the build
 				// process.
+				fmt.Printf("Calculating relative dir from \"%s\" to \"%s\"\n", filepath.Join(stateMachine.tempDirs.unpack, "gadget"), stateMachine.tempDirs.rootfs)
+				relativeRootfsPath, err := filepathRel(
+					filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
+					stateMachine.tempDirs.rootfs,
+				)
+				if err != nil {
+					return fmt.Errorf("Error creating relative path from unpack/gadget to rootfs: \"%s\"", err.Error())
+				}
 				for jj, content := range structure.Content {
 					content.UnresolvedSource = strings.ReplaceAll(content.UnresolvedSource,
 						"rootfs:",
-						filepath.Join("..", "..", "root"),
+						relativeRootfsPath,
 					)
 					volume.Structure[ii].Content[jj] = content
 				}
