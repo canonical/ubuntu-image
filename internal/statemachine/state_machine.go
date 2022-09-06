@@ -251,7 +251,6 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				// such as raspberry pi to source their kernel and
 				// initrd from the staged rootfs later in the build
 				// process.
-				fmt.Printf("Calculating relative dir from \"%s\" to \"%s\"\n", filepath.Join(stateMachine.tempDirs.unpack, "gadget"), stateMachine.tempDirs.rootfs)
 				relativeRootfsPath, err := filepathRel(
 					filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
 					stateMachine.tempDirs.rootfs,
