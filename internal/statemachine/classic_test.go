@@ -60,6 +60,10 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"not_valid_yaml", "test_invalid_yaml.yaml", false, "yaml: unmarshal errors"},
 		{"missing_yaml_fields", "test_missing_name.yaml", false, "Key \"name\" is required in struct \"ImageDefinition\", but is not in the YAML file!"},
 		{"private_ppa_without_fingerprint", "test_private_ppa_without_fingerprint.yaml", false, "Fingerprint is required for private PPAs"},
+		{"invalid_paths_in_manual_copy", "test_invalid_paths_in_manual_copy.yaml", false, "needs to be an absolute path (../../malicious)"},
+		{"invalid_paths_in_manual_copy_bug", "test_invalid_paths_in_manual_copy.yaml", false, "needs to be an absolute path (/../../malicious)"},
+		{"invalid_paths_in_manual_touch_file", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (../../malicious)"},
+		{"invalid_paths_in_manual_touch_file_bug", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (/../../malicious)"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_yaml_schema_"+tc.name, func(t *testing.T) {
@@ -245,13 +249,14 @@ func TestPrintStates(t *testing.T) {
 [8] populate_rootfs_contents
 [9] customize_cloud_init
 [10] customize_fstab
-[11] generate_disk_info
-[12] calculate_rootfs_size
-[13] populate_bootfs_contents
-[14] populate_prepare_partitions
-[15] make_disk
-[16] generate_manifest
-[17] finish
+[11] perform_manual_customization
+[12] generate_disk_info
+[13] calculate_rootfs_size
+[14] populate_bootfs_contents
+[15] populate_prepare_partitions
+[16] make_disk
+[17] generate_manifest
+[18] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
