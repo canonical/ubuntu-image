@@ -764,6 +764,7 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 			Rootfs: &RootfsType{
 				Archive: "ubuntu",
 			},
+			Customization: &CustomizationType{},
 		}
 
 		// need workdir set up for this

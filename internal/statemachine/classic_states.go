@@ -722,18 +722,22 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 		}
 	}
 
-	fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
-	fstabBytes, err := ioutilReadFile(fstabPath)
-	if err == nil {
-		if !strings.Contains(string(fstabBytes), "LABEL=writable") {
-			re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
-			newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
-			if !strings.Contains(string(newContents), "LABEL=writable") {
-				newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
-			}
-			err := ioutilWriteFile(fstabPath, newContents, 0644)
-			if err != nil {
-				return fmt.Errorf("Error writing to fstab: %s", err.Error())
+	if classicStateMachine.ImageDef.Customization != nil {
+		if len(classicStateMachine.ImageDef.Customization.Fstab) == 0 {
+			fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
+			fstabBytes, err := ioutilReadFile(fstabPath)
+			if err == nil {
+				if !strings.Contains(string(fstabBytes), "LABEL=writable") {
+					re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
+					newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
+					if !strings.Contains(string(newContents), "LABEL=writable") {
+						newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
+					}
+					err := ioutilWriteFile(fstabPath, newContents, 0644)
+					if err != nil {
+						return fmt.Errorf("Error writing to fstab: %s", err.Error())
+					}
+				}
 			}
 		}
 	}
