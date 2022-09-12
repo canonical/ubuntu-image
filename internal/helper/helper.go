@@ -236,6 +236,18 @@ type MissingFieldError struct {
 	gojsonschema.ResultErrorFields
 }
 
+// SliceHasElement searches for a string in a slice of strings and returns whether it
+// is found
+func SliceHasElement(haystack []string, needle string) bool {
+	found := false
+	for _, element := range haystack {
+		if element == needle {
+			found = true
+		}
+	}
+	return found
+}
+
 // SetCommandOutput sets the output of a command to either use a multiwriter
 // or behave as a normal command and store the output in a buffer
 func SetCommandOutput(cmd *exec.Cmd, liveOutput bool) (cmdOutput *bytes.Buffer) {
@@ -249,4 +261,12 @@ func SetCommandOutput(cmd *exec.Cmd, liveOutput bool) (cmdOutput *bytes.Buffer) 
 		cmd.Stderr = mwriter
 	}
 	return cmdOutput
+}
+
+// SafeQuantitySubtraction subtracts quantities while checking for integer underflow
+func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
+	if subtract > orig {
+		return 0
+	}
+	return orig - subtract
 }

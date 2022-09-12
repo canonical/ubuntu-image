@@ -71,13 +71,14 @@ type Tarball struct {
 	SHA256sum  string `yaml:"sha256sum" json:"SHA256sum,omitempty"`
 }
 
-// Customization defines the customization section of the image definition file
+// CustomizationType defines the customization section of the image definition file
 type Customization struct {
 	Installer     *Installer `yaml:"installer"      json:"Installer,omitempty"`
 	CloudInit     *CloudInit `yaml:"cloud-init"     json:"CloudInit,omitempty"`
 	ExtraPPAs     []*PPA     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"`
 	ExtraPackages []*Package `yaml:"extra-packages" json:"ExtraPackages,omitempty"`
 	ExtraSnaps    []*Snap    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"`
+	Fstab         []*Fstab   `yaml:"fstab"          json:"Fstab,omitempty"`
 	Manual        *Manual    `yaml:"manual"         json:"Manual,omitempty"`
 }
 
@@ -128,6 +129,16 @@ type Manual struct {
 	TouchFile []*TouchFile `yaml:"touch-file" json:"TouchFile,omitempty"`
 	AddGroup  []*AddGroup  `yaml:"add-group"  json:"AddGroup,omitempty"`
 	AddUser   []*AddUser   `yaml:"add-user"   json:"AddUser,omitempty"`
+}
+
+// Fstab defines the information that gets rendered into an fstab
+type Fstab struct {
+	Label        string `yaml:"label"           json:"Label"`
+	Mountpoint   string `yaml:"mountpoint"      json:"Mountpoint"`
+	FSType       string `yaml:"filesystem-type" json:"FSType"`
+	MountOptions string `yaml:"mount-options"   json:"MountOptions" default:"defaults"`
+	Dump         bool   `yaml:"dump"            json:"Dump,omitempty"`
+	FsckOrder    int    `yaml:"fsck-order"      json:"FsckOrder"`
 }
 
 // CopyFile allows users to copy files into the rootfs of an image
@@ -242,18 +253,35 @@ type InvalidPPAError struct {
 	gojsonschema.ResultErrorFields
 }
 
+func NewPathNotAbsoluteError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *PathNotAbsoluteError {
+	err := PathNotAbsoluteError{}
+	err.SetContext(context)
+	err.SetType("path_not_absolute_error")
+	err.SetDescriptionFormat("Key {{.key}} needs to be an absolute path ({{.value}})")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// PathNotAbsoluteError implements gojsonschema.ErrorType. It is used for custom errors for
+// fields that should be absolute but are not
+type PathNotAbsoluteError struct {
+	gojsonschema.ResultErrorFields
+}
+
 // generatePocketList returns a slice of strings that need to be added to
 // /etc/apt/sources.list in the chroot based on the value of "pocket"
 // in the rootfs section of the image definition
 func (ImageDef ImageDefinition) GeneratePocketList() []string {
 	pocketMap := map[string][]string{
-		"release": []string{},
-		"security": []string{
+		"release": {},
+		"security": {
 			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),
 		},
-		"updates": []string{
+		"updates": {
 			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),
@@ -261,7 +289,7 @@ func (ImageDef ImageDefinition) GeneratePocketList() []string {
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),
 		},
-		"proposed": []string{
+		"proposed": {
 			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
 				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
 			),

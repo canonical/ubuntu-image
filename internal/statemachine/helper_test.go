@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -21,7 +20,6 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
-	"github.com/snapcore/snapd/seed"
 )
 
 // TestMaxOffset tests the functionality of the maxOffset function
@@ -328,6 +326,16 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		asserter.AssertErrContains(err, "Error zeroing image file")
 		helperCopyBlob = helper.CopyBlob
 
+		// mock ioutil.ReadDir
+		ioutilReadDir = mockReadDir
+		defer func() {
+			ioutilReadDir = ioutil.ReadDir
+		}()
+		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
+			filepath.Join("/tmp", uuid.NewString()+".img"))
+		asserter.AssertErrContains(err, "Error listing contents of volume")
+		ioutilReadDir = ioutil.ReadDir
+
 		// mock gadget.MkfsWithContent
 		mkfsMakeWithContent = mockMkfsWithContent
 		defer func() {
@@ -588,76 +596,6 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 	}
 }
 
-// TestFailedRemovePreseeding tests various failure scenarios in the removePreseeding function
-func TestFailedRemovePreseeding(t *testing.T) {
-	t.Run("test_failed_remove_preseeding", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "snapd", "seed")
-		err = os.MkdirAll(seedDir, 0755)
-		asserter.AssertErrNil(err, true)
-
-		// call "snap prepare image" to preseed the filesystem.
-		// Doing the preseed at the time of the test allows it to
-		// run on each architecture and keeps the github repository
-		// free of large .snap files
-		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
-			filepath.Join("testdata", "modelAssertionClassic"),
-			stateMachine.tempDirs.rootfs)
-		err = snapPrepareImage.Run()
-		asserter.AssertErrNil(err, true)
-
-		// mock os.RemoveAll so the directory isn't cleared out every time
-		osRemoveAll = mockRemoveAll
-		defer func() {
-			osRemoveAll = os.RemoveAll
-		}()
-
-		// mock seed.Open
-		seedOpen = mockSeedOpen
-		defer func() {
-			seedOpen = seed.Open
-		}()
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Test error")
-		seedOpen = seed.Open
-
-		// move the model from var/lib/snapd/seed/assertions to cause an error
-		err = os.Rename(filepath.Join(seedDir, "assertions", "model"),
-			filepath.Join(stateMachine.tempDirs.rootfs, "model"))
-		asserter.AssertErrNil(err, true)
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "seed must have a model assertion")
-		err = os.Rename(filepath.Join(stateMachine.tempDirs.rootfs, "model"),
-			filepath.Join(seedDir, "assertions", "model"))
-		asserter.AssertErrNil(err, true)
-
-		// move seed.yaml to cause an error in LoadMeta
-		err = os.Rename(filepath.Join(seedDir, "seed.yaml"),
-			filepath.Join(seedDir, "seed.yaml.bak"))
-		asserter.AssertErrNil(err, true)
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "no seed metadata")
-		err = os.Rename(filepath.Join(seedDir, "seed.yaml.bak"),
-			filepath.Join(seedDir, "seed.yaml"))
-		asserter.AssertErrNil(err, true)
-
-		// the files have been restored, just test the failure in os.RemoveAll
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Test error")
-		osRemoveAll = os.RemoveAll
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}
-
 // TestGetHostArch unit tests the getHostArch function
 func TestGetHostArch(t *testing.T) {
 	t.Run("test_get_host_arch", func(t *testing.T) {
@@ -739,46 +677,6 @@ func TestGetQemuStaticForArch(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestRemovePreseeding unit tests the removePreseeding function
-func TestRemovePreseeding(t *testing.T) {
-	t.Run("test_remove_preseeding", func(t *testing.T) {
-		if runtime.GOARCH != "amd64" {
-			t.Skip("Test for amd64 only")
-		}
-		asserter := helper.Asserter{T: t}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-
-		// copy the filesystem over before attempting to preseed it
-		osutil.CopySpecialFile(filepath.Join("testdata", "filesystem"), stateMachine.tempDirs.rootfs)
-
-		// call "snap prepare image" to preseed the filesystem.
-		// Doing the preseed at the time of the test keeps the
-		// github repository free of large .snap files
-		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20=candidate", "--snap=snapd=beta", "--snap=lxd",
-			filepath.Join("testdata", "modelAssertionClassic"),
-			stateMachine.tempDirs.rootfs)
-		err := snapPrepareImage.Run()
-		asserter.AssertErrNil(err, true)
-
-		seededSnaps, err := removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrNil(err, true)
-
-		// make sure the correct snaps were returned by removePreseeding
-		expectedSnaps := map[string]string{
-			"core20": "candidate",
-			"snapd":  "beta",
-			"lxd":    "stable",
-		}
-
-		if !reflect.DeepEqual(seededSnaps, expectedSnaps) {
-			t.Error("removePreseeding did not find the correct snap/channel mappings")
-		}
-	})
 }
 
 // TestGenerateGerminateCmd unit tests the generateGerminateCmd function
@@ -954,6 +852,84 @@ func TestGeneratePocketList(t *testing.T) {
 	}
 }
 
+// TestFailedManualCopyFile tests the fail case of the manualCopyFile function
+func TestFailedManualCopyFile(t *testing.T) {
+	t.Run("test_failed_manual_copy_file", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		copyFiles := []*imagedefinition.CopyFile{
+			{
+				Dest:   "/test/does/not/exist",
+				Source: "/test/does/not/exist",
+			},
+		}
+		err := manualCopyFile(copyFiles, "/fakedir", true)
+		asserter.AssertErrContains(err, "Error copying file")
+	})
+}
+
+// TestFailedManualTouchFile tests the fail case of the manualTouchFile function
+func TestFailedManualTouchFile(t *testing.T) {
+	t.Run("test_failed_manual_touch_file", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		touchFiles := []*imagedefinition.TouchFile{
+			{
+				TouchPath: "/test/does/not/exist",
+			},
+		}
+		err := manualTouchFile(touchFiles, "/fakedir", true)
+		asserter.AssertErrContains(err, "Error creating file")
+	})
+}
+
+// TestFailedManualExecute tests the fail case of the manualExecute function
+func TestFailedManualExecute(t *testing.T) {
+	t.Run("test_failed_manual_execute", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		executes := []*imagedefinition.Execute{
+			{
+				ExecutePath: "/test/does/not/exist",
+			},
+		}
+		err := manualExecute(executes, "fakedir", true)
+		asserter.AssertErrContains(err, "Error running script")
+	})
+}
+
+// TestFailedManualAddGroup tests the fail case of the manualAddGroup function
+func TestFailedManualAddGroup(t *testing.T) {
+	t.Run("test_failed_manual_add_group", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		addGroups := []*imagedefinition.AddGroup{
+			{
+				GroupName: "testgroup",
+				GroupID:   "123",
+			},
+		}
+		err := manualAddGroup(addGroups, "fakedir", true)
+		asserter.AssertErrContains(err, "Error adding group")
+	})
+}
+
+// TestFailedManualAddUser tests the fail case of the manualAddUser function
+func TestFailedManualAddUser(t *testing.T) {
+	t.Run("test_failed_manual_add_user", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		addUsers := []*imagedefinition.AddUser{
+			{
+				UserName: "testuser",
+				UserID:   "123",
+			},
+		}
+		err := manualAddUser(addUsers, "fakedir", true)
+		asserter.AssertErrContains(err, "Error adding user")
+	})
+}
+
 // TestGenerateAptCmd unit tests the generateAptCmd function
 func TestGenerateAptCmds(t *testing.T) {
 	testCases := []struct {
@@ -976,6 +952,9 @@ func TestGenerateAptCmds(t *testing.T) {
 }
 
 // TestCreatePPAInfo unit tests the createPPAInfo function
+/* TODO: this is the logic for deb822 sources. When other projects
+(software-properties, ubuntu-release-upgrader) are ready, update
+to this logic instead.
 func TestCreatePPAInfo(t *testing.T) {
 	testCases := []struct {
 		name             string
@@ -1013,6 +992,49 @@ URIS: https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubu
 Suites: jammy
 Components: main`,
 		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_create_ppa_info_"+tc.name, func(t *testing.T) {
+			fileName, fileContents := createPPAInfo(tc.ppa, tc.series)
+			if fileName != tc.expectedName {
+				t.Errorf("Expected PPA filename \"%s\" but got \"%s\"",
+					tc.expectedName, fileName)
+			}
+			if fileContents != tc.expectedContents {
+				t.Errorf("Expected PPA file contents \"%s\" but got \"%s\"",
+					tc.expectedContents, fileContents)
+			}
+		})
+	}
+}
+*/
+// TestCreatePPAInfo unit tests the createPPAInfo function
+func TestCreatePPAInfo(t *testing.T) {
+	testCases := []struct {
+		name             string
+		ppa              *imagedefinition.PPA
+		series           string
+		expectedName     string
+		expectedContents string
+	}{
+		{
+			"public_ppa",
+			&imagedefinition.PPA{
+				PPAName: "public/ppa",
+			},
+			"focal",
+			"public-ubuntu-ppa-focal.list",
+			"deb https://ppa.launchpadcontent.net/public/ppa/ubuntu focal main",
+		},
+		{
+			"private_ppa",
+			&imagedefinition.PPA{
+				PPAName: "private/ppa",
+				Auth:    "testuser:testpass",
+			},
+			"jammy",
+			"private-ubuntu-ppa-jammy.list",
+			"deb https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubuntu jammy main"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_create_ppa_info_"+tc.name, func(t *testing.T) {
@@ -1166,5 +1188,92 @@ func TestFailedImportPPAKeys(t *testing.T) {
 		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 		asserter.AssertErrContains(err, "Error unmarshalling launchpad API response")
 		jsonUnmarshal = json.Unmarshal
+	})
+}
+
+// We had a bug where the snap manifest would contain ".snap" in the
+// revision field. This test ensures that bug stays fixed
+func TestManifestRevisionFormat(t *testing.T) {
+	t.Run("test_manifest_revision_format", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		// generate temporary directory
+		tempDir := filepath.Join("/tmp", "manifest-revision-format-"+uuid.NewString())
+		err := os.Mkdir(tempDir, 0755)
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(tempDir)
+
+		fakeSnaps := []string{"test1_123.snap", "test2_456.snap", "test3_789.snap"}
+		for _, fakeSnap := range fakeSnaps {
+			fullPath := filepath.Join(tempDir, fakeSnap)
+			_, err := os.Create(fullPath)
+			asserter.AssertErrNil(err, true)
+		}
+
+		manifestOutput := filepath.Join(tempDir, "test.manifest")
+		err = WriteSnapManifest(tempDir, manifestOutput)
+		asserter.AssertErrNil(err, true)
+
+		expectedManifestData := "test1 123\ntest2 456\ntest3 789\n"
+
+		manifestData, err := ioutil.ReadFile(manifestOutput)
+		asserter.AssertErrNil(err, true)
+
+		if string(manifestData) != expectedManifestData {
+			t.Errorf("Expected manifest file to be:\n%s\nBut got \n%s",
+				expectedManifestData, manifestData)
+		}
+	})
+}
+
+// TestLP1981720 tests a bug that occurred when a structure had no content specified,
+// but the content was created by an earlier step of ubuntu-image
+// https://bugs.launchpad.net/ubuntu-image/+bug/1981720
+func TestLP1981720(t *testing.T) {
+	t.Run("test_lp1981720", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-no-content.yaml")
+
+		// need workdir and loaded gadget.yaml set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		var bootStruct gadget.VolumeStructure
+		var volume *gadget.Volume = stateMachine.GadgetInfo.Volumes["pc"]
+		for _, structure := range volume.Structure {
+			if structure.Name == "system-boot" {
+				bootStruct = structure
+			}
+		}
+
+		// create a temporary file for contentRoot
+		contentRoot := filepath.Join("/tmp", uuid.NewString())
+		err = os.Mkdir(contentRoot, 0755)
+		defer os.RemoveAll(contentRoot)
+		asserter.AssertErrNil(err, true)
+		testFile, err := os.Create(filepath.Join(contentRoot, "test.txt"))
+		asserter.AssertErrNil(err, true)
+		testData := []byte("Test string that we will search the resulting image for")
+		_, err = testFile.Write(testData)
+		asserter.AssertErrNil(err, true)
+
+		// now execute copyStructureContent
+		err = stateMachine.copyStructureContent(volume, bootStruct, 0, contentRoot,
+			contentRoot+".img")
+		asserter.AssertErrNil(err, true)
+
+		// now check that the resulting .img file has the contents of test.txt in it
+		structureContent, err := os.ReadFile(contentRoot + ".img")
+		asserter.AssertErrNil(err, true)
+
+		if !bytes.Contains(structureContent, testData) {
+			t.Errorf("Test data is missing from output of copyStructureContent")
+		}
+
+		os.RemoveAll(contentRoot)
 	})
 }

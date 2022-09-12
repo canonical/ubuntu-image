@@ -5,281 +5,285 @@ that specifies how to build a classic image.
 
 The following specification defines what is supported in the YAML:
 
-  # The name of the image.
-  name: <string>
-  # The human readable name to use in the image.
-  display-name: <string>
-  # An integer used to track changes to the image definition file.
-  revision: <int> (optional)
-  # The architecture of the image to create.
-  architecture: amd64 | armhf | arm64 | s390x | ppc64el | riscv64
-  # The Ubuntu codename to use as apt sources. Example: jammy
-  series: <string>
-  # The classification for this image.
-  class: cloud | installer | preinstalled
-  # An alternative kernel to install in the image. Normally this
-  # is just one kernel and defaults to "linux", but we support
-  # installing more than one, since installer images can provide
-  # multiple kernels to choose from.
-  kernel: (optional)
-    name: <string> Example: "linux"
-    type: <string> Example: "hwe"
-  # gadget defines the boot assets of an image. When building a
-  # classic image, the gadget is optionally compiled as part of
-  # the state machine run.
-  gadget:
-    # An URI pointing to the location of the gadget tree. For
-    # gadgets that need to be built this can be a local path
-    # to a directory or a URL to be git cloned. For pre-built
-    # gadget trees this must be a local path.
-    url: <string>
-    type: git | directory | prebuilt
-    # A git reference to use if building a gadget tree from git.
-    ref: <string>
-    # The branch to use if building a gadget tree from git.
-    # Defaults to "main"
-    branch: <string>
-  # A path to a model assertion to use when pre-seeding snaps
-  # in the image.
-  model-assertion: <string> (optional)
-  # Defines parameters needed to build the rootfs for a classic
-  # image. Currently only building from a seed is supported.
-  # Exactly one of the following must be included: seed,
-  # archive-tasks, or tarball.
-  rootfs:
-    # Components are a list of apt sources, such as main,
-    # universe, and restricted. Defaults to "release".
-    components: (optional)
-      - <string>
-      - <string>
-    # The archive to use as an apt source. Defaults to "ubuntu".
-    archive: <string> (optional)
-    # The flavor of Ubuntu to build. Examples: kubuntu, xubuntu.
-    # Defaults to "ubuntu".
-    flavor: <string> (optional)
-    # The mirror for apt sources.
-    # Defaults to "http://archive.ubuntu.com/ubuntu/".
-    mirror: <string> (optional)
-    # Ubuntu offers several pockets, which often imply the
-    # inclusion of other pockets. The release pocket only
-    # includes itself. The security pocket includes itself
-    # and the release pocket. Updates includes updates,
-    # security, and release. Proposed includes all pockets.
-    # Defaults to "release".
-    pocket: release | security | updates | proposed
-    # Used for building an image from a set of archive tasks
-    # rather than seeds. Not yet supported.
-    archive-tasks:
-      - <string>
-      - <string>
-    # The seed to germinate from to create a list of packages
-    # to be installed in the image.
-    seed:
-        # A list of git, bzr, or http locations from which to
-        # retrieve the seeds.
-        urls:
-          - <string>
-          - <string>
-        # The names of seeds to use from the germinate output.
-        # Examples: server, minimal, cloud-image.
-        names:
-          - <string>
-          - <string>
-        # Whether to use the --vcs flag when running germinate.
-        # Defaults to "true".
-        vcs: <boolean> (optional)
-        # An alternative branch to use while retrieving seeds
-        # from a git or bzr source.
-        branch: <string> (optional)
-    # Used for pre-built root filesystems rather than germinating
-    # from a seed or using a list of archive-tasks.
-    tarball:
-        # The path to the tarball. Can be a local path or an URL.
-        url: <string>
-        # URL to the gpg signature to verify the tarball against.
-        gpg: <string> (optional)
-        # SHA256 sum of the tarball used to verify it has not
-        # been altered.
-        sha256sum: <string> (optional)
-  # ubuntu-image supports building automatically with some
-  # customizations to the image.
-  customization:
-    # Used only for installer images
-    installer: (optional)
-      preseeds: (optional)
+```
+    # The name of the image.
+    name: <string>
+    # The human readable name to use in the image.
+    display-name: <string>
+    # An integer used to track changes to the image definition file.
+    revision: <int> (optional)
+    # The architecture of the image to create.
+    architecture: amd64 | armhf | arm64 | s390x | ppc64el | riscv64
+    # The Ubuntu codename to use as apt sources. Example: jammy
+    series: <string>
+    # The classification for this image.
+    class: cloud | installer | preinstalled
+    # An alternative kernel to install in the image. Normally this
+    # is just one kernel and defaults to "linux", but we support
+    # installing more than one, since installer images can provide
+    # multiple kernels to choose from.
+    kernel: (optional)
+      name: <string> Example: "linux"
+      type: <string> Example: "hwe"
+    # gadget defines the boot assets of an image. When building a
+    # classic image, the gadget is optionally compiled as part of
+    # the state machine run.
+    gadget:
+      # An URI pointing to the location of the gadget tree. For
+      # gadgets that need to be built this can be a local path
+      # to a directory or a URL to be git cloned. For pre-built
+      # gadget trees this must be a local path.
+      url: <string>
+      type: git | directory | prebuilt
+      # A git reference to use if building a gadget tree from git.
+      ref: <string>
+      # The branch to use if building a gadget tree from git.
+      # Defaults to "main"
+      branch: <string>
+    # A path to a model assertion to use when pre-seeding snaps
+    # in the image.
+    model-assertion: <string> (optional)
+    # Defines parameters needed to build the rootfs for a classic
+    # image. Currently only building from a seed is supported.
+    # Exactly one of the following must be included: seed,
+    # archive-tasks, or tarball.
+    rootfs:
+      # Components are a list of apt sources, such as main,
+      # universe, and restricted. Defaults to "release".
+      components: (optional)
         - <string>
         - <string>
-      # Only applicable to subiquity based layered images.
-      layers: (optional)
+      # The archive to use as an apt source. Defaults to "ubuntu".
+      archive: <string> (optional)
+      # The flavor of Ubuntu to build. Examples: kubuntu, xubuntu.
+      # Defaults to "ubuntu".
+      flavor: <string> (optional)
+      # The mirror for apt sources.
+      # Defaults to "http://archive.ubuntu.com/ubuntu/".
+      mirror: <string> (optional)
+      # Ubuntu offers several pockets, which often imply the
+      # inclusion of other pockets. The release pocket only
+      # includes itself. The security pocket includes itself
+      # and the release pocket. Updates includes updates,
+      # security, and release. Proposed includes all pockets.
+      # Defaults to "release".
+      pocket: release | security | updates | proposed
+      # Used for building an image from a set of archive tasks
+      # rather than seeds. Not yet supported.
+      archive-tasks:
         - <string>
         - <string>
-    # Used to create a custom cloud-init configuration.
-    cloud-init: (optional)
-      # cloud-init yaml metadata
-      meta-data: <yaml> (optional)
-      # cloud-init yaml metadata
-      user-data: <yaml> (optional)
-      # cloud-init yaml metadata
-      network-config: <yaml> (optional)
-    # Extra PPAs to install in the image. Both public and
-    # private PPAs are supported. If specifying a private
-    # PPA, the auth and fingerprint fields are required.
-    # For public PPAs, auth has no effect and fingerprint
-    # is optional. These PPAs will be used as a source
-    # while creating the rootfs for the classic image.
-    extra-ppas: (optional)
-      -
-        # The name of the PPA in the format "user/ppa-name".
-        name: <string>
-        # The fingerprint of the GPG signing key for this
-        # PPA. Public PPAs have this information available
-        # from the Launchpad API, so it can be retrieved
-        # automatically. For Private PPAs this must be
-        # specified.
-        fingerprint: <string>
-        # Authentication for private PPAs in the format
-        # "user:password".
-        auth: <string>
-        # Whether to leave the PPA source file in the resulting
-        # image. Defaults to "true". If set to "false" this
-        # PPA will only be used as a source for installing
-        # packages during the rootfs build process, and the
-        # resulting image will not have this PPA configured.
-        keep-enabled: <boolean>
-    # A list of extra packages to install in the rootfs beyond
-    # what is included in the germinate output.
-    extra-packages: (optional)
-      -
-        name: <string>
-    # Extra snaps to preseed in the rootfs of the image.
-    extra-snaps: (optional)
-      -
-        # The name of the snap.
-        name: <string>
-        # The channel from which to seed the snap.
-        channel: <string>
-        # The store to retrieve the snap from. Not yet supported.
-        # Defaults to "canonical".
-        store: <string>
-        # The revision of the snap to preseed in the rootfs.
-        # Not yet supported.
-        revision: <int>
-    # After the rootfs has been created and before the image
-    # artifacts are generated, ubuntu-image can automatically
-    # perform some manual customization to the rootfs.
-    manual: (optional)
-      # Copies files from the host system to the rootfs of
-      # the image.
-      copy-file: (optional)
+      # The seed to germinate from to create a list of packages
+      # to be installed in the image.
+      seed:
+          # A list of git, bzr, or http locations from which to
+          # retrieve the seeds.
+          urls:
+            - <string>
+            - <string>
+          # The names of seeds to use from the germinate output.
+          # Examples: server, minimal, cloud-image.
+          names:
+            - <string>
+            - <string>
+          # Whether to use the --vcs flag when running germinate.
+          # Defaults to "true".
+          vcs: <boolean> (optional)
+          # An alternative branch to use while retrieving seeds
+          # from a git or bzr source.
+          branch: <string> (optional)
+      # Used for pre-built root filesystems rather than germinating
+      # from a seed or using a list of archive-tasks.
+      tarball:
+          # The path to the tarball. Can be a local path or an URL.
+          url: <string>
+          # URL to the gpg signature to verify the tarball against.
+          gpg: <string> (optional)
+          # SHA256 sum of the tarball used to verify it has not
+          # been altered.
+          sha256sum: <string> (optional)
+    # ubuntu-image supports building automatically with some
+    # customizations to the image.
+    customization:
+      # Used only for installer images
+      installer: (optional)
+        preseeds: (optional)
+          - <string>
+          - <string>
+        # Only applicable to subiquity based layered images.
+        layers: (optional)
+          - <string>
+          - <string>
+      # Used to create a custom cloud-init configuration.
+      cloud-init: (optional)
+        # cloud-init yaml metadata
+        meta-data: <yaml> (optional)
+        # cloud-init yaml metadata
+        user-data: <yaml> (optional)
+        # cloud-init yaml metadata
+        network-config: <yaml> (optional)
+      # Extra PPAs to install in the image. Both public and
+      # private PPAs are supported. If specifying a private
+      # PPA, the auth and fingerprint fields are required.
+      # For public PPAs, auth has no effect and fingerprint
+      # is optional. These PPAs will be used as a source
+      # while creating the rootfs for the classic image.
+      extra-ppas: (optional)
         -
-          # The path to the file to copy.
-          source: <string>
-          # The path to use as a destination for the copied
-          # file. The location of the rootfs will be prepended
-          # to this path automatically.
-          destination: <string>
-      # Creates empty files in the rootfs of the image.
-      touch-file: (optional)
-        -
-          # The location of the rootfs will be prepended to this
-          # path automatically.
-          path: <string>
-      # Chroots into the rootfs and executes an executable file.
-      # This customization state is run after the copy-files state,
-      # so files that have been copied into the rootfs are valid
-      # targets to be executed.
-      execute: (optional)
-        -
-          # Path inside the rootfs.
-          path: <string>
-      # Any additional users to add in the rootfs
-      add-user: (optional)
-        -
-          # The name for the user
+          # The name of the PPA in the format "user/ppa-name".
           name: <string>
-          # The UID to assing to this new user
-          id: <string> (optional)
-      add-group: (optional)
+          # The fingerprint of the GPG signing key for this
+          # PPA. Public PPAs have this information available
+          # from the Launchpad API, so it can be retrieved
+          # automatically. For Private PPAs this must be
+          # specified.
+          fingerprint: <string>
+          # Authentication for private PPAs in the format
+          # "user:password".
+          auth: <string>
+          # Whether to leave the PPA source file in the resulting
+          # image. Defaults to "true". If set to "false" this
+          # PPA will only be used as a source for installing
+          # packages during the rootfs build process, and the
+          # resulting image will not have this PPA configured.
+          keep-enabled: <boolean>
+      # A list of extra packages to install in the rootfs beyond
+      # what is included in the germinate output.
+      extra-packages: (optional)
         -
-          # The name of the group to create.
           name: <string>
-          # The GID to assign to this group.
-          gid: <string> (optional)
-      # ubuntu-image will support creating many different types of
-      # artifacts, including the actual images, manifest files,
-      # changelogs, and a list of files in the rootfs.
-      artifacts:
-        # Used to specify that ubuntu-image should create a .img file.
-        img: (optional)
-          # Relative path to output the .img file.
-          path: <string>
-        # Used to specify that ubuntu-image should create a .iso file.
-        iso: (optional)
-          # Relative path to output the .iso file.
-          path: <string>
-          # Specify parameters to use when calling `xorriso`. When not
-          # provided, ubuntu-image will attempt to create it's own
-          # `xorriso` command.
-          xorriso-command: <string> (optional)
-        # Uset to specify that ubuntu-image should create a .qcow2 file.
-        qcow2: (optional)
-          # Relative path to output the .qcow2 file.
-          path: <string>
-        # A manifest file is a list of all packages and their version
-        # numbers that are included in the rootfs of the image.
-        manifest:
-          # Relative path to output the manifest file.
-          path: <string>
-        # A filelist is a list of all files in the rootfs of the image.
-        filelist:
-          # Relative path to output the filelist file.
-          path: <string>
-        # Not yet supported.
-        changelog:
-          path: <string>
+      # Extra snaps to preseed in the rootfs of the image.
+      extra-snaps: (optional)
+        -
+          # The name of the snap.
+          name: <string>
+          # The channel from which to seed the snap.
+          channel: <string>
+          # The store to retrieve the snap from. Not yet supported.
+          # Defaults to "canonical".
+          store: <string>
+          # The revision of the snap to preseed in the rootfs.
+          # Not yet supported.
+          revision: <int>
+      # After the rootfs has been created and before the image
+      # artifacts are generated, ubuntu-image can automatically
+      # perform some manual customization to the rootfs.
+      manual: (optional)
+        # Copies files from the host system to the rootfs of
+        # the image.
+        copy-file: (optional)
+          -
+            # The path to the file to copy.
+            source: <string>
+            # The path to use as a destination for the copied
+            # file. The location of the rootfs will be prepended
+            # to this path automatically.
+            destination: <string>
+        # Creates empty files in the rootfs of the image.
+        touch-file: (optional)
+          -
+            # The location of the rootfs will be prepended to this
+            # path automatically.
+            path: <string>
+        # Chroots into the rootfs and executes an executable file.
+        # This customization state is run after the copy-files state,
+        # so files that have been copied into the rootfs are valid
+        # targets to be executed.
+        execute: (optional)
+          -
+            # Path inside the rootfs.
+            path: <string>
+        # Any additional users to add in the rootfs
+        add-user: (optional)
+          -
+            # The name for the user
+            name: <string>
+            # The UID to assing to this new user
+            id: <string> (optional)
+        add-group: (optional)
+          -
+            # The name of the group to create.
+            name: <string>
+            # The GID to assign to this group.
+            gid: <string> (optional)
+        # ubuntu-image will support creating many different types of
+        # artifacts, including the actual images, manifest files,
+        # changelogs, and a list of files in the rootfs.
+        artifacts:
+          # Used to specify that ubuntu-image should create a .img file.
+          img: (optional)
+            # Relative path to output the .img file.
+            path: <string>
+          # Used to specify that ubuntu-image should create a .iso file.
+          iso: (optional)
+            # Relative path to output the .iso file.
+            path: <string>
+            # Specify parameters to use when calling `xorriso`. When not
+            # provided, ubuntu-image will attempt to create it's own
+            # `xorriso` command.
+            xorriso-command: <string> (optional)
+          # Uset to specify that ubuntu-image should create a .qcow2 file.
+          qcow2: (optional)
+            # Relative path to output the .qcow2 file.
+            path: <string>
+          # A manifest file is a list of all packages and their version
+          # numbers that are included in the rootfs of the image.
+          manifest:
+            # Relative path to output the manifest file.
+            path: <string>
+          # A filelist is a list of all files in the rootfs of the image.
+          filelist:
+            # Relative path to output the filelist file.
+            path: <string>
+          # Not yet supported.
+          changelog:
+            path: <string>
+```
 
 Note that not all of these fields are required. An example used to build
 Raspberry Pi images is:
 
-  name: ubuntu-server-raspi-arm64
-  display-name: Ubuntu Server Raspberry Pi arm64
-  revision: 2
-  architecture: arm64
-  series: jammy
-  class: preinstalled
-  kernel:
-    name: linux-raspi
-  gadget:
-    url: "https://github.com/snapcore/pi-gadget.git"
-    branch: "classic"
-    type: "git"
-  model-assertion: pi-generic.model
-  rootfs:
-    archive: ubuntu
-    mirror: "http://ports.ubuntu.com/ubuntu/"
-    seed:
-      urls:
-        - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
-        - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
-      branch: jammy
-      names:
-        - server
-        - minimal
-        - standard
-        - cloud-image
-        - ubuntu-server-raspi
-  customization:
-    cloud-init:
-      user-data:
-        -
-          name: ubuntu
-          password: ubuntu
-    extra-packages:
-      - name: ubuntu-minimal
-      - name: linux-firmware-raspi
-      - name: pi-bluetooth
-  artifacts:
-    img:
-        path: raspi.img
-    manifest:
-        path: raspi.manifest
+```
+    name: ubuntu-server-raspi-arm64
+    display-name: Ubuntu Server Raspberry Pi arm64
+    revision: 2
+    architecture: arm64
+    series: jammy
+    class: preinstalled
+    kernel:
+      name: linux-raspi
+    gadget:
+      url: "https://github.com/snapcore/pi-gadget.git"
+      branch: "classic"
+      type: "git"
+    model-assertion: pi-generic.model
+    rootfs:
+      archive: ubuntu
+      mirror: "http://ports.ubuntu.com/ubuntu/"
+      seed:
+        urls:
+          - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+          - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+        branch: jammy
+        names:
+          - server
+          - minimal
+          - standard
+          - cloud-image
+          - ubuntu-server-raspi
+    customization:
+      cloud-init:
+        user-data:
+          -
+            name: ubuntu
+            password: ubuntu
+      extra-packages:
+        - name: ubuntu-minimal
+        - name: linux-firmware-raspi
+        - name: pi-bluetooth
+    artifacts:
+      img:
+          path: raspi.img
+      manifest:
+          path: raspi.manifest
+```

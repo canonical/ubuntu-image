@@ -2,36 +2,30 @@ name: ubuntu-server-raspi-arm64
 display-name: Ubuntu Server Raspberry Pi arm64
 revision: 2
 architecture: arm64
-series: kinetic
+series: jammy
 class: preinstalled
 kernel:
   name: linux-raspi
 gadget:
-  url: "https://github.com/jawn-smith/pi-gadget.git"
+  url: "https://github.com/snapcore/pi-gadget.git"
   branch: "classic"
   type: "git"
-#model-assertion: pi-generic.model
+model-assertion: pi-generic.model
 rootfs:
-  mirror: "http://ports.ubuntu.com/"
-  components:
-    - main
-    - universe
-    - restricted
+  archive: ubuntu
+  mirror: "http://ports.ubuntu.com/ubuntu/"
   seed:
     urls:
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
-    branch: kinetic
+    branch: jammy
     names:
       - server
       - minimal
       - standard
       - cloud-image
-      - server-raspi
+      - ubuntu-server-raspi
 customization:
-  extra-ppas:
-    -
-      name: "jawn-smith/devel-proposed"
   cloud-init:
     user-data:
       -
@@ -41,29 +35,12 @@ customization:
     - name: ubuntu-minimal
     - name: linux-firmware-raspi
     - name: pi-bluetooth
-    - name: linux-image-raspi
-  fstab:
-    -
-      label: "writable"
-      mountpoint: "/"
-      filesystem-type: "ext4"
-      dump: false
-      fsck-order: 1
-    -
-      label: "system-boot"
-      mountpoint: "/boot/firmware"
-      filesystem-type: "vfat"
-      mount-options: "defaults"
-      dump: false
-      fsck-order: 1
   manual:
-    copy-file:
-      -
-        source: /etc/hosts
-        destination: /etc/hosts
     touch-file:
       -
-        path: /etc/foo
+        path: ../../malicious
+      -
+        path: /../../malicious
 artifacts:
   img:
       path: raspi.img

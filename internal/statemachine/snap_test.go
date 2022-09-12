@@ -122,8 +122,8 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 		stateMachine.Opts.DisableConsoleConf = true
 		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.commonFlags.Snaps = []string{"hello-world"}
 		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
+		stateMachine.Opts.Snaps = []string{"hello-world"}
 		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
@@ -438,7 +438,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 
 			// use core18 because it builds the fastest
 			stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
-			stateMachine.commonFlags.Snaps = tc.snapArgs
+			stateMachine.Opts.Snaps = tc.snapArgs
 			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
@@ -478,7 +478,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 
 					// compile a regex used to get revision numbers from seed.manifest
 					revRegex, err := regexp.Compile(fmt.Sprintf(
-						"%s (.*?)\\.snap", snapName))
+						"%s (.*?)\n", snapName))
 					asserter.AssertErrNil(err, true)
 					seedData, err := ioutil.ReadFile(filepath.Join(
 						stateMachine.stateMachineFlags.WorkDir, "seed.manifest"))
@@ -522,7 +522,7 @@ func TestValidationFlag(t *testing.T) {
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
 		stateMachine.stateMachineFlags.Thru = "prepare_image"
-		stateMachine.Opts.Validation = "enforce"
+		stateMachine.commonFlags.Validation = "enforce"
 
 		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
@@ -560,7 +560,7 @@ func TestGadgetEdgeCases(t *testing.T) {
 		stateMachine.stateMachineFlags.WorkDir = workDir
 		// use the custom snap with a complicated gadget.yaml
 		customSnap := filepath.Join("testdata", "pc_20-gadget-edge-cases.snap")
-		stateMachine.commonFlags.Snaps = []string{customSnap}
+		stateMachine.Opts.Snaps = []string{customSnap}
 
 		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
