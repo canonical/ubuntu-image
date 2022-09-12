@@ -5,7 +5,7 @@ that specifies how to build a classic image.
 
 The following specification defines what is supported in the YAML:
 
-```
+```yaml
     # The name of the image.
     name: <string>
     # The human readable name to use in the image.
@@ -243,7 +243,7 @@ The following specification defines what is supported in the YAML:
 Note that not all of these fields are required. An example used to build
 Raspberry Pi images is:
 
-```
+```yaml
     name: ubuntu-server-raspi-arm64
     display-name: Ubuntu Server Raspberry Pi arm64
     revision: 2
