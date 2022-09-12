@@ -209,35 +209,49 @@ The following specification defines what is supported in the YAML:
         # ubuntu-image will support creating many different types of
         # artifacts, including the actual images, manifest files,
         # changelogs, and a list of files in the rootfs.
-        artifacts:
-          # Used to specify that ubuntu-image should create a .img file.
-          img: (optional)
-            # Relative path to output the .img file.
-            path: <string>
-          # Used to specify that ubuntu-image should create a .iso file.
-          iso: (optional)
-            # Relative path to output the .iso file.
-            path: <string>
-            # Specify parameters to use when calling `xorriso`. When not
-            # provided, ubuntu-image will attempt to create it's own
-            # `xorriso` command.
-            xorriso-command: <string> (optional)
-          # Uset to specify that ubuntu-image should create a .qcow2 file.
-          qcow2: (optional)
-            # Relative path to output the .qcow2 file.
-            path: <string>
-          # A manifest file is a list of all packages and their version
-          # numbers that are included in the rootfs of the image.
-          manifest:
-            # Relative path to output the manifest file.
-            path: <string>
-          # A filelist is a list of all files in the rootfs of the image.
-          filelist:
-            # Relative path to output the filelist file.
-            path: <string>
-          # Not yet supported.
-          changelog:
-            path: <string>
+      fstab: (optional)
+        -
+          # the value of LABEL= for the fstab entry
+          label: <string>
+          # where to mount the partition
+          mountpoint: <string>
+          # the filesystem type
+          filesystem-type: <string>
+          # options for mounting the filesystem
+          mount-options: <string> (optional)
+          # whether or not to dump the filesystem
+          dump: <bool> (optional)
+          # the order to fsck the filesystem
+          fsck-order: <int>
+    artifacts:
+      # Used to specify that ubuntu-image should create a .img file.
+      img: (optional)
+        # Relative name to output the .img file.
+        name: <string>
+      # Used to specify that ubuntu-image should create a .iso file.
+      iso: (optional)
+        # Relative name to output the .iso file.
+        name: <string>
+        # Specify parameters to use when calling `xorriso`. When not
+        # provided, ubuntu-image will attempt to create it's own
+        # `xorriso` command.
+        xorriso-command: <string> (optional)
+      # Used to specify that ubuntu-image should create a .qcow2 file.
+      qcow2: (optional)
+        # Relative name to output the .qcow2 file.
+        name: <string>
+      # A manifest file is a list of all packages and their version
+      # numbers that are included in the rootfs of the image.
+      manifest:
+        # Relative name to output the manifest file.
+        name: <string>
+      # A filelist is a list of all files in the rootfs of the image.
+      filelist:
+        # Relative name to output the filelist file.
+        name: <string>
+      # Not yet supported.
+      changelog:
+        name: <string>
 ```
 
 Note that not all of these fields are required. An example used to build
@@ -281,6 +295,20 @@ Raspberry Pi images is:
         - name: ubuntu-minimal
         - name: linux-firmware-raspi
         - name: pi-bluetooth
+      fstab:
+        -
+          label: "writable"
+          mountpoint: "/"
+          filesystem-type: "ext4"
+          dump: false
+          fsck-order: 1
+        -
+          label: "system-boot"
+          mountpoint: "/boot/firmware"
+          filesystem-type: "vfat"
+          mount-options: "defaults"
+          dump: false
+          fsck-order: 1
     artifacts:
       img:
           path: raspi.img
