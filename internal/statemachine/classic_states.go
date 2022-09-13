@@ -17,6 +17,7 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
+
 	//"github.com/snapcore/snapd/progress"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
@@ -542,23 +543,16 @@ func (stateMachine *StateMachine) germinate() error {
 func (stateMachine *StateMachine) customizeCloudInit() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	if customization := classicStateMachine.ImageDef.Customization; customization == nil || customization.CloudInit == nil {
-		if stateMachine.commonFlags.Debug {
-			fmt.Println("no cloud-init config found")
-		}
-		return nil
-	}
-
 	cloudInitCustomization := classicStateMachine.ImageDef.Customization.CloudInit
 
 	seedPath := path.Join(classicStateMachine.tempDirs.chroot, "var/lib/cloud/seed/nocloud")
-	err := os.MkdirAll(seedPath, 0755)
+	err := osMkdirAll(seedPath, 0755)
 	if err != nil {
 		return err
 	}
 
 	if cloudInitCustomization.MetaData != "" {
-		metaDataFile, err := os.Create(path.Join(seedPath, "meta-data"))
+		metaDataFile, err := osCreate(path.Join(seedPath, "meta-data"))
 		if err != nil {
 			return err
 		}
@@ -571,7 +565,7 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 	}
 
 	if cloudInitCustomization.UserData != nil {
-		userDataFile, err := os.Create(path.Join(seedPath, "user-data"))
+		userDataFile, err := osCreate(path.Join(seedPath, "user-data"))
 		if err != nil {
 			return err
 		}
@@ -589,7 +583,7 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 	}
 
 	if cloudInitCustomization.NetworkConfig != "" {
-		networkConfigFile, err := os.Create(path.Join(seedPath, "network-config"))
+		networkConfigFile, err := osCreate(path.Join(seedPath, "network-config"))
 		if err != nil {
 			return err
 		}
@@ -604,7 +598,7 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 	datasourceConfig := "# to update this file, run dpkg-reconfigure cloud-init\ndatasource_list: [ NoCloud ]\n"
 
 	dpkgConfigPath := path.Join(classicStateMachine.tempDirs.chroot, "etc/cloud/cloud.cfg.d/90_dpkg.cfg")
-	dpkgConfigFile, err := os.Create(dpkgConfigPath)
+	dpkgConfigFile, err := osCreate(dpkgConfigPath)
 	if err != nil {
 		return err
 	}
