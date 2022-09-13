@@ -171,6 +171,11 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	return nil
 }
 
+// State responsible for dynamically calculating all the remaining states
+// needed to build the image, as defined by the image-definition file
+// that was loaded in the previous 'state'.
+// If a new possible state is added to the classic build state machine, it
+// should be added here (usually basing on contents of the image definition)
 func (stateMachine *StateMachine) calculateStates() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
