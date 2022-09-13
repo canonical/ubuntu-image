@@ -4,6 +4,7 @@ package statemachine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -534,6 +535,95 @@ func TestCustomizeCloudInit(t *testing.T) {
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
+}
+
+func TestFailedCustomizeCloudInit(t *testing.T) {
+	// Test setup
+	asserter := helper.Asserter{T: t}
+	saveCWD := helper.SaveCWD()
+	defer saveCWD()
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	tmpDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	stateMachine.tempDirs.chroot = tmpDir
+
+	stateMachine.ImageDef.Customization = &CustomizationType{
+		CloudInit: &CloudInitType{
+			MetaData:      "foo: bar",
+			NetworkConfig: "foobar: foobar",
+			UserData: &[]UserDataType{
+				{UserName: "ubuntu", UserPassword: "ubuntu"},
+				{UserName: "john", UserPassword: "password"},
+			},
+		},
+	}
+
+	// Test if osCreate fails
+	fileList := []string{"meta-data", "user-data", "network-config", "90_dpkg.cfg"}
+	for _, file := range fileList {
+		t.Run("test_failed_customize_cloud_init_"+file, func(t *testing.T) {
+			// this directory is expected to be present as it is installed by cloud-init
+			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
+			os.MkdirAll(cloudInitConfigDirPath, 0777)
+			defer os.RemoveAll(cloudInitConfigDirPath)
+
+			osCreate = func(name string) (*os.File, error) {
+				if strings.Contains(name, file) {
+					return nil, errors.New("test error: failed to create file")
+				}
+				return os.Create(name)
+			}
+
+			err := stateMachine.customizeCloudInit()
+			asserter.AssertErrContains(err, "test error: failed to create file")
+		})
+	}
+
+	// Test if Write fails (file is read only)
+	for _, file := range fileList {
+		t.Run("test_failed_customize_cloud_init_"+file, func(t *testing.T) {
+			// this directory is expected to be present as it is installed by cloud-init
+			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
+			os.MkdirAll(cloudInitConfigDirPath, 0777)
+			defer os.RemoveAll(cloudInitConfigDirPath)
+
+			osCreate = func(name string) (*os.File, error) {
+				if strings.Contains(name, file) {
+					fileReadWrite, _ := os.Create(name)
+					fileReadWrite.Close()
+					fileReadOnly, _ := os.Open(name)
+					return fileReadOnly, nil
+				}
+				return os.Create(name)
+			}
+
+			err := stateMachine.customizeCloudInit()
+			if err == nil {
+				t.Errorf("expected error but got nil")
+			}
+		})
+	}
+
+	// Test if os.MkdirAll fails
+	t.Run("test_failed_customize_cloud_init_mkdir", func(t *testing.T) {
+		// this directory is expected to be present as it is installed by cloud-init
+		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
+		os.MkdirAll(cloudInitConfigDirPath, 0777)
+		defer os.RemoveAll(cloudInitConfigDirPath)
+
+		osMkdirAll = mockMkdirAll
+
+		err := stateMachine.customizeCloudInit()
+		if err == nil {
+			t.Error()
+		}
+	})
 }
 
 // TestSetupExtraPPAs unit tests the setupExtraPPAs function
