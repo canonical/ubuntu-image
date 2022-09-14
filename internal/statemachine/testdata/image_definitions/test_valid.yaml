@@ -66,6 +66,7 @@ customization:
         path: /etc/foo
 artifacts:
   img:
-      path: raspi.img
+    -
+      name: raspi.img
   manifest:
-      path: raspi.manifest
+    name: raspi.manifest

@@ -44,6 +44,7 @@ customization:
       - path: "/etc/testfile"
 artifacts:
   img:
-      path: raspi.img
+    -
+      name: raspi.img
   manifest:
-      path: raspi.manifest
+    name: raspi.manifest

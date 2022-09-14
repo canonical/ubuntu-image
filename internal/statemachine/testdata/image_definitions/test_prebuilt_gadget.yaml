@@ -33,6 +33,7 @@ customization:
     - name: pi-bluetooth
 artifacts:
   img:
-      path: raspi.img
+    -
+      name: raspi.img
   manifest:
-      path: raspi.manifest
+    name: raspi.manifest

@@ -50,4 +50,7 @@ customization:
       name: "hello-ubuntu-image-private"
 artifacts:
   img:
-      path: pc-amd64.img
+    -
+      name: pc-amd64.img
+  manifest:
+    name: "filesystem-manifest.txt"

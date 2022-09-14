@@ -345,7 +345,7 @@ func (stateMachine *StateMachine) makeDisk() error {
 	// TODO: this is only temporarily needed until go-diskfs is fixed - see below
 	var existingDiskIds [][]byte
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
-		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, volumeName+".img")
+		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[volumeName])
 
 		// Create the disk image
 		imgSize, found := stateMachine.ImageSizes[volumeName]

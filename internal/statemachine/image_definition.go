@@ -168,9 +168,9 @@ type AddUserType struct {
 // ArtifactType contains information about the files that are created
 // during and as a result of the image build process
 type ArtifactType struct {
-	Img       *ImgType       `yaml:"img"       json:"Img,omitempty"`
-	Iso       *IsoType       `yaml:"iso"       json:"Iso,omitempty"`
-	Qcow2     *Qcow2Type     `yaml:"qcow2"     json:"Qcow2,omitempty"`
+	Img       *[]ImgType     `yaml:"img"       json:"Img,omitempty"`
+	Iso       *[]IsoType     `yaml:"iso"       json:"Iso,omitempty"`
+	Qcow2     *[]Qcow2Type   `yaml:"qcow2"     json:"Qcow2,omitempty"`
 	Manifest  *ManifestType  `yaml:"manifest"  json:"Manifest,omitempty"`
 	Filelist  *FilelistType  `yaml:"filelist"  json:"Filelist,omitempty"`
 	Changelog *ChangelogType `yaml:"changelog" json:"Changelog,omitempty"`
@@ -179,39 +179,42 @@ type ArtifactType struct {
 // ImgType specifies the name of the resulting .img file.
 // If left emtpy no .img file will be created
 type ImgType struct {
-	ImgPath string `yaml:"path" json:"ImgPath"`
+	ImgName   string `yaml:"name"   json:"ImgName"`
+	ImgVolume string `yaml:"volume" json:"ImgVolume"`
 }
 
 // IsoType specifies the name of the resulting .iso file
 // and optionally the xorrisofs command used to create it.
 // If left emtpy no .iso file will be created
 type IsoType struct {
-	IsoPath string `yaml:"path"            json:"IsoPath"`
-	Command string `yaml:"xorriso-command" json:"Command,omitempty"`
+	IsoName   string `yaml:"name"            json:"IsoName"`
+	IsoVolume string `yaml:"volume"          json:"IsoVolume"`
+	Command   string `yaml:"xorriso-command" json:"Command,omitempty"`
 }
 
 // Qcow2Type specifies the name of the resulting .qcow2 file
 // If left emtpy no .qcow2 file will be created
 type Qcow2Type struct {
-	Qcow2Path string `yaml:"path" json:"Qcow2Path"`
+	Qcow2Name   string `yaml:"name"   json:"Qcow2Name"`
+	Qcow2Volume string `yaml:"volume" json:"Qcow2Volume"`
 }
 
 // ManifestType specifies the name of the manifest file.
 // If left emtpy no manifest file will be created
 type ManifestType struct {
-	ManifestPath string `yaml:"path" json:"ManifestPath"`
+	ManifestName string `yaml:"name" json:"ManifestName"`
 }
 
 // FilelistType specifies the name of the filelist file.
 // If left emtpy no filelist file will be created
 type FilelistType struct {
-	FilelistPath string `yaml:"path" json:"FilelistPath"`
+	FilelistName string `yaml:"name" json:"FilelistName"`
 }
 
 // ChangelogType specifies the name of the changelog file.
 // If left emtpy no changelog file will be created
 type ChangelogType struct {
-	ChangelogPath string `yaml:"path" json:"ChangelogPath"`
+	ChangelogName string `yaml:"name" json:"ChangelogName"`
 }
 
 func newMissingURLError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingURLError {
