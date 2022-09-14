@@ -266,6 +266,13 @@ type PathNotAbsoluteError struct {
 	gojsonschema.ResultErrorFields
 }
 
+func (imageDef ImageDefinition) securityMirror() string {
+	if imageDef.Architecture == "amd64" || imageDef.Architecture == "386" {
+		return "http://security.ubuntu.com/ubuntu/"
+	}
+	return imageDef.Rootfs.Mirror
+}
+
 // generatePocketList returns a slice of strings that need to be added to
 // /etc/apt/sources.list in the chroot based on the value of "pocket"
 // in the rootfs section of the image definition
@@ -274,7 +281,7 @@ func (ImageDef ImageDefinition) generatePocketList() []string {
 		"release": {},
 		"security": {
 			fmt.Sprintf("deb %s %s-security %s\n",
-				ImageDef.Rootfs.Mirror,
+				ImageDef.securityMirror(),
 				ImageDef.Series,
 				strings.Join(ImageDef.Rootfs.Components, " "),
 			),
@@ -286,7 +293,7 @@ func (ImageDef ImageDefinition) generatePocketList() []string {
 				strings.Join(ImageDef.Rootfs.Components, " "),
 			),
 			fmt.Sprintf("deb %s %s-security %s\n",
-				ImageDef.Rootfs.Mirror,
+				ImageDef.securityMirror(),
 				ImageDef.Series,
 				strings.Join(ImageDef.Rootfs.Components, " "),
 			),
@@ -298,7 +305,7 @@ func (ImageDef ImageDefinition) generatePocketList() []string {
 				strings.Join(ImageDef.Rootfs.Components, " "),
 			),
 			fmt.Sprintf("deb %s %s-security %s\n",
-				ImageDef.Rootfs.Mirror,
+				ImageDef.securityMirror(),
 				ImageDef.Series,
 				strings.Join(ImageDef.Rootfs.Components, " "),
 			),

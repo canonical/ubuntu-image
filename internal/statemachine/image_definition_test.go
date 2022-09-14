@@ -26,6 +26,7 @@ func TestGeneratePocketList(t *testing.T) {
 		{
 			"security",
 			ImageDefinition{
+				Architecture: "amd64",
 				Series: "jammy",
 				Rootfs: &RootfsType{
 					Pocket:     "security",
@@ -33,26 +34,28 @@ func TestGeneratePocketList(t *testing.T) {
 					Mirror:     "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
-			[]string{"deb http://archive.ubuntu.com/ubuntu/ jammy-security main\n"},
+			[]string{"deb http://security.ubuntu.com/ubuntu/ jammy-security main\n"},
 		},
 		{
 			"updates",
 			ImageDefinition{
+				Architecture: "arm64",
 				Series: "jammy",
 				Rootfs: &RootfsType{
 					Pocket:     "updates",
 					Components: []string{"main", "universe", "multiverse"},
-					Mirror:     "http://archive.ubuntu.com/ubuntu/",
+					Mirror:     "http://ports.ubuntu.com/",
 				},
 			},
 			[]string{
-				"deb http://archive.ubuntu.com/ubuntu/ jammy-security main universe multiverse\n",
-				"deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe multiverse\n",
+				"deb http://ports.ubuntu.com/ jammy-security main universe multiverse\n",
+				"deb http://ports.ubuntu.com/ jammy-updates main universe multiverse\n",
 			},
 		},
 		{
 			"proposed",
 			ImageDefinition{
+				Architecture: "amd64",
 				Series: "jammy",
 				Rootfs: &RootfsType{
 					Pocket:     "proposed",
@@ -61,7 +64,7 @@ func TestGeneratePocketList(t *testing.T) {
 				},
 			},
 			[]string{
-				"deb http://archive.ubuntu.com/ubuntu/ jammy-security main universe multiverse restricted\n",
+				"deb http://security.ubuntu.com/ubuntu/ jammy-security main universe multiverse restricted\n",
 				"deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe multiverse restricted\n",
 				"deb http://archive.ubuntu.com/ubuntu/ jammy-proposed main universe multiverse restricted\n",
 			},
