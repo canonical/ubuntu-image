@@ -27,7 +27,7 @@ func TestGeneratePocketList(t *testing.T) {
 			"security",
 			ImageDefinition{
 				Architecture: "amd64",
-				Series: "jammy",
+				Series:       "jammy",
 				Rootfs: &RootfsType{
 					Pocket:     "security",
 					Components: []string{"main"},
@@ -40,7 +40,7 @@ func TestGeneratePocketList(t *testing.T) {
 			"updates",
 			ImageDefinition{
 				Architecture: "arm64",
-				Series: "jammy",
+				Series:       "jammy",
 				Rootfs: &RootfsType{
 					Pocket:     "updates",
 					Components: []string{"main", "universe", "multiverse"},
@@ -56,7 +56,7 @@ func TestGeneratePocketList(t *testing.T) {
 			"proposed",
 			ImageDefinition{
 				Architecture: "amd64",
-				Series: "jammy",
+				Series:       "jammy",
 				Rootfs: &RootfsType{
 					Pocket:     "proposed",
 					Components: []string{"main", "universe", "multiverse", "restricted"},
