@@ -276,47 +276,47 @@ func (imageDef ImageDefinition) securityMirror() string {
 // generatePocketList returns a slice of strings that need to be added to
 // /etc/apt/sources.list in the chroot based on the value of "pocket"
 // in the rootfs section of the image definition
-func (ImageDef ImageDefinition) generatePocketList() []string {
+func (imageDef ImageDefinition) generatePocketList() []string {
 	pocketMap := map[string][]string{
 		"release": {},
 		"security": {
 			fmt.Sprintf("deb %s %s-security %s\n",
-				ImageDef.securityMirror(),
-				ImageDef.Series,
-				strings.Join(ImageDef.Rootfs.Components, " "),
+				imageDef.securityMirror(),
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 		},
 		"updates": {
 			fmt.Sprintf("deb %s %s-updates %s\n",
-				ImageDef.Rootfs.Mirror,
-				ImageDef.Series,
-				strings.Join(ImageDef.Rootfs.Components, " "),
+				imageDef.Rootfs.Mirror,
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 			fmt.Sprintf("deb %s %s-security %s\n",
-				ImageDef.securityMirror(),
-				ImageDef.Series,
-				strings.Join(ImageDef.Rootfs.Components, " "),
+				imageDef.securityMirror(),
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 		},
 		"proposed": {
 			fmt.Sprintf("deb %s %s-updates %s\n",
-				ImageDef.Rootfs.Mirror,
-				ImageDef.Series,
-				strings.Join(ImageDef.Rootfs.Components, " "),
+				imageDef.Rootfs.Mirror,
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 			fmt.Sprintf("deb %s %s-security %s\n",
-				ImageDef.securityMirror(),
-				ImageDef.Series,
-				strings.Join(ImageDef.Rootfs.Components, " "),
+				imageDef.securityMirror(),
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 			fmt.Sprintf("deb %s %s-proposed %s\n",
-				ImageDef.Rootfs.Mirror,
-				ImageDef.Series,
-				strings.Join(ImageDef.Rootfs.Components, " "),
+				imageDef.Rootfs.Mirror,
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 		},
 	}
 
 	// Schema validation has already confirmed the Pocket is a valid value
-	return pocketMap[strings.ToLower(ImageDef.Rootfs.Pocket)]
+	return pocketMap[strings.ToLower(imageDef.Rootfs.Pocket)]
 }
