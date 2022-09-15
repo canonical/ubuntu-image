@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -386,6 +387,181 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}
+
+// TestVerifyArtifactNames unit tests the verifyArtifactNames function
+func TestVerifyArtifactNames(t *testing.T) {
+	testCases := []struct {
+		name             string
+		gadgetYAML       string
+		img              *[]ImgType
+		expectedVolNames map[string]string
+		shouldPass       bool
+	}{
+		{
+			"single_volume_specified",
+			"gadget_tree/meta/gadget.yaml",
+			&[]ImgType{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "pc",
+				},
+			},
+			map[string]string{
+				"pc": "test1.img",
+			},
+			true,
+		},
+		{
+			"single_volume_not_specified",
+			"gadget_tree/meta/gadget.yaml",
+			&[]ImgType{
+				{
+					ImgName:   "test-single.img",
+				},
+			},
+			map[string]string{
+				"pc": "test-single.img",
+			},
+			true,
+		},
+		{
+			"mutli_volume_specified",
+			"gadget-multi.yaml",
+			&[]ImgType{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "first",
+				},
+				{
+					ImgName:   "test2.img",
+					ImgVolume: "second",
+				},
+				{
+					ImgName:   "test3.img",
+					ImgVolume: "third",
+				},
+				{
+					ImgName:   "test4.img",
+					ImgVolume: "fourth",
+				},
+			},
+			map[string]string{
+				"first": "test1.img",
+				"second": "test2.img",
+				"third": "test3.img",
+				"fourth": "test4.img",
+			},
+			true,
+		},
+		{
+			"mutli_volume_not_specified",
+			"gadget-multi.yaml",
+			&[]ImgType{
+				{
+					ImgName:   "test1.img",
+				},
+				{
+					ImgName:   "test2.img",
+				},
+				{
+					ImgName:   "test3.img",
+				},
+				{
+					ImgName:   "test4.img",
+				},
+			},
+			map[string]string{},
+			false,
+		},
+		{
+			"mutli_volume_some_specified",
+			"gadget-multi.yaml",
+			&[]ImgType{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "first",
+				},
+				{
+					ImgName:   "test2.img",
+					ImgVolume: "second",
+				},
+				{
+					ImgName:   "test3.img",
+				},
+				{
+					ImgName:   "test4.img",
+				},
+			},
+			map[string]string{},
+			false,
+		},
+		{
+			"mutli_volume_only_create_some_images",
+			"gadget-multi.yaml",
+			&[]ImgType{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "first",
+				},
+				{
+					ImgName:   "test2.img",
+					ImgVolume: "second",
+				},
+			},
+			map[string]string{
+				"first": "test1.img",
+				"second": "test2.img",
+			},
+			true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_verify_artifact_names_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+
+			stateMachine.YamlFilePath = filepath.Join("testdata", tc.gadgetYAML)
+			stateMachine.ImageDef = ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Rootfs: &RootfsType{
+					Archive: "ubuntu",
+				},
+				Customization: &CustomizationType{},
+				Artifacts: &ArtifactType{
+					Img: tc.img,
+				},
+			}
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			// load gadget yaml
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, true)
+
+			// verify artifact names
+			err = stateMachine.verifyArtifactNames()
+			if tc.shouldPass {
+				asserter.AssertErrNil(err, true)
+				if !reflect.DeepEqual(tc.expectedVolNames, stateMachine.VolumeNames) {
+					fmt.Println(tc.expectedVolNames)
+					fmt.Println(stateMachine.VolumeNames)
+					t.Errorf("Expected volume names does not match calculated volume names")
+				}
+			} else {
+				asserter.AssertErrContains(err, "Volume names must be specified for each image")
+			}
+
+		})
+	}
 }
 
 // TestBuildRootfsFromTasks unit tests the buildRootfsFromTasks function
