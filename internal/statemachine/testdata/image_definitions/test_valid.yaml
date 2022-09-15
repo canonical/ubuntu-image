@@ -5,18 +5,21 @@ architecture: arm64
 series: kinetic
 class: preinstalled
 kernel:
-  name: linux-raspi
+  name: linux-image-raspi
 gadget:
   url: "https://github.com/jawn-smith/pi-gadget.git"
   branch: "classic"
   type: "git"
 #model-assertion: pi-generic.model
 rootfs:
-  mirror: "http://ports.ubuntu.com/"
+  archive: ubuntu
   components:
     - main
     - universe
+    - multiverse
     - restricted
+  mirror: "http://ports.ubuntu.com/"
+  pocket: updates
   seed:
     urls:
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
@@ -24,6 +27,8 @@ rootfs:
     branch: kinetic
     names:
       - server
+      - server-raspi
+      - raspi-common
       - minimal
       - standard
       - cloud-image
@@ -41,6 +46,10 @@ customization:
     - name: ubuntu-minimal
     - name: linux-firmware-raspi
     - name: pi-bluetooth
+    - name: ubuntu-raspi-settings
+  extra-snaps:
+    - name: core
+    - name: snapd
     - name: linux-image-raspi
   fstab:
     -

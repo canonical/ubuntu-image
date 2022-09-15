@@ -249,10 +249,10 @@ func TestPrintStates(t *testing.T) {
 [6] add_extra_ppas
 [7] install_packages
 [8] preseed_image
-[9] populate_rootfs_contents
-[10] customize_cloud_init
-[11] customize_fstab
-[12] perform_manual_customization
+[9] customize_cloud_init
+[10] customize_fstab
+[11] perform_manual_customization
+[12] populate_rootfs_contents
 [13] generate_disk_info
 [14] calculate_rootfs_size
 [15] populate_bootfs_contents
