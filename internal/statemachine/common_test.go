@@ -919,6 +919,11 @@ func TestFailedMakeDisk(t *testing.T) {
 		defer os.RemoveAll(outDir)
 		stateMachine.commonFlags.OutputDir = outDir
 
+		// set up volume names
+		stateMachine.VolumeNames = map[string]string {
+			"pc": "pc.img",
+		}
+
 		// set a valid yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-mbr.yaml")
 		// ensure unpack exists
@@ -1099,6 +1104,11 @@ func TestImageSizeFlag(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 			//defer os.RemoveAll(outDir)
 			stateMachine.commonFlags.OutputDir = outDir
+
+			// set up volume names
+			stateMachine.VolumeNames = map[string]string {
+				"pc": "pc.img",
+			}
 
 			// set up a "rootfs" that we can eventually copy into the disk
 			os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
