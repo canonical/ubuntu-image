@@ -1084,6 +1084,19 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.OutputDir = "/test/path"
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &RootfsType{
+				Archive: "ubuntu",
+			},
+			Customization: &CustomizationType{},
+			Artifacts: &ArtifactType{
+				Manifest: &ManifestType {
+					ManifestName: "filesystem.manifest",
+				},
+			},
+		}
 
 		err := stateMachine.generatePackageManifest()
 		asserter.AssertErrContains(err, "Error creating manifest file")
