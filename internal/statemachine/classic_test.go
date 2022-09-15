@@ -200,6 +200,7 @@ func TestFailedCalculateStates(t *testing.T) {
 				ArchiveTasks: []string{"test"},
 			},
 			Customization: &CustomizationType{},
+			Artifacts: &ArtifactType{},
 		}
 
 		stateMachine.stateMachineFlags.Thru = "fake_state"
@@ -242,22 +243,23 @@ func TestPrintStates(t *testing.T) {
 [0] build_gadget_tree
 [1] prepare_gadget_tree
 [2] load_gadget_yaml
-[3] germinate
-[4] create_chroot
-[5] add_extra_ppas
-[6] install_packages
-[7] preseed_image
-[8] populate_rootfs_contents
-[9] customize_cloud_init
-[10] customize_fstab
-[11] perform_manual_customization
-[12] generate_disk_info
-[13] calculate_rootfs_size
-[14] populate_bootfs_contents
-[15] populate_prepare_partitions
-[16] make_disk
-[17] generate_manifest
-[18] finish
+[3] verify_artifact_names
+[4] germinate
+[5] create_chroot
+[6] add_extra_ppas
+[7] install_packages
+[8] preseed_image
+[9] populate_rootfs_contents
+[10] customize_cloud_init
+[11] customize_fstab
+[12] perform_manual_customization
+[13] generate_disk_info
+[14] calculate_rootfs_size
+[15] populate_bootfs_contents
+[16] populate_prepare_partitions
+[17] make_disk
+[18] generate_manifest
+[19] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
