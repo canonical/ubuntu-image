@@ -649,42 +649,6 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 	return debootstrapCmd
 }
 
-// generatePocketList returns a slice of strings that need to be added to
-// /etc/apt/sources.list in the chroot based on the value of "pocket"
-// in the rootfs section of the image definition
-func generatePocketList(imageDef imagedefinition.ImageDefinition) []string {
-	pocketMap := map[string][]string{
-		"release": {},
-		"security": {
-			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
-				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
-			),
-		},
-		"updates": {
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
-				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
-			),
-			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
-				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
-			),
-		},
-		"proposed": {
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
-				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
-			),
-			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
-				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
-			),
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-proposed %s\n",
-				imageDef.Series, strings.Join(imageDef.Rootfs.Components, " "),
-			),
-		},
-	}
-
-	// Schema validation has already confirmed the Pocket is a valid value
-	return pocketMap[strings.ToLower(imageDef.Rootfs.Pocket)]
-}
-
 // generateAptCmd generates the apt command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
 func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {

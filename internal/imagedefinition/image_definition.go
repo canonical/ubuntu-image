@@ -23,7 +23,7 @@ type ImageDefinition struct {
 	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget"`
 	ModelAssertion string         `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
 	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
-	Customization  *Customization `yaml:"customization"   json:"Customization"`
+	Customization  *Customization `yaml:"customization"   json:"Customization,omitempty"`
 	Artifacts      *Artifact      `yaml:"artifacts"       json:"Artifacts"`
 	Class          string         `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
 }
@@ -71,7 +71,7 @@ type Tarball struct {
 	SHA256sum  string `yaml:"sha256sum" json:"SHA256sum,omitempty"`
 }
 
-// CustomizationType defines the customization section of the image definition file
+// Customization defines the customization section of the image definition file
 type Customization struct {
 	Installer     *Installer `yaml:"installer"      json:"Installer,omitempty"`
 	CloudInit     *CloudInit `yaml:"cloud-init"     json:"CloudInit,omitempty"`
@@ -218,6 +218,9 @@ type Changelog struct {
 	ChangelogPath string `yaml:"path" json:"ChangelogPath"`
 }
 
+// NewMissingURLError fails the image definition parsing when a dict
+// requires a URL conditionally based on the value of other keys
+// in the dict but does not have one included
 func NewMissingURLError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingURLError {
 	err := MissingURLError{}
 	err.SetContext(context)
@@ -236,6 +239,8 @@ type MissingURLError struct {
 	gojsonschema.ResultErrorFields
 }
 
+// NewInvalidPPAError fails the image definition parsing when a private PPA
+// is configured with no fingerprint
 func NewInvalidPPAError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *InvalidPPAError {
 	err := InvalidPPAError{}
 	err.SetContext(context)
@@ -253,6 +258,7 @@ type InvalidPPAError struct {
 	gojsonschema.ResultErrorFields
 }
 
+// NewPathNotAbsoluteError fails the image definition parsing when a relative path is given
 func NewPathNotAbsoluteError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *PathNotAbsoluteError {
 	err := PathNotAbsoluteError{}
 	err.SetContext(context)
@@ -270,38 +276,57 @@ type PathNotAbsoluteError struct {
 	gojsonschema.ResultErrorFields
 }
 
-// generatePocketList returns a slice of strings that need to be added to
+func (imageDef ImageDefinition) securityMirror() string {
+	if imageDef.Architecture == "amd64" || imageDef.Architecture == "386" {
+		return "http://security.ubuntu.com/ubuntu/"
+	}
+	return imageDef.Rootfs.Mirror
+}
+
+// GeneratePocketList returns a slice of strings that need to be added to
 // /etc/apt/sources.list in the chroot based on the value of "pocket"
 // in the rootfs section of the image definition
-func (ImageDef ImageDefinition) GeneratePocketList() []string {
+func (imageDef ImageDefinition) GeneratePocketList() []string {
 	pocketMap := map[string][]string{
 		"release": {},
 		"security": {
-			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-security %s\n",
+				imageDef.securityMirror(),
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 		},
 		"updates": {
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-updates %s\n",
+				imageDef.Rootfs.Mirror,
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
-			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-security %s\n",
+				imageDef.securityMirror(),
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 		},
 		"proposed": {
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-updates %s\n",
+				imageDef.Rootfs.Mirror,
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
-			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-security %s\n",
+				imageDef.securityMirror(),
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-proposed %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-proposed %s\n",
+				imageDef.Rootfs.Mirror,
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 		},
 	}
 
 	// Schema validation has already confirmed the Pocket is a valid value
-	return pocketMap[strings.ToLower(ImageDef.Rootfs.Pocket)]
+	return pocketMap[strings.ToLower(imageDef.Rootfs.Pocket)]
 }
