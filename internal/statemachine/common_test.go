@@ -839,7 +839,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			stateMachine.commonFlags.OutputDir = outDir
 
 			// set up volume names
-			stateMachine.VolumeNames = map[string]string {
+			stateMachine.VolumeNames = map[string]string{
 				"pc": "pc.img",
 			}
 
@@ -920,7 +920,7 @@ func TestFailedMakeDisk(t *testing.T) {
 		stateMachine.commonFlags.OutputDir = outDir
 
 		// set up volume names
-		stateMachine.VolumeNames = map[string]string {
+		stateMachine.VolumeNames = map[string]string{
 			"pc": "pc.img",
 		}
 
@@ -1098,7 +1098,7 @@ func TestImageSizeFlag(t *testing.T) {
 				"second": 1 * quantity.SizeGiB,
 			},
 			map[string]string{
-				"first": "first.img",
+				"first":  "first.img",
 				"second": "second.img",
 			},
 		},

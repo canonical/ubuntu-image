@@ -200,7 +200,7 @@ func TestFailedCalculateStates(t *testing.T) {
 				ArchiveTasks: []string{"test"},
 			},
 			Customization: &CustomizationType{},
-			Artifacts: &ArtifactType{},
+			Artifacts:     &ArtifactType{},
 		}
 
 		stateMachine.stateMachineFlags.Thru = "fake_state"
@@ -419,7 +419,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 			"gadget_tree/meta/gadget.yaml",
 			&[]ImgType{
 				{
-					ImgName:   "test-single.img",
+					ImgName: "test-single.img",
 				},
 			},
 			map[string]string{
@@ -449,9 +449,9 @@ func TestVerifyArtifactNames(t *testing.T) {
 				},
 			},
 			map[string]string{
-				"first": "test1.img",
+				"first":  "test1.img",
 				"second": "test2.img",
-				"third": "test3.img",
+				"third":  "test3.img",
 				"fourth": "test4.img",
 			},
 			true,
@@ -461,16 +461,16 @@ func TestVerifyArtifactNames(t *testing.T) {
 			"gadget-multi.yaml",
 			&[]ImgType{
 				{
-					ImgName:   "test1.img",
+					ImgName: "test1.img",
 				},
 				{
-					ImgName:   "test2.img",
+					ImgName: "test2.img",
 				},
 				{
-					ImgName:   "test3.img",
+					ImgName: "test3.img",
 				},
 				{
-					ImgName:   "test4.img",
+					ImgName: "test4.img",
 				},
 			},
 			map[string]string{},
@@ -489,10 +489,10 @@ func TestVerifyArtifactNames(t *testing.T) {
 					ImgVolume: "second",
 				},
 				{
-					ImgName:   "test3.img",
+					ImgName: "test3.img",
 				},
 				{
-					ImgName:   "test4.img",
+					ImgName: "test4.img",
 				},
 			},
 			map[string]string{},
@@ -512,7 +512,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 				},
 			},
 			map[string]string{
-				"first": "test1.img",
+				"first":  "test1.img",
 				"second": "test2.img",
 			},
 			true,
@@ -1037,7 +1037,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 			},
 			Customization: &CustomizationType{},
 			Artifacts: &ArtifactType{
-				Manifest: &ManifestType {
+				Manifest: &ManifestType{
 					ManifestName: "filesystem.manifest",
 				},
 			},
@@ -1092,7 +1092,7 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 			},
 			Customization: &CustomizationType{},
 			Artifacts: &ArtifactType{
-				Manifest: &ManifestType {
+				Manifest: &ManifestType{
 					ManifestName: "filesystem.manifest",
 				},
 			},

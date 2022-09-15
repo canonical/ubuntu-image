@@ -62,7 +62,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 // each volume in the gadget. This function stores that info in the struct
 func (stateMachine *StateMachine) setArtifactNames() error {
 	stateMachine.VolumeNames = make(map[string]string)
-	for volumeName, _ := range stateMachine.GadgetInfo.Volumes {
+	for volumeName := range stateMachine.GadgetInfo.Volumes {
 		stateMachine.VolumeNames[volumeName] = volumeName + ".img"
 	}
 	return nil
