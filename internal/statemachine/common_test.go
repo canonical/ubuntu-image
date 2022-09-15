@@ -1076,14 +1076,32 @@ func TestImageSizeFlag(t *testing.T) {
 		sizeArg    string
 		gadgetTree string
 		imageSize  map[string]quantity.Size
+		volNames   map[string]string
 	}{
-		{"one_volume", "4G", filepath.Join("testdata", "gadget_tree"),
-			map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
-		{"multi_volume", "first:4G,second:1G",
+		{
+			"one_volume",
+			"4G",
+			filepath.Join("testdata", "gadget_tree"),
+			map[string]quantity.Size{
+				"pc": 4 * quantity.SizeGiB,
+			},
+			map[string]string{
+				"pc": "pc.img",
+			},
+		},
+		{
+			"multi_volume",
+			"first:4G,second:1G",
 			filepath.Join("testdata", "gadget_tree_multi"),
 			map[string]quantity.Size{
 				"first":  4 * quantity.SizeGiB,
-				"second": 1 * quantity.SizeGiB}},
+				"second": 1 * quantity.SizeGiB,
+			},
+			map[string]string{
+				"first": "first.img",
+				"second": "second.img",
+			},
+		},
 	}
 	for _, tc := range testCases {
 
@@ -1106,9 +1124,7 @@ func TestImageSizeFlag(t *testing.T) {
 			stateMachine.commonFlags.OutputDir = outDir
 
 			// set up volume names
-			stateMachine.VolumeNames = map[string]string {
-				"pc": "pc.img",
-			}
+			stateMachine.VolumeNames = tc.volNames
 
 			// set up a "rootfs" that we can eventually copy into the disk
 			os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
