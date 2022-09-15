@@ -210,9 +210,11 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
-		if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
-			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+		if classicStateMachine.ImageDef.Customization != nil {
+			if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+				rootfsCreationStates = append(rootfsCreationStates,
+					stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+			}
 		}
 		rootfsCreationStates = append(rootfsCreationStates,
 			[]stateFunc{
@@ -225,24 +227,26 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
 	}
 
+	// Determine any customization that needs to run before the image is created
+	//TODO: installer image customization... eventually.
+	if classicStateMachine.ImageDef.Customization != nil {
+		if classicStateMachine.ImageDef.Customization.CloudInit != nil {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
+		}
+		if len(classicStateMachine.ImageDef.Customization.Fstab) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"customize_fstab", (*StateMachine).customizeFstab})
+		}
+		if classicStateMachine.ImageDef.Customization.Manual != nil {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
+		}
+	}
+
 	// The rootfs is laid out in a staging area, now populate it in the correct location
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents})
-
-	// Determine any customization that needs to run before the image is created
-	//TODO: installer image customization... eventually.
-	if classicStateMachine.ImageDef.Customization.CloudInit != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
-	}
-	if len(classicStateMachine.ImageDef.Customization.Fstab) > 0 {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"customize_fstab", (*StateMachine).customizeFstab})
-	}
-	if classicStateMachine.ImageDef.Customization.Manual != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
-	}
 
 	// Add the "always there" states that populate partitions, build the disk, etc.
 	// This includes the no-op "finish" state to signify successful setup
@@ -675,12 +679,14 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	}
 
 	// add any extra snaps from the image definition to the list
-	for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
-		if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
-			imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
-		}
-		if extraSnap.Channel != "" {
-			imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
+	if classicStateMachine.ImageDef.Customization != nil {
+		for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
+			if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
+				imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
+			}
+			if extraSnap.Channel != "" {
+				imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
+			}
 		}
 	}
 

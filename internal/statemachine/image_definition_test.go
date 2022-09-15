@@ -18,6 +18,7 @@ func TestGeneratePocketList(t *testing.T) {
 				Rootfs: &RootfsType{
 					Pocket:     "release",
 					Components: []string{"main", "universe"},
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
 			[]string{},
@@ -25,10 +26,12 @@ func TestGeneratePocketList(t *testing.T) {
 		{
 			"security",
 			ImageDefinition{
-				Series: "jammy",
+				Architecture: "amd64",
+				Series:       "jammy",
 				Rootfs: &RootfsType{
 					Pocket:     "security",
 					Components: []string{"main"},
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
 			[]string{"deb http://security.ubuntu.com/ubuntu/ jammy-security main\n"},
@@ -36,24 +39,28 @@ func TestGeneratePocketList(t *testing.T) {
 		{
 			"updates",
 			ImageDefinition{
-				Series: "jammy",
+				Architecture: "arm64",
+				Series:       "jammy",
 				Rootfs: &RootfsType{
 					Pocket:     "updates",
 					Components: []string{"main", "universe", "multiverse"},
+					Mirror:     "http://ports.ubuntu.com/",
 				},
 			},
 			[]string{
-				"deb http://security.ubuntu.com/ubuntu/ jammy-security main universe multiverse\n",
-				"deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe multiverse\n",
+				"deb http://ports.ubuntu.com/ jammy-security main universe multiverse\n",
+				"deb http://ports.ubuntu.com/ jammy-updates main universe multiverse\n",
 			},
 		},
 		{
 			"proposed",
 			ImageDefinition{
-				Series: "jammy",
+				Architecture: "amd64",
+				Series:       "jammy",
 				Rootfs: &RootfsType{
 					Pocket:     "proposed",
 					Components: []string{"main", "universe", "multiverse", "restricted"},
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
 				},
 			},
 			[]string{
@@ -74,7 +81,7 @@ func TestGeneratePocketList(t *testing.T) {
 					}
 				}
 				if !found {
-					t.Errorf("Expected %s in pockets list, but it was not", expectedPocket)
+					t.Errorf("Expected %s in pockets list %s, but it was not", expectedPocket, pocketList)
 				}
 			}
 		})

@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -47,6 +48,16 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+
+	// image.Prepare automatically has some output that we only want for
+	// verbose or greater logging
+	if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
+		oldImageStdout := image.Stdout
+		image.Stdout = ioutil.Discard
+		defer func() {
+			image.Stdout = oldImageStdout
+		}()
+	}
 
 	if err := imagePrepare(&imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
