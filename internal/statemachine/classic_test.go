@@ -1029,7 +1029,21 @@ func TestGeneratePackageManifest(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.OutputDir = outputDir
+		stateMachine.ImageDef = ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &RootfsType{
+				Archive: "ubuntu",
+			},
+			Customization: &CustomizationType{},
+			Artifacts: &ArtifactType{
+				Manifest: &ManifestType {
+					ManifestName: "filesystem.manifest",
+				},
+			},
+		}
 		osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
 
 		err = stateMachine.generatePackageManifest()
 		asserter.AssertErrNil(err, true)
