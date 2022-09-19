@@ -571,7 +571,7 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 		}
 		defer userDataFile.Close()
 
-		userDataBytes, err := yaml.Marshal(cloudInitCustomization.UserData)
+		userDataBytes, err := yamlMarshal(cloudInitCustomization.UserData)
 		if err != nil {
 			return err
 		}

@@ -26,6 +26,8 @@ import (
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
 	"github.com/xeipuuv/gojsonschema"
+
+	"gopkg.in/yaml.v2"
 )
 
 // define some functions that can be mocked by test cases
@@ -58,6 +60,7 @@ var seedOpen = seed.Open
 var imagePrepare = image.Prepare
 var httpGet = http.Get
 var jsonUnmarshal = json.Unmarshal
+var yamlMarshal = yaml.Marshal
 var gojsonschemaValidate = gojsonschema.Validate
 
 var mockableBlockSize string = "1" //used for mocking dd calls

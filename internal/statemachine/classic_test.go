@@ -618,6 +618,27 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 		defer os.RemoveAll(cloudInitConfigDirPath)
 
 		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+
+		err := stateMachine.customizeCloudInit()
+		if err == nil {
+			t.Error()
+		}
+	})
+
+	// Test if yaml.Marshal fails
+	t.Run("Test_failed_customize_cloud_init_yaml_marshal", func(t *testing.T) {
+		// this directory is expected to be present as it is installed by cloud-init
+		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
+		os.MkdirAll(cloudInitConfigDirPath, 0777)
+		defer os.RemoveAll(cloudInitConfigDirPath)
+
+		yamlMarshal = mockMarshal
+		defer func() {
+			yamlMarshal = yaml.Marshal
+		}()
 
 		err := stateMachine.customizeCloudInit()
 		if err == nil {
