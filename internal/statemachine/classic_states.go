@@ -243,6 +243,13 @@ func (stateMachine *StateMachine) calculateStates() error {
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents})
 
+	// if the --disk-info flag was used on the command line place it in the correct
+	// location in the rootfs
+	if stateMachine.commonFlags.DiskInfo != "" {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo})
+	}
+
 	// Add the "always there" states that populate partitions, build the disk, etc.
 	// This includes the no-op "finish" state to signify successful setup
 	rootfsCreationStates = append(rootfsCreationStates, imageCreationStates...)

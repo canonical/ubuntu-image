@@ -220,6 +220,7 @@ func TestPrintStates(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.Debug = true
+		stateMachine.commonFlags.DiskInfo = "test" // for coverage!
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions", "test_valid.yaml")
 		err := stateMachine.parseImageDefinition()
 		asserter.AssertErrNil(err, true)
