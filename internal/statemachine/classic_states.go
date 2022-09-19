@@ -17,6 +17,7 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
+
 	//"github.com/snapcore/snapd/progress"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
@@ -549,8 +550,72 @@ func (stateMachine *StateMachine) germinate() error {
 
 // Customize Cloud init with the values in the image definition YAML
 func (stateMachine *StateMachine) customizeCloudInit() error {
-	// currently a no-op pending implementation of the classic image redesign
-	return nil
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	cloudInitCustomization := classicStateMachine.ImageDef.Customization.CloudInit
+
+	seedPath := path.Join(classicStateMachine.tempDirs.chroot, "var/lib/cloud/seed/nocloud")
+	err := osMkdirAll(seedPath, 0755)
+	if err != nil {
+		return err
+	}
+
+	if cloudInitCustomization.MetaData != "" {
+		metaDataFile, err := osCreate(path.Join(seedPath, "meta-data"))
+		if err != nil {
+			return err
+		}
+		defer metaDataFile.Close()
+
+		_, err = metaDataFile.WriteString(cloudInitCustomization.MetaData)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.UserData != nil {
+		userDataFile, err := osCreate(path.Join(seedPath, "user-data"))
+		if err != nil {
+			return err
+		}
+		defer userDataFile.Close()
+
+		userDataBytes, err := yamlMarshal(cloudInitCustomization.UserData)
+		if err != nil {
+			return err
+		}
+
+		_, err = userDataFile.Write(userDataBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.NetworkConfig != "" {
+		networkConfigFile, err := osCreate(path.Join(seedPath, "network-config"))
+		if err != nil {
+			return err
+		}
+		defer networkConfigFile.Close()
+
+		_, err = networkConfigFile.WriteString(cloudInitCustomization.NetworkConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	datasourceConfig := "# to update this file, run dpkg-reconfigure cloud-init\ndatasource_list: [ NoCloud ]\n"
+
+	dpkgConfigPath := path.Join(classicStateMachine.tempDirs.chroot, "etc/cloud/cloud.cfg.d/90_dpkg.cfg")
+	dpkgConfigFile, err := osCreate(dpkgConfigPath)
+	if err != nil {
+		return err
+	}
+	defer dpkgConfigFile.Close()
+
+	_, err = dpkgConfigFile.WriteString(datasourceConfig)
+
+	return err
 }
 
 // Configure Extra PPAs

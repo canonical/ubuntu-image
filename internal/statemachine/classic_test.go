@@ -4,10 +4,12 @@ package statemachine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -19,6 +21,8 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
+
+	//"github.com/snapcore/snapd/osutil"
 	//"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -424,18 +428,222 @@ func TestExtractRootfsTar(t *testing.T) {
 
 // TestCustomizeCloudInit unit tests the customizeCloudInit function
 func TestCustomizeCloudInit(t *testing.T) {
-	t.Run("test_customize_cloud_init", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	cloudInitConfigs := []CloudInitType{
+		{
+			MetaData:      "foo: bar",
+			NetworkConfig: "foobar: foobar",
+			UserData: &[]UserDataType{
+				{UserName: "ubuntu", UserPassword: "ubuntu"},
+				{UserName: "john", UserPassword: "password"},
+			},
+		},
+		{
+			MetaData:      "foo: bar",
+			NetworkConfig: "foobar: foobar",
+			UserData:      nil,
+		},
+		{
+			NetworkConfig: "foobar: foobar",
+			UserData:      &[]UserDataType{},
+		},
+		{
+			UserData: &[]UserDataType{
+				{UserName: "ubuntu", UserPassword: "ubuntu"},
+				{UserName: "john", UserPassword: "password"},
+			},
+		},
+	}
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	for _, cloudInitConfig := range cloudInitConfigs {
+		t.Run("test_customize_cloud_init", func(t *testing.T) {
+			// Test setup
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			tmpDir, err := os.MkdirTemp("", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.RemoveAll(tmpDir)
+			stateMachine.tempDirs.chroot = tmpDir
+
+			// this directory is expected to be present as it is installed by cloud-init
+			os.MkdirAll(path.Join(tmpDir, "etc/cloud/cloud.cfg.d"), 0777)
+
+			stateMachine.ImageDef.Customization = &CustomizationType{
+				CloudInit: &cloudInitConfig,
+			}
+
+			// Running function to test
+			err = stateMachine.customizeCloudInit()
+			asserter.AssertErrNil(err, true)
+
+			// Validation
+			seedPath := path.Join(tmpDir, "var/lib/cloud/seed/nocloud")
+
+			metaDataFile, err := os.Open(path.Join(seedPath, "meta-data"))
+			if cloudInitConfig.MetaData != "" {
+				asserter.AssertErrNil(err, false)
+
+				metaDataFileContent, err := ioutil.ReadAll(metaDataFile)
+				asserter.AssertErrNil(err, false)
+
+				if string(metaDataFileContent[:]) != cloudInitConfig.MetaData {
+					t.Errorf("un-expected meta-data content found: expected:\n%v\ngot:%v", cloudInitConfig.MetaData, string(metaDataFileContent[:]))
+				}
+			} else {
+				asserter.AssertErrContains(err, "no such file or directory")
+			}
+
+			networkConfigFile, err := os.Open(path.Join(seedPath, "network-config"))
+			if cloudInitConfig.NetworkConfig != "" {
+				asserter.AssertErrNil(err, false)
+
+				networkConfigFileContent, err := ioutil.ReadAll(networkConfigFile)
+				asserter.AssertErrNil(err, false)
+				if string(networkConfigFileContent[:]) != cloudInitConfig.NetworkConfig {
+					t.Errorf("un-expected network-config found: expected:\n%v\ngot:%v", cloudInitConfig.NetworkConfig, string(networkConfigFileContent[:]))
+				}
+			} else {
+				asserter.AssertErrContains(err, "no such file or directory")
+			}
+
+			userDataFile, err := os.Open(path.Join(seedPath, "user-data"))
+			if cloudInitConfig.UserData != nil {
+				asserter.AssertErrNil(err, false)
+
+				userDataFileContent, err := ioutil.ReadAll(userDataFile)
+				asserter.AssertErrNil(err, false)
+
+				userDataOut := make([]UserDataType, 0)
+				err = yaml.Unmarshal(userDataFileContent, &userDataOut)
+				asserter.AssertErrNil(err, false)
+
+				for i, user := range *cloudInitConfig.UserData {
+					if user != userDataOut[i] {
+						t.Errorf("expected user %#v got %#v", user, userDataOut[i])
+					}
+				}
+			} else {
+				asserter.AssertErrContains(err, "no such file or directory")
+			}
+
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		})
+	}
+}
+
+func TestFailedCustomizeCloudInit(t *testing.T) {
+	// Test setup
+	asserter := helper.Asserter{T: t}
+	saveCWD := helper.SaveCWD()
+	defer saveCWD()
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	tmpDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	stateMachine.tempDirs.chroot = tmpDir
+
+	stateMachine.ImageDef.Customization = &CustomizationType{
+		CloudInit: &CloudInitType{
+			MetaData:      "foo: bar",
+			NetworkConfig: "foobar: foobar",
+			UserData: &[]UserDataType{
+				{UserName: "ubuntu", UserPassword: "ubuntu"},
+				{UserName: "john", UserPassword: "password"},
+			},
+		},
+	}
+
+	// Test if osCreate fails
+	fileList := []string{"meta-data", "user-data", "network-config", "90_dpkg.cfg"}
+	for _, file := range fileList {
+		t.Run("test_failed_customize_cloud_init_"+file, func(t *testing.T) {
+			// this directory is expected to be present as it is installed by cloud-init
+			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
+			os.MkdirAll(cloudInitConfigDirPath, 0777)
+			defer os.RemoveAll(cloudInitConfigDirPath)
+
+			osCreate = func(name string) (*os.File, error) {
+				if strings.Contains(name, file) {
+					return nil, errors.New("test error: failed to create file")
+				}
+				return os.Create(name)
+			}
+
+			err := stateMachine.customizeCloudInit()
+			asserter.AssertErrContains(err, "test error: failed to create file")
+		})
+	}
+
+	// Test if Write fails (file is read only)
+	for _, file := range fileList {
+		t.Run("test_failed_customize_cloud_init_"+file, func(t *testing.T) {
+			// this directory is expected to be present as it is installed by cloud-init
+			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
+			os.MkdirAll(cloudInitConfigDirPath, 0777)
+			defer os.RemoveAll(cloudInitConfigDirPath)
+
+			osCreate = func(name string) (*os.File, error) {
+				if strings.Contains(name, file) {
+					fileReadWrite, _ := os.Create(name)
+					fileReadWrite.Close()
+					fileReadOnly, _ := os.Open(name)
+					return fileReadOnly, nil
+				}
+				return os.Create(name)
+			}
+
+			err := stateMachine.customizeCloudInit()
+			if err == nil {
+				t.Errorf("expected error but got nil")
+			}
+		})
+	}
+
+	// Test if os.MkdirAll fails
+	t.Run("test_failed_customize_cloud_init_mkdir", func(t *testing.T) {
+		// this directory is expected to be present as it is installed by cloud-init
+		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
+		os.MkdirAll(cloudInitConfigDirPath, 0777)
+		defer os.RemoveAll(cloudInitConfigDirPath)
+
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
 
 		err := stateMachine.customizeCloudInit()
-		asserter.AssertErrNil(err, true)
+		if err == nil {
+			t.Error()
+		}
+	})
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	// Test if yaml.Marshal fails
+	t.Run("Test_failed_customize_cloud_init_yaml_marshal", func(t *testing.T) {
+		// this directory is expected to be present as it is installed by cloud-init
+		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
+		os.MkdirAll(cloudInitConfigDirPath, 0777)
+		defer os.RemoveAll(cloudInitConfigDirPath)
+
+		yamlMarshal = mockMarshal
+		defer func() {
+			yamlMarshal = yaml.Marshal
+		}()
+
+		err := stateMachine.customizeCloudInit()
+		if err == nil {
+			t.Error()
+		}
 	})
 }
 
