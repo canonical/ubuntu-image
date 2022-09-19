@@ -21,7 +21,7 @@ SYNOPSIS
 
 ubuntu-image snap [options] model.assertion
 
-ubuntu-image classic [options] image_definition.yaml
+ubuntu-image classic [options] GADGET_TREE_URI
 
 
 DESCRIPTION
@@ -44,12 +44,22 @@ such things as the names of all the volumes to be produced [#]_, the
 structures [#]_ within the volume, whether the volume contains a bootloader
 and if so what kind of bootloader, etc.
 
-Classic images are built from an image definition file. This is a YAML
-file that details important information about the image, including how
-to build the gadget tree, how to build the rootfs, and allows the user
-to specify certain customizations that can be made to the image. This
-includes but is not limited to: extra snaps, extra packages, and adding
-users and groups.
+Note that ``ubuntu-image`` communicates with the snap store using the ``snap
+prepare-image`` subcommand.  The model assertion file is passed to ``snap
+prepare-image`` which handles downloading the appropriate gadget and any extra
+snaps.  See that command's documentation for additional details.
+
+Classic images are built from a local `gadget tree`_ path.  The `gadget tree`_
+is nothing more than a primed `gadget snap`_, containing a `gadget.yaml`_ file
+in the meta directory and all the necessary bootloader gadget bits built.
+For instance a `gadget tree`_ can be easily prepared by fetching a specially
+tailored `gadget snap`_ source and running ``snapcraft prime`` on it, with the
+resulting tree ending up in the ``prime/`` directory.
+
+The actual rootfs for a classic image is created by ``live-build`` with
+arguments passed as per the optional arguments to ``ubuntu-image``.  The
+``livecd-rootfs`` configuration from the host system is used.
+
 
 OPTIONS
 =======
@@ -89,9 +99,38 @@ Classic command options
 These are the options for defining the contents of classic preinstalled Ubuntu
 images.  Can only be used when the ``ubuntu-image classic`` command is used.
 
-IMAGE_DEFINITION_FILE
-    An URI to the image definition to be used to build the image.  This positional
+GADGET_TREE_URI
+    An URI to the gadget tree to be used to build the image.  This positional
     argument must be given for this mode of operation.  Must be a local path.
+
+-p PROJECT, --project PROJECT
+    Project name to be passed on to ``livecd-rootfs``. Mutually exclusive
+    with --filesystem
+
+-f FILESYSTEM, --filesystem FILESYSTEM
+    Unpacked Ubuntu filesystem to be copied to the system partition.
+    Mutually exclusive with --project.
+
+-s SUITE, --suite SUITE
+    Distribution name to be passed on to ``livecd-rootfs``.
+
+-a CPU-ARCHITECTURE, --arch CPU-ARCHITECTURE
+    CPU architecture to be passed on to ``livecd-rootfs``.  Default value is
+    the architecture of the host.
+
+--subproject SUBPROJECT
+    Sub-project name to be passed on ``livecd-rootfs``.
+
+--subarch SUBARCH
+    Sub-architecture to be passed on to ``livecd-rootfs``.
+
+--with-proposed
+    Defines if the image should be built with -proposed enabled.  This is
+    passed through to ``livecd-rootfs``.
+
+--extra-ppas EXTRA_PPAS
+    Extra ppas to install. This is passed through to ``livecd-rootfs``.
+
 
 Common options
 --------------
@@ -210,9 +249,6 @@ but ``--workdir`` must be given in that case since the state is saved in a
 FILES
 =====
 
-image definition
-    https://github.com/canonical/ubuntu-image/tree/feature/classic-image-redesign/internal/imagedefinition/README.md
-
 gadget.yaml
     https://github.com/snapcore/snapd/wiki/Gadget-snap#gadget.yaml
 
@@ -290,23 +326,12 @@ type are listed below
 Classic image steps
 -------------------
 
-Classic images often need different sets of steps to build the different
-image types. A list of all possible steps is below:
-
-#. parse_image_definition
-#. calculate_states
 #. make_temporary_directories
-#. build_gadget_tree
 #. prepare_gadget_tree
+#. run_live_build
 #. load_gadget_yaml
-#. germinate
-#. create_chroot
-#. add_extra_ppas
-#. install_packages
-#. manual_customization
-#. preseed_image
 #. populate_rootfs_contents
-#. customize_cloud_init
+#. populate_rootfs_contents_hooks
 #. generate_disk_info
 #. calculate_rootfs_size
 #. populate_bootfs_contents
@@ -370,4 +395,3 @@ FOOTNOTES
 .. _`gadget snap`: https://github.com/snapcore/snapd/wiki/Gadget-snap
 .. _`gadget tree`: Example: https://github.com/snapcore/pc-amd64-gadget
 .. _`gadget.yaml`: https://github.com/snapcore/snapd/wiki/Gadget-snap#gadget.yaml
-.. _image_definition: https://github.com/canonical/ubuntu-image/tree/feature/classic-image-redesign/internal/imagedefinition/README.md
