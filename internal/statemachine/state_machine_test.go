@@ -689,9 +689,6 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 			err = stateMachine.loadGadgetYaml()
 			asserter.AssertErrNil(err, false)
 
-			err = stateMachine.postProcessGadgetYaml()
-			asserter.AssertErrNil(err, false)
-
 			if !reflect.DeepEqual(*stateMachine.GadgetInfo.Volumes["pc"], tc.expectedResult) {
 				t.Errorf("GadgetInfo after postProcessGadgetYaml:\n%+v "+
 					"does not match expected result:\n%+v",
