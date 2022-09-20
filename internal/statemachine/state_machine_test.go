@@ -733,5 +733,10 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 		err = stateMachine.postProcessGadgetYaml()
 		asserter.AssertErrContains(err, "Error creating volume dir")
 		osMkdirAll = os.MkdirAll
+
+		// use a gadget with a disallowed string in the content field
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_invalid_content.yaml")
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrContains(err, "disallowed for security purposes")
 	})
 }

@@ -245,6 +245,14 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				}
 			}
 
+			// make sure there are no "../" paths in the structure's contents
+			for _, content := range structure.Content {
+				if strings.Contains(content.UnresolvedSource, "../") {
+					return fmt.Errorf("filesystem content source \"%s\" contains \"../\". "+
+						"This is disallowed for security purposes",
+						content.UnresolvedSource)
+				}
+			}
 			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
 				// handle special syntax of rootfs:/<file path> in
 				// structure content. This is needed to allow images
