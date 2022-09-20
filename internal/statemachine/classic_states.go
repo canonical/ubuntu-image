@@ -16,8 +16,6 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
-	"github.com/snapcore/snapd/osutil"
-	//"github.com/snapcore/snapd/progress"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -658,6 +656,9 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	if err != nil {
 		return err
 	}
+	if stateMachine.commonFlags.Channel != "" {
+		imageOpts.Channel = stateMachine.commonFlags.Channel
+	}
 
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
@@ -754,30 +755,6 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 			}
 		}
 	}
-
-	if classicStateMachine.commonFlags.CloudInit != "" {
-		seedDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
-		cloudDir := filepath.Join(seedDir, "nocloud-net")
-		err := osMkdirAll(cloudDir, 0756)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
-		}
-		metadataFile := filepath.Join(cloudDir, "meta-data")
-		metadataIO, err := osOpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
-		}
-		metadataIO.Write([]byte("instance-id: nocloud-static"))
-		metadataIO.Close()
-
-		userdataFile := filepath.Join(cloudDir, "user-data")
-		err = osutilCopyFile(classicStateMachine.commonFlags.CloudInit,
-			userdataFile, osutil.CopyFlagDefault)
-		if err != nil {
-			return fmt.Errorf("Error copying cloud-init: %s", err.Error())
-		}
-	}
-
 	return nil
 }
 
