@@ -169,6 +169,11 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	return nil
 }
 
+// State responsible for dynamically calculating all the remaining states
+// needed to build the image, as defined by the image-definition file
+// that was loaded in the previous 'state'.
+// If a new possible state is added to the classic build state machine, it
+// should be added here (usually basing on contents of the image definition)
 func (stateMachine *StateMachine) calculateStates() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
@@ -549,8 +554,72 @@ func (stateMachine *StateMachine) germinate() error {
 
 // Customize Cloud init with the values in the image definition YAML
 func (stateMachine *StateMachine) customizeCloudInit() error {
-	// currently a no-op pending implementation of the classic image redesign
-	return nil
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	cloudInitCustomization := classicStateMachine.ImageDef.Customization.CloudInit
+
+	seedPath := path.Join(classicStateMachine.tempDirs.chroot, "var/lib/cloud/seed/nocloud")
+	err := osMkdirAll(seedPath, 0755)
+	if err != nil {
+		return err
+	}
+
+	if cloudInitCustomization.MetaData != "" {
+		metaDataFile, err := osCreate(path.Join(seedPath, "meta-data"))
+		if err != nil {
+			return err
+		}
+		defer metaDataFile.Close()
+
+		_, err = metaDataFile.WriteString(cloudInitCustomization.MetaData)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.UserData != nil {
+		userDataFile, err := osCreate(path.Join(seedPath, "user-data"))
+		if err != nil {
+			return err
+		}
+		defer userDataFile.Close()
+
+		userDataBytes, err := yamlMarshal(cloudInitCustomization.UserData)
+		if err != nil {
+			return err
+		}
+
+		_, err = userDataFile.Write(userDataBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.NetworkConfig != "" {
+		networkConfigFile, err := osCreate(path.Join(seedPath, "network-config"))
+		if err != nil {
+			return err
+		}
+		defer networkConfigFile.Close()
+
+		_, err = networkConfigFile.WriteString(cloudInitCustomization.NetworkConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	datasourceConfig := "# to update this file, run dpkg-reconfigure cloud-init\ndatasource_list: [ NoCloud ]\n"
+
+	dpkgConfigPath := path.Join(classicStateMachine.tempDirs.chroot, "etc/cloud/cloud.cfg.d/90_dpkg.cfg")
+	dpkgConfigFile, err := osCreate(dpkgConfigPath)
+	if err != nil {
+		return err
+	}
+	defer dpkgConfigFile.Close()
+
+	_, err = dpkgConfigFile.WriteString(datasourceConfig)
+
+	return err
 }
 
 // Configure Extra PPAs
