@@ -145,6 +145,9 @@ func mockGet(string) (*http.Response, error) {
 func mockUnmarshal([]byte, any) error {
 	return fmt.Errorf("Test Error")
 }
+func mockMarshal(interface{}) ([]byte, error) {
+	return []byte{}, fmt.Errorf("Test Error")
+}
 func mockRel(string, string) (string, error) {
 	return "", fmt.Errorf("Test error")
 }

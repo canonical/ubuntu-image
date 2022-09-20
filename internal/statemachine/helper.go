@@ -240,18 +240,24 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 					partImg, err.Error())
 			}
 		}
+		// check if any content exists in unpack
+		contentFiles, err := ioutilReadDir(contentRoot)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("Error listing contents of volume \"%s\": %s",
+				contentRoot, err.Error())
+		}
 		// use mkfs functions from snapd to create the filesystems
-		if structure.Content == nil {
-			err := mkfsMake(structure.Filesystem, partImg, structure.Label,
-				structure.Size, stateMachine.SectorSize)
-			if err != nil {
-				return fmt.Errorf("Error running mkfs: %s", err.Error())
-			}
-		} else {
+		if structure.Content != nil || len(contentFiles) > 0 {
 			err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
 				contentRoot, structure.Size, stateMachine.SectorSize)
 			if err != nil {
 				return fmt.Errorf("Error running mkfs with content: %s", err.Error())
+			}
+		} else {
+			err := mkfsMake(structure.Filesystem, partImg, structure.Label,
+				structure.Size, stateMachine.SectorSize)
+			if err != nil {
+				return fmt.Errorf("Error running mkfs: %s", err.Error())
 			}
 		}
 	}
@@ -319,7 +325,7 @@ func WriteSnapManifest(snapsDir string, outputPath string) error {
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".snap") {
 			split := strings.SplitN(file.Name(), "_", 2)
-			fmt.Fprintf(manifest, "%s %s\n", split[0], split[1])
+			fmt.Fprintf(manifest, "%s %s\n", split[0], strings.TrimSuffix(split[1], ".snap"))
 		}
 	}
 	return nil
@@ -791,7 +797,7 @@ func manualCopyFile(copyFileInterfaces interface{}, targetDir string, debug bool
 		// Copy the file into the specified location in the chroot
 		dest := filepath.Join(targetDir, copyFile.Dest)
 		if debug {
-			fmt.Printf("Copying file \"%s\" to \"%s\"", copyFile.Source, dest)
+			fmt.Printf("Copying file \"%s\" to \"%s\"\n", copyFile.Source, dest)
 		}
 		if err := osutilCopySpecialFile(copyFile.Source, dest); err != nil {
 			return fmt.Errorf("Error copying file \"%s\" into chroot: %s",
@@ -808,7 +814,7 @@ func manualExecute(executeInterfaces interface{}, targetDir string, debug bool) 
 		execute := executeSlice.Index(i).Interface().(*ExecuteType)
 		executeCmd := execCommand("chroot", targetDir, execute.ExecutePath)
 		if debug {
-			fmt.Printf("Executing command \"%s\"", executeCmd.String())
+			fmt.Printf("Executing command \"%s\"\n", executeCmd.String())
 		}
 		executeOutput := helper.SetCommandOutput(executeCmd, debug)
 		err := executeCmd.Run()
@@ -827,7 +833,7 @@ func manualTouchFile(touchFileInterfaces interface{}, targetDir string, debug bo
 		touchFile := touchFileSlice.Index(i).Interface().(*TouchFileType)
 		fullPath := filepath.Join(targetDir, touchFile.TouchPath)
 		if debug {
-			fmt.Printf("Creating empty file \"%s\"", fullPath)
+			fmt.Printf("Creating empty file \"%s\"\n", fullPath)
 		}
 		_, err := osCreate(fullPath)
 		if err != nil {
@@ -843,10 +849,10 @@ func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool
 	for i := 0; i < addGroupSlice.Len(); i++ {
 		addGroup := addGroupSlice.Index(i).Interface().(*AddGroupType)
 		addGroupCmd := execCommand("chroot", targetDir, "addgroup", addGroup.GroupName)
-		debugStatement := fmt.Sprintf("Adding group \"%s\"", addGroup.GroupName)
+		debugStatement := fmt.Sprintf("Adding group \"%s\"\n", addGroup.GroupName)
 		if addGroup.GroupID != "" {
 			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", addGroup.GroupID}...)
-			debugStatement = fmt.Sprintf("%s with GID %s", debugStatement, addGroup.GroupID)
+			debugStatement = fmt.Sprintf("%s with GID %s\n", strings.TrimSpace(debugStatement), addGroup.GroupID)
 		}
 		if debug {
 			fmt.Printf(debugStatement)
@@ -867,10 +873,10 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 	for i := 0; i < addUserSlice.Len(); i++ {
 		addUser := addUserSlice.Index(i).Interface().(*AddUserType)
 		addUserCmd := execCommand("chroot", targetDir, "adduser", addUser.UserName)
-		debugStatement := fmt.Sprintf("Adding user \"%s\"", addUser.UserName)
+		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", addUser.UserName)
 		if addUser.UserID != "" {
 			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", addUser.UserID}...)
-			debugStatement = fmt.Sprintf("%s with UID %s", debugStatement, addUser.UserID)
+			debugStatement = fmt.Sprintf("%s with UID %s\n", strings.TrimSpace(debugStatement), addUser.UserID)
 		}
 		if debug {
 			fmt.Printf(debugStatement)

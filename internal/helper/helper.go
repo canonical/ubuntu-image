@@ -93,7 +93,8 @@ func CopyBlob(ddArgs []string) error {
 
 // SetDefaults iterates through the keys in a struct and sets
 // default values if one is specified with a struct tag of "default".
-// Currently only default values of strings and bools are supported
+// Currently only default values of strings, slice of strings, and
+// bools are supported
 func SetDefaults(needsDefaults interface{}) error {
 	value := reflect.ValueOf(needsDefaults)
 	if value.Kind() != reflect.Ptr {
@@ -102,14 +103,13 @@ func SetDefaults(needsDefaults interface{}) error {
 	elem := value.Elem()
 	for i := 0; i < elem.NumField(); i++ {
 		field := elem.Field(i)
-		// if we're dealing with a slice, iterate through
-		// it and set the defaults for each struct pointer
-		if field.Type().Kind() == reflect.Slice {
+		// if we're dealing with a slice of pointers to structs,
+		// iterate through it and set the defaults for each struct pointer
+		if field.Type().Kind() == reflect.Slice &&
+			field.Cap() > 0 &&
+			field.Index(0).Kind() == reflect.Pointer {
 			for i := 0; i < field.Cap(); i++ {
-				sliceElem := field.Index(i)
-				if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
-					SetDefaults(sliceElem.Interface())
-				}
+				SetDefaults(field.Index(i).Interface())
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
 			// otherwise if it's just a pointer, look for default types
@@ -126,6 +126,10 @@ func SetDefaults(needsDefaults interface{}) error {
 					switch varType {
 					case reflect.String:
 						field.SetString(defaultValue)
+						break
+					case reflect.Slice:
+						defaultValues := strings.Split(defaultValue, ",")
+						field.Set(reflect.ValueOf(defaultValues))
 						break
 					case reflect.Bool:
 						if defaultValue == "true" {
@@ -261,4 +265,12 @@ func SetCommandOutput(cmd *exec.Cmd, liveOutput bool) (cmdOutput *bytes.Buffer) 
 		cmd.Stderr = mwriter
 	}
 	return cmdOutput
+}
+
+// SafeQuantitySubtraction subtracts quantities while checking for integer underflow
+func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
+	if subtract > orig {
+		return 0
+	}
+	return orig - subtract
 }

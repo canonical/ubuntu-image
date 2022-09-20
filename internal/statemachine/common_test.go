@@ -333,22 +333,27 @@ func TestFailedGenerateDiskInfo(t *testing.T) {
 	})
 }
 
-// TestCalculateRootfsSize tests that the rootfs size can be calculated
+// TestCalculateRootfsSizeNoImageSize tests that the rootfs size can be
+// calculated by using du commands when the image size is not specified
 // this is accomplished by setting the test gadget tree as rootfs and
 // verifying that the size is calculated correctly
-func TestCalculateRootfsSize(t *testing.T) {
-	t.Run("test_calculate_rootfs_size", func(t *testing.T) {
+func TestCalculateRootfsSizeNoImageSize(t *testing.T) {
+	t.Run("test_calculate_rootfs_size_no_image_size", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.tempDirs.rootfs = filepath.Join("testdata", "gadget_tree")
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
 
 		// set a valid yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
 		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
-		err := stateMachine.loadGadgetYaml()
+		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.calculateRootfsSize()
@@ -369,6 +374,50 @@ func TestCalculateRootfsSize(t *testing.T) {
 	})
 }
 
+// TestCalculateRootfsSizeImageSize tests that the rootfs size can be
+// accurately calculated when the image size is specified
+func TestCalculateRootfsSizeImageSize(t *testing.T) {
+	testCases := []struct {
+		name         string
+		sizeArg      string
+		expectedSize quantity.Size
+	}{
+		{"one_image_size", "4G", 4183818240},
+		{"image_size_per_volume", "pc:4G", 4183818240},
+	}
+	for _, tc := range testCases {
+		t.Run("test_calculate_rootfs_size_image_size", func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.tempDirs.rootfs = filepath.Join("testdata", "gadget_tree")
+			stateMachine.commonFlags.Size = tc.sizeArg
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			// set a valid yaml file and load it in
+			stateMachine.YamlFilePath = filepath.Join("testdata",
+				"gadget_tree", "meta", "gadget.yaml")
+			// ensure unpack exists
+			os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.calculateRootfsSize()
+			asserter.AssertErrNil(err, true)
+
+			if stateMachine.RootfsSize != tc.expectedSize {
+				t.Errorf("Expected rootfs size %d, but got %d",
+					tc.expectedSize, stateMachine.RootfsSize)
+			}
+
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		})
+	}
+}
+
 // TestFailedCalculateRootfsSize tests a failure when calculating the rootfs size
 // this is accomplished by setting rootfs to a directory that does not exist
 func TestFailedCalculateRootfsSize(t *testing.T) {
@@ -380,6 +429,24 @@ func TestFailedCalculateRootfsSize(t *testing.T) {
 
 		err := stateMachine.calculateRootfsSize()
 		asserter.AssertErrContains(err, "Error getting rootfs size")
+
+		// now set a value of --image-size that is too small to hold the rootfs
+		stateMachine.commonFlags.Size = "1M"
+
+		// need workdir set up for this
+		err = stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// set a valid yaml file and load it in
+		stateMachine.YamlFilePath = filepath.Join("testdata",
+			"gadget_tree", "meta", "gadget.yaml")
+		// ensure unpack exists
+		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.calculateRootfsSize()
+		asserter.AssertErrContains(err, "smaller than actual rootfs contents")
 	})
 }
 
@@ -1005,7 +1072,7 @@ func TestImageSizeFlag(t *testing.T) {
 	}{
 		{"one_volume", "4G", filepath.Join("testdata", "gadget_tree"),
 			map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
-		{"multi-volume", "first:4G,second:1G",
+		{"multi_volume", "first:4G,second:1G",
 			filepath.Join("testdata", "gadget_tree_multi"),
 			map[string]quantity.Size{
 				"first":  4 * quantity.SizeGiB,
@@ -1031,19 +1098,15 @@ func TestImageSizeFlag(t *testing.T) {
 			//defer os.RemoveAll(outDir)
 			stateMachine.commonFlags.OutputDir = outDir
 
+			// set up a "rootfs" that we can eventually copy into the disk
+			os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
+			osutil.CopySpecialFile(tc.gadgetTree, stateMachine.tempDirs.rootfs)
+
 			// set a valid yaml file and load it in
 			stateMachine.YamlFilePath = filepath.Join(tc.gadgetTree, "meta", "gadget.yaml")
 			// ensure unpack exists
 			os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
 			err = stateMachine.loadGadgetYaml()
-			asserter.AssertErrNil(err, true)
-
-			// set up a "rootfs" that we can eventually copy into the disk
-			os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
-			osutil.CopySpecialFile(tc.gadgetTree, stateMachine.tempDirs.rootfs)
-
-			// also need to set the rootfs size to avoid partition errors
-			err = stateMachine.calculateRootfsSize()
 			asserter.AssertErrNil(err, true)
 
 			// ensure volumes exists
@@ -1055,6 +1118,10 @@ func TestImageSizeFlag(t *testing.T) {
 				srcFile := filepath.Join(tc.gadgetTree, srcFile.Name())
 				osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
 			}
+
+			// also need to set the rootfs size to avoid partition errors
+			err = stateMachine.calculateRootfsSize()
+			asserter.AssertErrNil(err, true)
 
 			// run through the rest of the states
 			err = stateMachine.populateBootfsContents()

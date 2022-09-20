@@ -19,7 +19,7 @@ type ImageDefinition struct {
 	Gadget         *GadgetType        `yaml:"gadget"          json:"Gadget"`
 	ModelAssertion string             `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
 	Rootfs         *RootfsType        `yaml:"rootfs"          json:"Rootfs"`
-	Customization  *CustomizationType `yaml:"customization"   json:"Customization"`
+	Customization  *CustomizationType `yaml:"customization"   json:"Customization,omitempty"`
 	Artifacts      *ArtifactType      `yaml:"artifacts"       json:"Artifacts"`
 	Class          string             `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
 }
@@ -40,7 +40,7 @@ type GadgetType struct {
 
 // RootfsType defines the rootfs section of the image definition file
 type RootfsType struct {
-	Components   []string     `yaml:"components"    json:"Components,omitempty"`
+	Components   []string     `yaml:"components"    json:"Components,omitempty"   default:"main"`
 	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
 	Flavor       string       `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
 	Mirror       string       `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
@@ -74,6 +74,7 @@ type CustomizationType struct {
 	ExtraPPAs     []*PPAType     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"`
 	ExtraPackages []*PackageType `yaml:"extra-packages" json:"ExtraPackages,omitempty"`
 	ExtraSnaps    []*SnapType    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"`
+	Fstab         []*FstabType   `yaml:"fstab"          json:"Fstab,omitempty"`
 	Manual        *ManualType    `yaml:"manual"         json:"Manual,omitempty"`
 }
 
@@ -115,6 +116,16 @@ type SnapType struct {
 	SnapRevision string `yaml:"revision" json:"SnapRevision,omitempty"`
 	Store        string `yaml:"store"    json:"Store"                  default:"canonical"`
 	Channel      string `yaml:"channel"  json:"Channel"                default:"stable"`
+}
+
+// FstabType defines the information that gets rendered into an fstab
+type FstabType struct {
+	Label        string `yaml:"label"           json:"Label"`
+	Mountpoint   string `yaml:"mountpoint"      json:"Mountpoint"`
+	FSType       string `yaml:"filesystem-type" json:"FSType"`
+	MountOptions string `yaml:"mount-options"   json:"MountOptions" default:"defaults"`
+	Dump         bool   `yaml:"dump"            json:"Dump,omitempty"`
+	FsckOrder    int    `yaml:"fsck-order"      json:"FsckOrder"`
 }
 
 // ManualType provides manual customization options
@@ -238,38 +249,74 @@ type InvalidPPAError struct {
 	gojsonschema.ResultErrorFields
 }
 
+func newPathNotAbsoluteError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *PathNotAbsoluteError {
+	err := PathNotAbsoluteError{}
+	err.SetContext(context)
+	err.SetType("path_not_absolute_error")
+	err.SetDescriptionFormat("Key {{.key}} needs to be an absolute path ({{.value}})")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// PathNotAbsoluteError implements gojsonschema.ErrorType. It is used for custom errors for
+// fields that should be absolute but are not
+type PathNotAbsoluteError struct {
+	gojsonschema.ResultErrorFields
+}
+
+func (imageDef ImageDefinition) securityMirror() string {
+	if imageDef.Architecture == "amd64" || imageDef.Architecture == "386" {
+		return "http://security.ubuntu.com/ubuntu/"
+	}
+	return imageDef.Rootfs.Mirror
+}
+
 // generatePocketList returns a slice of strings that need to be added to
 // /etc/apt/sources.list in the chroot based on the value of "pocket"
 // in the rootfs section of the image definition
-func (ImageDef ImageDefinition) generatePocketList() []string {
+func (imageDef ImageDefinition) generatePocketList() []string {
 	pocketMap := map[string][]string{
 		"release": {},
 		"security": {
-			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-security %s\n",
+				imageDef.securityMirror(),
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 		},
 		"updates": {
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-updates %s\n",
+				imageDef.Rootfs.Mirror,
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
-			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-security %s\n",
+				imageDef.securityMirror(),
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 		},
 		"proposed": {
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-updates %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-updates %s\n",
+				imageDef.Rootfs.Mirror,
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
-			fmt.Sprintf("deb http://security.ubuntu.com/ubuntu/ %s-security %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-security %s\n",
+				imageDef.securityMirror(),
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
-			fmt.Sprintf("deb http://archive.ubuntu.com/ubuntu/ %s-proposed %s\n",
-				ImageDef.Series, strings.Join(ImageDef.Rootfs.Components, " "),
+			fmt.Sprintf("deb %s %s-proposed %s\n",
+				imageDef.Rootfs.Mirror,
+				imageDef.Series,
+				strings.Join(imageDef.Rootfs.Components, " "),
 			),
 		},
 	}
 
 	// Schema validation has already confirmed the Pocket is a valid value
-	return pocketMap[strings.ToLower(ImageDef.Rootfs.Pocket)]
+	return pocketMap[strings.ToLower(imageDef.Rootfs.Pocket)]
 }

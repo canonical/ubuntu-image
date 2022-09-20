@@ -16,6 +16,9 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/osutil"
+
+	//"github.com/snapcore/snapd/progress"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -83,8 +86,9 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 			errDetail,
 		)
 	}
-	// do custom validation for private PPAs requiring fingerprint
+
 	if imageDefinition.Customization != nil {
+		// do custom validation for private PPAs requiring fingerprint
 		for _, ppa := range imageDefinition.Customization.ExtraPPAs {
 			if ppa.Auth != "" && ppa.Fingerprint == "" {
 				jsonContext := gojsonschema.NewJsonContext("ppa_validation", nil)
@@ -100,6 +104,52 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 					),
 					errDetail,
 				)
+			}
+		}
+		// do custom validation for manual customization paths
+		if imageDefinition.Customization.Manual != nil {
+			jsonContext := gojsonschema.NewJsonContext("manual_path_validation", nil)
+			if imageDefinition.Customization.Manual.CopyFile != nil {
+				for _, copy := range imageDefinition.Customization.Manual.CopyFile {
+					// XXX: filepath.IsAbs() does returns true for paths like /../../something
+					// and those are NOT absolute paths.
+					if !filepath.IsAbs(copy.Dest) || strings.Contains(copy.Dest, "/../") {
+						errDetail := gojsonschema.ErrorDetails{
+							"key":   "customization:manual:copy-file:destination",
+							"value": copy.Dest,
+						}
+						result.AddError(
+							newPathNotAbsoluteError(
+								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
+									jsonContext),
+								52,
+								errDetail,
+							),
+							errDetail,
+						)
+					}
+				}
+			}
+			if imageDefinition.Customization.Manual.TouchFile != nil {
+				for _, touch := range imageDefinition.Customization.Manual.TouchFile {
+					// XXX: filepath.IsAbs() does returns true for paths like /../../something
+					// and those are NOT absolute paths.
+					if !filepath.IsAbs(touch.TouchPath) || strings.Contains(touch.TouchPath, "/../") {
+						errDetail := gojsonschema.ErrorDetails{
+							"key":   "customization:manual:touch-file:path",
+							"value": touch.TouchPath,
+						}
+						result.AddError(
+							newPathNotAbsoluteError(
+								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
+									jsonContext),
+								52,
+								errDetail,
+							),
+							errDetail,
+						)
+					}
+				}
 			}
 		}
 	}
@@ -122,6 +172,11 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	return nil
 }
 
+// State responsible for dynamically calculating all the remaining states
+// needed to build the image, as defined by the image-definition file
+// that was loaded in the previous 'state'.
+// If a new possible state is added to the classic build state machine, it
+// should be added here (usually basing on contents of the image definition)
 func (stateMachine *StateMachine) calculateStates() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
@@ -156,9 +211,11 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
-		if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
-			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+		if classicStateMachine.ImageDef.Customization != nil {
+			if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+				rootfsCreationStates = append(rootfsCreationStates,
+					stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+			}
 		}
 		rootfsCreationStates = append(rootfsCreationStates,
 			[]stateFunc{
@@ -171,20 +228,26 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
 	}
 
+	// Determine any customization that needs to run before the image is created
+	//TODO: installer image customization... eventually.
+	if classicStateMachine.ImageDef.Customization != nil {
+		if classicStateMachine.ImageDef.Customization.CloudInit != nil {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
+		}
+		if len(classicStateMachine.ImageDef.Customization.Fstab) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"customize_fstab", (*StateMachine).customizeFstab})
+		}
+		if classicStateMachine.ImageDef.Customization.Manual != nil {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
+		}
+	}
+
 	// The rootfs is laid out in a staging area, now populate it in the correct location
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents})
-
-	// Determine any customization that needs to run before the image is created
-	//TODO: installer image customization... eventually.
-	if classicStateMachine.ImageDef.Customization.CloudInit != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
-	}
-	if classicStateMachine.ImageDef.Customization.Manual != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
-	}
 
 	// Add the "always there" states that populate partitions, build the disk, etc.
 	// This includes the no-op "finish" state to signify successful setup
@@ -263,29 +326,27 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 
 // Prepare the gadget tree
 func (stateMachine *StateMachine) prepareGadgetTree() error {
-	// currently a no-op pending implementation of the classic image redesign
-	/*var classicStateMachine *ClassicStateMachine
-	  classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
-	  gadgetDir := filepath.Join(classicStateMachine.tempDirs.unpack, "gadget")
-	  err := osMkdirAll(gadgetDir, 0755)
-	  if err != nil && !os.IsExist(err) {
-	          return fmt.Errorf("Error creating unpack directory: %s", err.Error())
-	  }
-	  // recursively copy the gadget tree to unpack/gadget
-	  files, err := ioutilReadDir(classicStateMachine.Args.GadgetTree)
-	  if err != nil {
-	          return fmt.Errorf("Error reading gadget tree: %s", err.Error())
-	  }
-	  for _, gadgetFile := range files {
-	          srcFile := filepath.Join(classicStateMachine.Args.GadgetTree, gadgetFile.Name())
-	          if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
-	                  return fmt.Errorf("Error copying gadget tree: %s", err.Error())
-	          }
-	  }
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	gadgetDir := filepath.Join(classicStateMachine.tempDirs.unpack, "gadget")
+	err := osMkdirAll(gadgetDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating unpack directory: %s", err.Error())
+	}
+	// recursively copy the gadget tree to unpack/gadget
+	gadgetTree := filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+	files, err := ioutilReadDir(gadgetTree)
+	if err != nil {
+		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
+	}
+	for _, gadgetFile := range files {
+		srcFile := filepath.Join(gadgetTree, gadgetFile.Name())
+		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
+			return fmt.Errorf("Error copying gadget tree: %s", err.Error())
+		}
+	}
 
-	  // We assume the gadget tree was built from a gadget source tree using
-	  // snapcraft prime so the gadget.yaml file is expected in the meta directory
-	  classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "meta", "gadget.yaml")*/
+	classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "gadget.yaml")
 
 	return nil
 }
@@ -489,8 +550,72 @@ func (stateMachine *StateMachine) germinate() error {
 
 // Customize Cloud init with the values in the image definition YAML
 func (stateMachine *StateMachine) customizeCloudInit() error {
-	// currently a no-op pending implementation of the classic image redesign
-	return nil
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	cloudInitCustomization := classicStateMachine.ImageDef.Customization.CloudInit
+
+	seedPath := path.Join(classicStateMachine.tempDirs.chroot, "var/lib/cloud/seed/nocloud")
+	err := osMkdirAll(seedPath, 0755)
+	if err != nil {
+		return err
+	}
+
+	if cloudInitCustomization.MetaData != "" {
+		metaDataFile, err := osCreate(path.Join(seedPath, "meta-data"))
+		if err != nil {
+			return err
+		}
+		defer metaDataFile.Close()
+
+		_, err = metaDataFile.WriteString(cloudInitCustomization.MetaData)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.UserData != nil {
+		userDataFile, err := osCreate(path.Join(seedPath, "user-data"))
+		if err != nil {
+			return err
+		}
+		defer userDataFile.Close()
+
+		userDataBytes, err := yamlMarshal(cloudInitCustomization.UserData)
+		if err != nil {
+			return err
+		}
+
+		_, err = userDataFile.Write(userDataBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.NetworkConfig != "" {
+		networkConfigFile, err := osCreate(path.Join(seedPath, "network-config"))
+		if err != nil {
+			return err
+		}
+		defer networkConfigFile.Close()
+
+		_, err = networkConfigFile.WriteString(cloudInitCustomization.NetworkConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	datasourceConfig := "# to update this file, run dpkg-reconfigure cloud-init\ndatasource_list: [ NoCloud ]\n"
+
+	dpkgConfigPath := path.Join(classicStateMachine.tempDirs.chroot, "etc/cloud/cloud.cfg.d/90_dpkg.cfg")
+	dpkgConfigFile, err := osCreate(dpkgConfigPath)
+	if err != nil {
+		return err
+	}
+	defer dpkgConfigFile.Close()
+
+	_, err = dpkgConfigFile.WriteString(datasourceConfig)
+
+	return err
 }
 
 // Configure Extra PPAs
@@ -504,6 +629,41 @@ func (stateMachine *StateMachine) setupExtraPPAs() error {
 // but what about extra packages with a tarball based images...
 func (stateMachine *StateMachine) installExtraPackages() error {
 	// currently a no-op pending implementation of the classic image redesign
+	return nil
+}
+
+// Customize /etc/fstab based on values in the image definition
+func (stateMachine *StateMachine) customizeFstab() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// open /etc/fstab for writing
+	fstabIO, err := osOpenFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
+		os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("Error opening fstab: %s", err.Error())
+	}
+	defer fstabIO.Close()
+
+	var fstabEntries []string
+	for _, fstab := range classicStateMachine.ImageDef.Customization.Fstab {
+		var dumpString string
+		if fstab.Dump {
+			dumpString = "1"
+		} else {
+			dumpString = "0"
+		}
+		fstabEntry := fmt.Sprintf("LABEL=%s\t%s\t%s\t%s\t%s\t%d",
+			fstab.Label,
+			fstab.Mountpoint,
+			fstab.FSType,
+			fstab.MountOptions,
+			dumpString,
+			fstab.FsckOrder,
+		)
+		fstabEntries = append(fstabEntries, fstabEntry)
+	}
+	fstabIO.Write([]byte(strings.Join(fstabEntries, "\n")))
 	return nil
 }
 
@@ -584,12 +744,14 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	}
 
 	// add any extra snaps from the image definition to the list
-	for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
-		if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
-			imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
-		}
-		if extraSnap.Channel != "" {
-			imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
+	if classicStateMachine.ImageDef.Customization != nil {
+		for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
+			if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
+				imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
+			}
+			if extraSnap.Channel != "" {
+				imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
+			}
 		}
 	}
 
@@ -619,88 +781,82 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 // populateClassicRootfsContents copies over the staged rootfs
 // to rootfs. It also changes fstab and handles the --cloud-init flag
 func (stateMachine *StateMachine) populateClassicRootfsContents() error {
-	/*	var classicStateMachine *ClassicStateMachine
-		classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-		var src string
-		if classicStateMachine.Opts.Filesystem != "" {
-			src = classicStateMachine.Opts.Filesystem
-		} else {
-			src = filepath.Join(classicStateMachine.tempDirs.unpack, "chroot")
+	src := stateMachine.tempDirs.chroot
+
+	files, err := ioutilReadDir(src)
+	if err != nil {
+		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
+	}
+
+	for _, srcFile := range files {
+		srcFile := filepath.Join(src, srcFile.Name())
+		if err := osutilCopySpecialFile(srcFile, classicStateMachine.tempDirs.rootfs); err != nil {
+			return fmt.Errorf("Error copying rootfs: %s", err.Error())
 		}
+	}
 
-		files, err := ioutilReadDir(src)
+	if classicStateMachine.ImageDef.Customization != nil {
+		if len(classicStateMachine.ImageDef.Customization.Fstab) == 0 {
+			fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
+			fstabBytes, err := ioutilReadFile(fstabPath)
+			if err == nil {
+				if !strings.Contains(string(fstabBytes), "LABEL=writable") {
+					re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
+					newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
+					if !strings.Contains(string(newContents), "LABEL=writable") {
+						newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
+					}
+					err := ioutilWriteFile(fstabPath, newContents, 0644)
+					if err != nil {
+						return fmt.Errorf("Error writing to fstab: %s", err.Error())
+					}
+				}
+			}
+		}
+	}
+
+	if classicStateMachine.commonFlags.CloudInit != "" {
+		seedDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
+		cloudDir := filepath.Join(seedDir, "nocloud-net")
+		err := osMkdirAll(cloudDir, 0756)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
+		}
+		metadataFile := filepath.Join(cloudDir, "meta-data")
+		metadataIO, err := osOpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
+			return fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
 		}
+		metadataIO.Write([]byte("instance-id: nocloud-static"))
+		metadataIO.Close()
 
-		for _, srcFile := range files {
-			srcFile := filepath.Join(src, srcFile.Name())
-			if err := osutilCopySpecialFile(srcFile, classicStateMachine.tempDirs.rootfs); err != nil {
-				return fmt.Errorf("Error copying rootfs: %s", err.Error())
-			}
+		userdataFile := filepath.Join(cloudDir, "user-data")
+		err = osutilCopyFile(classicStateMachine.commonFlags.CloudInit,
+			userdataFile, osutil.CopyFlagDefault)
+		if err != nil {
+			return fmt.Errorf("Error copying cloud-init: %s", err.Error())
 		}
+	}
 
-		fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
-		fstabBytes, err := ioutilReadFile(fstabPath)
-		if err == nil {
-			if !strings.Contains(string(fstabBytes), "LABEL=writable") {
-				re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
-				newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
-				if !strings.Contains(string(newContents), "LABEL=writable") {
-					newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
-				}
-				err := ioutilWriteFile(fstabPath, newContents, 0644)
-				if err != nil {
-					return fmt.Errorf("Error writing to fstab: %s", err.Error())
-				}
-			}
-		}
-
-		if classicStateMachine.commonFlags.CloudInit != "" {
-			seedDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
-			cloudDir := filepath.Join(seedDir, "nocloud-net")
-			err := osMkdirAll(cloudDir, 0756)
-			if err != nil && !os.IsExist(err) {
-				return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
-			}
-			metadataFile := filepath.Join(cloudDir, "meta-data")
-			metadataIO, err := osOpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
-			if err != nil {
-				return fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
-			}
-			metadataIO.Write([]byte("instance-id: nocloud-static"))
-			metadataIO.Close()
-
-			userdataFile := filepath.Join(cloudDir, "user-data")
-			err = osutilCopyFile(classicStateMachine.commonFlags.CloudInit,
-				userdataFile, osutil.CopyFlagDefault)
-			if err != nil {
-				return fmt.Errorf("Error copying cloud-init: %s", err.Error())
-			}
-		}*/
-
-	// currently a no-op pending implementation of the classic image redesign
 	return nil
 }
 
 // Generate the manifest
 func (stateMachine *StateMachine) generatePackageManifest() error {
-	// currently a no-op pending implementation of the classic image redesign
-	/*
-		// This is basically just a wrapper around dpkg-query
+	// This is basically just a wrapper around dpkg-query
 
-		outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
-		cmd := execCommand("sudo", "chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
-		manifest, err := os.Create(outputPath)
-		if err != nil {
-			return fmt.Errorf("Error creating manifest file: %s", err.Error())
-		}
-		defer manifest.Close()
+	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
+	cmd := execCommand("sudo", "chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
+	manifest, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("Error creating manifest file: %s", err.Error())
+	}
+	defer manifest.Close()
 
-		cmd.Stdout = manifest
-		err = cmd.Run()
-		return err
-	*/
-	return nil
+	cmd.Stdout = manifest
+	err = cmd.Run()
+	return err
 }

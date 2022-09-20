@@ -26,6 +26,8 @@ import (
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
 	"github.com/xeipuuv/gojsonschema"
+
+	"gopkg.in/yaml.v2"
 )
 
 // define some functions that can be mocked by test cases
@@ -58,6 +60,7 @@ var seedOpen = seed.Open
 var imagePrepare = image.Prepare
 var httpGet = http.Get
 var jsonUnmarshal = json.Unmarshal
+var yamlMarshal = yaml.Marshal
 var gojsonschemaValidate = gojsonschema.Validate
 var filepathRel = filepath.Rel
 
@@ -111,10 +114,6 @@ type StateMachine struct {
 	// image sizes for parsing the --image-size flags
 	ImageSizes  map[string]quantity.Size
 	VolumeOrder []string
-
-	// TODO: this is a temporary way to skip states while we implement
-	// the classic image redesign
-	stateSkip bool
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -289,6 +288,14 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			lastOffset = offset + quantity.Offset(structure.Size)
 			farthestOffset = maxOffset(lastOffset, farthestOffset)
 			structure.Offset = &offset
+
+			// system-data and system-seed do not always have content defined.
+			// this makes Content be a nil slice and lead copyStructureContent() skip the rootfs copying later.
+			// so we need to make an empty slice here to avoid this situation.
+			if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Content == nil {
+				structure.Content = make([]gadget.VolumeContent, 0)
+			}
+
 			// we've manually updated the offset, but since structure is
 			// not a pointer we need to overwrite the value in volume.Structure
 			volume.Structure[ii] = structure
@@ -386,7 +393,7 @@ func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Off
 	} else {
 		if volumeSize < calculated {
 			fmt.Printf("WARNING: ignoring image size smaller than "+
-				"minimum required size: vol:%s %d < %d",
+				"minimum required size: vol:%s %d < %d\n",
 				volumeName, uint64(volumeSize), uint64(calculated))
 			stateMachine.ImageSizes[volumeName] = calculated
 		} else {
