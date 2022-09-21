@@ -1,3 +1,4 @@
+================
 Image Definition
 ================
 
@@ -271,6 +272,119 @@ The following specification defines what is supported in the YAML:
          # Not yet supported.
          changelog:
            name: <string>
+
+The following sections detail the top-level keys within this definition,
+followed by several examples.
+
+
+name
+====
+
+This mandatory field is unused, but must not be blank. Any characters are
+permitted, of any (non-zero) length. For example:
+
+.. code:: yaml
+
+    name: ubuntu-server-raspi
+
+
+display-name
+============
+
+This mandatory field is unused, but must not be blank. Any characters are
+permitted, of any (non-zero) length. For example:
+
+.. code:: yaml
+
+    display-name: Ubuntu Server for Raspberry Pi
+
+
+revision
+========
+
+This optional field is unused. If specified, it must be an integer number.
+
+
+architecture
+============
+
+This mandatory field specifies the architecture of the image to be created. It
+must be one of the following valid strings:
+
+* amd64
+* armhf
+* arm64
+* s390x
+* ppc64el
+* riscv64
+
+For example:
+
+.. code:: yaml
+
+    architecture: arm64
+
+
+series
+======
+
+This mandatory field specifies the Ubuntu release name as it should appear in
+apt sources. For example, to produce an image for the 20.04 release, this
+should be "focal". Example values include:
+
+* bionic
+* focal
+* jammy
+* kinetic
+
+Please consult the `Releases <https://wiki.ubuntu.com/Releases>`_ page for
+currently valid release names, but bear in mind that release names must be
+specified as they would appear in apt sources, i.e. lower-cased with no numeric
+part and no "LTS" suffix.
+
+For example:
+
+.. code:: yaml
+
+    series: jammy
+
+
+class
+=====
+
+This mandatory field specifies the image classification. It is currently
+unused, and must be set to the string "preinstalled". In future, the set of
+valid strings is intended to be:
+
+* preinstalled
+* installer
+* cloud
+
+For example:
+
+.. code:: yaml
+
+    class: preinstalled
+
+
+kernel
+======
+
+This optional key specifies an additional kernel to include in the image. If
+specified, the sub-key "name" must be provided, naming the kernel package to
+include. The sub-key "type" may be provided with a non-empty string value, but
+this is unused. For example:
+
+.. code:: yaml
+
+    kernel:
+      name: linux
+      type: hwe
+
+
+
+Examples
+========
 
 Note that not all of these fields are required. An example used to build
 Raspberry Pi images is:
