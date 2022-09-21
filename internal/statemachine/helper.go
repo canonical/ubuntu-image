@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/partition"
 	"github.com/diskfs/go-diskfs/partition/gpt"
@@ -539,7 +540,7 @@ func parseSnapsAndChannels(snaps []string) (snapNames []string, snapChannels map
 
 // generateGerminateCmd creates the appropriate germinate command for the
 // values configured in the image definition yaml file
-func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
+func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec.Cmd {
 	// determine the value for the seed-dist in the form of <archive>.<series>
 	seedDist := imageDefinition.Rootfs.Flavor
 	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
@@ -571,7 +572,7 @@ func generateGerminateCmd(imageDefinition ImageDefinition) *exec.Cmd {
 
 // cloneGitRepo takes options from the image definition and clones the git
 // repo with the corresponding options
-func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
+func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir string) error {
 	// clone the repo
 	cloneOptions := &git.CloneOptions{
 		URL:          imageDefinition.Gadget.GadgetURL,
@@ -589,7 +590,7 @@ func cloneGitRepo(imageDefinition ImageDefinition, workDir string) error {
 
 // generateDebootstrapCmd generates the debootstrap command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func generateDebootstrapCmd(imageDefinition ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
+func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
 	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
@@ -640,7 +641,7 @@ func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
 // createPPAInfo generates the name for a PPA sources.list file
 // in the convention of add-apt-repository, and the contents
 // that define the sources.list in the DEB822 format
-func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents string) {
+func createPPAInfo(ppa *imagedefinition.PPA, series string) (fileName string, fileContents string) {
 	splitName := strings.Split(ppa.PPAName, "/")
 	user := splitName[0]
 	ppaName := splitName[1]
@@ -675,7 +676,7 @@ func createPPAInfo(ppa *PPAType, series string) (fileName string, fileContents s
 // The schema parsing has already validated that either Fingerprint is
 // specified or the PPA is public. If no fingerprint is provided, this
 // function reaches out to the Launchpad API to get the signing key
-func importPPAKeys(ppa *PPAType, tmpGPGDir, keyFilePath string, debug bool) error {
+func importPPAKeys(ppa *imagedefinition.PPA, tmpGPGDir, keyFilePath string, debug bool) error {
 	if ppa.Fingerprint == "" {
 		// The YAML schema has already validated that if no fingerprint is
 		// provided, then this is a public PPA. We will get the fingerprint
@@ -755,7 +756,7 @@ func mountFromHost(targetDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd)
 func manualCopyFile(copyFileInterfaces interface{}, targetDir string, debug bool) error {
 	copyFileSlice := reflect.ValueOf(copyFileInterfaces)
 	for i := 0; i < copyFileSlice.Len(); i++ {
-		copyFile := copyFileSlice.Index(i).Interface().(*CopyFileType)
+		copyFile := copyFileSlice.Index(i).Interface().(*imagedefinition.CopyFile)
 
 		// Copy the file into the specified location in the chroot
 		dest := filepath.Join(targetDir, copyFile.Dest)
@@ -774,7 +775,7 @@ func manualCopyFile(copyFileInterfaces interface{}, targetDir string, debug bool
 func manualExecute(executeInterfaces interface{}, targetDir string, debug bool) error {
 	executeSlice := reflect.ValueOf(executeInterfaces)
 	for i := 0; i < executeSlice.Len(); i++ {
-		execute := executeSlice.Index(i).Interface().(*ExecuteType)
+		execute := executeSlice.Index(i).Interface().(*imagedefinition.Execute)
 		executeCmd := execCommand("chroot", targetDir, execute.ExecutePath)
 		if debug {
 			fmt.Printf("Executing command \"%s\"\n", executeCmd.String())
@@ -793,7 +794,7 @@ func manualExecute(executeInterfaces interface{}, targetDir string, debug bool) 
 func manualTouchFile(touchFileInterfaces interface{}, targetDir string, debug bool) error {
 	touchFileSlice := reflect.ValueOf(touchFileInterfaces)
 	for i := 0; i < touchFileSlice.Len(); i++ {
-		touchFile := touchFileSlice.Index(i).Interface().(*TouchFileType)
+		touchFile := touchFileSlice.Index(i).Interface().(*imagedefinition.TouchFile)
 		fullPath := filepath.Join(targetDir, touchFile.TouchPath)
 		if debug {
 			fmt.Printf("Creating empty file \"%s\"\n", fullPath)
@@ -810,7 +811,7 @@ func manualTouchFile(touchFileInterfaces interface{}, targetDir string, debug bo
 func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool) error {
 	addGroupSlice := reflect.ValueOf(addGroupInterfaces)
 	for i := 0; i < addGroupSlice.Len(); i++ {
-		addGroup := addGroupSlice.Index(i).Interface().(*AddGroupType)
+		addGroup := addGroupSlice.Index(i).Interface().(*imagedefinition.AddGroup)
 		addGroupCmd := execCommand("chroot", targetDir, "addgroup", addGroup.GroupName)
 		debugStatement := fmt.Sprintf("Adding group \"%s\"\n", addGroup.GroupName)
 		if addGroup.GroupID != "" {
@@ -834,7 +835,7 @@ func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool
 func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) error {
 	addUserSlice := reflect.ValueOf(addUserInterfaces)
 	for i := 0; i < addUserSlice.Len(); i++ {
-		addUser := addUserSlice.Index(i).Interface().(*AddUserType)
+		addUser := addUserSlice.Index(i).Interface().(*imagedefinition.AddUser)
 		addUserCmd := execCommand("chroot", targetDir, "adduser", addUser.UserName)
 		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", addUser.UserName)
 		if addUser.UserID != "" {

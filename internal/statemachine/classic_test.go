@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
@@ -195,14 +196,14 @@ func TestFailedCalculateStates(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
-			Gadget: &GadgetType{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetType: "git",
 			},
-			Rootfs: &RootfsType{
+			Rootfs: &imagedefinition.Rootfs{
 				ArchiveTasks: []string{"test"},
 			},
-			Customization: &CustomizationType{},
+			Customization: &imagedefinition.Customization{},
 		}
 
 		stateMachine.stateMachineFlags.Thru = "fake_state"
@@ -429,11 +430,11 @@ func TestExtractRootfsTar(t *testing.T) {
 
 // TestCustomizeCloudInit unit tests the customizeCloudInit function
 func TestCustomizeCloudInit(t *testing.T) {
-	cloudInitConfigs := []CloudInitType{
+	cloudInitConfigs := []imagedefinition.CloudInit{
 		{
 			MetaData:      "foo: bar",
 			NetworkConfig: "foobar: foobar",
-			UserData: &[]UserDataType{
+			UserData: &[]imagedefinition.UserData{
 				{UserName: "ubuntu", UserPassword: "ubuntu"},
 				{UserName: "john", UserPassword: "password"},
 			},
@@ -445,10 +446,10 @@ func TestCustomizeCloudInit(t *testing.T) {
 		},
 		{
 			NetworkConfig: "foobar: foobar",
-			UserData:      &[]UserDataType{},
+			UserData:      &[]imagedefinition.UserData{},
 		},
 		{
-			UserData: &[]UserDataType{
+			UserData: &[]imagedefinition.UserData{
 				{UserName: "ubuntu", UserPassword: "ubuntu"},
 				{UserName: "john", UserPassword: "password"},
 			},
@@ -475,7 +476,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 			// this directory is expected to be present as it is installed by cloud-init
 			os.MkdirAll(path.Join(tmpDir, "etc/cloud/cloud.cfg.d"), 0777)
 
-			stateMachine.ImageDef.Customization = &CustomizationType{
+			stateMachine.ImageDef.Customization = &imagedefinition.Customization{
 				CloudInit: &cloudInitConfig,
 			}
 
@@ -520,7 +521,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 				userDataFileContent, err := ioutil.ReadAll(userDataFile)
 				asserter.AssertErrNil(err, false)
 
-				userDataOut := make([]UserDataType, 0)
+				userDataOut := make([]imagedefinition.UserData, 0)
 				err = yaml.Unmarshal(userDataFileContent, &userDataOut)
 				asserter.AssertErrNil(err, false)
 
@@ -554,11 +555,11 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	stateMachine.tempDirs.chroot = tmpDir
 
-	stateMachine.ImageDef.Customization = &CustomizationType{
-		CloudInit: &CloudInitType{
+	stateMachine.ImageDef.Customization = &imagedefinition.Customization{
+		CloudInit: &imagedefinition.CloudInit{
 			MetaData:      "foo: bar",
 			NetworkConfig: "foobar: foobar",
-			UserData: &[]UserDataType{
+			UserData: &[]imagedefinition.UserData{
 				{UserName: "ubuntu", UserPassword: "ubuntu"},
 				{UserName: "john", UserPassword: "password"},
 			},
@@ -693,38 +694,38 @@ func TestManualCustomization(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs: &RootfsType{
+			Rootfs: &imagedefinition.Rootfs{
 				Archive: "ubuntu",
 			},
-			Customization: &CustomizationType{
-				Manual: &ManualType{
-					CopyFile: []*CopyFileType{
+			Customization: &imagedefinition.Customization{
+				Manual: &imagedefinition.Manual{
+					CopyFile: []*imagedefinition.CopyFile{
 						{
 							Source: filepath.Join("testdata", "test_script"),
 							Dest:   "/test_copy_file",
 						},
 					},
-					TouchFile: []*TouchFileType{
+					TouchFile: []*imagedefinition.TouchFile{
 						{
 							TouchPath: "/test_touch_file",
 						},
 					},
-					Execute: []*ExecuteType{
+					Execute: []*imagedefinition.Execute{
 						{
 							// the file we already copied creates a file /test_execute
 							ExecutePath: "/test_copy_file",
 						},
 					},
-					AddUser: []*AddUserType{
+					AddUser: []*imagedefinition.AddUser{
 						{
 							UserName: "testuser",
 							UserID:   "123456",
 						},
 					},
-					AddGroup: []*AddGroupType{
+					AddGroup: []*imagedefinition.AddGroup{
 						{
 							GroupName: "testgroup",
 							GroupID:   "456789",
@@ -785,10 +786,10 @@ func TestFailedManualCustomization(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
-		stateMachine.ImageDef = ImageDefinition{
-			Customization: &CustomizationType{
-				Manual: &ManualType{
-					TouchFile: []*TouchFileType{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Customization: &imagedefinition.Customization{
+				Manual: &imagedefinition.Manual{
+					TouchFile: []*imagedefinition.TouchFile{
 						{
 							TouchPath: filepath.Join("this", "path", "does", "not", "exist"),
 						},
@@ -815,10 +816,10 @@ func TestPreseedClassicImage(t *testing.T) {
 		stateMachine.parent = &stateMachine
 		stateMachine.Snaps = []string{"lxd"}
 		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
-			Customization: &CustomizationType{
-				ExtraSnaps: []*SnapType{
+			Customization: &imagedefinition.Customization{
+				ExtraSnaps: []*imagedefinition.Snap{
 					{
 						SnapName: "hello",
 						Channel:  "candidate",
@@ -872,10 +873,10 @@ func TestFailedPreseedClassicImage(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
-			Customization: &CustomizationType{
-				ExtraSnaps: []*SnapType{},
+			Customization: &imagedefinition.Customization{
+				ExtraSnaps: []*imagedefinition.Snap{},
 			},
 		}
 
@@ -923,10 +924,10 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs: &RootfsType{
+			Rootfs: &imagedefinition.Rootfs{
 				Archive: "ubuntu",
 			},
 		}
@@ -967,13 +968,13 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs: &RootfsType{
+			Rootfs: &imagedefinition.Rootfs{
 				Archive: "ubuntu",
 			},
-			Customization: &CustomizationType{},
+			Customization: &imagedefinition.Customization{},
 		}
 
 		// need workdir set up for this
@@ -1257,13 +1258,13 @@ func TestGerminate(t *testing.T) {
 
 			hostArch := getHostArch()
 			hostSuite := getHostSuite()
-			imageDef := ImageDefinition{
+			imageDef := imagedefinition.ImageDefinition{
 				Architecture: hostArch,
 				Series:       hostSuite,
-				Rootfs: &RootfsType{
+				Rootfs: &imagedefinition.Rootfs{
 					Flavor: tc.flavor,
 					Mirror: "http://archive.ubuntu.com/ubuntu/",
-					Seed: &SeedType{
+					Seed: &imagedefinition.Seed{
 						SeedURLs:   tc.seedURLs,
 						SeedBranch: hostSuite,
 						Names:      tc.seedNames,
@@ -1329,13 +1330,13 @@ func TestFailedGerminate(t *testing.T) {
 		// create a valid imageDefinition
 		hostArch := getHostArch()
 		hostSuite := getHostSuite()
-		imageDef := ImageDefinition{
+		imageDef := imagedefinition.ImageDefinition{
 			Architecture: hostArch,
 			Series:       hostSuite,
-			Rootfs: &RootfsType{
+			Rootfs: &imagedefinition.Rootfs{
 				Flavor: "ubuntu",
 				Mirror: "http://archive.ubuntu.com/ubuntu/",
-				Seed: &SeedType{
+				Seed: &imagedefinition.Seed{
 					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 					SeedBranch: hostSuite,
 					Names:      []string{"server", "minimal", "standard", "cloud-image"},
@@ -1396,8 +1397,8 @@ func TestBuildGadgetTree(t *testing.T) {
 		wd, _ := os.Getwd()
 		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
 		sourcePath = "file://" + sourcePath
-		imageDef := ImageDefinition{
-			Gadget: &GadgetType{
+		imageDef := imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  sourcePath,
 				GadgetType: "directory",
 			},
@@ -1409,8 +1410,8 @@ func TestBuildGadgetTree(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// test the git method
-		imageDef = ImageDefinition{
-			Gadget: &GadgetType{
+		imageDef = imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
 				GadgetType:   "git",
 				GadgetBranch: "classic",
@@ -1451,8 +1452,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 		osMkdir = os.Mkdir
 
 		// try to clone a repo that doesn't exist
-		imageDef := ImageDefinition{
-			Gadget: &GadgetType{
+		imageDef := imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  "http://fakerepo.git",
 				GadgetType: "git",
 			},
@@ -1463,8 +1464,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 		asserter.AssertErrContains(err, "Error cloning gadget repository")
 
 		// try to copy a file that doesn't exist
-		imageDef = ImageDefinition{
-			Gadget: &GadgetType{
+		imageDef = imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  "file:///fake/file/that/does/not/exist",
 				GadgetType: "directory",
 			},
@@ -1483,8 +1484,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 		wd, _ := os.Getwd()
 		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
 		sourcePath = "file://" + sourcePath
-		imageDef = ImageDefinition{
-			Gadget: &GadgetType{
+		imageDef = imagedefinition.ImageDefinition{
+			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  sourcePath,
 				GadgetType: "directory",
 			},
@@ -1509,10 +1510,10 @@ func TestCreateChroot(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs: &RootfsType{
+			Rootfs: &imagedefinition.Rootfs{
 				Pocket: "proposed",
 			},
 		}
@@ -1570,10 +1571,10 @@ func TestFailedCreateChroot(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs:       &RootfsType{},
+			Rootfs:       &imagedefinition.Rootfs{},
 		}
 
 		// need workdir set up for this
@@ -1613,12 +1614,12 @@ func TestFailedInstallPackages(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs:       &RootfsType{},
-			Customization: &CustomizationType{
-				ExtraPackages: []*PackageType{
+			Rootfs:       &imagedefinition.Rootfs{},
+			Customization: &imagedefinition.Customization{
+				ExtraPackages: []*imagedefinition.Package{
 					{
 						PackageName: "test1",
 					},
@@ -1647,22 +1648,22 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
-		validPPA := &PPAType{
+		validPPA := &imagedefinition.PPA{
 			PPAName: "canonical-foundations/ubuntu-image",
 		}
-		invalidPPA := &PPAType{
+		invalidPPA := &imagedefinition.PPA{
 			PPAName:     "canonical-foundations/ubuntu-image",
 			Fingerprint: "TEST FINGERPRINT",
 		}
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs:       &RootfsType{},
-			Customization: &CustomizationType{
-				ExtraPPAs: []*PPAType{
+			Rootfs:       &imagedefinition.Rootfs{},
+			Customization: &imagedefinition.Customization{
+				ExtraPPAs: []*imagedefinition.PPA{
 					validPPA,
 				},
 			},
@@ -1703,10 +1704,10 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		osOpenFile = os.OpenFile
 
 		// Use an invalid PPA to trigger a failure in importPPAKeys
-		stateMachine.ImageDef.Customization.ExtraPPAs = []*PPAType{invalidPPA}
+		stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{invalidPPA}
 		err = stateMachine.addExtraPPAs()
 		asserter.AssertErrContains(err, "Error retrieving signing key")
-		stateMachine.ImageDef.Customization.ExtraPPAs = []*PPAType{validPPA}
+		stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{validPPA}
 
 		// mock os.RemoveAll
 		osRemoveAll = mockRemoveAll
@@ -1725,12 +1726,12 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 func TestCustomizeFstab(t *testing.T) {
 	testCases := []struct {
 		name          string
-		fstab         []*FstabType
+		fstab         []*imagedefinition.Fstab
 		expectedFstab string
 	}{
 		{
 			"one_entry",
-			[]*FstabType{
+			[]*imagedefinition.Fstab{
 				{
 					Label:        "writable",
 					Mountpoint:   "/",
@@ -1744,7 +1745,7 @@ func TestCustomizeFstab(t *testing.T) {
 		},
 		{
 			"two_entries",
-			[]*FstabType{
+			[]*imagedefinition.Fstab{
 				{
 					Label:        "writable",
 					Mountpoint:   "/",
@@ -1767,7 +1768,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1`,
 		},
 		{
 			"defaults_assumed",
-			[]*FstabType{
+			[]*imagedefinition.Fstab{
 				{
 					Label:      "writable",
 					Mountpoint: "/",
@@ -1788,11 +1789,11 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1`,
 			var stateMachine ClassicStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
-			stateMachine.ImageDef = ImageDefinition{
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
 				Architecture: getHostArch(),
 				Series:       getHostSuite(),
-				Rootfs:       &RootfsType{},
-				Customization: &CustomizationType{
+				Rootfs:       &imagedefinition.Rootfs{},
+				Customization: &imagedefinition.Customization{
 					Fstab: tc.fstab,
 				},
 			}
@@ -1836,12 +1837,12 @@ func TestFailedCustomizeFstab(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Rootfs:       &RootfsType{},
-			Customization: &CustomizationType{
-				Fstab: []*FstabType{
+			Rootfs:       &imagedefinition.Rootfs{},
+			Customization: &imagedefinition.Customization{
+				Fstab: []*imagedefinition.Fstab{
 					{
 						Label:        "writable",
 						Mountpoint:   "/",

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/snap"
@@ -29,7 +30,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
 	// Open and decode the yaml file
-	var imageDefinition ImageDefinition
+	var imageDefinition imagedefinition.ImageDefinition
 	imageFile, err := os.Open(classicStateMachine.Args.ImageDefinition)
 	if err != nil {
 		return fmt.Errorf("Error opening image definition file: %s", err.Error())
@@ -55,7 +56,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	var jsonReflector jsonschema.Reflector
 
 	// 1. parse the ImageDefinition struct into a schema using the jsonschema tags
-	schema := jsonReflector.Reflect(&ImageDefinition{})
+	schema := jsonReflector.Reflect(&imagedefinition.ImageDefinition{})
 
 	// 2. load the schema and parsed YAML data into types understood by gojsonschema
 	schemaLoader := gojsonschema.NewGoLoader(schema)
@@ -75,7 +76,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 			"value": imageDefinition.Gadget.GadgetType,
 		}
 		result.AddError(
-			newMissingURLError(
+			imagedefinition.NewMissingURLError(
 				gojsonschema.NewJsonContext("missingURL", jsonContext),
 				52,
 				errDetail,
@@ -93,7 +94,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 					"ppaName": ppa.PPAName,
 				}
 				result.AddError(
-					newInvalidPPAError(
+					imagedefinition.NewInvalidPPAError(
 						gojsonschema.NewJsonContext("missingPrivatePPAFingerprint",
 							jsonContext),
 						52,
@@ -116,7 +117,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 							"value": copy.Dest,
 						}
 						result.AddError(
-							newPathNotAbsoluteError(
+							imagedefinition.NewPathNotAbsoluteError(
 								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
 									jsonContext),
 								52,
@@ -137,7 +138,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 							"value": touch.TouchPath,
 						}
 						result.AddError(
-							newPathNotAbsoluteError(
+							imagedefinition.NewPathNotAbsoluteError(
 								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
 									jsonContext),
 								52,
@@ -378,7 +379,7 @@ func (stateMachine *StateMachine) createChroot() error {
 	}
 
 	// add any extra apt sources to /etc/apt/sources.list
-	aptSources := classicStateMachine.ImageDef.generatePocketList()
+	aptSources := classicStateMachine.ImageDef.GeneratePocketList()
 
 	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
 	sourcesListFile, _ := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)

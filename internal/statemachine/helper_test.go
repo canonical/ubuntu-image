@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -654,11 +655,11 @@ func TestGenerateGerminateCmd(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_germinate_cmd_"+tc.name, func(t *testing.T) {
-			imageDef := ImageDefinition{
+			imageDef := imagedefinition.ImageDefinition{
 				Architecture: tc.name,
-				Rootfs: &RootfsType{
+				Rootfs: &imagedefinition.Rootfs{
 					Mirror: tc.mirror,
-					Seed: &SeedType{
+					Seed: &imagedefinition.Seed{
 						SeedURLs:   []string{"git://test.git"},
 						SeedBranch: "testbranch",
 					},
@@ -743,7 +744,7 @@ func TestFailedManualCopyFile(t *testing.T) {
 	t.Run("test_failed_manual_copy_file", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 
-		copyFiles := []*CopyFileType{
+		copyFiles := []*imagedefinition.CopyFile{
 			{
 				Dest:   "/test/does/not/exist",
 				Source: "/test/does/not/exist",
@@ -759,7 +760,7 @@ func TestFailedManualTouchFile(t *testing.T) {
 	t.Run("test_failed_manual_touch_file", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 
-		touchFiles := []*TouchFileType{
+		touchFiles := []*imagedefinition.TouchFile{
 			{
 				TouchPath: "/test/does/not/exist",
 			},
@@ -774,7 +775,7 @@ func TestFailedManualExecute(t *testing.T) {
 	t.Run("test_failed_manual_execute", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 
-		executes := []*ExecuteType{
+		executes := []*imagedefinition.Execute{
 			{
 				ExecutePath: "/test/does/not/exist",
 			},
@@ -789,7 +790,7 @@ func TestFailedManualAddGroup(t *testing.T) {
 	t.Run("test_failed_manual_add_group", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 
-		addGroups := []*AddGroupType{
+		addGroups := []*imagedefinition.AddGroup{
 			{
 				GroupName: "testgroup",
 				GroupID:   "123",
@@ -805,7 +806,7 @@ func TestFailedManualAddUser(t *testing.T) {
 	t.Run("test_failed_manual_add_user", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 
-		addUsers := []*AddUserType{
+		addUsers := []*imagedefinition.AddUser{
 			{
 				UserName: "testuser",
 				UserID:   "123",
@@ -844,14 +845,14 @@ to this logic instead.
 func TestCreatePPAInfo(t *testing.T) {
 	testCases := []struct {
 		name             string
-		ppa              *PPAType
+		ppa              *imagedefinition.PPA
 		series           string
 		expectedName     string
 		expectedContents string
 	}{
 		{
 			"public_ppa",
-			&PPAType{
+			&imagedefinition.PPA{
 				PPAName: "public/ppa",
 			},
 			"focal",
@@ -865,7 +866,7 @@ Components: main`,
 		},
 		{
 			"private_ppa",
-			&PPAType{
+			&imagedefinition.PPA{
 				PPAName: "private/ppa",
 				Auth:    "testuser:testpass",
 			},
@@ -898,14 +899,14 @@ Components: main`,
 func TestCreatePPAInfo(t *testing.T) {
 	testCases := []struct {
 		name             string
-		ppa              *PPAType
+		ppa              *imagedefinition.PPA
 		series           string
 		expectedName     string
 		expectedContents string
 	}{
 		{
 			"public_ppa",
-			&PPAType{
+			&imagedefinition.PPA{
 				PPAName: "public/ppa",
 			},
 			"focal",
@@ -914,7 +915,7 @@ func TestCreatePPAInfo(t *testing.T) {
 		},
 		{
 			"private_ppa",
-			&PPAType{
+			&imagedefinition.PPA{
 				PPAName: "private/ppa",
 				Auth:    "testuser:testpass",
 			},
@@ -941,19 +942,19 @@ func TestCreatePPAInfo(t *testing.T) {
 func TestImportPPAKeys(t *testing.T) {
 	testCases := []struct {
 		name        string
-		ppa         *PPAType
+		ppa         *imagedefinition.PPA
 		keyFileName string
 	}{
 		{
 			"public_ppa",
-			&PPAType{
+			&imagedefinition.PPA{
 				PPAName: "canonical-foundations/ubuntu-image",
 			},
 			"public-canonical-foundations-ubuntu-image.key",
 		},
 		{
 			"private_ppa",
-			&PPAType{
+			&imagedefinition.PPA{
 				PPAName:     "canonical-foundations/ubuntu-image-private-test",
 				Auth:        "testuser:testpass",
 				Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
@@ -1035,7 +1036,7 @@ func TestFailedImportPPAKeys(t *testing.T) {
 		keyFilePath := filepath.Join(tmpTrustedDir, "test.key")
 
 		// try to import an invalid gpg fingerprint
-		ppa := &PPAType{
+		ppa := &imagedefinition.PPA{
 			PPAName:     "test-bad/fingerprint",
 			Fingerprint: "testfakefingperint",
 		}
@@ -1044,7 +1045,7 @@ func TestFailedImportPPAKeys(t *testing.T) {
 		asserter.AssertErrContains(err, "Error running gpg command")
 
 		// now use a valid PPA and mock some functions
-		ppa = &PPAType{
+		ppa = &imagedefinition.PPA{
 			PPAName: "canonical-foundations/ubuntu-image",
 		}
 

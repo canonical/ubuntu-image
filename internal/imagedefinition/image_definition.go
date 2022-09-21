@@ -1,4 +1,8 @@
-package statemachine
+/*
+Package imagedefinition provides the structure for the
+image definition that will be parsed from a YAML file.
+*/
+package imagedefinition
 
 import (
 	"fmt"
@@ -10,116 +14,125 @@ import (
 // ImageDefinition is the parent struct for the data
 // contained within a classic image definition file
 type ImageDefinition struct {
-	ImageName      string             `yaml:"name"            json:"ImageName"`
-	DisplayName    string             `yaml:"display-name"    json:"DisplayName"`
-	Revision       int                `yaml:"revision"        json:"Revision,omitempty"`
-	Architecture   string             `yaml:"architecture"    json:"Architecture"`
-	Series         string             `yaml:"series"          json:"Series"`
-	Kernel         *KernelType        `yaml:"kernel"          json:"Kernel"`
-	Gadget         *GadgetType        `yaml:"gadget"          json:"Gadget"`
-	ModelAssertion string             `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
-	Rootfs         *RootfsType        `yaml:"rootfs"          json:"Rootfs"`
-	Customization  *CustomizationType `yaml:"customization"   json:"Customization,omitempty"`
-	Artifacts      *ArtifactType      `yaml:"artifacts"       json:"Artifacts"`
-	Class          string             `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
+	ImageName      string         `yaml:"name"            json:"ImageName"`
+	DisplayName    string         `yaml:"display-name"    json:"DisplayName"`
+	Revision       int            `yaml:"revision"        json:"Revision,omitempty"`
+	Architecture   string         `yaml:"architecture"    json:"Architecture"`
+	Series         string         `yaml:"series"          json:"Series"`
+	Kernel         *Kernel        `yaml:"kernel"          json:"Kernel"`
+	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget"`
+	ModelAssertion string         `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
+	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
+	Customization  *Customization `yaml:"customization"   json:"Customization,omitempty"`
+	Artifacts      *Artifact      `yaml:"artifacts"       json:"Artifacts"`
+	Class          string         `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
 }
 
-// KernelType defines the kernel section of the image definition file
-type KernelType struct {
+// Kernel defines the kernel section of the image definition file
+type Kernel struct {
 	KernelName string `yaml:"name" json:"KernelName" default:"linux"`
 	KernelType string `yaml:"type" json:"KernelType,omitempty"`
 }
 
-// GadgetType defines the gadget section of the image definition file
-type GadgetType struct {
+// Gadget defines the gadget section of the image definition file
+type Gadget struct {
 	Ref          string `yaml:"ref"    json:"Ref,omitempty"`
 	GadgetBranch string `yaml:"branch" json:"GadgetBranch,omitempty"`
 	GadgetType   string `yaml:"type"   json:"GadgetType"             jsonschema:"enum=git,enum=directory,enum=prebuilt"`
 	GadgetURL    string `yaml:"url"    json:"GadgetURL,omitempty"    jsonschema:"type=string,format=uri"`
 }
 
-// RootfsType defines the rootfs section of the image definition file
-type RootfsType struct {
-	Components   []string     `yaml:"components"    json:"Components,omitempty"   default:"main"`
-	Archive      string       `yaml:"archive"       json:"Archive"                default:"ubuntu"`
-	Flavor       string       `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
-	Mirror       string       `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
-	Pocket       string       `yaml:"pocket"        json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
-	Seed         *SeedType    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
-	Tarball      *TarballType `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
-	ArchiveTasks []string     `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
+// Rootfs defines the rootfs section of the image definition file
+type Rootfs struct {
+	Components   []string `yaml:"components"    json:"Components,omitempty"`
+	Archive      string   `yaml:"archive"       json:"Archive"                default:"ubuntu"`
+	Flavor       string   `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
+	Mirror       string   `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
+	Pocket       string   `yaml:"pocket"        json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
+	Seed         *Seed    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
+	Tarball      *Tarball `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
+	ArchiveTasks []string `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
 }
 
-// SeedType defines the seed section of rootfs, which is used to
+// Seed defines the seed section of rootfs, which is used to
 // build a rootfs via seed germination
-type SeedType struct {
+type Seed struct {
 	SeedBranch string   `yaml:"branch" json:"SeedBranch,omitempty"`
 	SeedURLs   []string `yaml:"urls"   json:"SeedURLs"             jsonschema:"type=array,format=uri"`
 	Names      []string `yaml:"names"  json:"Names"`
 	Vcs        bool     `yaml:"vcs"    json:"Vcs"                  default:"true"`
 }
 
-// TarballType defines the tarball section of rootfs, which is used
+// Tarball defines the tarball section of rootfs, which is used
 // to create images from a pre-built rootfs
-type TarballType struct {
+type Tarball struct {
 	TarballURL string `yaml:"url"       json:"TarballURL"    jsonschema:"type=string,format=uri"`
 	GPG        string `yaml:"gpg"       json:"GPG,omitempty" jsonschema:"type=string,format=uri"`
 	SHA256sum  string `yaml:"sha256sum" json:"SHA256sum,omitempty"`
 }
 
-// CustomizationType defines the customization section of the image definition file
-type CustomizationType struct {
-	Installer     *InstallerType `yaml:"installer"      json:"Installer,omitempty"`
-	CloudInit     *CloudInitType `yaml:"cloud-init"     json:"CloudInit,omitempty"`
-	ExtraPPAs     []*PPAType     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"`
-	ExtraPackages []*PackageType `yaml:"extra-packages" json:"ExtraPackages,omitempty"`
-	ExtraSnaps    []*SnapType    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"`
-	Fstab         []*FstabType   `yaml:"fstab"          json:"Fstab,omitempty"`
-	Manual        *ManualType    `yaml:"manual"         json:"Manual,omitempty"`
+// Customization defines the customization section of the image definition file
+type Customization struct {
+	Installer     *Installer `yaml:"installer"      json:"Installer,omitempty"`
+	CloudInit     *CloudInit `yaml:"cloud-init"     json:"CloudInit,omitempty"`
+	ExtraPPAs     []*PPA     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"`
+	ExtraPackages []*Package `yaml:"extra-packages" json:"ExtraPackages,omitempty"`
+	ExtraSnaps    []*Snap    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"`
+	Fstab         []*Fstab   `yaml:"fstab"          json:"Fstab,omitempty"`
+	Manual        *Manual    `yaml:"manual"         json:"Manual,omitempty"`
 }
 
-// InstallerType provides customization options specific to installer images
-type InstallerType struct {
+// Installer provides customization options specific to installer images
+type Installer struct {
 	Preseeds []string `yaml:"preseeds" json:"Preseeds,omitempty"`
 	Layers   []string `yaml:"layers"   json:"Layers,omitempty"`
 }
 
-// CloudInitType provides customizations for running cloud-init
-type CloudInitType struct {
-	MetaData      string          `yaml:"meta-data"      json:"MetaData,omitempty"`
-	UserData      *[]UserDataType `yaml:"user-data"      json:"UserData,omitempty"`
-	NetworkConfig string          `yaml:"network-config" json:"NetworkConfig,omitempty"`
+// CloudInit provides customizations for running cloud-init
+type CloudInit struct {
+	MetaData      string      `yaml:"meta-data"      json:"MetaData,omitempty"`
+	UserData      *[]UserData `yaml:"user-data"      json:"UserData,omitempty"`
+	NetworkConfig string      `yaml:"network-config" json:"NetworkConfig,omitempty"`
 }
 
-// UserDataType defines the user information to be used by cloud-init
-type UserDataType struct {
+// UserData defines the user information to be used by cloud-init
+type UserData struct {
 	UserName     string `yaml:"name"     json:"UserName"`
 	UserPassword string `yaml:"password" json:"UserPassword"`
 }
 
-// PPAType contains information about a public or private PPA
-type PPAType struct {
+// PPA contains information about a public or private PPA
+type PPA struct {
 	PPAName     string `yaml:"name"         json:"PPAName"               jsonschema:"pattern=^[a-zA-Z0-9_.+-]+/[a-zA-Z0-9_.+-]+$"`
 	Auth        string `yaml:"auth"         json:"Auth,omitempty"        jsonschema:"pattern=^[a-zA-Z0-9_.+-]+:[a-zA-Z0-9]+$"`
 	Fingerprint string `yaml:"fingerprint"  json:"Fingerprint,omitempty"`
 	KeepEnabled bool   `yaml:"keep-enabled" json:"KeepEnabled"           default:"true"`
 }
 
-// PackageType contains information about packages
-type PackageType struct {
+// Package contains information about packages
+type Package struct {
 	PackageName string `yaml:"name" json:"PackageName"`
 }
 
-// SnapType contains information about snaps
-type SnapType struct {
+// Snap contains information about snaps
+type Snap struct {
 	SnapName     string `yaml:"name"     json:"SnapName"`
 	SnapRevision string `yaml:"revision" json:"SnapRevision,omitempty"`
 	Store        string `yaml:"store"    json:"Store"                  default:"canonical"`
 	Channel      string `yaml:"channel"  json:"Channel"                default:"stable"`
 }
 
-// FstabType defines the information that gets rendered into an fstab
-type FstabType struct {
+// Manual provides manual customization options
+type Manual struct {
+	CopyFile  []*CopyFile  `yaml:"copy-file"  json:"CopyFile,omitempty"`
+	Execute   []*Execute   `yaml:"execute"    json:"Execute,omitempty"`
+	TouchFile []*TouchFile `yaml:"touch-file" json:"TouchFile,omitempty"`
+	AddGroup  []*AddGroup  `yaml:"add-group"  json:"AddGroup,omitempty"`
+	AddUser   []*AddUser   `yaml:"add-user"   json:"AddUser,omitempty"`
+}
+
+// Fstab defines the information that gets rendered into an fstab
+type Fstab struct {
 	Label        string `yaml:"label"           json:"Label"`
 	Mountpoint   string `yaml:"mountpoint"      json:"Mountpoint"`
 	FSType       string `yaml:"filesystem-type" json:"FSType"`
@@ -128,93 +141,87 @@ type FstabType struct {
 	FsckOrder    int    `yaml:"fsck-order"      json:"FsckOrder"`
 }
 
-// ManualType provides manual customization options
-type ManualType struct {
-	CopyFile  []*CopyFileType  `yaml:"copy-file"  json:"CopyFile,omitempty"`
-	Execute   []*ExecuteType   `yaml:"execute"    json:"Execute,omitempty"`
-	TouchFile []*TouchFileType `yaml:"touch-file" json:"TouchFile,omitempty"`
-	AddGroup  []*AddGroupType  `yaml:"add-group"  json:"AddGroup,omitempty"`
-	AddUser   []*AddUserType   `yaml:"add-user"   json:"AddUser,omitempty"`
-}
-
-// CopyFileType allows users to copy files into the rootfs of an image
-type CopyFileType struct {
+// CopyFile allows users to copy files into the rootfs of an image
+type CopyFile struct {
 	Dest   string `yaml:"destination" json:"Dest"`
 	Source string `yaml:"source"      json:"Source"`
 }
 
-// ExecuteType allows users to execute a script in the rootfs of an image
-type ExecuteType struct {
+// Execute allows users to execute a script in the rootfs of an image
+type Execute struct {
 	ExecutePath string `yaml:"path" json:"ExecutePath"`
 }
 
-// TouchFileType allows users to touch a file in the rootfs of an image
-type TouchFileType struct {
+// TouchFile allows users to touch a file in the rootfs of an image
+type TouchFile struct {
 	TouchPath string `yaml:"path" json:"TouchPath"`
 }
 
-// AddGroupType allows users to add a group in the image that is being built
-type AddGroupType struct {
+// AddGroup allows users to add a group in the image that is being built
+type AddGroup struct {
 	GroupName string `yaml:"name" json:"GroupName"`
 	GroupID   string `yaml:"id"   json:"GroupID,omitempty"`
 }
 
-// AddUserType allows users to add a user in the image that is being built
-type AddUserType struct {
+// AddUser allows users to add a user in the image that is being built
+type AddUser struct {
 	UserName string `yaml:"name" json:"UserName"`
 	UserID   string `yaml:"id"   json:"UserID,omitempty"`
 }
 
-// ArtifactType contains information about the files that are created
+// Artifact contains information about the files that are created
 // during and as a result of the image build process
-type ArtifactType struct {
-	Img       *ImgType       `yaml:"img"       json:"Img,omitempty"`
-	Iso       *IsoType       `yaml:"iso"       json:"Iso,omitempty"`
-	Qcow2     *Qcow2Type     `yaml:"qcow2"     json:"Qcow2,omitempty"`
-	Manifest  *ManifestType  `yaml:"manifest"  json:"Manifest,omitempty"`
-	Filelist  *FilelistType  `yaml:"filelist"  json:"Filelist,omitempty"`
-	Changelog *ChangelogType `yaml:"changelog" json:"Changelog,omitempty"`
+type Artifact struct {
+	Img       *Img       `yaml:"img"       json:"Img,omitempty"`
+	Iso       *Iso       `yaml:"iso"       json:"Iso,omitempty"`
+	Qcow2     *Qcow2     `yaml:"qcow2"     json:"Qcow2,omitempty"`
+	Manifest  *Manifest  `yaml:"manifest"  json:"Manifest,omitempty"`
+	Filelist  *Filelist  `yaml:"filelist"  json:"Filelist,omitempty"`
+	Changelog *Changelog `yaml:"changelog" json:"Changelog,omitempty"`
 }
 
-// ImgType specifies the name of the resulting .img file.
+// Img specifies the name of the resulting .img file.
 // If left emtpy no .img file will be created
-type ImgType struct {
+type Img struct {
 	ImgPath string `yaml:"path" json:"ImgPath"`
 }
 
-// IsoType specifies the name of the resulting .iso file
+// Iso specifies the name of the resulting .iso file
 // and optionally the xorrisofs command used to create it.
 // If left emtpy no .iso file will be created
-type IsoType struct {
+type Iso struct {
 	IsoPath string `yaml:"path"            json:"IsoPath"`
 	Command string `yaml:"xorriso-command" json:"Command,omitempty"`
 }
 
-// Qcow2Type specifies the name of the resulting .qcow2 file
+// Qcow2 specifies the name of the resulting .qcow2 file
 // If left emtpy no .qcow2 file will be created
-type Qcow2Type struct {
+type Qcow2 struct {
 	Qcow2Path string `yaml:"path" json:"Qcow2Path"`
 }
 
-// ManifestType specifies the name of the manifest file.
+// Manifest specifies the name of the manifest file.
 // If left emtpy no manifest file will be created
-type ManifestType struct {
+type Manifest struct {
 	ManifestPath string `yaml:"path" json:"ManifestPath"`
 }
 
-// FilelistType specifies the name of the filelist file.
+// Filelist specifies the name of the filelist file.
 // If left emtpy no filelist file will be created
-type FilelistType struct {
+type Filelist struct {
 	FilelistPath string `yaml:"path" json:"FilelistPath"`
 }
 
-// ChangelogType specifies the name of the changelog file.
+// Changelog specifies the name of the changelog file.
 // If left emtpy no changelog file will be created
-type ChangelogType struct {
+type Changelog struct {
 	ChangelogPath string `yaml:"path" json:"ChangelogPath"`
 }
 
-func newMissingURLError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingURLError {
+// NewMissingURLError fails the image definition parsing when a dict
+// requires a URL conditionally based on the value of other keys
+// in the dict but does not have one included
+func NewMissingURLError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingURLError {
 	err := MissingURLError{}
 	err.SetContext(context)
 	err.SetType("missing_url_error")
@@ -232,7 +239,9 @@ type MissingURLError struct {
 	gojsonschema.ResultErrorFields
 }
 
-func newInvalidPPAError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *InvalidPPAError {
+// NewInvalidPPAError fails the image definition parsing when a private PPA
+// is configured with no fingerprint
+func NewInvalidPPAError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *InvalidPPAError {
 	err := InvalidPPAError{}
 	err.SetContext(context)
 	err.SetType("private_ppa_without_fingerprint")
@@ -249,7 +258,8 @@ type InvalidPPAError struct {
 	gojsonschema.ResultErrorFields
 }
 
-func newPathNotAbsoluteError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *PathNotAbsoluteError {
+// NewPathNotAbsoluteError fails the image definition parsing when a relative path is given
+func NewPathNotAbsoluteError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *PathNotAbsoluteError {
 	err := PathNotAbsoluteError{}
 	err.SetContext(context)
 	err.SetType("path_not_absolute_error")
@@ -273,10 +283,10 @@ func (imageDef ImageDefinition) securityMirror() string {
 	return imageDef.Rootfs.Mirror
 }
 
-// generatePocketList returns a slice of strings that need to be added to
+// GeneratePocketList returns a slice of strings that need to be added to
 // /etc/apt/sources.list in the chroot based on the value of "pocket"
 // in the rootfs section of the image definition
-func (imageDef ImageDefinition) generatePocketList() []string {
+func (imageDef ImageDefinition) GeneratePocketList() []string {
 	pocketMap := map[string][]string{
 		"release": {},
 		"security": {
