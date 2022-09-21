@@ -23,23 +23,33 @@ The following specification defines what is supported in the YAML:
     # installing more than one, since installer images can provide
     # multiple kernels to choose from.
     kernel: (optional)
-      name: <string> Example: "linux"
-      type: <string> Example: "hwe"
+      name: <string> Example: "linux" (required if kernel dict is specified)
+      type: <string> Example: "hwe" (optional)
     # gadget defines the boot assets of an image. When building a
     # classic image, the gadget is optionally compiled as part of
     # the state machine run.
     gadget:
       # An URI pointing to the location of the gadget tree. For
       # gadgets that need to be built this can be a local path
-      # to a directory or a URL to be git cloned. For pre-built
+      # to a directory or a URL to be git cloned. These gadget
+      # tree builds will automatically have the environment
+      # variables ARCH=<architecture> and SERIES=<series>.
+      # The values for these environment variables are sourced
+      # from this image definition file. For pre-built
       # gadget trees this must be a local path.
       url: <string>
+      # The type of gadget tree source. Currently supported values
+      # are git, directory, and prebuilt. When git is used the url
+      # will be cloned and `make` will be run. When directory is
+      # used, ubuntu-image will change directories into the specified
+      # URL and run `make`. When prebuilt is used, the contents of the
+      # URL are simply copied to the gadget directory.
       type: git | directory | prebuilt
       # A git reference to use if building a gadget tree from git.
-      ref: <string>
+      ref: <string> (optional)
       # The branch to use if building a gadget tree from git.
       # Defaults to "main"
-      branch: <string>
+      branch: <string> (optional)
     # A path to a model assertion to use when pre-seeding snaps
     # in the image.
     model-assertion: <string> (optional)
@@ -67,23 +77,23 @@ The following specification defines what is supported in the YAML:
       # and the release pocket. Updates includes updates,
       # security, and release. Proposed includes all pockets.
       # Defaults to "release".
-      pocket: release | security | updates | proposed
+      pocket: release | security | updates | proposed (optional)
       # Used for building an image from a set of archive tasks
       # rather than seeds. Not yet supported.
-      archive-tasks:
+      archive-tasks: (exactly 1 of archive-tasks, seed or tarball must be specified)
         - <string>
         - <string>
       # The seed to germinate from to create a list of packages
       # to be installed in the image.
-      seed:
+      seed: (exactly 1 of archive-tasks, seed or tarball must be specified)
           # A list of git, bzr, or http locations from which to
           # retrieve the seeds.
-          urls:
+          urls: (required if seed dict is specified)
             - <string>
             - <string>
           # The names of seeds to use from the germinate output.
           # Examples: server, minimal, cloud-image.
-          names:
+          names: (required if seed dict is specified)
             - <string>
             - <string>
           # Whether to use the --vcs flag when running germinate.
@@ -94,17 +104,18 @@ The following specification defines what is supported in the YAML:
           branch: <string> (optional)
       # Used for pre-built root filesystems rather than germinating
       # from a seed or using a list of archive-tasks.
-      tarball:
+      tarball: (exactly 1 of archive-tasks, seed or tarball must be specified)
           # The path to the tarball. Can be a local path or an URL.
-          url: <string>
+          url: <string> (required if tarball dict is specified)
           # URL to the gpg signature to verify the tarball against.
           gpg: <string> (optional)
           # SHA256 sum of the tarball used to verify it has not
           # been altered.
           sha256sum: <string> (optional)
     # ubuntu-image supports building automatically with some
-    # customizations to the image.
-    customization:
+    # customizations to the image. Note that if customization
+    # is specified, at least one of the subkeys should be used
+    customization: (optional)
       # Used only for installer images
       installer: (optional)
         preseeds: (optional)
@@ -137,10 +148,10 @@ The following specification defines what is supported in the YAML:
           # from the Launchpad API, so it can be retrieved
           # automatically. For Private PPAs this must be
           # specified.
-          fingerprint: <string>
+          fingerprint: <string> (optional for public PPAs)
           # Authentication for private PPAs in the format
           # "user:password".
-          auth: <string>
+          auth: <string> (optional for public PPAs)
           # Whether to leave the PPA source file in the resulting
           # image. Defaults to "true". If set to "false" this
           # PPA will only be used as a source for installing
@@ -158,13 +169,13 @@ The following specification defines what is supported in the YAML:
           # The name of the snap.
           name: <string>
           # The channel from which to seed the snap.
-          channel: <string>
+          channel: <string> (optional)
           # The store to retrieve the snap from. Not yet supported.
           # Defaults to "canonical".
-          store: <string>
+          store: <string> (optional)
           # The revision of the snap to preseed in the rootfs.
           # Not yet supported.
-          revision: <int>
+          revision: <int> (optional)
       # After the rootfs has been created and before the image
       # artifacts are generated, ubuntu-image can automatically
       # perform some manual customization to the rootfs.
@@ -226,28 +237,34 @@ The following specification defines what is supported in the YAML:
     artifacts:
       # Used to specify that ubuntu-image should create a .img file.
       img: (optional)
-        # Relative name to output the .img file.
-        name: <string>
+        -
+          # Name to output the .img file.
+          name: <string>
       # Used to specify that ubuntu-image should create a .iso file.
+      # Not yet supported.
       iso: (optional)
-        # Relative name to output the .iso file.
-        name: <string>
-        # Specify parameters to use when calling `xorriso`. When not
-        # provided, ubuntu-image will attempt to create it's own
-        # `xorriso` command.
-        xorriso-command: <string> (optional)
+        -
+          # Name to output the .iso file.
+          name: <string>
+          # Specify parameters to use when calling `xorriso`. When not
+          # provided, ubuntu-image will attempt to create it's own
+          # `xorriso` command.
+          xorriso-command: <string> (optional)
       # Used to specify that ubuntu-image should create a .qcow2 file.
+      # Not yet supported.
       qcow2: (optional)
-        # Relative name to output the .qcow2 file.
-        name: <string>
+        -
+          # Name to output the .qcow2 file.
+          name: <string>
       # A manifest file is a list of all packages and their version
       # numbers that are included in the rootfs of the image.
       manifest:
-        # Relative name to output the manifest file.
+        # Name to output the manifest file.
         name: <string>
       # A filelist is a list of all files in the rootfs of the image.
+      # Not yet supported
       filelist:
-        # Relative name to output the filelist file.
+        # Name to output the filelist file.
         name: <string>
       # Not yet supported.
       changelog:
@@ -287,8 +304,7 @@ Raspberry Pi images is:
           - ubuntu-server-raspi
     customization:
       cloud-init:
-        user-data:
-          -
+        user-data: |
             name: ubuntu
             password: ubuntu
       extra-packages:
@@ -311,7 +327,8 @@ Raspberry Pi images is:
           fsck-order: 1
     artifacts:
       img:
-          path: raspi.img
+        -
+          name: raspi.img
       manifest:
-          path: raspi.manifest
+        name: raspi.manifest
 ```
