@@ -277,7 +277,7 @@ type PathNotAbsoluteError struct {
 }
 
 func (imageDef ImageDefinition) securityMirror() string {
-	if imageDef.Architecture == "amd64" || imageDef.Architecture == "386" {
+	if imageDef.Architecture == "amd64" || imageDef.Architecture == "i386" {
 		return "http://security.ubuntu.com/ubuntu/"
 	}
 	return imageDef.Rootfs.Mirror
