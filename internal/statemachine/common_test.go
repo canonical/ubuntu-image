@@ -198,80 +198,6 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 	})
 }
 
-// TestPopulateRootfsContentsHooks ensures that the PopulateSnapRootfsContentsHooks
-// function can successfully run hook scripts and that core20 skips them
-func TestPopulateRootfsContentsHooks(t *testing.T) {
-	testCases := []struct {
-		name         string
-		isSeeded     bool
-		hooksCreated []string
-	}{
-		{"hooks_succeed", false, []string{"post-populate-rootfs-hookfile", "post-populate-rootfs-hookfile.d1", "post-populate-rootfs-hookfile.d2"}},
-		{"hooks_not_allowed", true, []string{}},
-	}
-	for _, tc := range testCases {
-		t.Run("test_"+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.commonFlags.Debug = true
-			stateMachine.commonFlags.HooksDirectories = []string{
-				filepath.Join("testdata", "good_hooksd"),
-				filepath.Join("testdata", "good_hookscript"),
-			}
-			stateMachine.IsSeeded = tc.isSeeded
-
-			// need workdir set up for this
-			err := stateMachine.makeTemporaryDirectories()
-			asserter.AssertErrNil(err, true)
-
-			err = stateMachine.populateRootfsContentsHooks()
-			asserter.AssertErrNil(err, false)
-
-			// the hook scripts used for testing simply touches some files.
-			// make sure they were successfully created
-			for _, file := range tc.hooksCreated {
-				_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
-				if err != nil {
-					if os.IsNotExist(err) {
-						t.Errorf("File %s should exist, but does not", file)
-					}
-				}
-			}
-
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		})
-	}
-}
-
-// TestFailedPopulateRootfsContentsHooks tests a variety of failures in running the hooks
-func TestFailedPopulateRootfsContentsHooks(t *testing.T) {
-	testCases := []struct {
-		name      string
-		hooksDirs []string
-	}{
-		{"hooks_not_executable", []string{filepath.Join("testdata", "hooks_not_executable")}},
-		{"hooks_return_error", []string{filepath.Join("testdata", "hooks_return_error")}},
-	}
-	for _, tc := range testCases {
-		t.Run("test_"+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.commonFlags.HooksDirectories = tc.hooksDirs
-			stateMachine.IsSeeded = false
-
-			// need workdir set up for this
-			err := stateMachine.makeTemporaryDirectories()
-			asserter.AssertErrNil(err, true)
-
-			err = stateMachine.populateRootfsContentsHooks()
-			asserter.AssertErrContains(err, "Error running hook")
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		})
-	}
-}
-
 // TestGenerateDiskInfo tests that diskInfo can be generated
 func TestGenerateDiskInfo(t *testing.T) {
 	t.Run("test_generate_disk_info", func(t *testing.T) {
@@ -589,9 +515,12 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 
 		// set rootfs to an empty string in order to trigger a failure in Write()
+		oldRootfs := stateMachine.tempDirs.rootfs
 		stateMachine.tempDirs.rootfs = ""
 		err = stateMachine.populateBootfsContents()
 		asserter.AssertErrContains(err, "Error in mountedFilesystem.Write")
+		// restore rootfs
+		stateMachine.tempDirs.rootfs = oldRootfs
 
 		// cause a failure in handleSecureBoot. First change to un-seeded yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata",
