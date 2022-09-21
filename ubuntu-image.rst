@@ -83,6 +83,13 @@ model_assertion
 --validation=<ignore|enforce>
     Control whether validations should be ignored or enforced.
 
+--snap SNAP
+    Install an extra snap.  This is passed through to ``snap prepare-image``.
+    The snap argument can include additional information about the channel
+    and/or risk with the following syntax: ``<snap>=<channel|risk>``. Note
+    that this flag will cause an error if the model assertion has a grade
+    higher than dangerous
+
 Classic command options
 -----------------------
 
@@ -108,10 +115,18 @@ in more detail below.
 -d, --debug
     Enable debugging output.
 
+--verbose
+    Enable verbose output.
+
+--quiet
+    Only print error messages. Suppress all other output.
+
 -O DIRECTORY, --output-dir DIRECTORY
     Write generated disk image files to this directory.  The files will be
     named after the ``gadget.yaml`` volume names, with ``.img`` suffix
-    appended.  If not given, the current working directory is used.  This
+    appended.  If not given, the value of the --workdir flag is used if
+    --workdir is specified.  If neither --output-dir or --workdir is used,
+    the image(s) will be placed in the current working directory.  This
     option replaces, and cannot be used with, the deprecated ``--output``
     option.
 
@@ -140,29 +155,13 @@ in more detail below.
     In the case of ambiguities, the size hint is ignored and the calculated
     size for the volume will be used instead.
 
---image-file-list FILENAME
-    Print to ``FILENAME``, a list of the file system paths to all the disk
-    images created by the command, if any.
-
---hooks-directory DIRECTORY
-    Directories in which scripts for build-time hooks will be located. This
-    flag must be specified once for each hook directory. ``ubuntu-image``
-    will look for hooks in ``hooks_directory/name_of_hooks_step.d`` and
-    a script with the name ``hooks_directory/name_of_hooks_step``. Currently
-    the only supported hooks step is ``populate_rootfs_contents``.
-
 --disk-info DISK-INFO-CONTENTS
     File to be used as .disk/info on the image's rootfs.  This file can
     contain useful information about the target image, like image
     identification data, system name, build timestamp etc.
 
---snap SNAP
-    Install an extra snap.  This is passed through to ``snap prepare-image``.
-    The snap argument can include additional information about the channel
-    and/or risk with the following syntax: ``<snap>=<channel|risk>``
-
 -c CHANNEL, --channel CHANNEL
-    The snap channel to use.
+    The default snap channel to use while preseeding the image.
 
 --sector-size SIZE
     When creating the disk image file, use the given sector size.  This
@@ -238,13 +237,6 @@ The following environment variables are recognized by ``ubuntu-image``.
     ``<workdir>/unpack`` directory after the ``snap prepare-image`` subcommand
     has run will be copied here.
 
-``UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH``
-    ``ubuntu-image`` uses ``livecd-rootfs`` configuration files for its
-    ``live-build`` runs.  If this variable is set, ``ubuntu-image`` will use
-    the configuration files from the selected path for its auto configuration.
-    Otherwise it will attempt to localize ``livecd-rootfs`` through a call to
-    ``dpkg``.
-
 ``UBUNTU_IMAGE_QEMU_USER_STATIC_PATH``
     In case of classic image cross-compilation for a different architecture,
     ``ubuntu-image`` will attempt to use the qemu-user-static emulator with
@@ -255,31 +247,6 @@ The following environment variables are recognized by ``ubuntu-image``.
 There are a few other environment variables used for building and testing
 only.
 
-
-HOOKS
-=====
-
-During image build at certain stages of the build process the user can execute
-custom scripts modifying its contents or otherwise affecting the process
-itself.  Whenever a hook is to be fired, the directories as listed in the
-``--hooks-directory`` parameter are scanned for matching scripts.  There can be
-multiple scripts for a specific hook defined.  The ``HookManager`` will first
-look for executable files in ``<hookdir>/<name-of-the-hook>.d`` and execute
-them in an alphanumerical order.  Finally the ``<hookdir>/<name-of-the-hook>``
-file is executed if existing.
-
-Hook scripts can have various additional data passed onto them through
-environment variables depending on the hook being fired.
-
-Currently supported hooks:
-
-post-populate-rootfs
-    Executed after the rootfs directory has been populated, allowing
-    custom modification of its contents.  Added in version 1.2.  Environment
-    variables present:
-
-        ``UBUNTU_IMAGE_HOOK_ROOTFS``
-            Includes the absolute path to the rootfs contents.
 
 STEPS
 =====
@@ -314,6 +281,9 @@ image types. A list of all possible steps is below:
 #. make_disk
 #. generate_manifest
 #. finish
+
+To check the steps that are going to be used for a specific image
+definition file, use the ``--print-states`` flag.
 
 Snap image steps
 ----------------
