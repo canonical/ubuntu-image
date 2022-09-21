@@ -589,9 +589,12 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 
 		// set rootfs to an empty string in order to trigger a failure in Write()
+		oldRootfs := stateMachine.tempDirs.rootfs
 		stateMachine.tempDirs.rootfs = ""
 		err = stateMachine.populateBootfsContents()
 		asserter.AssertErrContains(err, "Error in mountedFilesystem.Write")
+		// restore rootfs
+		stateMachine.tempDirs.rootfs = oldRootfs
 
 		// cause a failure in handleSecureBoot. First change to un-seeded yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata",
