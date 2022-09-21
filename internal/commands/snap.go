@@ -13,6 +13,7 @@ type SnapOpts struct {
 	AppArmorKernelFeaturesDir string   `long:"apparmor-features-dir" description:"Optional path to apparmor kernel features directory"`
 	PreseedSignKey            string   `long:"preseed-sign-key" description:"Name of the key to use to sign preseed assertion, otherwise use the default key"`
 	Snaps                     []string `long:"snap" description:"Install extra snaps. These are passed through to \"snap prepare-image\". The snap argument can include additional information about the channel and/or risk with the following syntax: <snap>=<channel|risk>" value-name:"SNAP"`
+	CloudInit                 string   `long:"cloud-init" description:"cloud-config data to be copied to the image" value-name:"USER-DATA-FILE"`
 }
 
 type snapCommand struct {

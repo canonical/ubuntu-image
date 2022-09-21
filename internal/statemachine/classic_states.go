@@ -17,8 +17,6 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
-	"github.com/snapcore/snapd/osutil"
-	//"github.com/snapcore/snapd/progress"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -248,6 +246,13 @@ func (stateMachine *StateMachine) calculateStates() error {
 	// The rootfs is laid out in a staging area, now populate it in the correct location
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents})
+
+	// if the --disk-info flag was used on the command line place it in the correct
+	// location in the rootfs
+	if stateMachine.commonFlags.DiskInfo != "" {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo})
+	}
 
 	// Add the "always there" states that populate partitions, build the disk, etc.
 	// This includes the no-op "finish" state to signify successful setup
@@ -550,8 +555,72 @@ func (stateMachine *StateMachine) germinate() error {
 
 // Customize Cloud init with the values in the image definition YAML
 func (stateMachine *StateMachine) customizeCloudInit() error {
-	// currently a no-op pending implementation of the classic image redesign
-	return nil
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	cloudInitCustomization := classicStateMachine.ImageDef.Customization.CloudInit
+
+	seedPath := path.Join(classicStateMachine.tempDirs.chroot, "var/lib/cloud/seed/nocloud")
+	err := osMkdirAll(seedPath, 0755)
+	if err != nil {
+		return err
+	}
+
+	if cloudInitCustomization.MetaData != "" {
+		metaDataFile, err := osCreate(path.Join(seedPath, "meta-data"))
+		if err != nil {
+			return err
+		}
+		defer metaDataFile.Close()
+
+		_, err = metaDataFile.WriteString(cloudInitCustomization.MetaData)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.UserData != nil {
+		userDataFile, err := osCreate(path.Join(seedPath, "user-data"))
+		if err != nil {
+			return err
+		}
+		defer userDataFile.Close()
+
+		userDataBytes, err := yamlMarshal(cloudInitCustomization.UserData)
+		if err != nil {
+			return err
+		}
+
+		_, err = userDataFile.Write(userDataBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.NetworkConfig != "" {
+		networkConfigFile, err := osCreate(path.Join(seedPath, "network-config"))
+		if err != nil {
+			return err
+		}
+		defer networkConfigFile.Close()
+
+		_, err = networkConfigFile.WriteString(cloudInitCustomization.NetworkConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	datasourceConfig := "# to update this file, run dpkg-reconfigure cloud-init\ndatasource_list: [ NoCloud ]\n"
+
+	dpkgConfigPath := path.Join(classicStateMachine.tempDirs.chroot, "etc/cloud/cloud.cfg.d/90_dpkg.cfg")
+	dpkgConfigFile, err := osCreate(dpkgConfigPath)
+	if err != nil {
+		return err
+	}
+	defer dpkgConfigFile.Close()
+
+	_, err = dpkgConfigFile.WriteString(datasourceConfig)
+
+	return err
 }
 
 // Configure Extra PPAs
@@ -657,6 +726,9 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	if err != nil {
 		return err
 	}
+	if stateMachine.commonFlags.Channel != "" {
+		imageOpts.Channel = stateMachine.commonFlags.Channel
+	}
 
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
@@ -753,30 +825,6 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 			}
 		}
 	}
-
-	if classicStateMachine.commonFlags.CloudInit != "" {
-		seedDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
-		cloudDir := filepath.Join(seedDir, "nocloud-net")
-		err := osMkdirAll(cloudDir, 0756)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
-		}
-		metadataFile := filepath.Join(cloudDir, "meta-data")
-		metadataIO, err := osOpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
-		}
-		metadataIO.Write([]byte("instance-id: nocloud-static"))
-		metadataIO.Close()
-
-		userdataFile := filepath.Join(cloudDir, "user-data")
-		err = osutilCopyFile(classicStateMachine.commonFlags.CloudInit,
-			userdataFile, osutil.CopyFlagDefault)
-		if err != nil {
-			return fmt.Errorf("Error copying cloud-init: %s", err.Error())
-		}
-	}
-
 	return nil
 }
 

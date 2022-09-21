@@ -39,42 +39,6 @@ func TestMaxOffset(t *testing.T) {
 	})
 }
 
-// TestFailedRunHooks tests failures in the runHooks function. This is accomplished by mocking
-// functions and calling hook scripts that intentionally return errors
-func TestFailedRunHooks(t *testing.T) {
-	t.Run("test_failed_run_hooks", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.commonFlags.Debug = true // for coverage!
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// first set a good hooks directory
-		stateMachine.commonFlags.HooksDirectories = []string{filepath.Join(
-			"testdata", "good_hookscript")}
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
-		defer func() {
-			ioutilReadDir = ioutil.ReadDir
-		}()
-		err = stateMachine.runHooks("post-populate-rootfs",
-			"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Error reading hooks directory")
-		ioutilReadDir = ioutil.ReadDir
-
-		// now set a hooks directory that will fail
-		stateMachine.commonFlags.HooksDirectories = []string{filepath.Join(
-			"testdata", "hooks_return_error")}
-		err = stateMachine.runHooks("post-populate-rootfs",
-			"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Error running hook")
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}
-
 // TestFailedHandleSecureBoot tests failures in the handleSecureBoot function by mocking functions
 func TestFailedHandleSecureBoot(t *testing.T) {
 	t.Run("test_failed_handle_secure_boot", func(t *testing.T) {
