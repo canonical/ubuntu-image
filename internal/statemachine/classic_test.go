@@ -224,6 +224,7 @@ func TestPrintStates(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.Debug = true
+		stateMachine.commonFlags.DiskInfo = "test" // for coverage!
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions", "test_valid.yaml")
 		err := stateMachine.parseImageDefinition()
 		asserter.AssertErrNil(err, true)
@@ -813,6 +814,7 @@ func TestPreseedClassicImage(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Snaps = []string{"lxd"}
+		stateMachine.commonFlags.Channel = "stable"
 		stateMachine.ImageDef = ImageDefinition{
 			Architecture: getHostArch(),
 			Customization: &CustomizationType{
@@ -965,7 +967,6 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
 		stateMachine.ImageDef = ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
@@ -1009,33 +1010,6 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		err = stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrContains(err, "Error writing to fstab")
 		ioutilWriteFile = ioutil.WriteFile
-
-		// mock os.MkdirAll
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error creating cloud-init dir")
-		osMkdirAll = os.MkdirAll
-
-		// mock os.OpenFile
-		osOpenFile = mockOpenFile
-		defer func() {
-			osOpenFile = os.OpenFile
-		}()
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error opening cloud-init meta-data file")
-		osOpenFile = os.OpenFile
-
-		// mock osutil.CopyFile
-		osutilCopyFile = mockCopyFile
-		defer func() {
-			osutilCopyFile = osutil.CopyFile
-		}()
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error copying cloud-init")
-		osutilCopyFile = osutil.CopyFile
 	})
 }
 

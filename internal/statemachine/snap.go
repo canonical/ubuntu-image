@@ -10,7 +10,6 @@ var snapStates = []stateFunc{
 	{"prepare_image", (*StateMachine).prepareImage},
 	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
 	{"populate_rootfs_contents", (*StateMachine).populateSnapRootfsContents},
-	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
 	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},

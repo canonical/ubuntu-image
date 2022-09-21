@@ -92,43 +92,6 @@ func (stateMachine *StateMachine) cleanup() error {
 	return nil
 }
 
-// runHooks reads through the --hooks-directory flags and calls a helper function to execute the scripts
-func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) error {
-	os.Setenv(envKey, envVal)
-	for _, hooksDir := range stateMachine.commonFlags.HooksDirectories {
-		hooksDirectoryd := filepath.Join(hooksDir, hookName+".d")
-		hookScripts, err := ioutilReadDir(hooksDirectoryd)
-
-		// It's okay for hooks-directory.d to not exist, but if it does exist run all the scripts in it
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("Error reading hooks directory: %s", err.Error())
-		}
-
-		for _, hookScript := range hookScripts {
-			hookScriptPath := filepath.Join(hooksDirectoryd, hookScript.Name())
-			if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
-				fmt.Printf("Running hook script: %s\n", hookScriptPath)
-			}
-			if err := helper.RunScript(hookScriptPath); err != nil {
-				return fmt.Errorf("Error running hook %s: %s", hookScriptPath, err.Error())
-			}
-		}
-
-		// if hookName exists in the hook directory, run it
-		hookScript := filepath.Join(hooksDir, hookName)
-		_, err = os.Stat(hookScript)
-		if err == nil {
-			if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
-				fmt.Printf("Running hook script: %s\n", hookScript)
-			}
-			if err := helper.RunScript(hookScript); err != nil {
-				return fmt.Errorf("Error running hook %s: %s", hookScript, err.Error())
-			}
-		}
-	}
-	return nil
-}
-
 // handleLkBootloader handles the special "lk" bootloader case where some extra
 // files need to be added to the bootfs
 func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) error {

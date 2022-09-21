@@ -17,7 +17,6 @@ var rootfsSeedStates = []stateFunc{
 }
 
 var imageCreationStates = []stateFunc{
-	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
 	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
