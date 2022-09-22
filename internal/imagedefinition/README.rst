@@ -280,8 +280,8 @@ followed by several examples.
 name
 ====
 
-This mandatory field is unused, but must not be blank. Any characters are
-permitted, of any (non-zero) length. For example:
+This mandatory meta-data field is not yet used, but must not be blank.
+Any characters are permitted, of any (non-zero) length. For example:
 
 .. code:: yaml
 
@@ -291,8 +291,8 @@ permitted, of any (non-zero) length. For example:
 display-name
 ============
 
-This mandatory field is unused, but must not be blank. Any characters are
-permitted, of any (non-zero) length. For example:
+This mandatory meta-data field is not yet used, but must not be blank.
+Any characters are permitted, of any (non-zero) length. For example:
 
 .. code:: yaml
 
@@ -302,7 +302,8 @@ permitted, of any (non-zero) length. For example:
 revision
 ========
 
-This optional field is unused. If specified, it must be an integer number.
+This optional meta-data field is not yet used. If specified, it must
+be an integer number.
 
 
 architecture
