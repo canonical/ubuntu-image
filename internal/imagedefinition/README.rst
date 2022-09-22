@@ -131,11 +131,11 @@ The following specification defines what is supported in the YAML:
          # Used to create a custom cloud-init configuration.
          cloud-init: (optional)
            # cloud-init yaml metadata
-           meta-data: <yaml> (optional)
+           meta-data: <yaml as a string> (optional)
            # cloud-init yaml metadata
-           user-data: <yaml> (optional)
+           user-data: <yaml as a string> (optional)
            # cloud-init yaml metadata
-           network-config: <yaml> (optional)
+           network-config: <yaml as a string> (optional)
          # Extra PPAs to install in the image. Both public and
          # private PPAs are supported. If specifying a private
          # PPA, the auth and fingerprint fields are required.
