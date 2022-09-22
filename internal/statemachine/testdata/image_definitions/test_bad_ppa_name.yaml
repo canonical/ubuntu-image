@@ -37,4 +37,5 @@ customization:
       auth: "testfailure"
 artifacts:
   img:
-      path: pc-amd64.img
+    -
+      name: pc-amd64.img

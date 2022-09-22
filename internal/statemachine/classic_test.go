@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -204,6 +205,7 @@ func TestFailedCalculateStates(t *testing.T) {
 				ArchiveTasks: []string{"test"},
 			},
 			Customization: &imagedefinition.Customization{},
+			Artifacts:     &imagedefinition.Artifact{},
 		}
 
 		stateMachine.stateMachineFlags.Thru = "fake_state"
@@ -247,22 +249,23 @@ func TestPrintStates(t *testing.T) {
 [0] build_gadget_tree
 [1] prepare_gadget_tree
 [2] load_gadget_yaml
-[3] germinate
-[4] create_chroot
-[5] add_extra_ppas
-[6] install_packages
-[7] preseed_image
-[8] customize_cloud_init
-[9] customize_fstab
-[10] perform_manual_customization
-[11] populate_rootfs_contents
-[12] generate_disk_info
-[13] calculate_rootfs_size
-[14] populate_bootfs_contents
-[15] populate_prepare_partitions
-[16] make_disk
-[17] generate_manifest
-[18] finish
+[3] verify_artifact_names
+[4] germinate
+[5] create_chroot
+[6] add_extra_ppas
+[7] install_packages
+[8] preseed_image
+[9] customize_cloud_init
+[10] customize_fstab
+[11] perform_manual_customization
+[12] populate_rootfs_contents
+[13] generate_disk_info
+[14] calculate_rootfs_size
+[15] populate_bootfs_contents
+[16] populate_prepare_partitions
+[17] make_disk
+[18] generate_manifest
+[19] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -392,6 +395,181 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}
+
+// TestVerifyArtifactNames unit tests the verifyArtifactNames function
+func TestVerifyArtifactNames(t *testing.T) {
+	testCases := []struct {
+		name             string
+		gadgetYAML       string
+		img              *[]imagedefinition.Img
+		expectedVolNames map[string]string
+		shouldPass       bool
+	}{
+		{
+			"single_volume_specified",
+			"gadget_tree/meta/gadget.yaml",
+			&[]imagedefinition.Img{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "pc",
+				},
+			},
+			map[string]string{
+				"pc": "test1.img",
+			},
+			true,
+		},
+		{
+			"single_volume_not_specified",
+			"gadget_tree/meta/gadget.yaml",
+			&[]imagedefinition.Img{
+				{
+					ImgName: "test-single.img",
+				},
+			},
+			map[string]string{
+				"pc": "test-single.img",
+			},
+			true,
+		},
+		{
+			"mutli_volume_specified",
+			"gadget-multi.yaml",
+			&[]imagedefinition.Img{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "first",
+				},
+				{
+					ImgName:   "test2.img",
+					ImgVolume: "second",
+				},
+				{
+					ImgName:   "test3.img",
+					ImgVolume: "third",
+				},
+				{
+					ImgName:   "test4.img",
+					ImgVolume: "fourth",
+				},
+			},
+			map[string]string{
+				"first":  "test1.img",
+				"second": "test2.img",
+				"third":  "test3.img",
+				"fourth": "test4.img",
+			},
+			true,
+		},
+		{
+			"mutli_volume_not_specified",
+			"gadget-multi.yaml",
+			&[]imagedefinition.Img{
+				{
+					ImgName: "test1.img",
+				},
+				{
+					ImgName: "test2.img",
+				},
+				{
+					ImgName: "test3.img",
+				},
+				{
+					ImgName: "test4.img",
+				},
+			},
+			map[string]string{},
+			false,
+		},
+		{
+			"mutli_volume_some_specified",
+			"gadget-multi.yaml",
+			&[]imagedefinition.Img{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "first",
+				},
+				{
+					ImgName:   "test2.img",
+					ImgVolume: "second",
+				},
+				{
+					ImgName: "test3.img",
+				},
+				{
+					ImgName: "test4.img",
+				},
+			},
+			map[string]string{},
+			false,
+		},
+		{
+			"mutli_volume_only_create_some_images",
+			"gadget-multi.yaml",
+			&[]imagedefinition.Img{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "first",
+				},
+				{
+					ImgName:   "test2.img",
+					ImgVolume: "second",
+				},
+			},
+			map[string]string{
+				"first":  "test1.img",
+				"second": "test2.img",
+			},
+			true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_verify_artifact_names_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+
+			stateMachine.YamlFilePath = filepath.Join("testdata", tc.gadgetYAML)
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Rootfs: &imagedefinition.Rootfs{
+					Archive: "ubuntu",
+				},
+				Customization: &imagedefinition.Customization{},
+				Artifacts: &imagedefinition.Artifact{
+					Img: tc.img,
+				},
+			}
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			// load gadget yaml
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, true)
+
+			// verify artifact names
+			err = stateMachine.verifyArtifactNames()
+			if tc.shouldPass {
+				asserter.AssertErrNil(err, true)
+				if !reflect.DeepEqual(tc.expectedVolNames, stateMachine.VolumeNames) {
+					fmt.Println(tc.expectedVolNames)
+					fmt.Println(stateMachine.VolumeNames)
+					t.Errorf("Expected volume names does not match calculated volume names")
+				}
+			} else {
+				asserter.AssertErrContains(err, "Volume names must be specified for each image")
+			}
+
+		})
+	}
 }
 
 // TestBuildRootfsFromTasks unit tests the buildRootfsFromTasks function
@@ -1034,7 +1212,21 @@ func TestGeneratePackageManifest(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.OutputDir = outputDir
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &imagedefinition.Rootfs{
+				Archive: "ubuntu",
+			},
+			Customization: &imagedefinition.Customization{},
+			Artifacts: &imagedefinition.Artifact{
+				Manifest: &imagedefinition.Manifest{
+					ManifestName: "filesystem.manifest",
+				},
+			},
+		}
 		osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
 
 		err = stateMachine.generatePackageManifest()
 		asserter.AssertErrNil(err, true)
@@ -1075,6 +1267,19 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.OutputDir = "/test/path"
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &imagedefinition.Rootfs{
+				Archive: "ubuntu",
+			},
+			Customization: &imagedefinition.Customization{},
+			Artifacts: &imagedefinition.Artifact{
+				Manifest: &imagedefinition.Manifest{
+					ManifestName: "filesystem.manifest",
+				},
+			},
+		}
 
 		err := stateMachine.generatePackageManifest()
 		asserter.AssertErrContains(err, "Error creating manifest file")

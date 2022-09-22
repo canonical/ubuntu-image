@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -199,6 +200,12 @@ func (stateMachine *StateMachine) calculateStates() error {
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml})
 
+	// if artifacts are specified, verify the correctness and store them in the struct
+	if classicStateMachine.ImageDef.Artifacts.Img != nil {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"verify_artifact_names", (*StateMachine).verifyArtifactNames})
+	}
+
 	// determine the states needed for preparing the rootfs.
 	// The rootfs is either created from a seed, from
 	// archive-tasks or as a prebuilt tarball. These
@@ -257,6 +264,22 @@ func (stateMachine *StateMachine) calculateStates() error {
 	// Add the "always there" states that populate partitions, build the disk, etc.
 	// This includes the no-op "finish" state to signify successful setup
 	rootfsCreationStates = append(rootfsCreationStates, imageCreationStates...)
+
+	// only run makeDisk if there is an artifact to make
+	if classicStateMachine.ImageDef.Artifacts.Img != nil {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"make_disk", (*StateMachine).makeDisk})
+	}
+
+	// only run generatePackageManifest if there is a manifest in the image definition
+	if classicStateMachine.ImageDef.Artifacts.Manifest != nil {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"generate_manifest", (*StateMachine).generatePackageManifest})
+	}
+
+	// add the no-op "finish" state
+	rootfsCreationStates = append(rootfsCreationStates,
+		stateFunc{"finish", (*StateMachine).finish})
 
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	stateMachine.states = append(stateMachine.states, rootfsCreationStates...)
@@ -488,6 +511,35 @@ func (stateMachine *StateMachine) installPackages() error {
 		}
 	}
 
+	return nil
+}
+
+// Verify artifact names have volumes listed for multi-volume gadgets and set
+// the volume names in the struct
+func (stateMachine *StateMachine) verifyArtifactNames() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	stateMachine.VolumeNames = make(map[string]string)
+
+	if len(stateMachine.GadgetInfo.Volumes) > 1 {
+		// dereferencing is safe because this state only runs when Img is non-nil
+		for _, img := range *classicStateMachine.ImageDef.Artifacts.Img {
+			if img.ImgVolume == "" {
+				return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
+			}
+			stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
+		}
+	} else {
+		img := (*classicStateMachine.ImageDef.Artifacts.Img)[0]
+		if img.ImgVolume == "" {
+			// there is only one volume, so get it from the map
+			volName := reflect.ValueOf(stateMachine.GadgetInfo.Volumes).MapKeys()[0].String()
+			stateMachine.VolumeNames[volName] = img.ImgName
+		} else {
+			stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
+		}
+	}
 	return nil
 }
 
@@ -830,9 +882,12 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 
 // Generate the manifest
 func (stateMachine *StateMachine) generatePackageManifest() error {
-	// This is basically just a wrapper around dpkg-query
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
+	// This is basically just a wrapper around dpkg-query
+	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
+		classicStateMachine.ImageDef.Artifacts.Manifest.ManifestName)
 	cmd := execCommand("sudo", "chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
 	manifest, err := os.Create(outputPath)
 	if err != nil {
