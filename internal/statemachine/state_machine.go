@@ -26,6 +26,8 @@ import (
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
 	"github.com/xeipuuv/gojsonschema"
+
+	"gopkg.in/yaml.v2"
 )
 
 // define some functions that can be mocked by test cases
@@ -58,7 +60,9 @@ var seedOpen = seed.Open
 var imagePrepare = image.Prepare
 var httpGet = http.Get
 var jsonUnmarshal = json.Unmarshal
+var yamlMarshal = yaml.Marshal
 var gojsonschemaValidate = gojsonschema.Validate
+var filepathRel = filepath.Rel
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 
@@ -240,6 +244,36 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				if structure.Label == "" {
 					structure.Label = "ubuntu-seed"
 					volume.Structure[ii] = structure
+				}
+			}
+
+			// make sure there are no "../" paths in the structure's contents
+			for _, content := range structure.Content {
+				if strings.Contains(content.UnresolvedSource, "../") {
+					return fmt.Errorf("filesystem content source \"%s\" contains \"../\". "+
+						"This is disallowed for security purposes",
+						content.UnresolvedSource)
+				}
+			}
+			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+				// handle special syntax of rootfs:/<file path> in
+				// structure content. This is needed to allow images
+				// such as raspberry pi to source their kernel and
+				// initrd from the staged rootfs later in the build
+				// process.
+				relativeRootfsPath, err := filepathRel(
+					filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
+					stateMachine.tempDirs.rootfs,
+				)
+				if err != nil {
+					return fmt.Errorf("Error creating relative path from unpack/gadget to rootfs: \"%s\"", err.Error())
+				}
+				for jj, content := range structure.Content {
+					content.UnresolvedSource = strings.ReplaceAll(content.UnresolvedSource,
+						"rootfs:",
+						relativeRootfsPath,
+					)
+					volume.Structure[ii].Content[jj] = content
 				}
 			}
 

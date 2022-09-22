@@ -101,30 +101,6 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 	return nil
 }
 
-// Run hooks specified by --hooks-directory after populating rootfs contents
-func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
-	if stateMachine.IsSeeded {
-		if stateMachine.commonFlags.Debug || stateMachine.commonFlags.Verbose {
-			fmt.Println("Building from a seeded gadget - " +
-				"skipping the post-populate-rootfs hook execution: unsupported")
-		}
-		return nil
-	}
-
-	if len(stateMachine.commonFlags.HooksDirectories) == 0 {
-		// no hooks, move on
-		return nil
-	}
-
-	err := stateMachine.runHooks("post-populate-rootfs",
-		"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // If --disk-info was used, copy the provided file to the correct location
 func (stateMachine *StateMachine) generateDiskInfo() error {
 	if stateMachine.commonFlags.DiskInfo != "" {

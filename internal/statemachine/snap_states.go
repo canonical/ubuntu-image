@@ -42,7 +42,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 	if snapStateMachine.Opts.FactoryImage {
 		customizations.BootFlags = append(customizations.BootFlags, "factory")
 	}
-	customizations.CloudInitUserData = stateMachine.commonFlags.CloudInit
+	customizations.CloudInitUserData = snapStateMachine.Opts.CloudInit
 	customizations.Validation = stateMachine.commonFlags.Validation
 	imageOpts.Customizations = customizations
 

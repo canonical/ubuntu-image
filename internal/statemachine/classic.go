@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 // classicStates are the names and function variables to be executed by the state machine for classic images
@@ -17,7 +18,6 @@ var rootfsSeedStates = []stateFunc{
 }
 
 var imageCreationStates = []stateFunc{
-	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
 	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
@@ -26,7 +26,7 @@ var imageCreationStates = []stateFunc{
 // ClassicStateMachine embeds StateMachine and adds the command line flags specific to classic images
 type ClassicStateMachine struct {
 	StateMachine
-	ImageDef ImageDefinition
+	ImageDef imagedefinition.ImageDefinition
 	Opts     commands.ClassicOpts
 	Args     commands.ClassicArgs
 	Packages []string

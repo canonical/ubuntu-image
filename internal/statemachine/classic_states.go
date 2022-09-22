@@ -15,10 +15,9 @@ import (
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
-	"github.com/snapcore/snapd/osutil"
-	//"github.com/snapcore/snapd/progress"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -32,7 +31,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
 	// Open and decode the yaml file
-	var imageDefinition ImageDefinition
+	var imageDefinition imagedefinition.ImageDefinition
 	imageFile, err := os.Open(classicStateMachine.Args.ImageDefinition)
 	if err != nil {
 		return fmt.Errorf("Error opening image definition file: %s", err.Error())
@@ -58,7 +57,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	var jsonReflector jsonschema.Reflector
 
 	// 1. parse the ImageDefinition struct into a schema using the jsonschema tags
-	schema := jsonReflector.Reflect(&ImageDefinition{})
+	schema := jsonReflector.Reflect(&imagedefinition.ImageDefinition{})
 
 	// 2. load the schema and parsed YAML data into types understood by gojsonschema
 	schemaLoader := gojsonschema.NewGoLoader(schema)
@@ -78,7 +77,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 			"value": imageDefinition.Gadget.GadgetType,
 		}
 		result.AddError(
-			newMissingURLError(
+			imagedefinition.NewMissingURLError(
 				gojsonschema.NewJsonContext("missingURL", jsonContext),
 				52,
 				errDetail,
@@ -96,7 +95,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 					"ppaName": ppa.PPAName,
 				}
 				result.AddError(
-					newInvalidPPAError(
+					imagedefinition.NewInvalidPPAError(
 						gojsonschema.NewJsonContext("missingPrivatePPAFingerprint",
 							jsonContext),
 						52,
@@ -119,7 +118,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 							"value": copy.Dest,
 						}
 						result.AddError(
-							newPathNotAbsoluteError(
+							imagedefinition.NewPathNotAbsoluteError(
 								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
 									jsonContext),
 								52,
@@ -140,7 +139,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 							"value": touch.TouchPath,
 						}
 						result.AddError(
-							newPathNotAbsoluteError(
+							imagedefinition.NewPathNotAbsoluteError(
 								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
 									jsonContext),
 								52,
@@ -254,6 +253,13 @@ func (stateMachine *StateMachine) calculateStates() error {
 	// The rootfs is laid out in a staging area, now populate it in the correct location
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents})
+
+	// if the --disk-info flag was used on the command line place it in the correct
+	// location in the rootfs
+	if stateMachine.commonFlags.DiskInfo != "" {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo})
+	}
 
 	// Add the "always there" states that populate partitions, build the disk, etc.
 	// This includes the no-op "finish" state to signify successful setup
@@ -396,7 +402,7 @@ func (stateMachine *StateMachine) createChroot() error {
 	}
 
 	// add any extra apt sources to /etc/apt/sources.list
-	aptSources := classicStateMachine.ImageDef.generatePocketList()
+	aptSources := classicStateMachine.ImageDef.GeneratePocketList()
 
 	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
 	sourcesListFile, _ := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
@@ -601,8 +607,72 @@ func (stateMachine *StateMachine) germinate() error {
 
 // Customize Cloud init with the values in the image definition YAML
 func (stateMachine *StateMachine) customizeCloudInit() error {
-	// currently a no-op pending implementation of the classic image redesign
-	return nil
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	cloudInitCustomization := classicStateMachine.ImageDef.Customization.CloudInit
+
+	seedPath := path.Join(classicStateMachine.tempDirs.chroot, "var/lib/cloud/seed/nocloud")
+	err := osMkdirAll(seedPath, 0755)
+	if err != nil {
+		return err
+	}
+
+	if cloudInitCustomization.MetaData != "" {
+		metaDataFile, err := osCreate(path.Join(seedPath, "meta-data"))
+		if err != nil {
+			return err
+		}
+		defer metaDataFile.Close()
+
+		_, err = metaDataFile.WriteString(cloudInitCustomization.MetaData)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.UserData != nil {
+		userDataFile, err := osCreate(path.Join(seedPath, "user-data"))
+		if err != nil {
+			return err
+		}
+		defer userDataFile.Close()
+
+		userDataBytes, err := yamlMarshal(cloudInitCustomization.UserData)
+		if err != nil {
+			return err
+		}
+
+		_, err = userDataFile.Write(userDataBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cloudInitCustomization.NetworkConfig != "" {
+		networkConfigFile, err := osCreate(path.Join(seedPath, "network-config"))
+		if err != nil {
+			return err
+		}
+		defer networkConfigFile.Close()
+
+		_, err = networkConfigFile.WriteString(cloudInitCustomization.NetworkConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	datasourceConfig := "# to update this file, run dpkg-reconfigure cloud-init\ndatasource_list: [ NoCloud ]\n"
+
+	dpkgConfigPath := path.Join(classicStateMachine.tempDirs.chroot, "etc/cloud/cloud.cfg.d/90_dpkg.cfg")
+	dpkgConfigFile, err := osCreate(dpkgConfigPath)
+	if err != nil {
+		return err
+	}
+	defer dpkgConfigFile.Close()
+
+	_, err = dpkgConfigFile.WriteString(datasourceConfig)
+
+	return err
 }
 
 // Configure Extra PPAs
@@ -708,6 +778,9 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	if err != nil {
 		return err
 	}
+	if stateMachine.commonFlags.Channel != "" {
+		imageOpts.Channel = stateMachine.commonFlags.Channel
+	}
 
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
@@ -804,30 +877,6 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 			}
 		}
 	}
-
-	if classicStateMachine.commonFlags.CloudInit != "" {
-		seedDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "var", "lib", "cloud", "seed")
-		cloudDir := filepath.Join(seedDir, "nocloud-net")
-		err := osMkdirAll(cloudDir, 0756)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating cloud-init dir: %s", err.Error())
-		}
-		metadataFile := filepath.Join(cloudDir, "meta-data")
-		metadataIO, err := osOpenFile(metadataFile, os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return fmt.Errorf("Error opening cloud-init meta-data file: %s", err.Error())
-		}
-		metadataIO.Write([]byte("instance-id: nocloud-static"))
-		metadataIO.Close()
-
-		userdataFile := filepath.Join(cloudDir, "user-data")
-		err = osutilCopyFile(classicStateMachine.commonFlags.CloudInit,
-			userdataFile, osutil.CopyFlagDefault)
-		if err != nil {
-			return fmt.Errorf("Error copying cloud-init: %s", err.Error())
-		}
-	}
-
 	return nil
 }
 
