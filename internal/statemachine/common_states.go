@@ -236,7 +236,8 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 		// with a mountedFilesystemWriter
 		layoutConstraints := gadget.LayoutConstraints{}
 		layoutOptions := &gadget.LayoutOptions{
-			SkipResolveContent: true,
+			SkipResolveContent: false,
+			IgnoreContent:      false,
 			GadgetRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
 			KernelRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
 		}
