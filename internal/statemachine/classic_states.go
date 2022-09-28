@@ -392,7 +392,6 @@ func (stateMachine *StateMachine) createChroot() error {
 	if err := osMkdir(stateMachine.tempDirs.chroot, 0755); err != nil {
 		return fmt.Errorf("Failed to create chroot directory: %s", err.Error())
 	}
-	classicStateMachine.RootfsSrc = stateMachine.tempDirs.chroot
 
 	debootstrapCmd := generateDebootstrapCmd(classicStateMachine.ImageDef,
 		stateMachine.tempDirs.chroot,
@@ -559,14 +558,17 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	classicStateMachine.RootfsSrc = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "tarball")
-	if err := osMkdir(classicStateMachine.RootfsSrc, 0755); err != nil {
+	// make the chroot directory to which we will extract the tar
+	if err := osMkdir(stateMachine.tempDirs.chroot, 0755); err != nil {
 		return fmt.Errorf("Failed to create chroot directory: %s", err.Error())
 	}
 
-	return helper.ExtractTarArchive(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL,
-		classicStateMachine.RootfsSrc)
-
+	tarURL, err := url.Parse(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL)
+	if err != nil {
+		return fmt.Errorf("Failed to parse rootfs tar URL \"%s\": \"%s\"",
+			classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL, err.Error())
+	}
+	return helper.ExtractTarArchive(tarURL.Path, stateMachine.tempDirs.chroot)
 }
 
 // germinate runs the germinate binary and parses the output to create
@@ -858,13 +860,13 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	files, err := ioutilReadDir(classicStateMachine.RootfsSrc)
+	files, err := ioutilReadDir(stateMachine.tempDirs.chroot)
 	if err != nil {
 		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
 	}
 
 	for _, srcFile := range files {
-		srcFile := filepath.Join(classicStateMachine.RootfsSrc, srcFile.Name())
+		srcFile := filepath.Join(stateMachine.tempDirs.chroot, srcFile.Name())
 		if err := osutilCopySpecialFile(srcFile, classicStateMachine.tempDirs.rootfs); err != nil {
 			return fmt.Errorf("Error copying rootfs: %s", err.Error())
 		}

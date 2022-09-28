@@ -31,7 +31,6 @@ type ClassicStateMachine struct {
 	Args      commands.ClassicArgs
 	Packages  []string
 	Snaps     []string
-	RootfsSrc string
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run()
