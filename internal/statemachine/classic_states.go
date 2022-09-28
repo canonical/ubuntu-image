@@ -388,6 +388,7 @@ func (stateMachine *StateMachine) createChroot() error {
 	if err := osMkdir(stateMachine.tempDirs.chroot, 0755); err != nil {
 		return fmt.Errorf("Failed to create chroot directory: %s", err.Error())
 	}
+	classicStateMachine.RootfsSrc = stateMachine.tempDirs.chroot
 
 	debootstrapCmd := generateDebootstrapCmd(classicStateMachine.ImageDef,
 		stateMachine.tempDirs.chroot,
@@ -551,8 +552,17 @@ func (stateMachine *StateMachine) buildRootfsFromTasks() error {
 
 // Extract the rootfs from a tar archive
 func (stateMachine *StateMachine) extractRootfsTar() error {
-	// currently a no-op pending implementation of the classic image redesign
-	return nil
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	classicStateMachine.RootfsSrc = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "tarball")
+	if err := osMkdir(classicStateMachine.RootfsSrc, 0755); err != nil {
+		return fmt.Errorf("Failed to create chroot directory: %s", err.Error())
+	}
+
+	return helper.ExtractTarArchive(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL,
+		classicStateMachine.RootfsSrc)
+
 }
 
 // germinate runs the germinate binary and parses the output to create
@@ -844,15 +854,13 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
-	src := stateMachine.tempDirs.chroot
-
-	files, err := ioutilReadDir(src)
+	files, err := ioutilReadDir(classicStateMachine.RootfsSrc)
 	if err != nil {
 		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
 	}
 
 	for _, srcFile := range files {
-		srcFile := filepath.Join(src, srcFile.Name())
+		srcFile := filepath.Join(classicStateMachine.RootfsSrc, srcFile.Name())
 		if err := osutilCopySpecialFile(srcFile, classicStateMachine.tempDirs.rootfs); err != nil {
 			return fmt.Errorf("Error copying rootfs: %s", err.Error())
 		}

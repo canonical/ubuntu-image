@@ -1,11 +1,15 @@
 package helper
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -273,4 +277,92 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 		return 0
 	}
 	return orig - subtract
+}
+
+// ExtractTarArchive extracts all the files from a tar. Currently supported are
+// uncompressed tar archives or gzip compressed tar archives
+func ExtractTarArchive(src, dest string) error {
+	// first check if the archive is gzip compressed
+	tarFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("Error opening tar file: \"%s\"", err.Error())
+	}
+	defer tarFile.Close()
+	tarBuff := make([]byte, 512)
+
+	_, err = tarFile.Read(tarBuff)
+	if err != nil {
+		return fmt.Errorf("Error reading tar file: \"%s\"", err.Error())
+	}
+
+	var tarReader *tar.Reader
+	fileType := http.DetectContentType(tarBuff)
+	switch fileType {
+	case "application/x-gzip":
+		// decompress the archive
+		gzipReader, err := gzip.NewReader(tarFile)
+		if err != nil {
+			return fmt.Errorf("Error reading gzip file: \"%s\"", err.Error())
+		}
+		defer gzipReader.Close()
+		tarReader = tar.NewReader(gzipReader)
+		break
+	case "application/x-tar":
+		// the archive is not compressed, so simply extract it
+		tarReader = tar.NewReader(tarFile)
+		break
+	default:
+		return fmt.Errorf("unsupported tar archive type: \"%s\"", fileType)
+	}
+
+	for {
+		header, err := tarReader.Next()
+
+		switch {
+
+		// if no more files are found return
+		case err == io.EOF:
+			return nil
+
+		// return any other error
+		case err != nil:
+			return err
+
+		// if the header is nil, just skip it (not sure how this happens)
+		case header == nil:
+			continue
+		}
+
+		// the target location where the dir/file should be created
+		target := filepath.Join(dest, header.Name)
+
+		// check the file type
+		switch header.Typeflag {
+
+		// if its a dir and it doesn't exist create it
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+			}
+
+		// if it's a file create it
+		case tar.TypeReg:
+			destFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+
+			// copy over contents
+			if _, err := io.Copy(destFile, tarReader); err != nil {
+				return err
+			}
+
+			// make sure to close the file
+			destFile.Close()
+		}
+	}
+
+	return nil
 }

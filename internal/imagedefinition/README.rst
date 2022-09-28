@@ -106,7 +106,8 @@ The following specification defines what is supported in the YAML:
              # from a git or bzr source.
              branch: <string> (optional)
          # Used for pre-built root filesystems rather than germinating
-         # from a seed or using a list of archive-tasks.
+         # from a seed or using a list of archive-tasks. Must be either
+         # an uncompressed tar archive or a gzip compressed tar archive.
          tarball: (exactly 1 of archive-tasks, seed or tarball must be specified)
              # The path to the tarball. Can be a local path or an URL.
              url: <string> (required if tarball dict is specified)
