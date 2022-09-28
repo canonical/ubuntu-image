@@ -10,6 +10,7 @@ ubuntu-image (2.2+22.04ubuntu4) UNRELEASED; urgency=medium
     --image-size (LP: #1981744)
   * Create filesystems with content when the content was created by
     ubuntu-image (LP: #1981720)
+  * Update to latest snapd volume layout API (LP: #1990979)
 
  -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Wed, 08 Jun 2022 10:25:57 -0500
 
