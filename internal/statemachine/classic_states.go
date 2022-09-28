@@ -563,11 +563,26 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 		return fmt.Errorf("Failed to create chroot directory: %s", err.Error())
 	}
 
+	// convert the URL to a file path
 	tarURL, err := url.Parse(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL)
 	if err != nil {
 		return fmt.Errorf("Failed to parse rootfs tar URL \"%s\": \"%s\"",
 			classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL, err.Error())
 	}
+	// if the sha256 sum of the tarball is provided, make sure it matches
+	if classicStateMachine.ImageDef.Rootfs.Tarball.SHA256sum != "" {
+		tarSHA256, err := helper.CalculateSHA256(tarURL.Path)
+		if err != nil {
+			return err
+		}
+		if tarSHA256 != classicStateMachine.ImageDef.Rootfs.Tarball.SHA256sum {
+			return fmt.Errorf("Calculated SHA256 sum of rootfs tarball \"%s\" does not match "+
+				"the expected value specified in the image definition: \"%s\"",
+				tarSHA256, classicStateMachine.ImageDef.Rootfs.Tarball.SHA256sum)
+		}
+	}
+
+	// now extract the archive
 	return helper.ExtractTarArchive(tarURL.Path, stateMachine.tempDirs.chroot)
 }
 

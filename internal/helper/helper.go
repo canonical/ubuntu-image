@@ -4,8 +4,10 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -283,33 +285,31 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 // uncompressed tar archives or gzip compressed tar archives
 func ExtractTarArchive(src, dest string) error {
 	// first check if the archive is gzip compressed
-	tarFile, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("Error opening tar file: \"%s\"", err.Error())
-	}
-	defer tarFile.Close()
-	tarBuff := make([]byte, 512)
-
-	_, err = tarFile.Read(tarBuff)
+	tarBytes, err := ioutil.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("Error reading tar file: \"%s\"", err.Error())
 	}
 
+	tarBuff := bytes.NewReader(tarBytes)
+
 	var tarReader *tar.Reader
-	fileType := http.DetectContentType(tarBuff)
+	fileType := http.DetectContentType(tarBytes[0:511]) // only use the first 512 bytes to check the content type
 	switch fileType {
 	case "application/x-gzip":
 		// decompress the archive
-		gzipReader, err := gzip.NewReader(tarFile)
+		if err != nil {
+			return fmt.Errorf("Error opening gzip file: \"%s\"", err.Error())
+		}
+		gzipReader, err := gzip.NewReader(tarBuff)
 		if err != nil {
 			return fmt.Errorf("Error reading gzip file: \"%s\"", err.Error())
 		}
 		defer gzipReader.Close()
 		tarReader = tar.NewReader(gzipReader)
 		break
-	case "application/x-tar":
+	case "application/x-tar", "application/octet-stream":
 		// the archive is not compressed, so simply extract it
-		tarReader = tar.NewReader(tarFile)
+		tarReader = tar.NewReader(tarBuff)
 		break
 	default:
 		return fmt.Errorf("unsupported tar archive type: \"%s\"", fileType)
@@ -347,8 +347,8 @@ func ExtractTarArchive(src, dest string) error {
 				}
 			}
 
-		// if it's a file create it
-		case tar.TypeReg:
+		// if it's a file or link create it
+		case tar.TypeReg, tar.TypeSymlink, tar.TypeLink:
 			destFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
@@ -365,4 +365,21 @@ func ExtractTarArchive(src, dest string) error {
 	}
 
 	return nil
+}
+
+// CalculateSHA256 calculates the SHA256 sum of the file provided as an argument
+func CalculateSHA256(fileName string) (string, error) {
+	f, err := os.Open(fileName)
+	if err != nil {
+		return "", fmt.Errorf("Error opening file \"%s\" to calculate SHA256 sum: \"%s\"", fileName, err.Error())
+	}
+	defer f.Close()
+
+	hasher := sha256.New()
+	_, err = io.Copy(hasher, f)
+	if err != nil {
+		return "", fmt.Errorf("Error calculating SHA256 sum of file \"%s\": \"%s\"", fileName, err.Error())
+	}
+
+	return string(hasher.Sum(nil)), nil
 }

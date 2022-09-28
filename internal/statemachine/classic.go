@@ -26,11 +26,11 @@ var imageCreationStates = []stateFunc{
 // ClassicStateMachine embeds StateMachine and adds the command line flags specific to classic images
 type ClassicStateMachine struct {
 	StateMachine
-	ImageDef  imagedefinition.ImageDefinition
-	Opts      commands.ClassicOpts
-	Args      commands.ClassicArgs
-	Packages  []string
-	Snaps     []string
+	ImageDef imagedefinition.ImageDefinition
+	Opts     commands.ClassicOpts
+	Args     commands.ClassicArgs
+	Packages []string
+	Snaps    []string
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run()
