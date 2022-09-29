@@ -66,9 +66,9 @@ type Seed struct {
 // Tarball defines the tarball section of rootfs, which is used
 // to create images from a pre-built rootfs
 type Tarball struct {
-	TarballURL string `yaml:"url"       json:"TarballURL"    jsonschema:"type=string,format=uri"`
-	GPG        string `yaml:"gpg"       json:"GPG,omitempty" jsonschema:"type=string,format=uri"`
-	SHA256sum  string `yaml:"sha256sum" json:"SHA256sum,omitempty"`
+	TarballURL string `yaml:"url"       json:"TarballURL"          jsonschema:"type=string,format=uri"`
+	GPG        string `yaml:"gpg"       json:"GPG,omitempty"       jsonschema:"type=string,format=uri"`
+	SHA256sum  string `yaml:"sha256sum" json:"SHA256sum,omitempty" jsonschema:"minLength=64,maxLength=64"`
 }
 
 // Customization defines the customization section of the image definition file

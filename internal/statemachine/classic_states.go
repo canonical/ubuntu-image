@@ -564,11 +564,10 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	}
 
 	// convert the URL to a file path
-	tarURL, err := url.Parse(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL)
-	if err != nil {
-		return fmt.Errorf("Failed to parse rootfs tar URL \"%s\": \"%s\"",
-			classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL, err.Error())
-	}
+	// no need to check error here as the validity of the URL
+	// has been confirmed by the schema validation
+	tarURL, _ := url.Parse(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL)
+
 	// if the sha256 sum of the tarball is provided, make sure it matches
 	if classicStateMachine.ImageDef.Rootfs.Tarball.SHA256sum != "" {
 		tarSHA256, err := helper.CalculateSHA256(tarURL.Path)
