@@ -590,22 +590,99 @@ func TestBuildRootfsFromTasks(t *testing.T) {
 }
 
 // TestExtractRootfsTar unit tests the extractRootfsTar function
-/*func TestExtractRootfsTar(t *testing.T) {
-	t.Run("test_extract_rootfs_tar", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+func TestExtractRootfsTar(t *testing.T) {
+	testCases := []struct {
+		name          string
+		rootfsTar     string
+		expectedFiles []string
+	}{
+		{
+			"vanilla_tar",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"),
+			[]string{
+				"test_tar1",
+				"test_tar2",
+			},
+		},
+		{
+			"zip",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.zip"),
+			[]string{
+				"test_tar_zip1",
+				"test_tar_zip2",
+			},
+		},
+		{
+			"gz",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.gz"),
+			[]string{
+				"test_tar_gz1",
+				"test_tar_gz2",
+			},
+		},
+		{
+			"xz",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.xz"),
+			[]string{
+				"test_tar_xz1",
+				"test_tar_xz2",
+			},
+		},
+		{
+			"bz2",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.bz2"),
+			[]string{
+				"test_tar_bz1",
+				"test_tar_bz2",
+			},
+		},
+		{
+			"zst",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.zst"),
+			[]string{
+				"test_tar_zstd1",
+				"test_tar_zstd2",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_extract_rootfs_tar_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			absTarPath, err := filepath.Abs(tc.rootfsTar)
+			asserter.AssertErrNil(err, true)
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Rootfs: &imagedefinition.Rootfs{
+					Tarball: &imagedefinition.Tarball {
+						TarballURL: fmt.Sprintf("file://%s", absTarPath),
+					},
+				},
+			}
 
-		err := stateMachine.extractRootfsTar()
-		asserter.AssertErrNil(err, true)
+			// need workdir set up for this
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}*/
+			err = stateMachine.extractRootfsTar()
+			asserter.AssertErrNil(err, true)
+
+			for _, testFile := range tc.expectedFiles {
+				_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, testFile))
+				if err != nil {
+					t.Errorf("File %s should be in chroot, but is missing", testFile)
+				}
+			}
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		})
+	}
+}
 
 // TestCustomizeCloudInit unit tests the customizeCloudInit function
 func TestCustomizeCloudInit(t *testing.T) {

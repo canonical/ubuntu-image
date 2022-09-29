@@ -2,13 +2,14 @@ package helper
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
+	"compress/bzip2"
 	"compress/gzip"
 	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +18,9 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/invopop/jsonschema"
+	"github.com/klauspost/compress/zstd"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/ulikunitz/xz"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -282,8 +285,18 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 }
 
 // ExtractTarArchive extracts all the files from a tar. Currently supported are
-// uncompressed tar archives or gzip compressed tar archives
+// uncompressed tar archives and the following compression types: zip, gzip, xz
+// bzip2, zstd
 func ExtractTarArchive(src, dest string) error {
+	// magic numbers are used to determine the compression type of
+	// the tar archive
+	magicNumbers := map[string][]byte{
+		"zip":   []byte{0x50, 0x4b, 0x03, 0x04},
+		"gzip":  []byte{0x1f, 0x8b, 0x08},
+		"xz":    []byte{0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00},
+		"bzip2": []byte{0x42, 0x5a, 0x68},
+		"zstd":  []byte{0x28, 0xb5, 0x2f, 0xfd},
+	}
 	// first check if the archive is gzip compressed
 	tarBytes, err := ioutil.ReadFile(src)
 	if err != nil {
@@ -293,13 +306,36 @@ func ExtractTarArchive(src, dest string) error {
 	tarBuff := bytes.NewReader(tarBytes)
 
 	var tarReader *tar.Reader
-	fileType := http.DetectContentType(tarBytes[0:511]) // only use the first 512 bytes to check the content type
-	switch fileType {
-	case "application/x-gzip":
-		// decompress the archive
-		if err != nil {
-			return fmt.Errorf("Error opening gzip file: \"%s\"", err.Error())
+	found := false
+	var fileType string
+	for compressionType, magicNumber := range magicNumbers {
+		if bytes.HasPrefix(tarBytes, magicNumber) {
+			found = true
+			fileType = compressionType
 		}
+	}
+	if !found {
+		// if it didn't have one of the listed magic numbers, assume it's a tar
+		// archive. This will throw an error later in the function if it is not
+		// a valid tar archive
+		fileType = "tar"
+	}
+	switch fileType {
+	case "zip":
+		zipReader, err := zip.NewReader(tarBuff, int64(len(tarBytes)))
+		if err != nil {
+			return fmt.Errorf("Error reading zip file: \"%s\"", err.Error())
+		}
+		if len(zipReader.File) > 1 {
+			return fmt.Errorf("Invalid zip file. Zip must contain exactly one tar file")
+		}
+		zipContents, err := zipReader.File[0].Open()
+		if err != nil {
+			return fmt.Errorf("Error reading contents of zip file: \"%s\"", err.Error())
+		}
+		tarReader = tar.NewReader(zipContents)
+		break
+	case "gzip":
 		gzipReader, err := gzip.NewReader(tarBuff)
 		if err != nil {
 			return fmt.Errorf("Error reading gzip file: \"%s\"", err.Error())
@@ -307,12 +343,29 @@ func ExtractTarArchive(src, dest string) error {
 		defer gzipReader.Close()
 		tarReader = tar.NewReader(gzipReader)
 		break
-	case "application/x-tar", "application/octet-stream":
+	case "xz":
+		xzReader, err := xz.NewReader(tarBuff)
+		if err != nil {
+			return fmt.Errorf("Error reading xz file: \"%s\"", err.Error())
+		}
+		tarReader = tar.NewReader(xzReader)
+		break
+	case "bzip2":
+		bzipReader := bzip2.NewReader(tarBuff)
+		tarReader = tar.NewReader(bzipReader)
+		break
+	case "zstd":
+		zstdReader, err := zstd.NewReader(tarBuff)
+		if err != nil {
+			return fmt.Errorf("Error reading zstd file: \"%s\"", err.Error())
+		}
+		defer zstdReader.Close()
+		tarReader = tar.NewReader(zstdReader)
+		break
+	case "tar":
 		// the archive is not compressed, so simply extract it
 		tarReader = tar.NewReader(tarBuff)
 		break
-	default:
-		return fmt.Errorf("unsupported tar archive type: \"%s\"", fileType)
 	}
 
 	for {
