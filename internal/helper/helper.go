@@ -416,8 +416,6 @@ func ExtractTarArchive(src, dest string) error {
 			destFile.Close()
 		}
 	}
-
-	return nil
 }
 
 // CalculateSHA256 calculates the SHA256 sum of the file provided as an argument
