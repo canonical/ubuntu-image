@@ -612,25 +612,23 @@ func TestCustomizeCloudInit(t *testing.T) {
 		{
 			MetaData:      "foo: bar",
 			NetworkConfig: "foobar: foobar",
-			UserData: &[]imagedefinition.UserData{
-				{UserName: "ubuntu", UserPassword: "ubuntu"},
-				{UserName: "john", UserPassword: "password"},
-			},
+			UserData:      "bar: baz",
 		},
 		{
 			MetaData:      "foo: bar",
 			NetworkConfig: "foobar: foobar",
-			UserData:      nil,
+			UserData:      "",
 		},
 		{
 			NetworkConfig: "foobar: foobar",
-			UserData:      &[]imagedefinition.UserData{},
+			UserData:      "",
 		},
 		{
-			UserData: &[]imagedefinition.UserData{
-				{UserName: "ubuntu", UserPassword: "ubuntu"},
-				{UserName: "john", UserPassword: "password"},
-			},
+			UserData: `chpasswd:
+  expire: true
+  list:
+    - ubuntu:ubuntu
+`,
 		},
 	}
 
@@ -693,20 +691,14 @@ func TestCustomizeCloudInit(t *testing.T) {
 			}
 
 			userDataFile, err := os.Open(path.Join(seedPath, "user-data"))
-			if cloudInitConfig.UserData != nil {
+			if cloudInitConfig.UserData != "" {
 				asserter.AssertErrNil(err, false)
 
 				userDataFileContent, err := ioutil.ReadAll(userDataFile)
 				asserter.AssertErrNil(err, false)
 
-				userDataOut := make([]imagedefinition.UserData, 0)
-				err = yaml.Unmarshal(userDataFileContent, &userDataOut)
-				asserter.AssertErrNil(err, false)
-
-				for i, user := range *cloudInitConfig.UserData {
-					if user != userDataOut[i] {
-						t.Errorf("expected user %#v got %#v", user, userDataOut[i])
-					}
+				if string(userDataFileContent[:]) != cloudInitConfig.UserData {
+					t.Errorf("un-expected user-data content found: expected:\n%v\ngot:%v", cloudInitConfig.UserData, string(userDataFileContent[:]))
 				}
 			} else {
 				asserter.AssertErrContains(err, "no such file or directory")
@@ -737,10 +729,11 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 		CloudInit: &imagedefinition.CloudInit{
 			MetaData:      "foo: bar",
 			NetworkConfig: "foobar: foobar",
-			UserData: &[]imagedefinition.UserData{
-				{UserName: "ubuntu", UserPassword: "ubuntu"},
-				{UserName: "john", UserPassword: "password"},
-			},
+			UserData: `chpasswd:
+  expire: true
+  list:
+    - ubuntu:ubuntu
+`,
 		},
 	}
 

@@ -483,6 +483,12 @@ func (stateMachine *StateMachine) installPackages() error {
 		}
 	}
 
+	// Make sure to install the extra kernel if it is specified
+	if classicStateMachine.ImageDef.Kernel != "" {
+		classicStateMachine.Packages = append(classicStateMachine.Packages,
+			classicStateMachine.ImageDef.Kernel)
+	}
+
 	// Slice used to store all the commands that need to be run
 	// to install the packages
 	var installPackagesCmds []*exec.Cmd
@@ -630,19 +636,14 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 		}
 	}
 
-	if cloudInitCustomization.UserData != nil {
+	if cloudInitCustomization.UserData != "" {
 		userDataFile, err := osCreate(path.Join(seedPath, "user-data"))
 		if err != nil {
 			return err
 		}
 		defer userDataFile.Close()
 
-		userDataBytes, err := yamlMarshal(cloudInitCustomization.UserData)
-		if err != nil {
-			return err
-		}
-
-		_, err = userDataFile.Write(userDataBytes)
+		_, err = userDataFile.WriteString(cloudInitCustomization.UserData)
 		if err != nil {
 			return err
 		}

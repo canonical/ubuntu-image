@@ -4,8 +4,7 @@ revision: 2
 architecture: arm64
 series: jammy
 class: preinstalled
-kernel:
-  name: linux-raspi
+kernel: linux-raspi
 gadget:
   url: "https://github.com/snapcore/pi-gadget.git"
   branch: classic
@@ -27,7 +26,7 @@ rootfs:
     - desktop-raspi
 customization:
   cloud-init:
-    user-data:
+    user-data: |
       -
         name: ubuntu
         password: ubuntu
