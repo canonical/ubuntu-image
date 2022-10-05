@@ -4,8 +4,7 @@ revision: 2
 architecture: arm64
 series: kinetic
 class: preinstalled
-kernel:
-  name: linux-image-raspi
+kernel: linux-image-raspi
 gadget:
   url: "https://github.com/jawn-smith/pi-gadget.git"
   branch: "classic"
@@ -38,10 +37,13 @@ customization:
     -
       name: "jawn-smith/devel-proposed"
   cloud-init:
-    user-data:
-      -
-        name: ubuntu
-        password: ubuntu
+    user-data: |
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
   extra-packages:
     - name: ubuntu-minimal
     - name: linux-firmware-raspi
