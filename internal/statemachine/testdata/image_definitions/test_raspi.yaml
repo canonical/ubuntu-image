@@ -7,7 +7,7 @@ class: preinstalled
 kernel: linux-image-raspi
 gadget:
   url: "https://github.com/jawn-smith/pi-gadget.git"
-  branch: "classic"
+  branch: "classic-redesign"
   type: "git"
 #model-assertion: pi-generic.model
 rootfs:
@@ -33,17 +33,6 @@ rootfs:
       - cloud-image
       - server-raspi
 customization:
-  extra-ppas:
-    -
-      name: "jawn-smith/devel-proposed"
-  cloud-init:
-    user-data: |
-      chpasswd:
-        expire: true
-        users:
-          - name: ubuntu
-            password: ubuntu
-            type: text
   extra-packages:
     - name: ubuntu-minimal
     - name: linux-firmware-raspi
