@@ -49,7 +49,6 @@ customization:
   extra-snaps:
     - name: core
     - name: snapd
-    - name: linux-image-raspi
   fstab:
     -
       label: "writable"

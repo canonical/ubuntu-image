@@ -55,7 +55,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		shouldPass      bool
 		expectedError   string
 	}{
-		{"valid_image_definition", "test_valid.yaml", true, ""},
+		{"valid_image_definition", "test_raspi.yaml", true, ""},
 		{"invalid_class", "test_bad_class.yaml", false, "Class must be one of the following"},
 		{"invalid_url", "test_bad_url.yaml", false, "Does not match format 'uri'"},
 		{"invalid_ppa_name", "test_bad_ppa_name.yaml", false, "PPAName: Does not match pattern"},
@@ -105,7 +105,7 @@ func TestFailedParseImageDefinition(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
-			"test_valid.yaml")
+			"test_raspi.yaml")
 
 		// mock helper.SetDefaults
 		helperSetDefaults = mockSetDefaults
@@ -228,7 +228,7 @@ func TestPrintStates(t *testing.T) {
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.Debug = true
 		stateMachine.commonFlags.DiskInfo = "test" // for coverage!
-		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions", "test_valid.yaml")
+		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions", "test_raspi.yaml")
 		err := stateMachine.parseImageDefinition()
 		asserter.AssertErrNil(err, true)
 
@@ -1596,6 +1596,8 @@ func TestBuildGadgetTree(t *testing.T) {
 		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
 		sourcePath = "file://" + sourcePath
 		imageDef := imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  sourcePath,
 				GadgetType: "directory",
@@ -1609,6 +1611,8 @@ func TestBuildGadgetTree(t *testing.T) {
 
 		// test the git method
 		imageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
 				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
 				GadgetType:   "git",
@@ -1651,6 +1655,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 
 		// try to clone a repo that doesn't exist
 		imageDef := imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  "http://fakerepo.git",
 				GadgetType: "git",
@@ -1663,6 +1669,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 
 		// try to copy a file that doesn't exist
 		imageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  "file:///fake/file/that/does/not/exist",
 				GadgetType: "directory",
@@ -1683,6 +1691,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
 		sourcePath = "file://" + sourcePath
 		imageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
 				GadgetURL:  sourcePath,
 				GadgetType: "directory",
