@@ -27,9 +27,12 @@ rootfs:
 customization:
   cloud-init:
     user-data: |
-      -
-        name: ubuntu
-        password: ubuntu
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
   extra-packages:
     - name: ubuntu-minimal
     - name: linux-firmware-raspi

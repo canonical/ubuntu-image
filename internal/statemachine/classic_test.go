@@ -626,8 +626,10 @@ func TestCustomizeCloudInit(t *testing.T) {
 		{
 			UserData: `chpasswd:
   expire: true
-  list:
-    - ubuntu:ubuntu
+  users:
+    - name: ubuntu
+      password: ubuntu
+      type: text
 `,
 		},
 	}
@@ -731,8 +733,10 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 			NetworkConfig: "foobar: foobar",
 			UserData: `chpasswd:
   expire: true
-  list:
-    - ubuntu:ubuntu
+  users:
+    - name: ubuntu
+      password: ubuntu
+      type: text
 `,
 		},
 	}
