@@ -287,7 +287,7 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 // ExtractTarArchive extracts all the files from a tar. Currently supported are
 // uncompressed tar archives and the following compression types: zip, gzip, xz
 // bzip2, zstd
-func ExtractTarArchive(src, dest string) error {
+func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 	// magic numbers are used to determine the compression type of
 	// the tar archive
 	magicNumbers := map[string][]byte{
@@ -311,6 +311,9 @@ func ExtractTarArchive(src, dest string) error {
 	for compressionType, magicNumber := range magicNumbers {
 		if bytes.HasPrefix(tarBytes, magicNumber) {
 			found = true
+			if verbose || debug {
+				fmt.Printf("Detected tar compression type %s\n", compressionType)
+			}
 			fileType = compressionType
 		}
 	}
@@ -370,6 +373,9 @@ func ExtractTarArchive(src, dest string) error {
 
 	for {
 		header, err := tarReader.Next()
+		if debug {
+			fmt.Printf("Extracting file %s from tar\n", header.Name)
+		}
 
 		switch {
 

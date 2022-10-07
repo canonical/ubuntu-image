@@ -582,7 +582,8 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	}
 
 	// now extract the archive
-	return helper.ExtractTarArchive(tarURL.Path, stateMachine.tempDirs.chroot)
+	return helper.ExtractTarArchive(tarURL.Path, stateMachine.tempDirs.chroot,
+		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
 }
 
 // germinate runs the germinate binary and parses the output to create
