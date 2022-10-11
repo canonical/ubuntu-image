@@ -342,6 +342,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	makeCmd.Env = append(makeCmd.Env, []string{
 		fmt.Sprintf("ARCH=%s", classicStateMachine.ImageDef.Architecture),
 		fmt.Sprintf("SERIES=%s", classicStateMachine.ImageDef.Series),
+		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
 	}...)
 	makeCmd.Dir = sourceDir
 
