@@ -339,11 +339,13 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 
 	// now run "make" to build the gadget tree
 	makeCmd := execCommand("make")
+	// add ARCH and SERIES environment variables for making the gadget tree
 	makeCmd.Env = append(makeCmd.Env, []string{
 		fmt.Sprintf("ARCH=%s", classicStateMachine.ImageDef.Architecture),
 		fmt.Sprintf("SERIES=%s", classicStateMachine.ImageDef.Series),
-		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
 	}...)
+	// add the current ENV to the command
+	makeCmd.Env = append(makeCmd.Env, os.Environ()...)
 	makeCmd.Dir = sourceDir
 
 	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.Debug)
