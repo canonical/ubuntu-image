@@ -8,7 +8,7 @@ Generate a bootable disk image
 
 :Authors:
     Barry Warsaw <barry@ubuntu.com>,
-    Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>
+    Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>,
     William 'jawn-smith' Wilson <william.wilson@canonical.com>
 :Date: 2021-10-21
 :Copyright: 2016-2021 Canonical Ltd.
@@ -266,12 +266,26 @@ type are listed below
 Classic image steps
 -------------------
 
+State machines are dynamically created for classic image builds based on
+the contents of the image definition. The list of all possible states
+is as follows:
+
 #. make_temporary_directories
+#. parse_image_definition
+#. calculate_states
+#. build_gadget_tree
 #. prepare_gadget_tree
-#. run_live_build
 #. load_gadget_yaml
+#. create_chroot
+#. germinate
+#. add_extra_ppas
+#. install_packages
+#. verify_artifact_names
+#. customize_cloud_init
+#. customize_fstab
+#. manual_customization
+#. preseed_image
 #. populate_rootfs_contents
-#. populate_rootfs_contents_hooks
 #. generate_disk_info
 #. calculate_rootfs_size
 #. populate_bootfs_contents
