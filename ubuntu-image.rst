@@ -106,37 +106,10 @@ Classic command options
 These are the options for defining the contents of classic preinstalled Ubuntu
 images.  Can only be used when the ``ubuntu-image classic`` command is used.
 
-GADGET_TREE_URI
-    An URI to the gadget tree to be used to build the image.  This positional
-    argument must be given for this mode of operation.  Must be a local path.
-
--p PROJECT, --project PROJECT
-    Project name to be passed on to ``livecd-rootfs``. Mutually exclusive
-    with --filesystem
-
--f FILESYSTEM, --filesystem FILESYSTEM
-    Unpacked Ubuntu filesystem to be copied to the system partition.
-    Mutually exclusive with --project.
-
--s SUITE, --suite SUITE
-    Distribution name to be passed on to ``livecd-rootfs``.
-
--a CPU-ARCHITECTURE, --arch CPU-ARCHITECTURE
-    CPU architecture to be passed on to ``livecd-rootfs``.  Default value is
-    the architecture of the host.
-
---subproject SUBPROJECT
-    Sub-project name to be passed on ``livecd-rootfs``.
-
---subarch SUBARCH
-    Sub-architecture to be passed on to ``livecd-rootfs``.
-
---with-proposed
-    Defines if the image should be built with -proposed enabled.  This is
-    passed through to ``livecd-rootfs``.
-
---extra-ppas EXTRA_PPAS
-    Extra ppas to install. This is passed through to ``livecd-rootfs``.
+image_definition
+    Path to the image definition file. This file defines all of the
+    customization required when building your image. This positional
+    argument must be given for this mode of operation.
 
 
 Common options
@@ -365,3 +338,4 @@ FOOTNOTES
 .. _`gadget snap`: https://github.com/snapcore/snapd/wiki/Gadget-snap
 .. _`gadget tree`: Example: https://github.com/snapcore/pc-amd64-gadget
 .. _`gadget.yaml`: https://github.com/snapcore/snapd/wiki/Gadget-snap#gadget.yaml
+.. _`image_definition.yaml`: https://github.com/canonical/ubuntu-image/tree/main/internal/imagedefinition#readme
