@@ -40,5 +40,3 @@ type commonOptions struct {
 	CommonOptsPassed       CommonOpts
 	StateMachineOptsPassed StateMachineOpts
 }
-
-
