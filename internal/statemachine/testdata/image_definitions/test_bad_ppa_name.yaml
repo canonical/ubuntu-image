@@ -4,8 +4,7 @@ revision: 1
 architecture: amd64
 series: jammy
 class: preinstalled
-kernel:
-  name: linux
+kernel: linux-image-generic
 gadget:
   url: "https://github.com/snapcore/pc-amd64-gadget.git"
   branch: classic
@@ -27,14 +26,18 @@ rootfs:
       - cloud-image
 customization:
   cloud-init:
-    user-data:
-      -
-        name: ubuntu
-        password: ubuntu
+    user-data: |
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
   extra-ppas:
     -
       name: "testfailure"
       auth: "testfailure"
 artifacts:
   img:
-      path: pc-amd64.img
+    -
+      name: pc-amd64.img

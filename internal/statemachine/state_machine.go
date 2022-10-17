@@ -114,6 +114,9 @@ type StateMachine struct {
 	// image sizes for parsing the --image-size flags
 	ImageSizes  map[string]quantity.Size
 	VolumeOrder []string
+
+	// names of images for each volume
+	VolumeNames map[string]string
 }
 
 // SetCommonOpts stores the common options for all image types in the struct

@@ -4,8 +4,7 @@ revision: 2
 architecture: arm64
 series: jammy
 class: preinstalled
-kernel:
-  name: linux-raspi
+kernel: linux-raspi
 gadget:
   url: "https://github.com/snapcore/pi-gadget.git"
   branch: "classic"
@@ -27,10 +26,13 @@ rootfs:
       - ubuntu-server-raspi
 customization:
   cloud-init:
-    user-data:
-      -
-        name: ubuntu
-        password: ubuntu
+    user-data: |
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
   extra-packages:
     - name: ubuntu-minimal
     - name: linux-firmware-raspi
@@ -45,6 +47,7 @@ customization:
         destination: ../../malicious
 artifacts:
   img:
-      path: raspi.img
+    -
+      name: raspi.img
   manifest:
-      path: raspi.manifest
+    name: raspi.manifest

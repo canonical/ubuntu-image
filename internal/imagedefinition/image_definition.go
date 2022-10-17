@@ -19,19 +19,13 @@ type ImageDefinition struct {
 	Revision       int            `yaml:"revision"        json:"Revision,omitempty"`
 	Architecture   string         `yaml:"architecture"    json:"Architecture"`
 	Series         string         `yaml:"series"          json:"Series"`
-	Kernel         *Kernel        `yaml:"kernel"          json:"Kernel"`
+	Kernel         string         `yaml:"kernel"          json:"Kernel,omitempty"`
 	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget"`
 	ModelAssertion string         `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
 	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *Customization `yaml:"customization"   json:"Customization,omitempty"`
 	Artifacts      *Artifact      `yaml:"artifacts"       json:"Artifacts"`
 	Class          string         `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
-}
-
-// Kernel defines the kernel section of the image definition file
-type Kernel struct {
-	KernelName string `yaml:"name" json:"KernelName" default:"linux"`
-	KernelType string `yaml:"type" json:"KernelType,omitempty"`
 }
 
 // Gadget defines the gadget section of the image definition file
@@ -90,15 +84,9 @@ type Installer struct {
 
 // CloudInit provides customizations for running cloud-init
 type CloudInit struct {
-	MetaData      string      `yaml:"meta-data"      json:"MetaData,omitempty"`
-	UserData      *[]UserData `yaml:"user-data"      json:"UserData,omitempty"`
-	NetworkConfig string      `yaml:"network-config" json:"NetworkConfig,omitempty"`
-}
-
-// UserData defines the user information to be used by cloud-init
-type UserData struct {
-	UserName     string `yaml:"name"     json:"UserName"`
-	UserPassword string `yaml:"password" json:"UserPassword"`
+	MetaData      string `yaml:"meta-data"      json:"MetaData,omitempty"`
+	UserData      string `yaml:"user-data"      json:"UserData,omitempty"`
+	NetworkConfig string `yaml:"network-config" json:"NetworkConfig,omitempty"`
 }
 
 // PPA contains information about a public or private PPA
@@ -172,9 +160,9 @@ type AddUser struct {
 // Artifact contains information about the files that are created
 // during and as a result of the image build process
 type Artifact struct {
-	Img       *Img       `yaml:"img"       json:"Img,omitempty"`
-	Iso       *Iso       `yaml:"iso"       json:"Iso,omitempty"`
-	Qcow2     *Qcow2     `yaml:"qcow2"     json:"Qcow2,omitempty"`
+	Img       *[]Img     `yaml:"img"       json:"Img,omitempty"`
+	Iso       *[]Iso     `yaml:"iso"       json:"Iso,omitempty"`
+	Qcow2     *[]Qcow2   `yaml:"qcow2"     json:"Qcow2,omitempty"`
 	Manifest  *Manifest  `yaml:"manifest"  json:"Manifest,omitempty"`
 	Filelist  *Filelist  `yaml:"filelist"  json:"Filelist,omitempty"`
 	Changelog *Changelog `yaml:"changelog" json:"Changelog,omitempty"`
@@ -183,39 +171,42 @@ type Artifact struct {
 // Img specifies the name of the resulting .img file.
 // If left emtpy no .img file will be created
 type Img struct {
-	ImgPath string `yaml:"path" json:"ImgPath"`
+	ImgName   string `yaml:"name"   json:"ImgName"`
+	ImgVolume string `yaml:"volume" json:"ImgVolume"`
 }
 
 // Iso specifies the name of the resulting .iso file
 // and optionally the xorrisofs command used to create it.
 // If left emtpy no .iso file will be created
 type Iso struct {
-	IsoPath string `yaml:"path"            json:"IsoPath"`
-	Command string `yaml:"xorriso-command" json:"Command,omitempty"`
+	IsoName   string `yaml:"name"            json:"IsoName"`
+	IsoVolume string `yaml:"volume"          json:"IsoVolume"`
+	Command   string `yaml:"xorriso-command" json:"Command,omitempty"`
 }
 
 // Qcow2 specifies the name of the resulting .qcow2 file
 // If left emtpy no .qcow2 file will be created
 type Qcow2 struct {
-	Qcow2Path string `yaml:"path" json:"Qcow2Path"`
+	Qcow2Name   string `yaml:"name"   json:"Qcow2Name"`
+	Qcow2Volume string `yaml:"volume" json:"Qcow2Volume"`
 }
 
 // Manifest specifies the name of the manifest file.
 // If left emtpy no manifest file will be created
 type Manifest struct {
-	ManifestPath string `yaml:"path" json:"ManifestPath"`
+	ManifestName string `yaml:"name" json:"ManifestName"`
 }
 
 // Filelist specifies the name of the filelist file.
 // If left emtpy no filelist file will be created
 type Filelist struct {
-	FilelistPath string `yaml:"path" json:"FilelistPath"`
+	FilelistName string `yaml:"name" json:"FilelistName"`
 }
 
 // Changelog specifies the name of the changelog file.
 // If left emtpy no changelog file will be created
 type Changelog struct {
-	ChangelogPath string `yaml:"path" json:"ChangelogPath"`
+	ChangelogName string `yaml:"name" json:"ChangelogName"`
 }
 
 // NewMissingURLError fails the image definition parsing when a dict

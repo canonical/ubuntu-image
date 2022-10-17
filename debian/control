@@ -20,12 +20,14 @@ Built-Using: ${misc:Built-Using},
 Depends: ${shlibs:Depends},
          ${misc:Depends},
          debootstrap,
+         dosfstools,
          fdisk,
          gdisk,
          germinate,
          gpg,
          mtools,
          snapd,
+         squashfs-tools,
 Conflicts: python3-ubuntu-image
 Description: Toolkit for building Ubuntu images.
  Ubuntu Image is the official tool for building various Ubuntu images according

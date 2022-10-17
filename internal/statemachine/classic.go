@@ -21,9 +21,6 @@ var imageCreationStates = []stateFunc{
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
 	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
-	{"make_disk", (*StateMachine).makeDisk},
-	{"generate_manifest", (*StateMachine).generatePackageManifest},
-	{"finish", (*StateMachine).finish},
 }
 
 // ClassicStateMachine embeds StateMachine and adds the command line flags specific to classic images
