@@ -321,5 +321,3 @@ func (imageDef ImageDefinition) GeneratePocketList() []string {
 	// Schema validation has already confirmed the Pocket is a valid value
 	return pocketMap[strings.ToLower(imageDef.Rootfs.Pocket)]
 }
-
-
