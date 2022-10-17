@@ -19,7 +19,7 @@ jobs:
             internal/imagedefinition/**
 
       - name: Fail if image definition README has not been updated
-        if: steps.changed-files-image-def.outputs.any_changed == 'true' && !contains(steps.changed-files-image-def.outputs.changed_files, 'README')
+        if: steps.changed-files-image-def.outputs.any_changed == 'true' && contains(steps.changed-files-image-def.outputs.changed_files, 'README') != true
         run: |
           echo "Image Definition struct has changed but README was not updated"
           exit 1
@@ -32,7 +32,7 @@ jobs:
             internal/commands/**
 
       - name: Fail if command line args have changed but manpage has not been updated
-        if: steps.changed-files-flags.outputs.any_changed == 'true' && !contains(steps.changed-files-flags.outputs.changed_files, 'ubuntu-image.rst')
+        if: steps.changed-files-flags.outputs.any_changed == 'true' && contains(steps.changed-files-flags.outputs.changed_files, 'ubuntu-image.rst') != true
         run: |
           echo "Command line flags have been updated but the manpage has not"
           exit 1
