@@ -1,4 +1,4 @@
-ubuntu-image (2.2+22.04ubuntu4) UNRELEASED; urgency=medium
+ubuntu-image (2.2+22.10ubuntu1) UNRELEASED; urgency=medium
 
   [ Pawel Stolowski ]
   * Add support for uc20 preseeding-related options.
@@ -10,6 +10,7 @@ ubuntu-image (2.2+22.04ubuntu4) UNRELEASED; urgency=medium
     --image-size (LP: #1981744)
   * Create filesystems with content when the content was created by
     ubuntu-image (LP: #1981720)
+  * Fix map ordering bug in populate_bootfs_contents step
   * Update to latest snapd volume layout API (LP: #1990979)
 
  -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Wed, 08 Jun 2022 10:25:57 -0500
