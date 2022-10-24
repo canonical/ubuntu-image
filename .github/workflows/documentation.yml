@@ -1,0 +1,38 @@
+name: Do docs need to be updated?
+
+on: [pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: changelog-check
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Get info on if image definition has changed
+        id: changed-files-image-def
+        uses: tj-actions/changed-files@v32
+        with:
+          files: |
+            internal/imagedefinition/**
+
+      - name: Fail if image definition README has not been updated
+        if: steps.changed-files-image-def.outputs.any_changed == 'true' && contains(steps.changed-files-image-def.outputs.changed_files, 'README') != true
+        run: |
+          echo "Image Definition struct has changed but README was not updated"
+          exit 1
+
+      - name: Get info on if command options or flags have changed
+        id: changed-files-flags
+        uses: tj-actions/changed-files@v32
+        with:
+          files: |
+            internal/commands/**
+
+      - name: Fail if command line args have changed but manpage has not been updated
+        if: steps.changed-files-flags.outputs.any_changed == 'true' && contains(steps.changed-files-flags.outputs.changed_files, 'ubuntu-image.rst') != true
+        run: |
+          echo "Command line flags have been updated but the manpage has not"
+          exit 1

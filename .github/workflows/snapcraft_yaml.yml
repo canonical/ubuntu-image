@@ -1,0 +1,25 @@
+name: Has snapcraft.yaml been updated?
+
+on: [pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: changelog-check
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Get info on if snapcraft.yaml has changed
+        id: changed-files-specific
+        uses: tj-actions/changed-files@v32
+        with:
+          files: |
+            snapcraft.yaml
+
+      - name: Fail if snapcraft.yaml has not changed
+        if: steps.changed-files-specific.outputs.any_changed != 'true'
+        run: |
+          echo "snapcraft.yaml has not been updated. The version must be incremented."
+          exit 1
