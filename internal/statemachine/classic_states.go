@@ -339,10 +339,13 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 
 	// now run "make" to build the gadget tree
 	makeCmd := execCommand("make")
+	// add ARCH and SERIES environment variables for making the gadget tree
 	makeCmd.Env = append(makeCmd.Env, []string{
 		fmt.Sprintf("ARCH=%s", classicStateMachine.ImageDef.Architecture),
 		fmt.Sprintf("SERIES=%s", classicStateMachine.ImageDef.Series),
 	}...)
+	// add the current ENV to the command
+	makeCmd.Env = append(makeCmd.Env, os.Environ()...)
 	makeCmd.Dir = sourceDir
 
 	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.Debug)
@@ -485,6 +488,12 @@ func (stateMachine *StateMachine) installPackages() error {
 			classicStateMachine.Packages = append(classicStateMachine.Packages,
 				packageInfo.PackageName)
 		}
+	}
+
+	// Make sure to install the extra kernel if it is specified
+	if classicStateMachine.ImageDef.Kernel != "" {
+		classicStateMachine.Packages = append(classicStateMachine.Packages,
+			classicStateMachine.ImageDef.Kernel)
 	}
 
 	// Slice used to store all the commands that need to be run
@@ -661,19 +670,14 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 		}
 	}
 
-	if cloudInitCustomization.UserData != nil {
+	if cloudInitCustomization.UserData != "" {
 		userDataFile, err := osCreate(path.Join(seedPath, "user-data"))
 		if err != nil {
 			return err
 		}
 		defer userDataFile.Close()
 
-		userDataBytes, err := yamlMarshal(cloudInitCustomization.UserData)
-		if err != nil {
-			return err
-		}
-
-		_, err = userDataFile.Write(userDataBytes)
+		_, err = userDataFile.WriteString(cloudInitCustomization.UserData)
 		if err != nil {
 			return err
 		}
@@ -917,7 +921,7 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	// This is basically just a wrapper around dpkg-query
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
 		classicStateMachine.ImageDef.Artifacts.Manifest.ManifestName)
-	cmd := execCommand("sudo", "chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
+	cmd := execCommand("chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
 	manifest, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("Error creating manifest file: %s", err.Error())

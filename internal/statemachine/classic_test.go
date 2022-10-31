@@ -252,20 +252,18 @@ func TestPrintStates(t *testing.T) {
 [3] verify_artifact_names
 [4] germinate
 [5] create_chroot
-[6] add_extra_ppas
-[7] install_packages
-[8] preseed_image
-[9] customize_cloud_init
-[10] customize_fstab
-[11] perform_manual_customization
-[12] populate_rootfs_contents
-[13] generate_disk_info
-[14] calculate_rootfs_size
-[15] populate_bootfs_contents
-[16] populate_prepare_partitions
-[17] make_disk
-[18] generate_manifest
-[19] finish
+[6] install_packages
+[7] preseed_image
+[8] customize_fstab
+[9] perform_manual_customization
+[10] populate_rootfs_contents
+[11] generate_disk_info
+[12] calculate_rootfs_size
+[13] populate_bootfs_contents
+[14] populate_prepare_partitions
+[15] make_disk
+[16] generate_manifest
+[17] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -752,25 +750,25 @@ func TestCustomizeCloudInit(t *testing.T) {
 		{
 			MetaData:      "foo: bar",
 			NetworkConfig: "foobar: foobar",
-			UserData: &[]imagedefinition.UserData{
-				{UserName: "ubuntu", UserPassword: "ubuntu"},
-				{UserName: "john", UserPassword: "password"},
-			},
+			UserData:      "bar: baz",
 		},
 		{
 			MetaData:      "foo: bar",
 			NetworkConfig: "foobar: foobar",
-			UserData:      nil,
+			UserData:      "",
 		},
 		{
 			NetworkConfig: "foobar: foobar",
-			UserData:      &[]imagedefinition.UserData{},
+			UserData:      "",
 		},
 		{
-			UserData: &[]imagedefinition.UserData{
-				{UserName: "ubuntu", UserPassword: "ubuntu"},
-				{UserName: "john", UserPassword: "password"},
-			},
+			UserData: `chpasswd:
+  expire: true
+  users:
+    - name: ubuntu
+      password: ubuntu
+      type: text
+`,
 		},
 	}
 
@@ -833,20 +831,14 @@ func TestCustomizeCloudInit(t *testing.T) {
 			}
 
 			userDataFile, err := os.Open(path.Join(seedPath, "user-data"))
-			if cloudInitConfig.UserData != nil {
+			if cloudInitConfig.UserData != "" {
 				asserter.AssertErrNil(err, false)
 
 				userDataFileContent, err := ioutil.ReadAll(userDataFile)
 				asserter.AssertErrNil(err, false)
 
-				userDataOut := make([]imagedefinition.UserData, 0)
-				err = yaml.Unmarshal(userDataFileContent, &userDataOut)
-				asserter.AssertErrNil(err, false)
-
-				for i, user := range *cloudInitConfig.UserData {
-					if user != userDataOut[i] {
-						t.Errorf("expected user %#v got %#v", user, userDataOut[i])
-					}
+				if string(userDataFileContent[:]) != cloudInitConfig.UserData {
+					t.Errorf("un-expected user-data content found: expected:\n%v\ngot:%v", cloudInitConfig.UserData, string(userDataFileContent[:]))
 				}
 			} else {
 				asserter.AssertErrContains(err, "no such file or directory")
@@ -877,10 +869,13 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 		CloudInit: &imagedefinition.CloudInit{
 			MetaData:      "foo: bar",
 			NetworkConfig: "foobar: foobar",
-			UserData: &[]imagedefinition.UserData{
-				{UserName: "ubuntu", UserPassword: "ubuntu"},
-				{UserName: "john", UserPassword: "password"},
-			},
+			UserData: `chpasswd:
+  expire: true
+  users:
+    - name: ubuntu
+      password: ubuntu
+      type: text
+`,
 		},
 	}
 

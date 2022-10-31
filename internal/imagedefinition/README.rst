@@ -25,9 +25,7 @@ The following specification defines what is supported in the YAML:
        # is just one kernel and defaults to "linux", but we support
        # installing more than one, since installer images can provide
        # multiple kernels to choose from.
-       kernel: (optional)
-         name: <string> Example: "linux" (required if kernel dict is specified)
-         type: <string> Example: "hwe" (optional)
+       kernel: <string> (optional)
        # gadget defines the boot assets of an image. When building a
        # classic image, the gadget is optionally compiled as part of
        # the state machine run.
@@ -374,15 +372,12 @@ kernel
 ======
 
 This optional key specifies an additional kernel to include in the image. If
-specified, the sub-key "name" must be provided, naming the kernel package to
-include. The sub-key "type" may be provided with a non-empty string value, but
-this is unused. For example:
+specified, the value should be a string that represents the name of the
+kernel package to be installed.
 
 .. code:: yaml
 
-    kernel:
-      name: linux
-      type: hwe
+    kernel: linux-image-generic
 
 
 

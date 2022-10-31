@@ -19,19 +19,13 @@ type ImageDefinition struct {
 	Revision       int            `yaml:"revision"        json:"Revision,omitempty"`
 	Architecture   string         `yaml:"architecture"    json:"Architecture"`
 	Series         string         `yaml:"series"          json:"Series"`
-	Kernel         *Kernel        `yaml:"kernel"          json:"Kernel"`
+	Kernel         string         `yaml:"kernel"          json:"Kernel,omitempty"`
 	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget"`
 	ModelAssertion string         `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
 	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *Customization `yaml:"customization"   json:"Customization,omitempty"`
 	Artifacts      *Artifact      `yaml:"artifacts"       json:"Artifacts"`
 	Class          string         `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
-}
-
-// Kernel defines the kernel section of the image definition file
-type Kernel struct {
-	KernelName string `yaml:"name" json:"KernelName" default:"linux"`
-	KernelType string `yaml:"type" json:"KernelType,omitempty"`
 }
 
 // Gadget defines the gadget section of the image definition file
@@ -90,15 +84,9 @@ type Installer struct {
 
 // CloudInit provides customizations for running cloud-init
 type CloudInit struct {
-	MetaData      string      `yaml:"meta-data"      json:"MetaData,omitempty"`
-	UserData      *[]UserData `yaml:"user-data"      json:"UserData,omitempty"`
-	NetworkConfig string      `yaml:"network-config" json:"NetworkConfig,omitempty"`
-}
-
-// UserData defines the user information to be used by cloud-init
-type UserData struct {
-	UserName     string `yaml:"name"     json:"UserName"`
-	UserPassword string `yaml:"password" json:"UserPassword"`
+	MetaData      string `yaml:"meta-data"      json:"MetaData,omitempty"`
+	UserData      string `yaml:"user-data"      json:"UserData,omitempty"`
+	NetworkConfig string `yaml:"network-config" json:"NetworkConfig,omitempty"`
 }
 
 // PPA contains information about a public or private PPA

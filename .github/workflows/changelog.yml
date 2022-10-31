@@ -1,0 +1,25 @@
+name: Has debian/changelog been updated?
+
+on: [pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: changelog-check
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Get info on if debian/changelog has changed
+        id: changed-files-specific
+        uses: tj-actions/changed-files@v32
+        with:
+          files: |
+            debian/changelog
+
+      - name: Fail if debian/changelog has not changed
+        if: steps.changed-files-specific.outputs.any_changed != 'true'
+        run: |
+          echo "debian/changelog has not been updated."
+          exit 1
