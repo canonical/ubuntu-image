@@ -589,17 +589,157 @@ func TestBuildRootfsFromTasks(t *testing.T) {
 
 // TestExtractRootfsTar unit tests the extractRootfsTar function
 func TestExtractRootfsTar(t *testing.T) {
-	t.Run("test_extract_rootfs_tar", func(t *testing.T) {
+	testCases := []struct {
+		name          string
+		rootfsTar     string
+		SHA256sum     string
+		expectedFiles []string
+	}{
+		{
+			"vanilla_tar",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"),
+			"ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
+			[]string{
+				"test_tar1",
+				"test_tar2",
+			},
+		},
+		{
+			"zip",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.zip"),
+			"22866400a1c66220c93f0df945f04c8bf230b177e6146a9df4fdd8ad238b6e64",
+			[]string{
+				"test_tar_zip1",
+				"test_tar_zip2",
+			},
+		},
+		{
+			"gz",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.gz"),
+			"29152fd9cadbc92f174815ec642ab3aea98f08f902a4f317ec037f8fe60e40c3",
+			[]string{
+				"test_tar_gz1",
+				"test_tar_gz2",
+			},
+		},
+		{
+			"xz",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.xz"),
+			"e3708f1d98ccea0e0c36843d9576580505ee36d523bfcf78b0f73a035ae9a14e",
+			[]string{
+				"test_tar_xz1",
+				"test_tar_xz2",
+			},
+		},
+		{
+			"bz2",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.bz2"),
+			"a1180a73b652d85d7330ef21d433b095363664f2f808363e67f798fae15abf0c",
+			[]string{
+				"test_tar_bz1",
+				"test_tar_bz2",
+			},
+		},
+		{
+			"zst",
+			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.zst"),
+			"5fb00513f84e28225a3155fd78c59a6a923b222e1c125aab35bbfd4091281829",
+			[]string{
+				"test_tar_zstd1",
+				"test_tar_zstd2",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_extract_rootfs_tar_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			absTarPath, err := filepath.Abs(tc.rootfsTar)
+			asserter.AssertErrNil(err, true)
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Rootfs: &imagedefinition.Rootfs{
+					Tarball: &imagedefinition.Tarball{
+						TarballURL: fmt.Sprintf("file://%s", absTarPath),
+					},
+				},
+			}
+
+			// need workdir set up for this
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.extractRootfsTar()
+			asserter.AssertErrNil(err, true)
+
+			for _, testFile := range tc.expectedFiles {
+				_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, testFile))
+				if err != nil {
+					t.Errorf("File %s should be in chroot, but is missing", testFile)
+				}
+			}
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		})
+	}
+}
+
+// TestFailedExtractRootfsTar tests failures in the extractRootfsTar function
+func TestFailedExtractRootfsTar(t *testing.T) {
+	t.Run("test_failed_extract_rootfs_tar", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		absTarPath, err := filepath.Abs(filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"))
+		asserter.AssertErrNil(err, true)
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &imagedefinition.Rootfs{
+				Tarball: &imagedefinition.Tarball{
+					TarballURL: fmt.Sprintf("file://%s", absTarPath),
+					SHA256sum:  "fail",
+				},
+			},
+		}
 
-		err := stateMachine.extractRootfsTar()
+		// need workdir set up for this
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err = stateMachine.extractRootfsTar()
+		asserter.AssertErrContains(err, "Failed to create chroot directory")
+		osMkdir = os.Mkdir
+
+		// clean up chroot directory
+		os.RemoveAll(stateMachine.tempDirs.chroot)
+
+		// now test with the incorrect SHA256sum
+		err = stateMachine.extractRootfsTar()
+		asserter.AssertErrContains(err, "Calculated SHA256 sum of rootfs tarball")
+
+		// clean up chroot directory
+		os.RemoveAll(stateMachine.tempDirs.chroot)
+
+		// use a tarball that doesn't exist to trigger a failure in computing
+		// the SHA256 sum
+		stateMachine.ImageDef.Rootfs.Tarball.TarballURL = "fakefile"
+		err = stateMachine.extractRootfsTar()
+		asserter.AssertErrContains(err, "Error opening file \"fakefile\" to calculate SHA256 sum")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

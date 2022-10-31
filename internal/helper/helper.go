@@ -1,17 +1,26 @@
 package helper
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bufio"
 	"bytes"
+	"compress/bzip2"
+	"compress/gzip"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/invopop/jsonschema"
+	"github.com/klauspost/compress/zstd"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/ulikunitz/xz"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -273,4 +282,175 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 		return 0
 	}
 	return orig - subtract
+}
+
+// ExtractTarArchive extracts all the files from a tar. Currently supported are
+// uncompressed tar archives and the following compression types: zip, gzip, xz
+// bzip2, zstd
+func ExtractTarArchive(src, dest string, verbose, debug bool) error {
+	// magic numbers are used to determine the compression type of
+	// the tar archive
+	magicNumbers := map[string][]byte{
+		"zip":   {0x50, 0x4b, 0x03, 0x04},
+		"gzip":  {0x1f, 0x8b, 0x08},
+		"xz":    {0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00},
+		"bzip2": {0x42, 0x5a, 0x68},
+		"zstd":  {0x28, 0xb5, 0x2f, 0xfd},
+	}
+	// first check if the archive is gzip compressed
+	tarFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("Error reading tar file: \"%s\"", err.Error())
+	}
+
+	tarBuff := bufio.NewReader(tarFile)
+	tarBytes, err := tarBuff.Peek(6)
+	if err != nil {
+		return fmt.Errorf("Error Peeking tar file: \"%s\"", err.Error())
+	}
+
+	var tarReader *tar.Reader
+	found := false
+	var fileType string
+	for compressionType, magicNumber := range magicNumbers {
+		if bytes.HasPrefix(tarBytes, magicNumber) {
+			found = true
+			if verbose || debug {
+				fmt.Printf("Detected tar compression type %s\n", compressionType)
+			}
+			fileType = compressionType
+		}
+	}
+	if !found {
+		// if it didn't have one of the listed magic numbers, assume it's a tar
+		// archive. This will throw an error later in the function if it is not
+		// a valid tar archive
+		fileType = "tar"
+	}
+	switch fileType {
+	case "zip":
+		tarStat, err := os.Stat(src)
+		if err != nil {
+			return fmt.Errorf("Error running Stat on tar file: \"%s\"", err.Error())
+		}
+		buff := bytes.NewBuffer([]byte{})
+		_, err = io.Copy(buff, tarBuff)
+		if err != nil {
+			return fmt.Errorf("Error copying tar buffer: \"%s\"", err.Error())
+		}
+		reader := bytes.NewReader(buff.Bytes())
+		zipReader, err := zip.NewReader(reader, tarStat.Size())
+		if err != nil {
+			return fmt.Errorf("Error reading zip file: \"%s\"", err.Error())
+		}
+		if len(zipReader.File) > 1 {
+			return fmt.Errorf("Invalid zip file. Zip must contain exactly one tar file")
+		}
+		zipContents, err := zipReader.File[0].Open()
+		if err != nil {
+			return fmt.Errorf("Error reading contents of zip file: \"%s\"", err.Error())
+		}
+		tarReader = tar.NewReader(zipContents)
+		break
+	case "gzip":
+		gzipReader, err := gzip.NewReader(tarBuff)
+		if err != nil {
+			return fmt.Errorf("Error reading gzip file: \"%s\"", err.Error())
+		}
+		defer gzipReader.Close()
+		tarReader = tar.NewReader(gzipReader)
+		break
+	case "xz":
+		xzReader, err := xz.NewReader(tarBuff)
+		if err != nil {
+			return fmt.Errorf("Error reading xz file: \"%s\"", err.Error())
+		}
+		tarReader = tar.NewReader(xzReader)
+		break
+	case "bzip2":
+		bzipReader := bzip2.NewReader(tarBuff)
+		tarReader = tar.NewReader(bzipReader)
+		break
+	case "zstd":
+		zstdReader, err := zstd.NewReader(tarBuff)
+		if err != nil {
+			return fmt.Errorf("Error reading zstd file: \"%s\"", err.Error())
+		}
+		defer zstdReader.Close()
+		tarReader = tar.NewReader(zstdReader)
+		break
+	case "tar":
+		// the archive is not compressed, so simply extract it
+		tarReader = tar.NewReader(tarBuff)
+		break
+	}
+
+	for {
+		header, err := tarReader.Next()
+		if debug {
+			fmt.Printf("Extracting file %s from tar\n", header.Name)
+		}
+
+		switch {
+
+		// if no more files are found return
+		case err == io.EOF:
+			return nil
+
+		// return any other error
+		case err != nil:
+			return err
+
+		// if the header is nil, just skip it (not sure how this happens)
+		case header == nil:
+			continue
+		}
+
+		// the target location where the dir/file should be created
+		target := filepath.Join(dest, header.Name)
+
+		// check the file type
+		switch header.Typeflag {
+
+		// if its a dir and it doesn't exist create it
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+			}
+
+		// if it's a file or link create it
+		case tar.TypeReg, tar.TypeSymlink, tar.TypeLink:
+			destFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+
+			// copy over contents
+			if _, err := io.Copy(destFile, tarReader); err != nil {
+				return err
+			}
+
+			// make sure to close the file
+			destFile.Close()
+		}
+	}
+}
+
+// CalculateSHA256 calculates the SHA256 sum of the file provided as an argument
+func CalculateSHA256(fileName string) (string, error) {
+	f, err := os.Open(fileName)
+	if err != nil {
+		return "", fmt.Errorf("Error opening file \"%s\" to calculate SHA256 sum: \"%s\"", fileName, err.Error())
+	}
+	defer f.Close()
+
+	hasher := sha256.New()
+	_, err = io.Copy(hasher, f)
+	if err != nil {
+		return "", fmt.Errorf("Error calculating SHA256 sum of file \"%s\": \"%s\"", fileName, err.Error())
+	}
+
+	return string(hasher.Sum(nil)), nil
 }
