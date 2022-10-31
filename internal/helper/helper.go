@@ -3,13 +3,13 @@ package helper
 import (
 	"archive/tar"
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -298,12 +298,16 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 		"zstd":  {0x28, 0xb5, 0x2f, 0xfd},
 	}
 	// first check if the archive is gzip compressed
-	tarBytes, err := ioutil.ReadFile(src)
+	tarFile, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("Error reading tar file: \"%s\"", err.Error())
 	}
 
-	tarBuff := bytes.NewReader(tarBytes)
+	tarBuff := bufio.NewReader(tarFile)
+	tarBytes, err := tarBuff.Peek(6)
+	if err != nil {
+		return fmt.Errorf("Error Peeking tar file: \"%s\"", err.Error())
+	}
 
 	var tarReader *tar.Reader
 	found := false
@@ -325,7 +329,17 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 	}
 	switch fileType {
 	case "zip":
-		zipReader, err := zip.NewReader(tarBuff, int64(len(tarBytes)))
+		tarStat, err := os.Stat(src)
+		if err != nil {
+			return fmt.Errorf("Error running Stat on tar file: \"%s\"", err.Error())
+		}
+		buff := bytes.NewBuffer([]byte{})
+		_, err = io.Copy(buff, tarBuff)
+		if err != nil {
+			return fmt.Errorf("Error copying tar buffer: \"%s\"", err.Error())
+		}
+		reader := bytes.NewReader(buff.Bytes())
+		zipReader, err := zip.NewReader(reader, tarStat.Size())
 		if err != nil {
 			return fmt.Errorf("Error reading zip file: \"%s\"", err.Error())
 		}
