@@ -63,7 +63,7 @@ func mockCheckEmptyFields(interface{}, *gojsonschema.Result, *jsonschema.Schema)
 func mockCopyBlobSuccess([]string) error {
 	return nil
 }
-func mockLayoutVolume(string, string, *gadget.Volume, gadget.LayoutConstraints) (*gadget.LaidOutVolume, error) {
+func mockLayoutVolume(*gadget.Volume, gadget.LayoutConstraints, *gadget.LayoutOptions) (*gadget.LaidOutVolume, error) {
 	return nil, fmt.Errorf("Test Error")
 }
 func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure,

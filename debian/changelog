@@ -1,16 +1,22 @@
 ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
 
+  * Redesign classic image builds to use image definition file.
+
+ -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Fri, 21 Oct 2022 09:17:21 -0500
+
+ubuntu-image (2.2+22.10ubuntu1) kinetic; urgency=medium
+
   [ Pawel Stolowski ]
   * Add support for uc20 preseeding-related options.
 
   [ William 'jawn-smith' Wilson ]
-  * Redesign classic image builds to use image definition file.
   * Update to latest snapd that supports snapcraft v7 credentials
     (LP: #1984014)
   * Fix issue with partitions not being sized properly when using
     --image-size (LP: #1981744)
   * Create filesystems with content when the content was created by
     ubuntu-image (LP: #1981720)
+  * Fix map ordering bug in populate_bootfs_contents step
   * Update to latest snapd volume layout API (LP: #1990979)
 
  -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Mon, 17 Oct 2022 16:38:25 -0500

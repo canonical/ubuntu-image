@@ -216,11 +216,14 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 
 		// now call LayoutVolume to get a LaidOutVolume we can use
 		// with a mountedFilesystemWriter
-		layoutConstraints := gadget.LayoutConstraints{SkipResolveContent: false}
-		laidOutVolume, err := gadgetLayoutVolume(
-			filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
-			filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
-			volume, layoutConstraints)
+		layoutConstraints := gadget.LayoutConstraints{}
+		layoutOptions := &gadget.LayoutOptions{
+			SkipResolveContent: false,
+			IgnoreContent:      false,
+			GadgetRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
+			KernelRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
+		}
+		laidOutVolume, err := gadgetLayoutVolume(volume, layoutConstraints, layoutOptions)
 		if err != nil {
 			return fmt.Errorf("Error laying out bootfs contents: %s", err.Error())
 		}

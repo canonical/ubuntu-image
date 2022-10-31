@@ -8,9 +8,29 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/invopop/jsonschema v0.4.0
 	github.com/jessevdk/go-flags v1.5.0
-	github.com/snapcore/snapd v0.0.0-20220818093435-f83b1f15601b
+	github.com/snapcore/snapd v0.0.0-20220927112420-6e453dafb812
 	github.com/xeipuuv/gojsonschema v1.2.0
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v2 v2.4.0
+)
+
+require (
+	github.com/snapcore/secboot v0.0.0-20220905094328-6a625ee231d3 // indirect
+	github.com/ulikunitz/xz v0.5.10 // indirect
+	github.com/xanzy/ssh-agent v0.3.0 // indirect
+	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
+	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
+	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
+	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
+	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b // indirect
+	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
+	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
+	gopkg.in/djherbis/times.v1 v1.2.0 // indirect
+	gopkg.in/retry.v1 v1.0.3 // indirect
+	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
+	gopkg.in/warnings.v0 v0.1.2 // indirect
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	maze.io/x/crypto v0.0.0-20190131090603-9b94c9afe066 // indirect
 )
 
 require (
@@ -40,23 +60,6 @@ require (
 	github.com/sirupsen/logrus v1.7.0 // indirect
 	github.com/snapcore/bolt v1.3.2-0.20210908134111-63c8bfcf7af8 // indirect
 	github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2 // indirect
-	github.com/snapcore/secboot v0.0.0-20211018143212-802bb19ca263 // indirect
-	github.com/ulikunitz/xz v0.5.10 // indirect
-	github.com/xanzy/ssh-agent v0.3.0 // indirect
-	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
-	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
-	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
-	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect
-	golang.org/x/sys v0.0.0-20210908233432-aa78b53d3365 // indirect
-	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	gopkg.in/djherbis/times.v1 v1.2.0 // indirect
 	gopkg.in/macaroon.v1 v1.0.0 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
-	gopkg.in/retry.v1 v1.0.3 // indirect
-	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
-	gopkg.in/warnings.v0 v0.1.2 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-	maze.io/x/crypto v0.0.0-20190131090603-9b94c9afe066 // indirect
 )
