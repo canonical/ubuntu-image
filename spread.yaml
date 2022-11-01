@@ -11,7 +11,7 @@ path: /home/ubuntu-image
 
 prepare: |
   apt update
-  apt install -y snapd
+  apt install -y snapd libc6-dev gcc-multilib
   snap install core20 --channel=latest/edge
   snap install --classic snapcraft
   unset SHELL
