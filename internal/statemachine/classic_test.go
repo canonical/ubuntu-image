@@ -324,7 +324,7 @@ func TestPrepareGadgetTree(t *testing.T) {
 		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget {},
+			Gadget:       &imagedefinition.Gadget{},
 		}
 
 		// need workdir set up for this
@@ -364,7 +364,7 @@ func TestPrepareGadgetTreePrebuilt(t *testing.T) {
 		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget {
+			Gadget: &imagedefinition.Gadget{
 				GadgetType: "prebuilt",
 				GadgetURL:  "testdata/gadget_tree/",
 			},
@@ -387,6 +387,7 @@ func TestPrepareGadgetTreePrebuilt(t *testing.T) {
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
+
 // TestFailedPrepareGadgetTree tests failures in os, osutil, and ioutil libraries
 func TestFailedPrepareGadgetTree(t *testing.T) {
 	t.Run("test_failed_prepare_gadget_tree", func(t *testing.T) {
@@ -397,7 +398,7 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget {},
+			Gadget:       &imagedefinition.Gadget{},
 		}
 
 		// need workdir set up for this
