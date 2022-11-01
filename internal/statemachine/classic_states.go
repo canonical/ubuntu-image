@@ -369,7 +369,13 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 		return fmt.Errorf("Error creating unpack directory: %s", err.Error())
 	}
 	// recursively copy the gadget tree to unpack/gadget
-	gadgetTree := filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+	var gadgetTree string
+	if classicStateMachine.ImageDef.Gadget.GadgetType == "prebuilt" {
+		gadgetURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
+		gadgetTree = gadgetURL.String()
+	} else {
+		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+	}
 	files, err := ioutilReadDir(gadgetTree)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
