@@ -277,6 +277,12 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"generate_manifest", (*StateMachine).generatePackageManifest})
 	}
 
+	// only run generateFilelist if there is a filelist in the image definition
+	if classicStateMachine.ImageDef.Artifacts.Filelist != nil {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"generate_filelist", (*StateMachine).generateFilelist})
+	}
+
 	// add the no-op "finish" state
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"finish", (*StateMachine).finish})
@@ -935,6 +941,26 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	defer manifest.Close()
 
 	cmd.Stdout = manifest
+	err = cmd.Run()
+	return err
+}
+
+// Generate the manifest
+func (stateMachine *StateMachine) generateFilelist() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// This is basically just a wrapper around find (similar to what we do in livecd-rootfs)
+	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
+		classicStateMachine.ImageDef.Artifacts.Filelist.FilelistName)
+	cmd := execCommand("chroot", stateMachine.tempDirs.rootfs, "find", "-xdev")
+	filelist, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("Error creating filellist file: %s", err.Error())
+	}
+	defer filelist.Close()
+
+	cmd.Stdout = filelist
 	err = cmd.Run()
 	return err
 }
