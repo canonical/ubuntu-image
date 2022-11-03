@@ -372,7 +372,7 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	var gadgetTree string
 	if classicStateMachine.ImageDef.Gadget.GadgetType == "prebuilt" {
 		gadgetURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
-		gadgetTree = gadgetURL.String()
+		gadgetTree = gadgetURL.Path
 	} else {
 		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
 	}
