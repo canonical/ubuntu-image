@@ -956,7 +956,7 @@ func (stateMachine *StateMachine) generateFilelist() error {
 	cmd := execCommand("chroot", stateMachine.tempDirs.rootfs, "find", "-xdev")
 	filelist, err := os.Create(outputPath)
 	if err != nil {
-		return fmt.Errorf("Error creating filellist file: %s", err.Error())
+		return fmt.Errorf("Error creating filelist file: %s", err.Error())
 	}
 	defer filelist.Close()
 
