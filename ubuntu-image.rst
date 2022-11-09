@@ -8,7 +8,7 @@ Generate a bootable disk image
 
 :Authors:
     Barry Warsaw <barry@ubuntu.com>,
-    Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>
+    Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>,
     William 'jawn-smith' Wilson <william.wilson@canonical.com>
 :Date: 2021-10-21
 :Copyright: 2016-2021 Canonical Ltd.
@@ -106,37 +106,10 @@ Classic command options
 These are the options for defining the contents of classic preinstalled Ubuntu
 images.  Can only be used when the ``ubuntu-image classic`` command is used.
 
-GADGET_TREE_URI
-    An URI to the gadget tree to be used to build the image.  This positional
-    argument must be given for this mode of operation.  Must be a local path.
-
--p PROJECT, --project PROJECT
-    Project name to be passed on to ``livecd-rootfs``. Mutually exclusive
-    with --filesystem
-
--f FILESYSTEM, --filesystem FILESYSTEM
-    Unpacked Ubuntu filesystem to be copied to the system partition.
-    Mutually exclusive with --project.
-
--s SUITE, --suite SUITE
-    Distribution name to be passed on to ``livecd-rootfs``.
-
--a CPU-ARCHITECTURE, --arch CPU-ARCHITECTURE
-    CPU architecture to be passed on to ``livecd-rootfs``.  Default value is
-    the architecture of the host.
-
---subproject SUBPROJECT
-    Sub-project name to be passed on ``livecd-rootfs``.
-
---subarch SUBARCH
-    Sub-architecture to be passed on to ``livecd-rootfs``.
-
---with-proposed
-    Defines if the image should be built with -proposed enabled.  This is
-    passed through to ``livecd-rootfs``.
-
---extra-ppas EXTRA_PPAS
-    Extra ppas to install. This is passed through to ``livecd-rootfs``.
+image_definition
+    Path to the image definition file. This file defines all of the
+    customization required when building your image. This positional
+    argument must be given for this mode of operation.
 
 
 Common options
@@ -293,12 +266,26 @@ type are listed below
 Classic image steps
 -------------------
 
+State machines are dynamically created for classic image builds based on
+the contents of the image definition. The list of all possible states
+is as follows:
+
 #. make_temporary_directories
+#. parse_image_definition
+#. calculate_states
+#. build_gadget_tree
 #. prepare_gadget_tree
-#. run_live_build
 #. load_gadget_yaml
+#. create_chroot
+#. germinate
+#. add_extra_ppas
+#. install_packages
+#. verify_artifact_names
+#. customize_cloud_init
+#. customize_fstab
+#. manual_customization
+#. preseed_image
 #. populate_rootfs_contents
-#. populate_rootfs_contents_hooks
 #. generate_disk_info
 #. calculate_rootfs_size
 #. populate_bootfs_contents
@@ -365,3 +352,4 @@ FOOTNOTES
 .. _`gadget snap`: https://github.com/snapcore/snapd/wiki/Gadget-snap
 .. _`gadget tree`: Example: https://github.com/snapcore/pc-amd64-gadget
 .. _`gadget.yaml`: https://github.com/snapcore/snapd/wiki/Gadget-snap#gadget.yaml
+.. _`image_definition.yaml`: https://github.com/canonical/ubuntu-image/tree/main/internal/imagedefinition#readme
