@@ -321,6 +321,11 @@ func TestPrepareGadgetTree(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget:       &imagedefinition.Gadget{},
+		}
 
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
@@ -346,6 +351,43 @@ func TestPrepareGadgetTree(t *testing.T) {
 	})
 }
 
+// TestPrepareGadgetTreePrebuilt tests the prepareGadgetTree function with prebuilt gadgets
+func TestPrepareGadgetTreePrebuilt(t *testing.T) {
+	t.Run("test_prepare_gadget_tree_prebuilt", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget: &imagedefinition.Gadget{
+				GadgetType: "prebuilt",
+				GadgetURL:  "testdata/gadget_tree/",
+			},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrNil(err, true)
+
+		gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
+		for _, file := range gadgetTreeFiles {
+			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
+			if err != nil {
+				t.Errorf("File %s should be in unpack, but is missing", file)
+			}
+		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
 // TestFailedPrepareGadgetTree tests failures in os, osutil, and ioutil libraries
 func TestFailedPrepareGadgetTree(t *testing.T) {
 	t.Run("test_failed_prepare_gadget_tree", func(t *testing.T) {
@@ -353,6 +395,11 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget:       &imagedefinition.Gadget{},
+		}
 
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
