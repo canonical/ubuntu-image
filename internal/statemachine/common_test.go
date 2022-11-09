@@ -993,6 +993,7 @@ func TestFailedMakeDisk(t *testing.T) {
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error writing disk image")
 		helperCopyBlob = helper.CopyBlob
+		os.Remove("pc.img")
 	})
 }
 

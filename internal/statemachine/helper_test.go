@@ -335,6 +335,8 @@ func TestCleanup(t *testing.T) {
 			t.Errorf("Error: temporary workdir %s was not cleaned up\n",
 				stateMachine.stateMachineFlags.WorkDir)
 		}
+		// remove a leftover artifact
+		os.Remove("ubuntu-image.gob")
 	})
 }
 
