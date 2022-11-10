@@ -990,10 +990,14 @@ func TestFailedMakeDisk(t *testing.T) {
 		}()
 		stateMachine.cleanWorkDir = true // for coverage!
 		stateMachine.commonFlags.OutputDir = ""
+		defer os.Remove("pc.img")
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error writing disk image")
 		helperCopyBlob = helper.CopyBlob
-		os.Remove("pc.img")
+
+		// make sure with no OutputDir the image was created in the cwd
+		_, err = os.Stat("pc.img")
+		asserter.AssertErrNil(err, true)
 	})
 }
 

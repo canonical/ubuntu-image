@@ -327,16 +327,18 @@ func TestFailedCopyStructureContent(t *testing.T) {
 // state machine has finished running
 func TestCleanup(t *testing.T) {
 	t.Run("test_cleanup", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Run()
+		// create the workdir and make sure it is set to be cleaned up
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+		stateMachine.cleanWorkDir = true
 		stateMachine.Teardown()
 		if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err == nil {
 			t.Errorf("Error: temporary workdir %s was not cleaned up\n",
 				stateMachine.stateMachineFlags.WorkDir)
 		}
-		// remove a leftover artifact
-		os.Remove("ubuntu-image.gob")
 	})
 }
 
