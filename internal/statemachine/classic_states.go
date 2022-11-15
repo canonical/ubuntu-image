@@ -70,20 +70,22 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	}
 
 	// do custom validation for gadgetURL being required if gadget is not pre-built
-	if imageDefinition.Gadget.GadgetType != "prebuilt" && imageDefinition.Gadget.GadgetURL == "" {
-		jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
-		errDetail := gojsonschema.ErrorDetails{
-			"key":   "gadget:type",
-			"value": imageDefinition.Gadget.GadgetType,
-		}
-		result.AddError(
-			imagedefinition.NewMissingURLError(
-				gojsonschema.NewJsonContext("missingURL", jsonContext),
-				52,
+	if classicStateMachine.ImageDef.Gadget != nil {
+		if imageDefinition.Gadget.GadgetType != "prebuilt" && imageDefinition.Gadget.GadgetURL == "" {
+			jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
+			errDetail := gojsonschema.ErrorDetails{
+				"key":   "gadget:type",
+				"value": imageDefinition.Gadget.GadgetType,
+			}
+			result.AddError(
+				imagedefinition.NewMissingURLError(
+					gojsonschema.NewJsonContext("missingURL", jsonContext),
+					52,
+					errDetail,
+				),
 				errDetail,
-			),
-			errDetail,
-		)
+			)
+		}
 	}
 
 	if imageDefinition.Customization != nil {

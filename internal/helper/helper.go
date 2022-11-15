@@ -299,7 +299,8 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 		if err != nil {
 			return err
 		}
-		if !fileInfo.Mode().IsRegular() {
+		// skip non-regular files that aren't symbolic links
+		if !fileInfo.Mode().IsRegular() && !(fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink) {
 			return nil
 		}
 
@@ -307,7 +308,7 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 			fmt.Printf("Adding file \"%s\" to tar archive", fileInfo.Name())
 		}
 
-		// create a new dir/file header
+		// create a header for the file or directory
 		header, err := tar.FileInfoHeader(fileInfo, fileInfo.Name())
 		if err != nil {
 			return err
@@ -321,20 +322,21 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 			return err
 		}
 
-		// open files for taring
-		f, err := os.Open(filePath)
-		if err != nil {
-			return err
+		// only open and copy file contents if it's a regular file (not a symlink)
+		if fileInfo.Mode().IsRegular() {
+			// open files for taring
+			f, err := os.Open(filePath)
+			if err != nil {
+				return err
+			}
+
+			// copy file data into tar writer
+			if _, err := io.Copy(tarWriter, f); err != nil {
+				return err
+			}
+			f.Close()
 		}
 
-		// copy file data into tar writer
-		if _, err := io.Copy(tarWriter, f); err != nil {
-			return err
-		}
-
-		// manually close here after each file operation; defering would cause each file close
-		// to wait until all operations have completed.
-		f.Close()
 		return nil
 	})
 
