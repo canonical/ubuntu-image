@@ -955,20 +955,6 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	return err
 }
 
-<<<<<<< HEAD
-// Generate the rootfs tarball
-func (stateMachine *StateMachine) generateRootfsTarball() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
-
-	// first create a vanilla uncompressed tar archive
-	rootfsSrc := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
-	rootfsDst := filepath.Join(stateMachine.commonFlags.OutputDir,
-		classicStateMachine.ImageDef.Artifacts.RootfsTar.RootfsTarName)
-	return helper.CreateTarArchive(rootfsSrc, rootfsDst,
-		classicStateMachine.ImageDef.Artifacts.RootfsTar.Compression,
-		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
-=======
 // Generate the manifest
 func (stateMachine *StateMachine) generateFilelist() error {
 	var classicStateMachine *ClassicStateMachine
@@ -987,5 +973,18 @@ func (stateMachine *StateMachine) generateFilelist() error {
 	cmd.Stdout = filelist
 	err = cmd.Run()
 	return err
->>>>>>> 240773583c942cca90494c3aa9b73b3482ff97ad
+}
+
+// Generate the rootfs tarball
+func (stateMachine *StateMachine) generateRootfsTarball() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// first create a vanilla uncompressed tar archive
+	rootfsSrc := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
+	rootfsDst := filepath.Join(stateMachine.commonFlags.OutputDir,
+		classicStateMachine.ImageDef.Artifacts.RootfsTar.RootfsTarName)
+	return helper.CreateTarArchive(rootfsSrc, rootfsDst,
+		classicStateMachine.ImageDef.Artifacts.RootfsTar.Compression,
+		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
 }
