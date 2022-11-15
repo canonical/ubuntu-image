@@ -1432,23 +1432,9 @@ func TestGeneratePackageManifest(t *testing.T) {
 func TestFailedGeneratePackageManifest(t *testing.T) {
 	t.Run("test_failed_generate_package_manifest", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-
-		// Setup the exec.Command mock - version from the success test
-		testCaseName = "TestGeneratePackageManifest"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		// Setup the mock for os.Create, making those fail
-		osCreate = mockCreate
-		defer func() {
-			osCreate = os.Create
-		}()
-
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.commonFlags.OutputDir = "/test/path"
 		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
@@ -1463,8 +1449,37 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 			},
 		}
 
-		err := stateMachine.generatePackageManifest()
+		// We need the output directory set for this
+		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(outputDir)
+		stateMachine.commonFlags.OutputDir = outputDir
+
+		// Setup the exec.Command mock - version from the success test
+		testCaseName = "TestGeneratePackageManifest"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+
+		// Setup the mock for os.Create, making those fail
+		osCreate = mockCreate
+		defer func() {
+			osCreate = os.Create
+		}()
+
+		err = stateMachine.generatePackageManifest()
 		asserter.AssertErrContains(err, "Error creating manifest file")
+		osCreate = os.Create
+
+		// Setup the exec.Command mock - version from the fail test
+		testCaseName = "TestFailedGeneratePackageManifest"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err = stateMachine.generatePackageManifest()
+		asserter.AssertErrContains(err, "Error generating package manifest with command")
 	})
 }
 
@@ -1535,7 +1550,6 @@ func TestFailedGenerateFilelist(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		stateMachine.commonFlags.OutputDir = "/test/path"
 		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
@@ -1550,8 +1564,37 @@ func TestFailedGenerateFilelist(t *testing.T) {
 			},
 		}
 
-		err := stateMachine.generateFilelist()
-		asserter.AssertErrContains(err, "Error creating filelist file")
+		// We need the output directory set for this
+		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(outputDir)
+		stateMachine.commonFlags.OutputDir = outputDir
+
+		// Setup the exec.Command mock - version from the success test
+		testCaseName = "TestGenerateFilelist"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+
+		// Setup the mock for os.Create, making those fail
+		osCreate = mockCreate
+		defer func() {
+			osCreate = os.Create
+		}()
+
+		err = stateMachine.generateFilelist()
+		asserter.AssertErrContains(err, "Error creating filelist")
+		osCreate = os.Create
+
+		// Setup the exec.Command mock - version from the fail test
+		testCaseName = "TestFailedGenerateFilelist"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err = stateMachine.generateFilelist()
+		asserter.AssertErrContains(err, "Error generating file list with command")
 	})
 }
 

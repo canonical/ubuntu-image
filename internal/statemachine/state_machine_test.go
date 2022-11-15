@@ -201,6 +201,13 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestGeneratePackageManifest":
 		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
 		break
+	case "TestGenerateFilelist":
+		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
+		break
+	case "TestFailedGeneratePackageManifest":
+		fallthrough
+	case "TestFailedGenerateFilelist":
+		fallthrough
 	case "TestFailedGerminate":
 		fallthrough
 	case "TestFailedSetupLiveBuildCommands":

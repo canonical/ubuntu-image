@@ -934,15 +934,22 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
 		classicStateMachine.ImageDef.Artifacts.Manifest.ManifestName)
 	cmd := execCommand("chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
-	manifest, err := os.Create(outputPath)
+	cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Error generating package manifest with command \"%s\". "+
+			"Error is \"%s\". Full output below:\n%s",
+			cmd.String(), err.Error(), cmdOutput.String())
+	}
+
+	// write the output to a file on successful executions
+	manifest, err := osCreate(outputPath)
 	if err != nil {
 		return fmt.Errorf("Error creating manifest file: %s", err.Error())
 	}
 	defer manifest.Close()
-
-	cmd.Stdout = manifest
-	err = cmd.Run()
-	return err
+	manifest.Write(cmdOutput.Bytes())
+	return nil
 }
 
 // Generate the manifest
@@ -954,13 +961,20 @@ func (stateMachine *StateMachine) generateFilelist() error {
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
 		classicStateMachine.ImageDef.Artifacts.Filelist.FilelistName)
 	cmd := execCommand("chroot", stateMachine.tempDirs.rootfs, "find", "-xdev")
-	filelist, err := os.Create(outputPath)
+	cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Error generating file list with command \"%s\". "+
+			"Error is \"%s\". Full output below:\n%s",
+			cmd.String(), err.Error(), cmdOutput.String())
+	}
+
+	// write the output to a file on successful executions
+	filelist, err := osCreate(outputPath)
 	if err != nil {
 		return fmt.Errorf("Error creating filelist file: %s", err.Error())
 	}
 	defer filelist.Close()
-
-	cmd.Stdout = filelist
-	err = cmd.Run()
-	return err
+	filelist.Write(cmdOutput.Bytes())
+	return nil
 }
