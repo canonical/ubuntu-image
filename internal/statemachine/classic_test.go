@@ -2392,6 +2392,7 @@ func TestGenerateRootfsTarball(t *testing.T) {
 			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
+			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
 
 			err = stateMachine.generateRootfsTarball()
 			asserter.AssertErrNil(err, true)
