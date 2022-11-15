@@ -708,12 +708,17 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, false)
+
 		// set a valid yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
 		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
-		err := stateMachine.loadGadgetYaml()
+		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, false)
 
 		// mock filepath.Rel

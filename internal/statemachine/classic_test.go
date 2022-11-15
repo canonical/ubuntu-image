@@ -1563,15 +1563,21 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
+		// We need the output directory set for this
+		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(outputDir)
+
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.Debug = true
 		stateMachine.commonFlags.Size = "4G"
+		stateMachine.commonFlags.OutputDir = outputDir
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 			"test_amd64.yaml")
 
-		err := stateMachine.Setup()
+		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.Run()
