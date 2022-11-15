@@ -58,3 +58,5 @@ artifacts:
     name: "filesystem-manifest.txt"
   rootfs-tarball:
     name: "rootfs.tar"
+  filelist:
+    name: "filesystem-filelist.txt"

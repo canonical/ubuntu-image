@@ -1468,6 +1468,93 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 	})
 }
 
+// TestGenerateFilelist tests if classic image filelist generation works
+func TestGenerateFilelist(t *testing.T) {
+	t.Run("test_generate_filelist", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		// Setup the exec.Command mock
+		testCaseName = "TestGenerateFilelist"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		// We need the output directory set for this
+		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(outputDir)
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.commonFlags.OutputDir = outputDir
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &imagedefinition.Rootfs{
+				Archive: "ubuntu",
+			},
+			Customization: &imagedefinition.Customization{},
+			Artifacts: &imagedefinition.Artifact{
+				Filelist: &imagedefinition.Filelist{
+					FilelistName: "filesystem.filelist",
+				},
+			},
+		}
+		osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
+
+		err = stateMachine.generateFilelist()
+		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		// Check if filelist file got generated
+		filelistPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.filelist")
+		_, err = os.Stat(filelistPath)
+		asserter.AssertErrNil(err, true)
+	})
+}
+
+// TestFailedGenerateFilelist tests if classic filelist generation failures are reported
+func TestFailedGenerateFilelist(t *testing.T) {
+	t.Run("test_failed_generate_filelist", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		// Setup the exec.Command mock - version from the success test
+		testCaseName = "TestGenerateFilelist"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		// Setup the mock for os.Create, making those fail
+		osCreate = mockCreate
+		defer func() {
+			osCreate = os.Create
+		}()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.commonFlags.OutputDir = "/test/path"
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &imagedefinition.Rootfs{
+				Archive: "ubuntu",
+			},
+			Customization: &imagedefinition.Customization{},
+			Artifacts: &imagedefinition.Artifact{
+				Filelist: &imagedefinition.Filelist{
+					FilelistName: "filesystem.filelist",
+				},
+			},
+		}
+
+		err := stateMachine.generateFilelist()
+		asserter.AssertErrContains(err, "Error creating filelist file")
+	})
+}
+
 // TestSuccessfulClassicRun runs through a full classic state machine run and ensures
 // it is successful
 func TestSuccessfulClassicRun(t *testing.T) {
@@ -1476,15 +1563,21 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
+		// We need the output directory set for this
+		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(outputDir)
+
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.Debug = true
 		stateMachine.commonFlags.Size = "4G"
+		stateMachine.commonFlags.OutputDir = outputDir
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 			"test_amd64.yaml")
 
-		err := stateMachine.Setup()
+		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.Run()

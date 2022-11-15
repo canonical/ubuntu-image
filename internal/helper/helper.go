@@ -444,10 +444,6 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 
 	for {
 		header, err := tarReader.Next()
-		if debug {
-			fmt.Printf("Extracting file %s from tar\n", header.Name)
-		}
-
 		switch {
 
 		// if no more files are found return
@@ -461,6 +457,10 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 		// if the header is nil, just skip it (not sure how this happens)
 		case header == nil:
 			continue
+		}
+
+		if debug {
+			fmt.Printf("Extracting file %s from tar\n", header.Name)
 		}
 
 		// the target location where the dir/file should be created
