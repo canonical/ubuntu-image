@@ -2262,3 +2262,52 @@ func TestFailedCustomizeFstab(t *testing.T) {
 		osOpenFile = os.OpenFile
 	})
 }
+
+// TestGenerateRootfsTarball tests that a rootfs tarball is generated
+// when appropriate and that it contains the correct files
+func TestGenerateRootfsTarball(t *testing.T) {
+	testCases := []struct {
+		name      string // the name will double as the compression type
+		tarPath   string
+	}{
+		{
+			"uncompressed",
+			"test_generate_rootfs_tarball.tar",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_rootfs_tarball_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Rootfs:       &imagedefinition.Rootfs{},
+				Artifacts: &imagedefinition.Artifact{
+					RootfsTar: &imagedefinition.RootfsTar{
+						RootfsTarName: tc.tarPath,
+						Compression:   tc.name,
+					},
+				},
+			}
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.generateRootfsTarball()
+			asserter.AssertErrNil(err, true)
+
+			// make sure tar archive exists and is the correct compression type
+			_, err = os.Stat(filepath.Join(stateMachine.stateMachineFlags.WorkDir, tc.tarPath))
+			if err != nil {
+				t.Errorf("File %s should be in workdir, but is missing", tc.tarPath)
+			}
+		})
+	}
+}

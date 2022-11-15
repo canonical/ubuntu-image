@@ -29,7 +29,7 @@ The following specification defines what is supported in the YAML:
        # gadget defines the boot assets of an image. When building a
        # classic image, the gadget is optionally compiled as part of
        # the state machine run.
-       gadget:
+       gadget: (optional)
          # An URI pointing to the location of the gadget tree. For
          # gadgets that need to be built this can be a local path
          # to a directory or a URL to be git cloned. These gadget
@@ -265,13 +265,19 @@ The following specification defines what is supported in the YAML:
            # Name to output the manifest file.
            name: <string>
          # A filelist is a list of all files in the rootfs of the image.
-         # Not yet supported
          filelist:
            # Name to output the filelist file.
            name: <string>
          # Not yet supported.
          changelog:
            name: <string>
+         # A tarball of the rootfs that has been built by ubuntu-image.
+         rootfs-tarball:
+           # Name to output the tar archive.
+           name: <string>
+           # Type of compression to use on the tar archive. Defaults
+           # to "uncompressed"
+           compression: uncompressed | bzip2 | gzip | xz | zip | zstd (optional)
 
 The following sections detail the top-level keys within this definition,
 followed by several examples.
@@ -380,6 +386,15 @@ kernel package to be installed.
     kernel: linux-image-generic
 
 
+gadget
+======
+
+This optional field specifies from where the gadget tree will be sourced.
+Support is included for prebuilt gadgets, building gadgets from a local
+directory, or building gadgets from a git repository. If gadget is not
+included in the image definition, no image files will be generated. It
+should only be excluded if the only artifact that you will be creating
+is a rootfs tarball.
 
 Examples
 ========

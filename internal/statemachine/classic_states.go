@@ -182,23 +182,25 @@ func (stateMachine *StateMachine) calculateStates() error {
 
 	var rootfsCreationStates []stateFunc
 
-	// determine the states needed for preparing the gadget
-	switch classicStateMachine.ImageDef.Gadget.GadgetType {
-	case "git":
-		fallthrough
-	case "directory":
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"build_gadget_tree", (*StateMachine).buildGadgetTree})
-		fallthrough
-	case "prebuilt":
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree})
-		break
-	}
+	if classicStateMachine.ImageDef.Gadget != nil {
+		// determine the states needed for preparing the gadget
+		switch classicStateMachine.ImageDef.Gadget.GadgetType {
+		case "git":
+			fallthrough
+		case "directory":
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"build_gadget_tree", (*StateMachine).buildGadgetTree})
+			fallthrough
+		case "prebuilt":
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree})
+			break
+		}
 
-	// Load the gadget yaml after the gadget is built
-	rootfsCreationStates = append(rootfsCreationStates,
-		stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml})
+		// Load the gadget yaml after the gadget is built
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml})
+	}
 
 	// if artifacts are specified, verify the correctness and store them in the struct
 	if classicStateMachine.ImageDef.Artifacts.Img != nil {
@@ -261,20 +263,28 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo})
 	}
 
-	// Add the "always there" states that populate partitions, build the disk, etc.
-	// This includes the no-op "finish" state to signify successful setup
-	rootfsCreationStates = append(rootfsCreationStates, imageCreationStates...)
+	if classicStateMachine.ImageDef.Gadget != nil {
+		// Add the "always there" states that populate partitions, build the disk, etc.
+		// This includes the no-op "finish" state to signify successful setup
+		rootfsCreationStates = append(rootfsCreationStates, imageCreationStates...)
 
-	// only run makeDisk if there is an artifact to make
-	if classicStateMachine.ImageDef.Artifacts.Img != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"make_disk", (*StateMachine).makeDisk})
+		// only run makeDisk if there is an artifact to make
+		if classicStateMachine.ImageDef.Artifacts.Img != nil {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"make_disk", (*StateMachine).makeDisk})
+		}
 	}
 
 	// only run generatePackageManifest if there is a manifest in the image definition
 	if classicStateMachine.ImageDef.Artifacts.Manifest != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"generate_manifest", (*StateMachine).generatePackageManifest})
+	}
+
+	// only run generateRootfsTarball if there is a rootfs-tarball in the image definition
+	if classicStateMachine.ImageDef.Artifacts.RootfsTar != nil {
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"generate_rootfs_tarball", (*StateMachine).generateRootfsTarball})
 	}
 
 	// add the no-op "finish" state
@@ -937,4 +947,18 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	cmd.Stdout = manifest
 	err = cmd.Run()
 	return err
+}
+
+// Generate the rootfs tarball
+func (stateMachine *StateMachine) generateRootfsTarball() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// first create a vanilla uncompressed tar archive
+	rootfsSrc := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
+	rootfsDst := filepath.Join(stateMachine.commonFlags.OutputDir,
+		classicStateMachine.ImageDef.Artifacts.RootfsTar.RootfsTarName)
+	return helper.CreateTarArchive(rootfsSrc, rootfsDst,
+		classicStateMachine.ImageDef.Artifacts.RootfsTar.Compression,
+		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
 }

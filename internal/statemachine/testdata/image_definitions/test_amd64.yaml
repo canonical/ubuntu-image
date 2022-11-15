@@ -56,3 +56,5 @@ artifacts:
       name: pc-amd64.img
   manifest:
     name: "filesystem-manifest.txt"
+  rootfs-tarball:
+    name: "rootfs.tar"

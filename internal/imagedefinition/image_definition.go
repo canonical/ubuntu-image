@@ -20,7 +20,7 @@ type ImageDefinition struct {
 	Architecture   string         `yaml:"architecture"    json:"Architecture"`
 	Series         string         `yaml:"series"          json:"Series"`
 	Kernel         string         `yaml:"kernel"          json:"Kernel,omitempty"`
-	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget"`
+	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget,omitempty"`
 	ModelAssertion string         `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
 	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *Customization `yaml:"customization"   json:"Customization,omitempty"`
@@ -160,12 +160,13 @@ type AddUser struct {
 // Artifact contains information about the files that are created
 // during and as a result of the image build process
 type Artifact struct {
-	Img       *[]Img     `yaml:"img"       json:"Img,omitempty"`
-	Iso       *[]Iso     `yaml:"iso"       json:"Iso,omitempty"`
-	Qcow2     *[]Qcow2   `yaml:"qcow2"     json:"Qcow2,omitempty"`
-	Manifest  *Manifest  `yaml:"manifest"  json:"Manifest,omitempty"`
-	Filelist  *Filelist  `yaml:"filelist"  json:"Filelist,omitempty"`
-	Changelog *Changelog `yaml:"changelog" json:"Changelog,omitempty"`
+	Img       *[]Img     `yaml:"img"            json:"Img,omitempty"`
+	Iso       *[]Iso     `yaml:"iso"            json:"Iso,omitempty"`
+	Qcow2     *[]Qcow2   `yaml:"qcow2"          json:"Qcow2,omitempty"`
+	Manifest  *Manifest  `yaml:"manifest"       json:"Manifest,omitempty"`
+	Filelist  *Filelist  `yaml:"filelist"       json:"Filelist,omitempty"`
+	Changelog *Changelog `yaml:"changelog"      json:"Changelog,omitempty"`
+	RootfsTar *RootfsTar `yaml:"rootfs-tarball" json:"RootfsTar,omitempty"`
 }
 
 // Img specifies the name of the resulting .img file.
@@ -207,6 +208,13 @@ type Filelist struct {
 // If left emtpy no changelog file will be created
 type Changelog struct {
 	ChangelogName string `yaml:"name" json:"ChangelogName"`
+}
+
+// RootfsTar specifies the name of a tarball to create from the
+// rootfs build steps and the compression to use on it
+type RootfsTar struct {
+	RootfsTarName string `yaml:"name"        json:"RootfsTarName"`
+	Compression   string `yaml:"compression" json:"Compression"   jsonschema:"enum=uncompressed,enum=bzip2,enum=gzip,enum=xz,enum=zip,enum=zstd" default:"uncompressed"`
 }
 
 // NewMissingURLError fails the image definition parsing when a dict
