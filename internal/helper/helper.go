@@ -348,7 +348,6 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 	return nil
 }
 
-
 // ExtractTarArchive extracts all the files from a tar. Currently supported are
 // uncompressed tar archives and the following compression types: zip, gzip, xz
 // bzip2, zstd
@@ -451,7 +450,7 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 	}
 
 	symlinks := make(map[string]string)
-	tarloop:
+tarloop:
 	for {
 		header, err := tarReader.Next()
 		switch {
