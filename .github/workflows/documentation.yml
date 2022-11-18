@@ -19,9 +19,9 @@ jobs:
             internal/imagedefinition/**
 
       - name: Fail if image definition README has not been updated
-        if: steps.changed-files-image-def.outputs.any_changed == 'true' && contains(steps.changed-files-image-def.outputs.changed_files, 'README.rst') != true
+        if: steps.changed-files-image-def.outputs.any_changed == 'true' && contains(steps.changed-files-image-def.outputs.all, 'README.rst') != true
         run: |
-          for changed_file in ${{ steps.changed-files-image-def.outputs.changed_files }}; do
+          for changed_file in ${{ steps.changed-files-image-def.outputs.all }}; do
             echo "File ${changed_file} has changed"
           done
           echo "Image Definition struct has changed but README was not updated"
