@@ -28,6 +28,8 @@ jobs:
       - name: Fail if image definition README has not been updated
         if: steps.changed-files-image-def.outputs.any_changed == 'true' && steps.changed-files-image-def-readme.outputs.any_changed != true
         run: |
+          echo "${steps.changed-files-image-def.outputs.any_changed}"
+          echo "${steps.changed-files-image-def-readme.outputs.any_changed}"
           echo "Image Definition struct has changed but README was not updated"
           exit 1
 
