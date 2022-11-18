@@ -25,6 +25,14 @@ jobs:
           files: |
             internal/imagedefinition/README.rst
 
+      - name: test struct boolean
+        if: steps.changed-files-image-def.outputs.any_changed == 'true'
+        run: |
+          echo "Struct has changed"
+      - name: test struct README
+        if: steps.changed-files-image-def-reamde.outputs.any_changed == 'true'
+        run: |
+          echo "README has changed"
       - name: Fail if image definition README has not been updated
         if: steps.changed-files-image-def.outputs.any_changed == 'true' && steps.changed-files-image-def-readme.outputs.any_changed != true
         run: |
