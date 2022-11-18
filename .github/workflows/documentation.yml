@@ -16,14 +16,18 @@ jobs:
         uses: tj-actions/changed-files@v32
         with:
           files: |
-            internal/imagedefinition/*
+            internal/imagedefinition/image_definition.go
+
+      - name: Get info on if image definition README was updated
+        id: changed-files-image-def-readme
+        uses: tj-actions/changed-files@v32
+        with:
+          files: |
+            internal/imagedefinition/README.rst
 
       - name: Fail if image definition README has not been updated
-        if: steps.changed-files-image-def.outputs.any_changed == 'true' && contains(steps.changed-files-image-def.outputs.all, 'README.rst') != true
+        if: steps.changed-files-image-def.outputs.any_changed == 'true' && steps.changed-files-image-def-readme.outputs.any_changed != true
         run: |
-          for changed_file in ${{ steps.changed-files-image-def.outputs.all }}; do
-            echo "File ${changed_file} has changed"
-          done
           echo "Image Definition struct has changed but README was not updated"
           exit 1
 
