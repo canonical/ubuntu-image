@@ -5,7 +5,7 @@ on: [pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: changelog-check
+    name: documentation-check
     steps:
       - uses: actions/checkout@v3
         with:
@@ -21,6 +21,7 @@ jobs:
       - name: Fail if image definition README has not been updated
         if: steps.changed-files-image-def.outputs.any_changed == 'true' && contains(steps.changed-files-image-def.outputs.changed_files, 'README.rst') != true
         run: |
+          echo steps.changed-files-image-def.outputs.changed_files
           echo "Image Definition struct has changed but README was not updated"
           exit 1
 
