@@ -344,8 +344,6 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 
 		return nil
 	})
-
-	return nil
 }
 
 // ExtractTarArchive extracts all the files from a tar. Currently supported are
@@ -498,8 +496,6 @@ tarloop:
 			if _, err := io.Copy(destFile, tarReader); err != nil {
 				return err
 			}
-			break
-
 			// make sure to close the file
 			destFile.Close()
 		case tar.TypeSymlink:
