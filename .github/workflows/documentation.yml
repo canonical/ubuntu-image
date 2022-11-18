@@ -30,14 +30,12 @@ jobs:
         run: |
           echo "Struct has changed"
       - name: test struct README
-        if: steps.changed-files-image-def-reamde.outputs.any_changed == 'true'
+        if: steps.changed-files-image-def-reamde.outputs.any_changed != 'true'
         run: |
-          echo "README has changed"
+          echo "README has not changed"
       - name: Fail if image definition README has not been updated
         if: steps.changed-files-image-def.outputs.any_changed == 'true' && steps.changed-files-image-def-readme.outputs.any_changed != true
         run: |
-          echo "${steps.changed-files-image-def.outputs.any_changed}"
-          echo "${steps.changed-files-image-def-readme.outputs.any_changed}"
           echo "Image Definition struct has changed but README was not updated"
           exit 1
 
