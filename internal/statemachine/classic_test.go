@@ -70,6 +70,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"invalid_paths_in_manual_copy_bug", "test_invalid_paths_in_manual_copy.yaml", false, "needs to be an absolute path (/../../malicious)"},
 		{"invalid_paths_in_manual_touch_file", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (../../malicious)"},
 		{"invalid_paths_in_manual_touch_file_bug", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (/../../malicious)"},
+		{"img_specified_without_gadget", "test_image_without_gadget.yaml", false, "Key img: cannot be used without key gadget:"},
 	}
 	for _, tc := range testCases {
 		t.Run("test_yaml_schema_"+tc.name, func(t *testing.T) {

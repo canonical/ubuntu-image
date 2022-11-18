@@ -504,18 +504,14 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 			// make sure to close the file
 			destFile.Close()
 		case tar.TypeSymlink:
-			fmt.Printf("Found symlink %s pointing to %s\n", header.Name, header.Linkname)
 			symlinks[header.Name] = header.Linkname
-			fmt.Println(symlinks[header.Linkname])
 			break
 		}
 	}
 	// now go create all of the symlinks
-	fmt.Println(symlinks)
 	cwd, _ := os.Getwd()
 	os.Chdir(dest)
 	for name, linkname := range symlinks {
-		fmt.Printf("Creating symlink %s to %s\n", name, linkname)
 		err := os.Symlink(linkname, name)
 		if err != nil {
 			return err

@@ -275,6 +275,26 @@ type PathNotAbsoluteError struct {
 	gojsonschema.ResultErrorFields
 }
 
+// NewDependentKeyError fails the image definition parsing when one
+// field depends on another being specified
+func NewDependentKeyError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *DependentKeyError {
+	err := DependentKeyError{}
+	err.SetContext(context)
+	err.SetType("dependent_key_error")
+	err.SetDescriptionFormat("Key {{.key1}} cannot be used without key {{.key2}}")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// DependentKeyError implements gojsonschema.ErrorType.
+// It is used for custom errors for keys that depend on
+// other keys being specified
+type DependentKeyError struct {
+	gojsonschema.ResultErrorFields
+}
+
 func (imageDef ImageDefinition) securityMirror() string {
 	if imageDef.Architecture == "amd64" || imageDef.Architecture == "i386" {
 		return "http://security.ubuntu.com/ubuntu/"

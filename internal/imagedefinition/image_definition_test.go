@@ -133,5 +133,16 @@ func TestCustomErrors(t *testing.T) {
 			t.Errorf("pathNotAbsoluteError description format \"%s\" is invalid",
 				pathNotAbsoluteErr.DescriptionFormat())
 		}
+		dependentKeyErr := NewDependentKeyError(
+			gojsonschema.NewJsonContext("testDependentKey", jsonContext),
+			52,
+			errDetail,
+		)
+		// spot check the description format
+		if !strings.Contains(dependentKeyErr.DescriptionFormat(),
+			"Key {{.key1}} cannot be used without key {{.key2}}") {
+			t.Errorf("dependentKeyError description format \"%s\" is invalid",
+				dependentKeyErr.DescriptionFormat())
+		}
 	})
 }
