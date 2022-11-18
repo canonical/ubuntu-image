@@ -392,9 +392,9 @@ gadget
 This optional field specifies from where the gadget tree will be sourced.
 Support is included for prebuilt gadgets, building gadgets from a local
 directory, or building gadgets from a git repository. If gadget is not
-included in the image definition, no image files will be generated. It
-should only be excluded if the only artifact that you will be creating
-is a rootfs tarball.
+included in the image definition, but some disk output (img, qcow2, iso)
+is included, an error will occur. Gadget should only be excluded if the
+only artifact that you will be creating is a rootfs tarball.
 
 Examples
 ========
