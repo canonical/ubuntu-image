@@ -299,8 +299,10 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 		if err != nil {
 			return err
 		}
-		// skip non-regular files that aren't symbolic links
-		if !fileInfo.Mode().IsRegular() && !(fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink) {
+		// skip non-regular files that aren't symbolic links or directories
+		if !fileInfo.Mode().IsRegular() &&
+			!(fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink) &&
+			!fileInfo.IsDir() {
 			return nil
 		}
 
@@ -313,15 +315,18 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 		if err != nil {
 			return err
 		}
-
+		if fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
+			// get the path that the symlink points to
+			linkedPath, _ := os.Readlink(filePath)
+			header.Size = fileInfo.Size()
+			header.Linkname = linkedPath
+		}
 		// update the name to correctly reflect the desired destination when untaring
 		header.Name = strings.TrimPrefix(strings.Replace(filePath, src, "", -1), string(filepath.Separator))
-
 		// write the header
 		if err := tarWriter.WriteHeader(header); err != nil {
 			return err
 		}
-
 		// only open and copy file contents if it's a regular file (not a symlink)
 		if fileInfo.Mode().IsRegular() {
 			// open files for taring
@@ -342,6 +347,7 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 
 	return nil
 }
+
 
 // ExtractTarArchive extracts all the files from a tar. Currently supported are
 // uncompressed tar archives and the following compression types: zip, gzip, xz
@@ -444,13 +450,15 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 		break
 	}
 
+	symlinks := make(map[string]string)
+	tarloop:
 	for {
 		header, err := tarReader.Next()
 		switch {
 
-		// if no more files are found return
+		// if no more files are found exit the loop
 		case err == io.EOF:
-			return nil
+			break tarloop
 
 		// return any other error
 		case err != nil:
@@ -478,9 +486,10 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 					return err
 				}
 			}
+			break
 
 		// if it's a file or link create it
-		case tar.TypeReg, tar.TypeSymlink, tar.TypeLink:
+		case tar.TypeReg:
 			destFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
@@ -490,11 +499,30 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 			if _, err := io.Copy(destFile, tarReader); err != nil {
 				return err
 			}
+			break
 
 			// make sure to close the file
 			destFile.Close()
+		case tar.TypeSymlink:
+			fmt.Printf("Found symlink %s pointing to %s\n", header.Name, header.Linkname)
+			symlinks[header.Name] = header.Linkname
+			fmt.Println(symlinks[header.Linkname])
+			break
 		}
 	}
+	// now go create all of the symlinks
+	fmt.Println(symlinks)
+	cwd, _ := os.Getwd()
+	os.Chdir(dest)
+	for name, linkname := range symlinks {
+		fmt.Printf("Creating symlink %s to %s\n", name, linkname)
+		err := os.Symlink(linkname, name)
+		if err != nil {
+			return err
+		}
+	}
+	os.Chdir(cwd)
+	return nil
 }
 
 // CalculateSHA256 calculates the SHA256 sum of the file provided as an argument
