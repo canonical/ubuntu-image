@@ -532,3 +532,36 @@ func CalculateSHA256(fileName string) (string, error) {
 
 	return string(hasher.Sum(nil)), nil
 }
+
+// CheckTags iterates through the keys in a struct and looks for
+// a value passed in as a parameter. It returns the yaml name of
+// the key and an error. Currently only boolean values for the tags
+// are supported
+func CheckTags(searchStruct interface{}, tag string) (string, error) {
+	value := reflect.ValueOf(searchStruct)
+	if value.Kind() != reflect.Ptr {
+		return "", fmt.Errorf("The argument to CheckTags must be a pointer")
+	}
+	elem := value.Elem()
+	for i := 0; i < elem.NumField(); i++ {
+		field := elem.Field(i)
+		// if we're dealing with a slice of pointers to structs,
+		// iterate through it and check the tags for each struct pointer
+		if field.Type().Kind() == reflect.Slice &&
+			field.Cap() > 0 &&
+			field.Index(0).Kind() == reflect.Pointer {
+			for i := 0; i < field.Cap(); i++ {
+				CheckTags(field.Index(i).Interface(), tag)
+			}
+		} else if !field.IsNil() {
+			tags := elem.Type().Field(i).Tag
+			tagValue, hasTag := tags.Lookup(tag)
+			if hasTag && tagValue == "true" {
+				yamlName, _ := tags.Lookup("yaml")
+				return yamlName, nil
+			}
+		}
+	}
+	// no true value found
+	return "", nil
+}

@@ -90,12 +90,14 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 
 	// don't allow any images to be created without a gadget
 	if imageDefinition.Gadget == nil {
-		if imageDefinition.Artifacts.Img == nil ||
-			imageDefinition.Artifacts.Iso == nil ||
-			imageDefinition.Artifacts.Qcow2 == nil {
+		diskUsed, err := helperCheckTags(imageDefinition.Artifacts, "is_disk")
+		if err != nil {
+			return fmt.Errorf("Error checking struct tags for Artifacts: \"%s\"", err.Error())
+		}
+		if diskUsed != "" {
 			jsonContext := gojsonschema.NewJsonContext("image_without_gadget", nil)
 			errDetail := gojsonschema.ErrorDetails{
-				"key1": "img:",
+				"key1": diskUsed,
 				"key2": "gadget:",
 			}
 			result.AddError(

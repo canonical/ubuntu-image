@@ -160,13 +160,13 @@ type AddUser struct {
 // Artifact contains information about the files that are created
 // during and as a result of the image build process
 type Artifact struct {
-	Img       *[]Img     `yaml:"img"            json:"Img,omitempty"`
-	Iso       *[]Iso     `yaml:"iso"            json:"Iso,omitempty"`
-	Qcow2     *[]Qcow2   `yaml:"qcow2"          json:"Qcow2,omitempty"`
-	Manifest  *Manifest  `yaml:"manifest"       json:"Manifest,omitempty"`
-	Filelist  *Filelist  `yaml:"filelist"       json:"Filelist,omitempty"`
-	Changelog *Changelog `yaml:"changelog"      json:"Changelog,omitempty"`
-	RootfsTar *RootfsTar `yaml:"rootfs-tarball" json:"RootfsTar,omitempty"`
+	Img       *[]Img     `yaml:"img"            json:"Img,omitempty"       is_disk:"true"`
+	Iso       *[]Iso     `yaml:"iso"            json:"Iso,omitempty"       is_disk:"true"`
+	Qcow2     *[]Qcow2   `yaml:"qcow2"          json:"Qcow2,omitempty"     is_disk:"true"`
+	Manifest  *Manifest  `yaml:"manifest"       json:"Manifest,omitempty"  is_disk:"false"`
+	Filelist  *Filelist  `yaml:"filelist"       json:"Filelist,omitempty"  is_disk:"false"`
+	Changelog *Changelog `yaml:"changelog"      json:"Changelog,omitempty" is_disk:"false"`
+	RootfsTar *RootfsTar `yaml:"rootfs-tarball" json:"RootfsTar,omitempty" is_disk:"false"`
 }
 
 // Img specifies the name of the resulting .img file.
