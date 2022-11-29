@@ -4,7 +4,7 @@ on: [pull_request]
 
 jobs:
   spread:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         system:
@@ -18,7 +18,5 @@ jobs:
         run: curl -s https://storage.googleapis.com/snapd-spread-tests/spread/spread-amd64.tar.gz | tar -xz
       - name: Init lxd
         run: sudo lxd init --auto
-      - name: install-golang-snap
-        run: sudo snap install go --channel=1.19/stable --classic
       - name: Run spread tests
         run: sudo ./spread lxd:${{ matrix.system }}
