@@ -16,9 +16,9 @@ jobs:
           fetch-depth: 2
       - name: Download spread
         run: curl -s https://storage.googleapis.com/snapd-spread-tests/spread/spread-amd64.tar.gz | tar -xz
-      - name: install-test-dependencies
-        run: sudo apt install -y gcc golang-go libc6-dev
       - name: Init lxd
         run: sudo lxd init --auto
+      - name: install-golang-snap
+        run: sudo snap refresh go --channel=1.19/stable
       - name: Run spread tests
         run: sudo ./spread lxd:${{ matrix.system }}
