@@ -17,7 +17,7 @@ jobs:
       - name: Download spread
         run: curl -s https://storage.googleapis.com/snapd-spread-tests/spread/spread-amd64.tar.gz | tar -xz
       - name: install-test-dependencies
-        run: sudo apt install -y gcc libc6-dev
+        run: sudo apt install -y gcc golang-go libc6-dev
       - name: Init lxd
         run: sudo lxd init --auto
       - name: Run spread tests
