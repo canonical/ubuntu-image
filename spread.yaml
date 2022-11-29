@@ -11,9 +11,10 @@ path: /home/ubuntu-image
 
 prepare: |
   apt update
-  apt install -y snapd
+  apt install -y snapd libc6-dev gcc
   snap install core20 --channel=latest/edge
   snap install --classic snapcraft
+  snap install --classic go --channel=1.19/stable
   unset SHELL
   snapcraft --destructive-mode
   snap install --classic --dangerous ubuntu-image_*.snap
