@@ -19,6 +19,6 @@ jobs:
       - name: Init lxd
         run: sudo lxd init --auto
       - name: install-golang-snap
-        run: sudo snap refresh go --channel=1.19/stable
+        run: sudo snap install go --channel=1.19/stable --classic
       - name: Run spread tests
         run: sudo ./spread lxd:${{ matrix.system }}
