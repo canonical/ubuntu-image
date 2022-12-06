@@ -121,7 +121,7 @@ func TestDetermineOutputDirectory(t *testing.T) {
 				t.Errorf("Workdir set in in struct \"%s\" does not match expected value \"%s\"",
 					stateMachine.commonFlags.OutputDir, tc.expectedOutputDir)
 			}
-			if _, err := os.Stat(stateMachine.commonFlags.outputDir); err != nil {
+			if _, err := os.Stat(stateMachine.commonFlags.OutputDir); err != nil {
 				t.Errorf("Failed to create output directory %s",
 					stateMachine.stateMachineFlags.WorkDir)
 			}
@@ -142,7 +142,7 @@ func TestFailedDetermineOutputDir(t *testing.T) {
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		err = stateMachine.makeDisk()
+		err := stateMachine.determineOutputDirectory()
 		asserter.AssertErrContains(err, "Error creating OutputDir")
 		osMkdirAll = os.MkdirAll
 	})
