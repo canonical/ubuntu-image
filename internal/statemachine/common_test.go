@@ -88,6 +88,7 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 func TestDetermineOutputDirectory(t *testing.T) {
 	testDir1 := "/tmp/determine_output_dir-" + uuid.NewString()
 	testDir2 := "/tmp/determine_output_dir-" + uuid.NewString()
+	cwd, _ := os.Getwd()
 	testCases := []struct {
 		name              string
 		workDir           string
@@ -95,7 +96,7 @@ func TestDetermineOutputDirectory(t *testing.T) {
 		expectedOutputDir string
 		cleanUp           bool
 	}{
-		{"no_workdir_no_outputdir", "", "", os.Getwd(), false},
+		{"no_workdir_no_outputdir", "", "", cwd, false},
 		{"yes_workdir_no_outputdir", testDir1, "", testDir1, true},
 		{"no_workdir_yes_outputdir", "", testDir1, testDir1, true},
 		{"different_workdir_and_outputdir", testDir1, testDir2, testDir2, true},
@@ -111,7 +112,7 @@ func TestDetermineOutputDirectory(t *testing.T) {
 
 			err := stateMachine.determineOutputDirectory()
 			asserter.AssertErrNil(err, true)
-			if cleanUp {
+			if tc.cleanUp {
 				defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
 			}
 
@@ -120,7 +121,7 @@ func TestDetermineOutputDirectory(t *testing.T) {
 				t.Errorf("Workdir set in in struct \"%s\" does not match expected value \"%s\"",
 					stateMachine.commonFlags.OutputDir, tc.expectedOutputDir)
 			}
-			if _, err := os.Stat(stateMachine.commonFlags, outputDir); err != nil {
+			if _, err := os.Stat(stateMachine.commonFlags.outputDir); err != nil {
 				t.Errorf("Failed to create output directory %s",
 					stateMachine.stateMachineFlags.WorkDir)
 			}
@@ -130,7 +131,7 @@ func TestDetermineOutputDirectory(t *testing.T) {
 }
 
 // TestFailedDetermineOutputDir tests failures in the determineOutputDirectory function
-func TestFailedMakeTemporaryDirectories(t *testing.T) {
+func TestFailedDetermineOutputDir(t *testing.T) {
 	t.Run("test_failed_determine_output_dir", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
