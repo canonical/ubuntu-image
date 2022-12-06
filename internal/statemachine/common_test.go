@@ -110,7 +110,11 @@ func TestDetermineOutputDirectory(t *testing.T) {
 			stateMachine.stateMachineFlags.WorkDir = tc.workDir
 			stateMachine.commonFlags.OutputDir = tc.outputDir
 
-			err := stateMachine.determineOutputDirectory()
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.determineOutputDirectory()
 			asserter.AssertErrNil(err, true)
 			if tc.cleanUp {
 				defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
@@ -118,7 +122,7 @@ func TestDetermineOutputDirectory(t *testing.T) {
 
 			// ensure the correct output dir was set and that it exists
 			if stateMachine.commonFlags.OutputDir != tc.expectedOutputDir {
-				t.Errorf("Workdir set in in struct \"%s\" does not match expected value \"%s\"",
+				t.Errorf("OutputDir set in in struct \"%s\" does not match expected value \"%s\"",
 					stateMachine.commonFlags.OutputDir, tc.expectedOutputDir)
 			}
 			if _, err := os.Stat(stateMachine.commonFlags.OutputDir); err != nil {
@@ -130,12 +134,13 @@ func TestDetermineOutputDirectory(t *testing.T) {
 	}
 }
 
-// TestFailedDetermineOutputDir tests failures in the determineOutputDirectory function
-func TestFailedDetermineOutputDir(t *testing.T) {
+// TestFailedDetermineOutputDirectory tests failures in the determineOutputDirectory function
+func TestFailedDetermineOutputDirectory(t *testing.T) {
 	t.Run("test_failed_determine_output_dir", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.commonFlags.OutputDir = "testdir"
 
 		// mock os.MkdirAll
 		osMkdirAll = mockMkdirAll
