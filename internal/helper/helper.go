@@ -1,26 +1,19 @@
 package helper
 
 import (
-	"archive/tar"
-	"archive/zip"
 	"bufio"
 	"bytes"
-	"compress/bzip2"
-	"compress/gzip"
 	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/invopop/jsonschema"
-	"github.com/klauspost/compress/zstd"
 	"github.com/snapcore/snapd/gadget/quantity"
-	"github.com/ulikunitz/xz"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -288,70 +281,43 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 // Currently supported are uncompressed tar archives and the following
 // compression types: zip, gzip, xz bzip2, zstd
 func CreateTarArchive(src, dest, compression string, verbose, debug bool) error {
-	tarFile, err := os.Create(dest)
-	if err != nil {
-		return fmt.Errorf("Error creating tar archive \"%s\": \"%s\"", dest, err.Error())
+	tarCommand := *exec.Command("tar",
+		"--directory",
+		src,
+		"--xattrs",
+		"--create",
+		"--file",
+		dest,
+		".",
+	)
+	fmt.Println(tarCommand.String())
+	if debug {
+		tarCommand.Args = append(tarCommand.Args, "--verbose")
 	}
-	var fileWriter io.WriteCloser = tarFile
-	tarWriter := tar.NewWriter(fileWriter)
-	defer tarWriter.Close()
-	return filepath.Walk(src, func(filePath string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		// skip non-regular files that aren't symbolic links or directories
-		if !fileInfo.Mode().IsRegular() &&
-			!(fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink) &&
-			!fileInfo.IsDir() {
-			return nil
-		}
-
-		if debug {
-			fmt.Printf("Adding file \"%s\" to tar archive", fileInfo.Name())
-		}
-
-		// create a header for the file or directory
-		header, err := tar.FileInfoHeader(fileInfo, fileInfo.Name())
-		if err != nil {
-			return err
-		}
-		if fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
-			// get the path that the symlink points to
-			linkedPath, _ := os.Readlink(filePath)
-			header.Size = fileInfo.Size()
-			header.Linkname = linkedPath
-		}
-		// update the name to correctly reflect the desired destination when untaring
-		header.Name = strings.TrimPrefix(strings.Replace(filePath, src, "", -1), string(filepath.Separator))
-		// write the header
-		if err := tarWriter.WriteHeader(header); err != nil {
-			return err
-		}
-		// only open and copy file contents if it's a regular file (not a symlink)
-		if fileInfo.Mode().IsRegular() {
-			// open files for taring
-			f, err := os.Open(filePath)
-			if err != nil {
-				return err
-			}
-
-			// copy file data into tar writer
-			if _, err := io.Copy(tarWriter, f); err != nil {
-				return err
-			}
-			f.Close()
-		}
-
-		return nil
-	})
+	tarOutput := SetCommandOutput(&tarCommand, debug)
+	if err := tarCommand.Run(); err != nil {
+		return fmt.Errorf("Error running \"tar\" command \"%s\". "+
+			"Error is \"%s\". Full output below:\n%s",
+			tarCommand.String(), err.Error(), tarOutput.String())
+	}
+	return nil
 }
 
 // ExtractTarArchive extracts all the files from a tar. Currently supported are
 // uncompressed tar archives and the following compression types: zip, gzip, xz
 // bzip2, zstd
 func ExtractTarArchive(src, dest string, verbose, debug bool) error {
-	// magic numbers are used to determine the compression type of
-	// the tar archive
+	tarCommand := *exec.Command("tar",
+		"--extract",
+		"--file",
+		src,
+		"--directory",
+		dest,
+	)
+	if debug {
+		tarCommand.Args = append(tarCommand.Args, "--verbose")
+	}
+	// determine if there is compression on the tar archive, and what kind
 	magicNumbers := map[string][]byte{
 		"zip":   {0x50, 0x4b, 0x03, 0x04},
 		"gzip":  {0x1f, 0x8b, 0x08},
@@ -366,153 +332,43 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 	}
 
 	tarBuff := bufio.NewReader(tarFile)
-	tarBytes, err := tarBuff.Peek(6)
+	tarBytes, err := tarBuff.Peek(6) // only look at the first 6 bytes for magic numbers
 	if err != nil {
 		return fmt.Errorf("Error Peeking tar file: \"%s\"", err.Error())
 	}
 
-	var tarReader *tar.Reader
-	found := false
 	var fileType string
 	for compressionType, magicNumber := range magicNumbers {
 		if bytes.HasPrefix(tarBytes, magicNumber) {
-			found = true
 			if verbose || debug {
 				fmt.Printf("Detected tar compression type %s\n", compressionType)
 			}
 			fileType = compressionType
 		}
 	}
-	if !found {
-		// if it didn't have one of the listed magic numbers, assume it's a tar
-		// archive. This will throw an error later in the function if it is not
-		// a valid tar archive
-		fileType = "tar"
-	}
+	// append compression flags to the command
 	switch fileType {
 	case "zip":
-		tarStat, err := os.Stat(src)
-		if err != nil {
-			return fmt.Errorf("Error running Stat on tar file: \"%s\"", err.Error())
-		}
-		buff := bytes.NewBuffer([]byte{})
-		_, err = io.Copy(buff, tarBuff)
-		if err != nil {
-			return fmt.Errorf("Error copying tar buffer: \"%s\"", err.Error())
-		}
-		reader := bytes.NewReader(buff.Bytes())
-		zipReader, err := zip.NewReader(reader, tarStat.Size())
-		if err != nil {
-			return fmt.Errorf("Error reading zip file: \"%s\"", err.Error())
-		}
-		if len(zipReader.File) > 1 {
-			return fmt.Errorf("Invalid zip file. Zip must contain exactly one tar file")
-		}
-		zipContents, err := zipReader.File[0].Open()
-		if err != nil {
-			return fmt.Errorf("Error reading contents of zip file: \"%s\"", err.Error())
-		}
-		tarReader = tar.NewReader(zipContents)
-		break
+		fallthrough
 	case "gzip":
-		gzipReader, err := gzip.NewReader(tarBuff)
-		if err != nil {
-			return fmt.Errorf("Error reading gzip file: \"%s\"", err.Error())
-		}
-		defer gzipReader.Close()
-		tarReader = tar.NewReader(gzipReader)
+		tarCommand.Args = append(tarCommand.Args, "--gunzip")
 		break
 	case "xz":
-		xzReader, err := xz.NewReader(tarBuff)
-		if err != nil {
-			return fmt.Errorf("Error reading xz file: \"%s\"", err.Error())
-		}
-		tarReader = tar.NewReader(xzReader)
+		tarCommand.Args = append(tarCommand.Args, "--xz")
 		break
 	case "bzip2":
-		bzipReader := bzip2.NewReader(tarBuff)
-		tarReader = tar.NewReader(bzipReader)
+		tarCommand.Args = append(tarCommand.Args, "--bzip2")
 		break
 	case "zstd":
-		zstdReader, err := zstd.NewReader(tarBuff)
-		if err != nil {
-			return fmt.Errorf("Error reading zstd file: \"%s\"", err.Error())
-		}
-		defer zstdReader.Close()
-		tarReader = tar.NewReader(zstdReader)
-		break
-	case "tar":
-		// the archive is not compressed, so simply extract it
-		tarReader = tar.NewReader(tarBuff)
+		tarCommand.Args = append(tarCommand.Args, "--zstd")
 		break
 	}
-
-	symlinks := make(map[string]string)
-tarloop:
-	for {
-		header, err := tarReader.Next()
-		switch {
-
-		// if no more files are found exit the loop
-		case err == io.EOF:
-			break tarloop
-
-		// return any other error
-		case err != nil:
-			return err
-
-		// if the header is nil, just skip it (not sure how this happens)
-		case header == nil:
-			continue
-		}
-
-		if debug {
-			fmt.Printf("Extracting file %s from tar\n", header.Name)
-		}
-
-		// the target location where the dir/file should be created
-		target := filepath.Join(dest, header.Name)
-
-		// check the file type
-		switch header.Typeflag {
-
-		// if its a dir and it doesn't exist create it
-		case tar.TypeDir:
-			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(target, 0755); err != nil {
-					return err
-				}
-			}
-			break
-
-		// if it's a file or link create it
-		case tar.TypeReg:
-			destFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
-			if err != nil {
-				return err
-			}
-
-			// copy over contents
-			if _, err := io.Copy(destFile, tarReader); err != nil {
-				return err
-			}
-			// make sure to close the file
-			destFile.Close()
-		case tar.TypeSymlink:
-			symlinks[header.Name] = header.Linkname
-			break
-		}
+	tarOutput := SetCommandOutput(&tarCommand, debug)
+	if err := tarCommand.Run(); err != nil {
+		return fmt.Errorf("Error running \"tar\" command \"%s\". "+
+			"Error is \"%s\". Full output below:\n%s",
+			tarCommand.String(), err.Error(), tarOutput.String())
 	}
-	// now go create all of the symlinks
-	cwd, _ := os.Getwd()
-	os.Chdir(dest)
-	for name, linkname := range symlinks {
-		err := os.Symlink(linkname, name)
-		if err != nil {
-			return err
-		}
-	}
-	os.Chdir(cwd)
 	return nil
 }
 

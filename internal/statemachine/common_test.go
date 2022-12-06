@@ -84,6 +84,69 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 	})
 }
 
+// TestDetermineOutputDirectory unit tests the determineOutputDirectory function
+func TestDetermineOutputDirectory(t *testing.T) {
+	testDir1 := "/tmp/determine_output_dir-" + uuid.NewString()
+	testDir2 := "/tmp/determine_output_dir-" + uuid.NewString()
+	testCases := []struct {
+		name              string
+		workDir           string
+		outputDir         string
+		expectedOutputDir string
+		cleanUp           bool
+	}{
+		{"no_workdir_no_outputdir", "", "", os.Getwd(), false},
+		{"yes_workdir_no_outputdir", testDir1, "", testDir1, true},
+		{"no_workdir_yes_outputdir", "", testDir1, testDir1, true},
+		{"different_workdir_and_outputdir", testDir1, testDir2, testDir2, true},
+		{"same_workdir_and_outputdir", testDir1, testDir1, testDir1, true},
+	}
+	for _, tc := range testCases {
+		t.Run("test_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.WorkDir = tc.workDir
+			stateMachine.commonFlags.OutputDir = tc.outputDir
+
+			err := stateMachine.determineOutputDirectory()
+			asserter.AssertErrNil(err, true)
+			if cleanUp {
+				defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
+			}
+
+			// ensure the correct output dir was set and that it exists
+			if stateMachine.commonFlags.OutputDir != tc.expectedOutputDir {
+				t.Errorf("Workdir set in in struct \"%s\" does not match expected value \"%s\"",
+					stateMachine.commonFlags.OutputDir, tc.expectedOutputDir)
+			}
+			if _, err := os.Stat(stateMachine.commonFlags, outputDir); err != nil {
+				t.Errorf("Failed to create output directory %s",
+					stateMachine.stateMachineFlags.WorkDir)
+			}
+
+		})
+	}
+}
+
+// TestFailedDetermineOutputDir tests failures in the determineOutputDirectory function
+func TestFailedMakeTemporaryDirectories(t *testing.T) {
+	t.Run("test_failed_determine_output_dir", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// mock os.MkdirAll
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		err = stateMachine.makeDisk()
+		asserter.AssertErrContains(err, "Error creating OutputDir")
+		osMkdirAll = os.MkdirAll
+	})
+}
+
 // TestLoadGadgetYaml tests a successful load of gadget.yaml. It also tests that the unpack
 // directory is preserved if the relevant environment variable is set
 func TestLoadGadgetYaml(t *testing.T) {
@@ -847,6 +910,8 @@ func TestFailedMakeDisk(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(outDir)
 		stateMachine.commonFlags.OutputDir = outDir
+		err = stateMachine.determineOutputDirectory()
+		asserter.AssertErrNil(err, true)
 
 		// set up volume names
 		stateMachine.VolumeNames = map[string]string{
@@ -873,15 +938,6 @@ func TestFailedMakeDisk(t *testing.T) {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
 		}
-
-		// mock os.MkdirAll
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		err = stateMachine.makeDisk()
-		asserter.AssertErrContains(err, "Error creating OutputDir")
-		osMkdirAll = os.MkdirAll
 
 		// mock os.RemoveAll
 		osRemoveAll = mockRemoveAll
