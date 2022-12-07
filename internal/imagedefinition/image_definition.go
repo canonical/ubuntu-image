@@ -214,7 +214,7 @@ type Changelog struct {
 // rootfs build steps and the compression to use on it
 type RootfsTar struct {
 	RootfsTarName string `yaml:"name"        json:"RootfsTarName"`
-	Compression   string `yaml:"compression" json:"Compression"   jsonschema:"enum=uncompressed,enum=bzip2,enum=gzip,enum=xz,enum=zip,enum=zstd" default:"uncompressed"`
+	Compression   string `yaml:"compression" json:"Compression"   jsonschema:"enum=uncompressed,enum=bzip2,enum=gzip,enum=xz,enum=zstd" default:"uncompressed"`
 }
 
 // NewMissingURLError fails the image definition parsing when a dict

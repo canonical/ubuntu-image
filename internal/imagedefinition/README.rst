@@ -106,7 +106,7 @@ The following specification defines what is supported in the YAML:
          # Used for pre-built root filesystems rather than germinating
          # from a seed or using a list of archive-tasks. Must be an
          # an uncompressed tar archive or a tar archive with one of the
-         # following compression types: bzip2, gzip, xz, zip, zstd.
+         # following compression types: bzip2, gzip, xz, zstd.
          tarball: (exactly 1 of archive-tasks, seed or tarball must be specified)
              # The path to the tarball. Can be a local path or an URL.
              url: <string> (required if tarball dict is specified)
@@ -277,7 +277,7 @@ The following specification defines what is supported in the YAML:
            name: <string>
            # Type of compression to use on the tar archive. Defaults
            # to "uncompressed"
-           compression: uncompressed | bzip2 | gzip | xz | zip | zstd (optional)
+           compression: uncompressed | bzip2 | gzip | xz | zstd (optional)
 
 The following sections detail the top-level keys within this definition,
 followed by several examples.

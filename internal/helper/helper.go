@@ -1,7 +1,6 @@
 package helper
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"fmt"
@@ -281,16 +280,17 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 // Currently supported are uncompressed tar archives and the following
 // compression types: zip, gzip, xz bzip2, zstd
 func CreateTarArchive(src, dest, compression string, verbose, debug bool) error {
-	tarCommand := *exec.Command("tar",
+	tarCommand := *exec.Command(
+		"tar",
 		"--directory",
 		src,
 		"--xattrs",
+		"--xattrs-include=*",
 		"--create",
 		"--file",
 		dest,
 		".",
 	)
-	fmt.Println(tarCommand.String())
 	if debug {
 		tarCommand.Args = append(tarCommand.Args, "--verbose")
 	}
@@ -307,7 +307,10 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 // uncompressed tar archives and the following compression types: zip, gzip, xz
 // bzip2, zstd
 func ExtractTarArchive(src, dest string, verbose, debug bool) error {
-	tarCommand := *exec.Command("tar",
+	tarCommand := *exec.Command(
+		"tar",
+		"--xattrs",
+		"--xattrs-include=*",
 		"--extract",
 		"--file",
 		src,
@@ -316,52 +319,6 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 	)
 	if debug {
 		tarCommand.Args = append(tarCommand.Args, "--verbose")
-	}
-	// determine if there is compression on the tar archive, and what kind
-	magicNumbers := map[string][]byte{
-		"zip":   {0x50, 0x4b, 0x03, 0x04},
-		"gzip":  {0x1f, 0x8b, 0x08},
-		"xz":    {0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00},
-		"bzip2": {0x42, 0x5a, 0x68},
-		"zstd":  {0x28, 0xb5, 0x2f, 0xfd},
-	}
-	// first check if the archive is gzip compressed
-	tarFile, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("Error reading tar file: \"%s\"", err.Error())
-	}
-
-	tarBuff := bufio.NewReader(tarFile)
-	tarBytes, err := tarBuff.Peek(6) // only look at the first 6 bytes for magic numbers
-	if err != nil {
-		return fmt.Errorf("Error Peeking tar file: \"%s\"", err.Error())
-	}
-
-	var fileType string
-	for compressionType, magicNumber := range magicNumbers {
-		if bytes.HasPrefix(tarBytes, magicNumber) {
-			if verbose || debug {
-				fmt.Printf("Detected tar compression type %s\n", compressionType)
-			}
-			fileType = compressionType
-		}
-	}
-	// append compression flags to the command
-	switch fileType {
-	case "zip":
-		fallthrough
-	case "gzip":
-		tarCommand.Args = append(tarCommand.Args, "--gunzip")
-		break
-	case "xz":
-		tarCommand.Args = append(tarCommand.Args, "--xz")
-		break
-	case "bzip2":
-		tarCommand.Args = append(tarCommand.Args, "--bzip2")
-		break
-	case "zstd":
-		tarCommand.Args = append(tarCommand.Args, "--zstd")
-		break
 	}
 	tarOutput := SetCommandOutput(&tarCommand, debug)
 	if err := tarCommand.Run(); err != nil {
@@ -407,7 +364,16 @@ func CheckTags(searchStruct interface{}, tag string) (string, error) {
 			field.Cap() > 0 &&
 			field.Index(0).Kind() == reflect.Pointer {
 			for i := 0; i < field.Cap(); i++ {
-				CheckTags(field.Index(i).Interface(), tag)
+				tagUsed, err := CheckTags(field.Index(i).Interface(), tag)
+				if err != nil {
+					return "", err
+				}
+				if tagUsed != "" {
+					// just return on the first one found.
+					// user can iteratively work through error
+					// messages if there are more than one
+					return tagUsed, nil
+				}
 			}
 		} else if !field.IsNil() {
 			tags := elem.Type().Field(i).Tag
