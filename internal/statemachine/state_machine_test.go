@@ -60,6 +60,9 @@ func mockSetDefaults(interface{}) error {
 func mockCheckEmptyFields(interface{}, *gojsonschema.Result, *jsonschema.Schema) error {
 	return fmt.Errorf("Test Error")
 }
+func mockCheckTags(interface{}, string) (string, error) {
+	return "", fmt.Errorf("Test Error")
+}
 func mockCopyBlobSuccess([]string) error {
 	return nil
 }

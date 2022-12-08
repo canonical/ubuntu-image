@@ -20,7 +20,7 @@ type ImageDefinition struct {
 	Architecture   string         `yaml:"architecture"    json:"Architecture"`
 	Series         string         `yaml:"series"          json:"Series"`
 	Kernel         string         `yaml:"kernel"          json:"Kernel,omitempty"`
-	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget"`
+	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget,omitempty"`
 	ModelAssertion string         `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
 	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *Customization `yaml:"customization"   json:"Customization,omitempty"`
@@ -160,12 +160,13 @@ type AddUser struct {
 // Artifact contains information about the files that are created
 // during and as a result of the image build process
 type Artifact struct {
-	Img       *[]Img     `yaml:"img"       json:"Img,omitempty"`
-	Iso       *[]Iso     `yaml:"iso"       json:"Iso,omitempty"`
-	Qcow2     *[]Qcow2   `yaml:"qcow2"     json:"Qcow2,omitempty"`
-	Manifest  *Manifest  `yaml:"manifest"  json:"Manifest,omitempty"`
-	Filelist  *Filelist  `yaml:"filelist"  json:"Filelist,omitempty"`
-	Changelog *Changelog `yaml:"changelog" json:"Changelog,omitempty"`
+	Img       *[]Img     `yaml:"img"            json:"Img,omitempty"       is_disk:"true"`
+	Iso       *[]Iso     `yaml:"iso"            json:"Iso,omitempty"       is_disk:"true"`
+	Qcow2     *[]Qcow2   `yaml:"qcow2"          json:"Qcow2,omitempty"     is_disk:"true"`
+	Manifest  *Manifest  `yaml:"manifest"       json:"Manifest,omitempty"  is_disk:"false"`
+	Filelist  *Filelist  `yaml:"filelist"       json:"Filelist,omitempty"  is_disk:"false"`
+	Changelog *Changelog `yaml:"changelog"      json:"Changelog,omitempty" is_disk:"false"`
+	RootfsTar *RootfsTar `yaml:"rootfs-tarball" json:"RootfsTar,omitempty" is_disk:"false"`
 }
 
 // Img specifies the name of the resulting .img file.
@@ -207,6 +208,13 @@ type Filelist struct {
 // If left emtpy no changelog file will be created
 type Changelog struct {
 	ChangelogName string `yaml:"name" json:"ChangelogName"`
+}
+
+// RootfsTar specifies the name of a tarball to create from the
+// rootfs build steps and the compression to use on it
+type RootfsTar struct {
+	RootfsTarName string `yaml:"name"        json:"RootfsTarName"`
+	Compression   string `yaml:"compression" json:"Compression"   jsonschema:"enum=uncompressed,enum=bzip2,enum=gzip,enum=xz,enum=zstd" default:"uncompressed"`
 }
 
 // NewMissingURLError fails the image definition parsing when a dict
@@ -264,6 +272,26 @@ func NewPathNotAbsoluteError(context *gojsonschema.JsonContext, value interface{
 // PathNotAbsoluteError implements gojsonschema.ErrorType. It is used for custom errors for
 // fields that should be absolute but are not
 type PathNotAbsoluteError struct {
+	gojsonschema.ResultErrorFields
+}
+
+// NewDependentKeyError fails the image definition parsing when one
+// field depends on another being specified
+func NewDependentKeyError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *DependentKeyError {
+	err := DependentKeyError{}
+	err.SetContext(context)
+	err.SetType("dependent_key_error")
+	err.SetDescriptionFormat("Key {{.key1}} cannot be used without key {{.key2}}")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// DependentKeyError implements gojsonschema.ErrorType.
+// It is used for custom errors for keys that depend on
+// other keys being specified
+type DependentKeyError struct {
 	gojsonschema.ResultErrorFields
 }
 

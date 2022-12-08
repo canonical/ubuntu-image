@@ -36,6 +36,7 @@ var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 var helperCopyBlob = helper.CopyBlob
 var helperSetDefaults = helper.SetDefaults
 var helperCheckEmptyFields = helper.CheckEmptyFields
+var helperCheckTags = helper.CheckTags
 var ioutilReadAll = ioutil.ReadAll
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile

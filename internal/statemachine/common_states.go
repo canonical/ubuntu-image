@@ -49,6 +49,24 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	return nil
 }
 
+// determineOutputDirectory sets the directory in which to place artifacts
+// and creates it if it doesn't already exist
+func (stateMachine *StateMachine) determineOutputDirectory() error {
+	if stateMachine.commonFlags.OutputDir == "" {
+		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd
+			stateMachine.commonFlags.OutputDir, _ = os.Getwd()
+		} else {
+			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
+		}
+	} else {
+		err := osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating OutputDir: %s", err.Error())
+		}
+	}
+	return nil
+}
+
 // Load gadget.yaml, do some validation, and store the relevant info in the StateMachine struct
 func (stateMachine *StateMachine) loadGadgetYaml() error {
 	gadgetYamlDst := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "gadget.yaml")
@@ -308,19 +326,6 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 
 // Make the disk
 func (stateMachine *StateMachine) makeDisk() error {
-	// ensure the output dir exists
-	if stateMachine.commonFlags.OutputDir == "" {
-		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd
-			stateMachine.commonFlags.OutputDir, _ = os.Getwd()
-		} else {
-			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
-		}
-	} else {
-		err := osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating OutputDir: %s", err.Error())
-		}
-	}
 	// TODO: this is only temporarily needed until go-diskfs is fixed - see below
 	var existingDiskIds [][]byte
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
