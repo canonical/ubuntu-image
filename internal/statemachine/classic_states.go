@@ -653,12 +653,11 @@ func (stateMachine *StateMachine) verifyArtifactNames() error {
 					qcow2.Qcow2Volume = volName
 					(*classicStateMachine.ImageDef.Artifacts.Qcow2)[0] = qcow2
 					return nil // We will re-use the .img file in this case
-				} else {
-					// there is only one volume, so get it from the map
-					stateMachine.VolumeNames[volName] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
-					qcow2.Qcow2Volume = volName
-					(*classicStateMachine.ImageDef.Artifacts.Qcow2)[0] = qcow2
 				}
+				// there is only one volume, so get it from the map
+				stateMachine.VolumeNames[volName] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
+				qcow2.Qcow2Volume = volName
+				(*classicStateMachine.ImageDef.Artifacts.Qcow2)[0] = qcow2
 			} else {
 				if classicStateMachine.ImageDef.Artifacts.Img != nil {
 					return nil // We will re-use the .img file in this case
