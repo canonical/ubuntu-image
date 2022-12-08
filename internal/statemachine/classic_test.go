@@ -621,7 +621,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 			nil,
 			&[]imagedefinition.Qcow2{
 				{
-					Qcow2Name:   "test1.qcow2",
+					Qcow2Name: "test1.qcow2",
 				},
 			},
 			map[string]string{
