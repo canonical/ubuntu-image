@@ -1812,7 +1812,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		// We need the output directory set for this
 		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
-		//defer os.RemoveAll(outputDir)
+		defer os.RemoveAll(outputDir)
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
