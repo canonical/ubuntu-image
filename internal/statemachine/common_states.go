@@ -326,7 +326,6 @@ func (stateMachine *StateMachine) makeDisk() error {
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		if _, found := stateMachine.VolumeNames[volumeName]; found {
 			imgName := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[volumeName])
-
 			// Create the disk image
 			imgSize, found := stateMachine.ImageSizes[volumeName]
 			if !found {

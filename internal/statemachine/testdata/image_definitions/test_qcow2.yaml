@@ -51,13 +51,6 @@ customization:
     -
       name: "hello-ubuntu-image-private"
 artifacts:
-  img:
-    -
-      name: pc-amd64.img
   qcow2:
     -
       name: pc-amd64.qcow2
-  manifest:
-    name: "filesystem-manifest.txt"
-  filelist:
-    name: "filesystem-filelist.txt"

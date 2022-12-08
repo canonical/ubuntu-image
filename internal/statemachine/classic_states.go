@@ -201,7 +201,7 @@ func (stateMachine *StateMachine) calculateStates() error {
 		stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml})
 
 	// if artifacts are specified, verify the correctness and store them in the struct
-	if classicStateMachine.ImageDef.Artifacts.Img != nil {
+	if classicStateMachine.ImageDef.Artifacts.Img != nil || classicStateMachine.ImageDef.Artifacts.Qcow2 != nil { // TODO: switch to the helper function to check all artifacts that should go in here
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"verify_artifact_names", (*StateMachine).verifyArtifactNames})
 	}
@@ -269,6 +269,23 @@ func (stateMachine *StateMachine) calculateStates() error {
 	if classicStateMachine.ImageDef.Artifacts.Img != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"make_disk", (*StateMachine).makeDisk})
+	}
+
+	// only run makeDisk if there is an artifact to make
+	if classicStateMachine.ImageDef.Artifacts.Qcow2 != nil {
+		// only run make_disk once
+		found := false
+		for _, stateFunc := range rootfsCreationStates {
+			if stateFunc.name == "make_disk" {
+				found = true
+			}
+		}
+		if !found {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"make_disk", (*StateMachine).makeDisk})
+		}
+		rootfsCreationStates = append(rootfsCreationStates,
+			stateFunc{"create_qcow2_image", (*StateMachine).createQcow2})
 	}
 
 	// only run generatePackageManifest if there is a manifest in the image definition
@@ -548,21 +565,67 @@ func (stateMachine *StateMachine) verifyArtifactNames() error {
 	stateMachine.VolumeNames = make(map[string]string)
 
 	if len(stateMachine.GadgetInfo.Volumes) > 1 {
-		// dereferencing is safe because this state only runs when Img is non-nil
-		for _, img := range *classicStateMachine.ImageDef.Artifacts.Img {
-			if img.ImgVolume == "" {
-				return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
+		// first handle .img files if they are specified
+		if classicStateMachine.ImageDef.Artifacts.Img != nil {
+			for _, img := range *classicStateMachine.ImageDef.Artifacts.Img {
+				if img.ImgVolume == "" {
+					return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
+				}
+				stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
 			}
-			stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
+		}
+		if classicStateMachine.ImageDef.Artifacts.Qcow2 != nil {
+			for _, qcow2 := range *classicStateMachine.ImageDef.Artifacts.Qcow2 {
+				if qcow2.Qcow2Volume == "" {
+					return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
+				}
+				// We can save a whole lot of disk I/O here if the volume is already specified as a .img file
+				if classicStateMachine.ImageDef.Artifacts.Img != nil {
+					found := false
+					for _, img := range *classicStateMachine.ImageDef.Artifacts.Img {
+						if img.ImgVolume == qcow2.Qcow2Volume {
+							found = true
+						}
+					}
+					if !found {
+						stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
+					}
+				} else {
+					stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
+				}
+			}
 		}
 	} else {
-		img := (*classicStateMachine.ImageDef.Artifacts.Img)[0]
-		if img.ImgVolume == "" {
-			// there is only one volume, so get it from the map
-			volName := reflect.ValueOf(stateMachine.GadgetInfo.Volumes).MapKeys()[0].String()
-			stateMachine.VolumeNames[volName] = img.ImgName
-		} else {
-			stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
+		if classicStateMachine.ImageDef.Artifacts.Img != nil {
+			img := (*classicStateMachine.ImageDef.Artifacts.Img)[0]
+			if img.ImgVolume == "" {
+				// there is only one volume, so get it from the map
+				volName := reflect.ValueOf(stateMachine.GadgetInfo.Volumes).MapKeys()[0].String()
+				stateMachine.VolumeNames[volName] = img.ImgName
+			} else {
+				stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
+			}
+		}
+		if classicStateMachine.ImageDef.Artifacts.Qcow2 != nil {
+			qcow2 := (*classicStateMachine.ImageDef.Artifacts.Qcow2)[0]
+			if qcow2.Qcow2Volume == "" {
+				volName := reflect.ValueOf(stateMachine.GadgetInfo.Volumes).MapKeys()[0].String()
+				if classicStateMachine.ImageDef.Artifacts.Img != nil {
+					qcow2.Qcow2Volume = volName
+					(*classicStateMachine.ImageDef.Artifacts.Qcow2)[0] = qcow2
+					return nil // We will re-use the .img file in this case
+				} else {
+					// there is only one volume, so get it from the map
+					stateMachine.VolumeNames[volName] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
+					qcow2.Qcow2Volume = volName
+					(*classicStateMachine.ImageDef.Artifacts.Qcow2)[0] = qcow2
+				}
+			} else {
+				if classicStateMachine.ImageDef.Artifacts.Img != nil {
+					return nil // We will re-use the .img file in this case
+				}
+				stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
+			}
 		}
 	}
 	return nil
@@ -976,5 +1039,32 @@ func (stateMachine *StateMachine) generateFilelist() error {
 	}
 	defer filelist.Close()
 	filelist.Write(cmdOutput.Bytes())
+	return nil
+}
+
+func (stateMachine *StateMachine) createQcow2() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	for _, qcow2 := range *classicStateMachine.ImageDef.Artifacts.Qcow2 {
+		backingFile := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[qcow2.Qcow2Volume])
+		resultingFile := filepath.Join(stateMachine.commonFlags.OutputDir, qcow2.Qcow2Name)
+		qemuImgCommand := execCommand("qemu-img",
+			"convert",
+			"-c",
+			"-O",
+			"qcow2",
+			"-o",
+			"compat=0.10",
+			backingFile,
+			resultingFile,
+		)
+		qemuOutput := helper.SetCommandOutput(qemuImgCommand, classicStateMachine.commonFlags.Debug)
+		if err := qemuImgCommand.Run(); err != nil {
+			return fmt.Errorf("Error creating qcow2 artifact with command \"%s\". "+
+				"Error is \"%s\". Full output below:\n%s",
+				qemuImgCommand.String(), err.Error(), qemuOutput.String())
+		}
+	}
 	return nil
 }
