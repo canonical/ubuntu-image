@@ -5,10 +5,6 @@ architecture: amd64
 series: jammy
 class: preinstalled
 kernel: linux-image-generic
-gadget:
-  url: "https://github.com/snapcore/pc-amd64-gadget.git"
-  branch: classic
-  type: "git"
 rootfs:
   components:
     - main
@@ -53,10 +49,4 @@ customization:
 artifacts:
   img:
     -
-      name: pc-amd64.img
-  manifest:
-    name: "filesystem-manifest.txt"
-  rootfs-tarball:
-    name: "rootfs.tar"
-  filelist:
-    name: "filesystem-filelist.txt"
+      name: "pi.img"

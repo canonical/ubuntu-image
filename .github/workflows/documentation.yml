@@ -5,7 +5,7 @@ on: [pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: changelog-check
+    name: documentation-check
     steps:
       - uses: actions/checkout@v3
         with:
@@ -16,10 +16,25 @@ jobs:
         uses: tj-actions/changed-files@v32
         with:
           files: |
-            internal/imagedefinition/**
+            internal/imagedefinition/image_definition.go
 
+      - name: Get info on if image definition README was updated
+        id: changed-files-image-def-readme
+        uses: tj-actions/changed-files@v32
+        with:
+          files: |
+            internal/imagedefinition/README.rst
+
+      - name: test struct boolean
+        if: steps.changed-files-image-def.outputs.any_changed == 'true'
+        run: |
+          echo "Struct has changed"
+      - name: test struct README
+        if: steps.changed-files-image-def-reamde.outputs.any_changed != 'true'
+        run: |
+          echo "README has not changed"
       - name: Fail if image definition README has not been updated
-        if: steps.changed-files-image-def.outputs.any_changed == 'true' && contains(steps.changed-files-image-def.outputs.changed_files, 'README') != true
+        if: steps.changed-files-image-def.outputs.any_changed == 'true' && steps.changed-files-image-def-readme.outputs.any_changed != true
         run: |
           echo "Image Definition struct has changed but README was not updated"
           exit 1
@@ -29,7 +44,7 @@ jobs:
         uses: tj-actions/changed-files@v32
         with:
           files: |
-            internal/commands/**
+            internal/commands/*
 
       - name: Fail if command line args have changed but manpage has not been updated
         if: steps.changed-files-flags.outputs.any_changed == 'true' && contains(steps.changed-files-flags.outputs.changed_files, 'ubuntu-image.rst') != true

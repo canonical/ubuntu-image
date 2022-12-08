@@ -10,6 +10,7 @@ var startingClassicStates = []stateFunc{
 	{"parse_image_definition", (*StateMachine).parseImageDefinition},
 	{"calculate_states", (*StateMachine).calculateStates},
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
+	{"determine_output_directory", (*StateMachine).determineOutputDirectory},
 }
 
 var rootfsSeedStates = []stateFunc{

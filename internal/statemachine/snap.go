@@ -7,6 +7,7 @@ import (
 // snapStates are the names and function variables to be executed by the state machine for snap images
 var snapStates = []stateFunc{
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
+	{"determine_output_directory", (*StateMachine).determineOutputDirectory},
 	{"prepare_image", (*StateMachine).prepareImage},
 	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
 	{"set_artifact_names", (*StateMachine).setArtifactNames},
