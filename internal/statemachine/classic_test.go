@@ -165,7 +165,7 @@ func TestCalculateStates(t *testing.T) {
 		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"germinate"}},
 		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
 		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "perform_manual_customization"}},
-		{"qcow2", "test_qcow2.yaml", []string{"make_disk", "create_qcow2_image"}},
+		{"qcow2", "test_qcow2.yaml", []string{"make_disk", "make_qcow2_image"}},
 	}
 	for _, tc := range testCases {
 		t.Run("test_calcluate_states_"+tc.name, func(t *testing.T) {
@@ -2752,9 +2752,9 @@ func TestPingXattrs(t *testing.T) {
 	})
 }
 
-// TestFailedCreateQcow2 tests failures in the createQcow2Image function
-func TestFailedCreateQcow2(t *testing.T) {
-	t.Run("test_failed_create_qcow2_image", func(t *testing.T) {
+// TestFailedMakeQcow2Img tests failures in the makeQcow2Img function
+func TestFailedMakeQcow2Img(t *testing.T) {
+	t.Run("test_failed_make_qcow2_image", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -2775,13 +2775,13 @@ func TestFailedCreateQcow2(t *testing.T) {
 		}
 
 		// Setup the exec.Command mock
-		testCaseName = "TestFailedCreateQcow2Image"
+		testCaseName = "TestFailedMakeQcow2Image"
 		execCommand = fakeExecCommand
 		defer func() {
 			execCommand = exec.Command
 		}()
 
-		err := stateMachine.createQcow2()
+		err := stateMachine.makeQcow2Img()
 		asserter.AssertErrContains(err, "Error creating qcow2 artifact")
 	})
 }

@@ -318,7 +318,7 @@ func (stateMachine *StateMachine) calculateStates() error {
 				stateFunc{"make_disk", (*StateMachine).makeDisk})
 		}
 		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"create_qcow2_image", (*StateMachine).createQcow2})
+			stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img})
 	}
 
 	// only run generatePackageManifest if there is a manifest in the image definition
@@ -613,12 +613,19 @@ func (stateMachine *StateMachine) verifyArtifactNames() error {
 				stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
 			}
 		}
+		// qcow2 img logic is more complicated. If .img artifacts are already specified
+		// in the image definition for corresponding volumes, we will re-use those and
+		// convert them to a qcow2 image. Otherwise, we will create a raw .img file to
+		//use as an input file for the conversion.
+		// The names of these images are placed in the VolumeNames map, which is used
+		// as an input file for an eventual `qemu-convert` operation.
 		if classicStateMachine.ImageDef.Artifacts.Qcow2 != nil {
 			for _, qcow2 := range *classicStateMachine.ImageDef.Artifacts.Qcow2 {
 				if qcow2.Qcow2Volume == "" {
 					return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
 				}
-				// We can save a whole lot of disk I/O here if the volume is already specified as a .img file
+				// We can save a whole lot of disk I/O here if the volume is
+				// already specified as a .img file
 				if classicStateMachine.ImageDef.Artifacts.Img != nil {
 					found := false
 					for _, img := range *classicStateMachine.ImageDef.Artifacts.Img {
@@ -627,9 +634,13 @@ func (stateMachine *StateMachine) verifyArtifactNames() error {
 						}
 					}
 					if !found {
+						// if a .img artifact for this volume isn't explicitly stated in
+						// the image definition, then create one
 						stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
 					}
 				} else {
+					// no .img artifacts exist in the image definition,
+					// but we still need to create one to convert to qcow2
 					stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
 				}
 			}
@@ -645,6 +656,12 @@ func (stateMachine *StateMachine) verifyArtifactNames() error {
 				stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
 			}
 		}
+		// qcow2 img logic is more complicated. If .img artifacts are already specified
+		// in the image definition for corresponding volumes, we will re-use those and
+		// convert them to a qcow2 image. Otherwise, we will create a raw .img file to
+		//use as an input file for the conversion.
+		// The names of these images are placed in the VolumeNames map, which is used
+		// as an input file for an eventual `qemu-convert` operation.
 		if classicStateMachine.ImageDef.Artifacts.Qcow2 != nil {
 			qcow2 := (*classicStateMachine.ImageDef.Artifacts.Qcow2)[0]
 			if qcow2.Qcow2Volume == "" {
@@ -1094,8 +1111,8 @@ func (stateMachine *StateMachine) generateRootfsTarball() error {
 		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
 }
 
-// createQcow2 converts raw .img artifacts into qcow2 artifacts
-func (stateMachine *StateMachine) createQcow2() error {
+// makeQcow2Img converts raw .img artifacts into qcow2 artifacts
+func (stateMachine *StateMachine) makeQcow2Img() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
