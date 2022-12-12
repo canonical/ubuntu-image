@@ -14,6 +14,7 @@ coverage.txt
 
 # Images built in the file tree
 *.img
+*.qcow2
 
 # Packaging artefacts
 debian/*debhelper*

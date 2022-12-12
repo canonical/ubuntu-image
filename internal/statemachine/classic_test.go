@@ -165,6 +165,7 @@ func TestCalculateStates(t *testing.T) {
 		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"germinate"}},
 		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
 		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "perform_manual_customization"}},
+		{"qcow2", "test_qcow2.yaml", []string{"make_disk", "make_qcow2_image"}},
 	}
 	for _, tc := range testCases {
 		t.Run("test_calcluate_states_"+tc.name, func(t *testing.T) {
@@ -199,9 +200,8 @@ func TestCalculateStates(t *testing.T) {
 	}
 }
 
-// TestFailedCalculateStates tests that the calculateStates
-// function fails if the value of --until or --thru is not
-// in the calculated list of states
+// TestFailedCalculateStates tests failure scenarios in the
+// calculateStates function
 func TestFailedCalculateStates(t *testing.T) {
 	t.Run("test_failed_calcluate_states", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
@@ -222,10 +222,21 @@ func TestFailedCalculateStates(t *testing.T) {
 			Artifacts:     &imagedefinition.Artifact{},
 		}
 
+		// mock helper.CheckTags
+		// the gadget must be set to nil for this test to work
+		helperCheckTags = mockCheckTags
+		defer func() {
+			helperCheckTags = helper.CheckTags
+		}()
+		err := stateMachine.calculateStates()
+		asserter.AssertErrContains(err, "Test Error")
+		helperCheckTags = helper.CheckTags
+
+		// now set a --thru flag for a state that doesn't exist
 		stateMachine.stateMachineFlags.Thru = "fake_state"
 
 		// now calculate the states and ensure that the expected states are in the slice
-		err := stateMachine.calculateStates()
+		err = stateMachine.calculateStates()
 		asserter.AssertErrContains(err, "not a valid state name")
 	})
 }
@@ -462,6 +473,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 		name             string
 		gadgetYAML       string
 		img              *[]imagedefinition.Img
+		qcow2            *[]imagedefinition.Qcow2
 		expectedVolNames map[string]string
 		shouldPass       bool
 	}{
@@ -474,6 +486,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 					ImgVolume: "pc",
 				},
 			},
+			nil,
 			map[string]string{
 				"pc": "test1.img",
 			},
@@ -487,6 +500,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 					ImgName: "test-single.img",
 				},
 			},
+			nil,
 			map[string]string{
 				"pc": "test-single.img",
 			},
@@ -513,6 +527,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 					ImgVolume: "fourth",
 				},
 			},
+			nil,
 			map[string]string{
 				"first":  "test1.img",
 				"second": "test2.img",
@@ -538,6 +553,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 					ImgName: "test4.img",
 				},
 			},
+			nil,
 			map[string]string{},
 			false,
 		},
@@ -560,6 +576,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 					ImgName: "test4.img",
 				},
 			},
+			nil,
 			map[string]string{},
 			false,
 		},
@@ -576,9 +593,188 @@ func TestVerifyArtifactNames(t *testing.T) {
 					ImgVolume: "second",
 				},
 			},
+			nil,
 			map[string]string{
 				"first":  "test1.img",
 				"second": "test2.img",
+			},
+			true,
+		},
+		{
+			"qcow2_single_volume_no_img",
+			"gadget_tree/meta/gadget.yaml",
+			nil,
+			&[]imagedefinition.Qcow2{
+				{
+					Qcow2Name:   "test1.qcow2",
+					Qcow2Volume: "pc",
+				},
+			},
+			map[string]string{
+				"pc": "test1.qcow2.img",
+			},
+			true,
+		},
+		{
+			"qcow2_single_volume_not_specified_no_img",
+			"gadget_tree/meta/gadget.yaml",
+			nil,
+			&[]imagedefinition.Qcow2{
+				{
+					Qcow2Name: "test1.qcow2",
+				},
+			},
+			map[string]string{
+				"pc": "test1.qcow2.img",
+			},
+			true,
+		},
+		{
+			"qcow2_single_volume_yes_img",
+			"gadget_tree/meta/gadget.yaml",
+			&[]imagedefinition.Img{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "pc",
+				},
+			},
+			&[]imagedefinition.Qcow2{
+				{
+					Qcow2Name:   "test1.img",
+					Qcow2Volume: "pc",
+				},
+			},
+			map[string]string{
+				"pc": "test1.img",
+			},
+			true,
+		},
+		{
+			"qcow2_mutli_volume_not_specified",
+			"gadget-multi.yaml",
+			nil,
+			&[]imagedefinition.Qcow2{
+				{
+					Qcow2Name: "test1.img",
+				},
+				{
+					Qcow2Name: "test2.img",
+				},
+				{
+					Qcow2Name: "test3.img",
+				},
+				{
+					Qcow2Name: "test4.img",
+				},
+			},
+			map[string]string{},
+			false,
+		},
+		{
+			"qcow2_mutli_volume_no_img",
+			"gadget-multi.yaml",
+			nil,
+			&[]imagedefinition.Qcow2{
+				{
+					Qcow2Name:   "test1.qcow2",
+					Qcow2Volume: "first",
+				},
+				{
+					Qcow2Name:   "test2.qcow2",
+					Qcow2Volume: "second",
+				},
+				{
+					Qcow2Name:   "test3.qcow2",
+					Qcow2Volume: "third",
+				},
+				{
+					Qcow2Name:   "test4.qcow2",
+					Qcow2Volume: "fourth",
+				},
+			},
+			map[string]string{
+				"first":  "test1.qcow2.img",
+				"second": "test2.qcow2.img",
+				"third":  "test3.qcow2.img",
+				"fourth": "test4.qcow2.img",
+			},
+			true,
+		},
+		{
+			"qcow2_mutli_volume_yes_img",
+			"gadget-multi.yaml",
+			&[]imagedefinition.Img{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "first",
+				},
+				{
+					ImgName:   "test2.img",
+					ImgVolume: "second",
+				},
+				{
+					ImgName:   "test3.img",
+					ImgVolume: "third",
+				},
+				{
+					ImgName:   "test4.img",
+					ImgVolume: "fourth",
+				},
+			},
+			&[]imagedefinition.Qcow2{
+				{
+					Qcow2Name:   "test1.img",
+					Qcow2Volume: "first",
+				},
+				{
+					Qcow2Name:   "test2.img",
+					Qcow2Volume: "second",
+				},
+				{
+					Qcow2Name:   "test3.img",
+					Qcow2Volume: "third",
+				},
+				{
+					Qcow2Name:   "test4.img",
+					Qcow2Volume: "fourth",
+				},
+			},
+			map[string]string{
+				"first":  "test1.img",
+				"second": "test2.img",
+				"third":  "test3.img",
+				"fourth": "test4.img",
+			},
+			true,
+		},
+		{
+			"qcow2_mutli_volume_img_for_different_volume",
+			"gadget-multi.yaml",
+			&[]imagedefinition.Img{
+				{
+					ImgName:   "test1.img",
+					ImgVolume: "first",
+				},
+				{
+					ImgName:   "test2.img",
+					ImgVolume: "second",
+				},
+			},
+			&[]imagedefinition.Qcow2{
+				{
+					Qcow2Name:   "test3.qcow2",
+					Qcow2Volume: "third",
+				},
+				{
+					Qcow2Name:   "test4.qcow2",
+					Qcow2Volume: "fourth",
+				},
+			},
+			map[string]string{
+				"first":  "test1.img",
+				"second": "test2.img",
+				"third":  "test3.qcow2.img",
+				"fourth": "test4.qcow2.img",
 			},
 			true,
 		},
@@ -602,7 +798,8 @@ func TestVerifyArtifactNames(t *testing.T) {
 				},
 				Customization: &imagedefinition.Customization{},
 				Artifacts: &imagedefinition.Artifact{
-					Img: tc.img,
+					Img:   tc.img,
+					Qcow2: tc.qcow2,
 				},
 			}
 
@@ -1604,7 +1801,8 @@ func TestFailedGenerateFilelist(t *testing.T) {
 }
 
 // TestSuccessfulClassicRun runs through a full classic state machine run and ensures
-// it is successful
+// it is successful. It creates a .img and a .qcow2 file and ensures they are the
+// correct file types
 func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
@@ -1672,6 +1870,32 @@ func TestSuccessfulClassicRun(t *testing.T) {
 					t.Errorf("Expected snap %s to be pre-seeded with channel %s, but got %s",
 						seededSnap.Name, channel, seededSnap.Channel)
 				}
+			}
+		}
+
+		// make sure all the artifacts were created and are the correct file types
+		artifacts := map[string]string{
+			"pc-amd64.img":            "DOS/MBR boot sector",
+			"pc-amd64.qcow2":          "QEMU QCOW2 Image",
+			"filesystem-manifest.txt": "text",
+			"filesystem-filelist.txt": "text",
+		}
+		for artifact, fileType := range artifacts {
+			fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
+			_, err := os.Stat(fullPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("File \"%s\" should exist, but does not", fullPath)
+				}
+			}
+
+			// check it is the expected file type
+			fileCommand := *exec.Command("file", fullPath)
+			cmdOutput, err := fileCommand.CombinedOutput()
+			asserter.AssertErrNil(err, true)
+			if !strings.Contains(string(cmdOutput), fileType) {
+				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
+					fullPath, fileType, string(cmdOutput))
 			}
 		}
 
@@ -2525,5 +2749,39 @@ func TestPingXattrs(t *testing.T) {
 		if !reflect.DeepEqual(pingXattrs, []string{"security.capability"}) {
 			t.Error("ping has lost the security.capability xattr after tar extraction")
 		}
+	})
+}
+
+// TestFailedMakeQcow2Img tests failures in the makeQcow2Img function
+func TestFailedMakeQcow2Img(t *testing.T) {
+	t.Run("test_failed_make_qcow2_image", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Artifacts: &imagedefinition.Artifact{
+				Qcow2: &[]imagedefinition.Qcow2{
+					{
+						Qcow2Name: "test.qcow2",
+					},
+				},
+			},
+		}
+
+		// Setup the exec.Command mock
+		testCaseName = "TestFailedMakeQcow2Image"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+
+		err := stateMachine.makeQcow2Img()
+		asserter.AssertErrContains(err, "Error creating qcow2 artifact")
 	})
 }

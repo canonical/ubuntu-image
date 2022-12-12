@@ -207,6 +207,8 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestGenerateFilelist":
 		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
 		break
+	case "TestFailedMakeQcow2Image":
+		fallthrough
 	case "TestFailedGeneratePackageManifest":
 		fallthrough
 	case "TestFailedGenerateFilelist":
