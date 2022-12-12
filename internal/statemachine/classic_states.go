@@ -616,7 +616,7 @@ func (stateMachine *StateMachine) verifyArtifactNames() error {
 		// qcow2 img logic is more complicated. If .img artifacts are already specified
 		// in the image definition for corresponding volumes, we will re-use those and
 		// convert them to a qcow2 image. Otherwise, we will create a raw .img file to
-		//use as an input file for the conversion.
+		// use as an input file for the conversion.
 		// The names of these images are placed in the VolumeNames map, which is used
 		// as an input file for an eventual `qemu-convert` operation.
 		if classicStateMachine.ImageDef.Artifacts.Qcow2 != nil {
@@ -659,7 +659,7 @@ func (stateMachine *StateMachine) verifyArtifactNames() error {
 		// qcow2 img logic is more complicated. If .img artifacts are already specified
 		// in the image definition for corresponding volumes, we will re-use those and
 		// convert them to a qcow2 image. Otherwise, we will create a raw .img file to
-		//use as an input file for the conversion.
+		// use as an input file for the conversion.
 		// The names of these images are placed in the VolumeNames map, which is used
 		// as an input file for an eventual `qemu-convert` operation.
 		if classicStateMachine.ImageDef.Artifacts.Qcow2 != nil {
