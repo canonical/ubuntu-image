@@ -52,7 +52,7 @@ func mockCopyBlob([]string) error {
 func mockCopyBlobSuccess([]string) error {
 	return nil
 }
-func mockLayoutVolume(*gadget.Volume, gadget.LayoutConstraints, *gadget.LayoutOptions) (*gadget.LaidOutVolume, error) {
+func mockLayoutVolume(*gadget.Volume, *gadget.LayoutOptions) (*gadget.LaidOutVolume, error) {
 	return nil, fmt.Errorf("Test Error")
 }
 func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure,
