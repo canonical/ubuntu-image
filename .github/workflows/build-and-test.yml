@@ -18,7 +18,7 @@ jobs:
       - name: apt-update
         run: sudo apt update
       - name: install-test-dependencies
-        run: sudo apt install -y live-build livecd-rootfs=2.664.26.1~ppa1 snapd fdisk gdisk qemu-system-aarch64 qemu-user-static
+        run: sudo apt install -y live-build livecd-rootfs=2.765.14.1~ppa1 snapd fdisk gdisk qemu-system-aarch64 qemu-user-static
       - name: test
         run: sudo go test -timeout 0 -v -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage to Codecov
