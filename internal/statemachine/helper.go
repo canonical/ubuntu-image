@@ -336,7 +336,8 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 	var mbrPartitions = make([]*mbr.Partition, 0)
 	var partitionTable partition.Table
 
-	for _, structure := range volume.Structure {
+	var offset uint64 = 0
+	for i, structure := range volume.Structure {
 		if structure.Role == "mbr" || structure.Type == "bare" ||
 			shouldSkipStructure(structure, isSeeded) {
 			continue
@@ -369,7 +370,15 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 				Type:     mbr.Type(partitionType),
 				Bootable: bootable,
 			}
+			for i < structure.PartitionNumber {
+				mbrPartitions = append(mbrPartitions, &mbr.Partition{
+					Start: uint32(offset),
+					Size:  1,
+					Type:  0x00,
+				})
+			}
 			mbrPartitions = append(mbrPartitions, mbrPartition)
+			offset = offset + uint64(mbrPartition.Size)
 		} else {
 			var partitionName string
 			if structure.Role == "system-data" && structure.Name == "" {
@@ -385,7 +394,17 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 				Type:  partitionType,
 				Name:  partitionName,
 			}
+			fmt.Println(gptPartition)
+			offset = offset + gptPartition.Size
 			gptPartitions = append(gptPartitions, gptPartition)
+			for i < structure.PartitionNumber {
+				gptPartitions = append(gptPartitions, &gpt.Partition{
+					Start: offset,
+					Size:  1,
+					Type:  "00000000-0000-0000-0000-000000000000",
+				})
+			}
+			offset = offset + gptPartition.Size
 		}
 	}
 
