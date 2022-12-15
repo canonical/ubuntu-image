@@ -370,7 +370,7 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 				Type:     mbr.Type(partitionType),
 				Bootable: bootable,
 			}
-			for (i+1) < structure.PartitionNumber {
+			for (i + 1) < structure.PartitionNumber {
 				mbrPartitions = append(mbrPartitions, &mbr.Partition{
 					Start: uint32(offset),
 					Size:  1,
@@ -397,7 +397,7 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 			}
 			offset = offset + gptPartition.Size
 			gptPartitions = append(gptPartitions, gptPartition)
-			for (i+1) < structure.PartitionNumber {
+			for (i + 1) < structure.PartitionNumber {
 				gptPartitions = append(gptPartitions, &gpt.Partition{
 					Start: offset,
 					Size:  1,
