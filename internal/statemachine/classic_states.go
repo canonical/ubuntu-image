@@ -245,6 +245,20 @@ func (stateMachine *StateMachine) calculateStates() error {
 	if classicStateMachine.ImageDef.Rootfs.Tarball != nil {
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
+		// if there are extra snaps or packages to install, these will have
+		// to be done as separate steps
+		if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+		}
+		if len(classicStateMachine.ImageDef.Customization.ExtraPackages) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"install_extra_packages", (*StateMachine).installPackages})
+		}
+		if len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"install_extra_snaps", (*StateMachine).preseedClassicImage})
+		}
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
 		if classicStateMachine.ImageDef.Customization != nil {
@@ -838,20 +852,6 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 	_, err = dpkgConfigFile.WriteString(datasourceConfig)
 
 	return err
-}
-
-// Configure Extra PPAs
-func (stateMachine *StateMachine) setupExtraPPAs() error {
-	// currently a no-op pending implementation of the classic image redesign
-	return nil
-}
-
-// Install extra packages
-// TODO: this should probably happen during the rootfs build steps.
-// but what about extra packages with a tarball based images...
-func (stateMachine *StateMachine) installExtraPackages() error {
-	// currently a no-op pending implementation of the classic image redesign
-	return nil
 }
 
 // Customize /etc/fstab based on values in the image definition

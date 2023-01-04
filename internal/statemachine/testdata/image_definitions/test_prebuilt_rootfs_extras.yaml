@@ -1,0 +1,37 @@
+name: ubuntu-server-raspi-arm64
+display-name: Ubuntu Server Raspberry Pi arm64
+revision: 2
+architecture: arm64
+series: jammy
+class: preinstalled
+kernel: linux-raspi
+gadget:
+  url: "file://test.tar"
+  type: "directory"
+model-assertion: pi-generic.model
+rootfs:
+  tarball:
+    url: "file://test.tar"
+customization:
+  cloud-init:
+    user-data: |
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
+  extra-packages:
+    - name: ubuntu-minimal
+    - name: linux-firmware-raspi
+    - name: pi-bluetooth
+  extra-snaps:
+    - name: hello
+  extra-ppas:
+    - name: test/ppa
+artifacts:
+  img:
+    -
+      name: raspi.img
+  manifest:
+    name: raspi.manifest
