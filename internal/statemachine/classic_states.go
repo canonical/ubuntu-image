@@ -433,8 +433,10 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	// recursively copy the gadget tree to unpack/gadget
 	var gadgetTree string
 	if classicStateMachine.ImageDef.Gadget.GadgetType == "prebuilt" {
-		gadgetURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
-		gadgetTree = gadgetURL.Path
+		gadgetTree = strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
+		if !filepath.IsAbs(gadgetTree) {
+			gadgetTree, _ = filepath.Abs(gadgetTree)
+		}
 	} else {
 		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
 	}
@@ -705,11 +707,14 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	// convert the URL to a file path
 	// no need to check error here as the validity of the URL
 	// has been confirmed by the schema validation
-	tarURL, _ := url.Parse(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL)
+	tarURL := strings.TrimPrefix(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL, "file://")
+	if !filepath.IsAbs(tarURL) {
+		tarURL, _ = filepath.Abs(tarURL)
+	}
 
 	// if the sha256 sum of the tarball is provided, make sure it matches
 	if classicStateMachine.ImageDef.Rootfs.Tarball.SHA256sum != "" {
-		tarSHA256, err := helper.CalculateSHA256(tarURL.Path)
+		tarSHA256, err := helper.CalculateSHA256(tarURL)
 		if err != nil {
 			return err
 		}
@@ -721,7 +726,7 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	}
 
 	// now extract the archive
-	return helper.ExtractTarArchive(tarURL.Path, stateMachine.tempDirs.chroot,
+	return helper.ExtractTarArchive(tarURL, stateMachine.tempDirs.chroot,
 		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
 }
 
