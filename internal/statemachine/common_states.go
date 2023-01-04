@@ -234,21 +234,20 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 
 		// now call LayoutVolume to get a LaidOutVolume we can use
 		// with a mountedFilesystemWriter
-		layoutConstraints := gadget.LayoutConstraints{}
 		layoutOptions := &gadget.LayoutOptions{
 			SkipResolveContent: false,
 			IgnoreContent:      false,
 			GadgetRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
 			KernelRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
 		}
-		laidOutVolume, err := gadgetLayoutVolume(volume, layoutConstraints, layoutOptions)
+		laidOutVolume, err := gadgetLayoutVolume(volume, layoutOptions)
 		if err != nil {
 			return fmt.Errorf("Error laying out bootfs contents: %s", err.Error())
 		}
 
 		for ii, laidOutStructure := range laidOutVolume.LaidOutStructure {
 			var targetDir string
-			if laidOutStructure.Role == gadget.SystemSeed {
+			if laidOutStructure.Role() == gadget.SystemSeed {
 				targetDir = stateMachine.tempDirs.rootfs
 			} else {
 				targetDir = filepath.Join(stateMachine.tempDirs.volumes,
@@ -261,8 +260,8 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 			// signed bootloader image which has this path embedded, so
 			// we need to install our files to there.
 			if !stateMachine.IsSeeded &&
-				(laidOutStructure.Role == gadget.SystemBoot ||
-					laidOutStructure.Label == gadget.SystemBoot) {
+				(laidOutStructure.Role() == gadget.SystemBoot ||
+					laidOutStructure.Label() == gadget.SystemBoot) {
 				if err := stateMachine.handleSecureBoot(volume, targetDir); err != nil {
 					return err
 				}
