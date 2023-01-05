@@ -812,7 +812,7 @@ func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool
 	addGroupSlice := reflect.ValueOf(addGroupInterfaces)
 	for i := 0; i < addGroupSlice.Len(); i++ {
 		addGroup := addGroupSlice.Index(i).Interface().(*imagedefinition.AddGroup)
-		addGroupCmd := execCommand("chroot", targetDir, "groupadd", addGroup.GroupName)
+		addGroupCmd := execCommand("chroot", targetDir, "addgroup", addGroup.GroupName)
 		debugStatement := fmt.Sprintf("Adding group \"%s\"\n", addGroup.GroupName)
 		if addGroup.GroupID != "" {
 			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", addGroup.GroupID}...)
@@ -836,7 +836,7 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 	addUserSlice := reflect.ValueOf(addUserInterfaces)
 	for i := 0; i < addUserSlice.Len(); i++ {
 		addUser := addUserSlice.Index(i).Interface().(*imagedefinition.AddUser)
-		addUserCmd := execCommand("chroot", targetDir, "useradd", addUser.UserName)
+		addUserCmd := execCommand("chroot", targetDir, "adduser", addUser.UserName)
 		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", addUser.UserName)
 		if addUser.UserID != "" {
 			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", addUser.UserID}...)
