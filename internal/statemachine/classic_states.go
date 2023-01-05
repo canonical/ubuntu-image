@@ -707,14 +707,14 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	// convert the URL to a file path
 	// no need to check error here as the validity of the URL
 	// has been confirmed by the schema validation
-	tarURL := strings.TrimPrefix(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL, "file://")
-	if !filepath.IsAbs(tarURL) {
-		tarURL, _ = filepath.Abs(tarURL)
+	tarPath := strings.TrimPrefix(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL, "file://")
+	if !filepath.IsAbs(tarPath) {
+		tarPath, _ = filepath.Abs(tarPath)
 	}
 
 	// if the sha256 sum of the tarball is provided, make sure it matches
 	if classicStateMachine.ImageDef.Rootfs.Tarball.SHA256sum != "" {
-		tarSHA256, err := helper.CalculateSHA256(tarURL)
+		tarSHA256, err := helper.CalculateSHA256(tarPath)
 		if err != nil {
 			return err
 		}
@@ -726,7 +726,7 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	}
 
 	// now extract the archive
-	return helper.ExtractTarArchive(tarURL, stateMachine.tempDirs.chroot,
+	return helper.ExtractTarArchive(tarPath, stateMachine.tempDirs.chroot,
 		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
 }
 
