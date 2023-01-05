@@ -294,6 +294,26 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 	if debug {
 		tarCommand.Args = append(tarCommand.Args, "--verbose")
 	}
+	// set up any compression arguments
+	switch compression {
+	case "uncompressed":
+		break
+	case "bzip2":
+		tarCommand.Args = append(tarCommand.Args, "--bzip2")
+		break
+	case "gzip":
+		tarCommand.Args = append(tarCommand.Args, "--gzip")
+		break
+	case "xz":
+		tarCommand.Args = append(tarCommand.Args, "--xz")
+		break
+	case "zstd":
+		tarCommand.Args = append(tarCommand.Args, "--zstd")
+		break
+	default:
+		return fmt.Errorf("Unknown compression type: \"%s\"", compression)
+	}
+
 	tarOutput := SetCommandOutput(&tarCommand, debug)
 	if err := tarCommand.Run(); err != nil {
 		return fmt.Errorf("Error running \"tar\" command \"%s\". "+

@@ -2634,10 +2634,32 @@ func TestGenerateRootfsTarball(t *testing.T) {
 	testCases := []struct {
 		name    string // the name will double as the compression type
 		tarPath string
+		fileType string
 	}{
 		{
 			"uncompressed",
 			"test_generate_rootfs_tarball.tar",
+			"tar archive",
+		},
+		{
+			"bzip2",
+			"test_generate_rootfs_tarball.tar.bz2",
+			"bzip2 compressed data",
+		},
+		{
+			"gzip",
+			"test_generate_rootfs_tarball.tar.gz",
+			"gzip compressed data",
+		},
+		{
+			"xz",
+			"test_generate_rootfs_tarball.tar.xz",
+			"XZ compressed data",
+		},
+		{
+			"zstd",
+			"test_generate_rootfs_tarball.tar.zst",
+			"Zstandard compressed data",
 		},
 	}
 	for _, tc := range testCases {
@@ -2673,6 +2695,15 @@ func TestGenerateRootfsTarball(t *testing.T) {
 			_, err = os.Stat(filepath.Join(stateMachine.stateMachineFlags.WorkDir, tc.tarPath))
 			if err != nil {
 				t.Errorf("File %s should be in workdir, but is missing", tc.tarPath)
+			}
+
+			fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, tc.tarPath)
+			fileCommand := *exec.Command("file", fullPath)
+			cmdOutput, err := fileCommand.CombinedOutput()
+			asserter.AssertErrNil(err, true)
+			if !strings.Contains(string(cmdOutput), tc.fileType) {
+				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
+					fullPath, tc.fileType, string(cmdOutput))
 			}
 		})
 	}
