@@ -65,13 +65,15 @@ type Tarball struct {
 	SHA256sum  string `yaml:"sha256sum" json:"SHA256sum,omitempty" jsonschema:"minLength=64,maxLength=64"`
 }
 
-// Customization defines the customization section of the image definition file
+// Customization defines the customization section of the image definition file.
+// The extra_step struct tag denotes that an extra state will need to be added
+// for image builds with prebuilt root filesystems.
 type Customization struct {
 	Installer     *Installer `yaml:"installer"      json:"Installer,omitempty"`
 	CloudInit     *CloudInit `yaml:"cloud-init"     json:"CloudInit,omitempty"`
-	ExtraPPAs     []*PPA     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"`
-	ExtraPackages []*Package `yaml:"extra-packages" json:"ExtraPackages,omitempty"`
-	ExtraSnaps    []*Snap    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"`
+	ExtraPPAs     []*PPA     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"     extra_step:"add_extra_ppas"`
+	ExtraPackages []*Package `yaml:"extra-packages" json:"ExtraPackages,omitempty" extra_step:"install_extra_packages"`
+	ExtraSnaps    []*Snap    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"    extra_step:"install_extra_snaps"`
 	Fstab         []*Fstab   `yaml:"fstab"          json:"Fstab,omitempty"`
 	Manual        *Manual    `yaml:"manual"         json:"Manual,omitempty"`
 }

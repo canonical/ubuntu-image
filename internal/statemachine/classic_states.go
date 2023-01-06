@@ -247,17 +247,12 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
 		// if there are extra snaps or packages to install, these will have
 		// to be done as separate steps
-		if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
-			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
-		}
-		if len(classicStateMachine.ImageDef.Customization.ExtraPackages) > 0 {
-			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"install_extra_packages", (*StateMachine).installPackages})
-		}
-		if len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
-			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"install_extra_snaps", (*StateMachine).preseedClassicImage})
+		if classicStateMachine.ImageDef.Customization != nil {
+			extraStates, err := CheckCustomizationSteps(classicStateMachine.ImageDef.Customization, "extra_step")
+			if err != nil {
+				return fmt.Errorf("Error determining extra customization steps: \"%s\"", err.Error())
+			}
+			rootfsCreationStates = append(rootfsCreationStates, extraStates...)
 		}
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
