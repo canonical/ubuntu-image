@@ -2632,8 +2632,8 @@ func TestFailedCustomizeFstab(t *testing.T) {
 // when appropriate and that it contains the correct files
 func TestGenerateRootfsTarball(t *testing.T) {
 	testCases := []struct {
-		name    string // the name will double as the compression type
-		tarPath string
+		name     string // the name will double as the compression type
+		tarPath  string
 		fileType string
 	}{
 		{
