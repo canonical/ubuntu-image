@@ -1172,8 +1172,8 @@ func TestLP1981720(t *testing.T) {
 // TestCheckCustomizationSteps unit tests the checkCustomizationSteps function
 func TestCheckCustomizationSteps(t *testing.T) {
 	testCases := []struct {
-		name           string
-		customization  *imagedefinition.Customization
+		name          string
+		customization *imagedefinition.Customization
 		expectedSteps []string
 	}{
 		{
@@ -1186,7 +1186,7 @@ func TestCheckCustomizationSteps(t *testing.T) {
 				},
 			},
 			[]string{
-					"add_extra_ppas",
+				"add_extra_ppas",
 			},
 		},
 		{
@@ -1199,7 +1199,7 @@ func TestCheckCustomizationSteps(t *testing.T) {
 				},
 			},
 			[]string{
-					"install_extra_packages",
+				"install_extra_packages",
 			},
 		},
 		{
@@ -1212,7 +1212,7 @@ func TestCheckCustomizationSteps(t *testing.T) {
 				},
 			},
 			[]string{
-					"install_extra_snaps",
+				"install_extra_snaps",
 			},
 		},
 		{
@@ -1235,9 +1235,9 @@ func TestCheckCustomizationSteps(t *testing.T) {
 				},
 			},
 			[]string{
-					"add_extra_ppas",
-					"install_extra_packages",
-					"install_extra_snaps",
+				"add_extra_ppas",
+				"install_extra_packages",
+				"install_extra_snaps",
 			},
 		},
 		{
