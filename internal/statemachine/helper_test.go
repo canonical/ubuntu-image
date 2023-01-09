@@ -1168,3 +1168,100 @@ func TestLP1981720(t *testing.T) {
 		os.RemoveAll(contentRoot)
 	})
 }
+
+// TestCheckCustomizationSteps unit tests the checkCustomizationSteps function
+func TestCheckCustomizationSteps(t *testing.T) {
+	testCases := []struct {
+		name           string
+		customization  *imagedefinition.Customization
+		expectedSteps []string
+	}{
+		{
+			"add_extra_ppas",
+			&imagedefinition.Customization{
+				ExtraPPAs: []*imagedefinition.PPA{
+					{
+						PPAName: "test",
+					},
+				},
+			},
+			[]string{
+					"add_extra_ppas",
+			},
+		},
+		{
+			"install_extra_packages",
+			&imagedefinition.Customization{
+				ExtraPackages: []*imagedefinition.Package{
+					{
+						PackageName: "test",
+					},
+				},
+			},
+			[]string{
+					"install_extra_packages",
+			},
+		},
+		{
+			"install_extra_snaps",
+			&imagedefinition.Customization{
+				ExtraSnaps: []*imagedefinition.Snap{
+					{
+						SnapName: "test",
+					},
+				},
+			},
+			[]string{
+					"install_extra_snaps",
+			},
+		},
+		{
+			"all_extra_states",
+			&imagedefinition.Customization{
+				ExtraPPAs: []*imagedefinition.PPA{
+					{
+						PPAName: "test",
+					},
+				},
+				ExtraPackages: []*imagedefinition.Package{
+					{
+						PackageName: "test",
+					},
+				},
+				ExtraSnaps: []*imagedefinition.Snap{
+					{
+						SnapName: "test",
+					},
+				},
+			},
+			[]string{
+					"add_extra_ppas",
+					"install_extra_packages",
+					"install_extra_snaps",
+			},
+		},
+		{
+			"no_extra_states",
+			&imagedefinition.Customization{},
+			[]string{},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_check_customization_steps_"+tc.name, func(t *testing.T) {
+			extraSteps := checkCustomizationSteps(tc.customization, "extra_step")
+			for _, stepName := range tc.expectedSteps {
+				found := false
+				for _, extraStep := range extraSteps {
+					if stepName == extraStep.name {
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("Expected state \"%s\" to be added to the state machine but it was not",
+						stepName,
+					)
+				}
+			}
+		})
+	}
+}

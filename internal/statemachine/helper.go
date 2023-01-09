@@ -855,20 +855,17 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 	return nil
 }
 
-// CheckCustomizationSteps examines a struct and returns a slice
+// checkCustomizationSteps examines a struct and returns a slice
 // of state functions that need to be manually added. It expects
 // the image definition's customization struct to be passed in and
 // uses struct tags to identify which state must be added
-func CheckCustomizationSteps(searchStruct interface{}, tag string) (extraStates []stateFunc, err error) {
+func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates []stateFunc) {
 	possibleStateFunc := map[string]stateFunc{
 		"add_extra_ppas":         stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs},
 		"install_extra_packages": stateFunc{"install_extra_packages", (*StateMachine).installPackages},
 		"install_extra_snaps":    stateFunc{"install_extra_snaps", (*StateMachine).preseedClassicImage},
 	}
 	value := reflect.ValueOf(searchStruct)
-	if value.Kind() != reflect.Ptr {
-		return []stateFunc{}, fmt.Errorf("The argument to CheckCustomizationSteps must be a pointer")
-	}
 	elem := value.Elem()
 	for i := 0; i < elem.NumField(); i++ {
 		field := elem.Field(i)
@@ -880,5 +877,5 @@ func CheckCustomizationSteps(searchStruct interface{}, tag string) (extraStates 
 			}
 		}
 	}
-	return extraStates, nil
+	return extraStates
 }

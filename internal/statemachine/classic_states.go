@@ -248,10 +248,9 @@ func (stateMachine *StateMachine) calculateStates() error {
 		// if there are extra snaps or packages to install, these will have
 		// to be done as separate steps
 		if classicStateMachine.ImageDef.Customization != nil {
-			extraStates, err := CheckCustomizationSteps(classicStateMachine.ImageDef.Customization, "extra_step")
-			if err != nil {
-				return fmt.Errorf("Error determining extra customization steps: \"%s\"", err.Error())
-			}
+			extraStates := checkCustomizationSteps(classicStateMachine.ImageDef.Customization,
+				"extra_step",
+			)
 			rootfsCreationStates = append(rootfsCreationStates, extraStates...)
 		}
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
