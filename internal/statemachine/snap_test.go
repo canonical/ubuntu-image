@@ -293,14 +293,9 @@ func TestGenerateSnapManifest(t *testing.T) {
 			// Check if manifests got generated and if they have expected contents
 			// For both UC20+ and regular images
 			var testResultMap map[string][]string
-			if tc.seeded {
-				testResultMap = map[string][]string{
-					"seed.manifest": {"foo 1.23", "uc20specific 345"},
-				}
-			} else {
+			if !tc.seeded {
 				testResultMap = map[string][]string{
 					"snaps.manifest": {"foo 1.23", "bar 1.23_version", "baz 234"},
-					"seed.manifest":  {"foo 1.23", "test 1234"},
 				}
 			}
 			for manifest, snapList := range testResultMap {
@@ -431,6 +426,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
 			stateMachine.stateMachineFlags.WorkDir = workDir
+			stateMachine.commonFlags.OutputDir = workDir
 
 			err = stateMachine.Setup()
 			asserter.AssertErrNil(err, true)
