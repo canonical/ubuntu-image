@@ -10,7 +10,7 @@ require (
 	github.com/jessevdk/go-flags v1.5.1-0.20210607101731-3927b71304df
 	github.com/mvo5/goconfigparser v0.0.0-20201015074339-50f22f44deb5 // indirect
 	github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2 // indirect
-	github.com/snapcore/snapd v0.0.0-20221213091249-ec6b35d578f4
+	github.com/snapcore/snapd v0.0.0-20230110165810-bb2514455dea
 	gopkg.in/macaroon.v1 v1.0.0 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 )
