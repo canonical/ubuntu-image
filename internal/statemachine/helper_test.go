@@ -1248,7 +1248,7 @@ func TestCheckCustomizationSteps(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_check_customization_steps_"+tc.name, func(t *testing.T) {
-			extraSteps := checkCustomizationSteps(tc.customization, "extra_step")
+			extraSteps := checkCustomizationSteps(tc.customization, "extra_step_prebuilt_rootfs")
 			for _, stepName := range tc.expectedSteps {
 				found := false
 				for _, extraStep := range extraSteps {
