@@ -426,6 +426,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
 			stateMachine.stateMachineFlags.WorkDir = workDir
+			stateMachine.commonFlags.OutputDir = workDir
 
 			err = stateMachine.Setup()
 			asserter.AssertErrNil(err, true)
