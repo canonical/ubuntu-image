@@ -243,22 +243,34 @@ The following specification defines what is supported in the YAML:
            -
              # Name to output the .img file.
              name: <string>
+             # Volume from the gadget from which to create the image
+             volume: <string> (optional for single volume gadgets,
+                               required for multi-volume gadgets)
          # Used to specify that ubuntu-image should create a .iso file.
          # Not yet supported.
          iso: (optional)
            -
              # Name to output the .iso file.
              name: <string>
+             # Volume from the gadget from which to create the image
+             volume: <string> (optional for single volume gadgets,
+                               required for multi-volume gadgets)
              # Specify parameters to use when calling `xorriso`. When not
              # provided, ubuntu-image will attempt to create it's own
              # `xorriso` command.
              xorriso-command: <string> (optional)
          # Used to specify that ubuntu-image should create a .qcow2 file.
-         # Not yet supported.
+         # If a .img file is specified for the corresponding volume, the
+         # existing .img will be re-used and converted into a qcow2 image.
+         # Otherwise, a new raw image will be created and then converted
+         # to qcow2.
          qcow2: (optional)
            -
              # Name to output the .qcow2 file.
              name: <string>
+             # Volume from the gadget from which to create the image
+             volume: <string> (optional for single volume gadgets,
+                               required for multi-volume gadgets)
          # A manifest file is a list of all packages and their version
          # numbers that are included in the rootfs of the image.
          manifest:
@@ -277,7 +289,7 @@ The following specification defines what is supported in the YAML:
            name: <string>
            # Type of compression to use on the tar archive. Defaults
            # to "uncompressed"
-           compression: uncompressed | bzip2 | gzip | xz | zstd (optional)
+           compression: uncompressed (default) | bzip2 | gzip | xz | zstd (optional)
 
 The following sections detail the top-level keys within this definition,
 followed by several examples.
