@@ -161,6 +161,7 @@ func TestCalculateStates(t *testing.T) {
 	}{
 		{"state_build_gadget", "test_build_gadget.yaml", []string{"build_gadget_tree", "load_gadget_yaml"}},
 		{"state_prebuilt_gadget", "test_prebuilt_gadget.yaml", []string{"prepare_gadget_tree", "load_gadget_yaml"}},
+		{"state_prebuilt_rootfs_extras", "test_prebuilt_rootfs_extras.yaml", []string{"add_extra_ppas", "install_extra_packages", "install_extra_snaps"}},
 		{"extract_rootfs_tar", "test_extract_rootfs_tar.yaml", []string{"extract_rootfs_tar"}},
 		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"germinate"}},
 		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
@@ -1216,40 +1217,6 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 		if err == nil {
 			t.Error()
 		}
-	})
-}
-
-// TestSetupExtraPPAs unit tests the setupExtraPPAs function
-func TestSetupExtraPPAs(t *testing.T) {
-	t.Run("test_setup_extra_PPAs", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		err := stateMachine.setupExtraPPAs()
-		asserter.AssertErrNil(err, true)
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
-}
-
-// TestInstallExtraPackages unit tests the installExtraPackages function
-func TestInstallExtraPackages(t *testing.T) {
-	t.Run("test_install_extra_packages", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-		err := stateMachine.installExtraPackages()
-		asserter.AssertErrNil(err, true)
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
