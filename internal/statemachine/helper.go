@@ -812,7 +812,7 @@ func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool
 	addGroupSlice := reflect.ValueOf(addGroupInterfaces)
 	for i := 0; i < addGroupSlice.Len(); i++ {
 		addGroup := addGroupSlice.Index(i).Interface().(*imagedefinition.AddGroup)
-		addGroupCmd := execCommand("chroot", targetDir, "addgroup", addGroup.GroupName)
+		addGroupCmd := execCommand("chroot", targetDir, "groupadd", addGroup.GroupName)
 		debugStatement := fmt.Sprintf("Adding group \"%s\"\n", addGroup.GroupName)
 		if addGroup.GroupID != "" {
 			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", addGroup.GroupID}...)
@@ -836,7 +836,7 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 	addUserSlice := reflect.ValueOf(addUserInterfaces)
 	for i := 0; i < addUserSlice.Len(); i++ {
 		addUser := addUserSlice.Index(i).Interface().(*imagedefinition.AddUser)
-		addUserCmd := execCommand("chroot", targetDir, "adduser", addUser.UserName)
+		addUserCmd := execCommand("chroot", targetDir, "useradd", addUser.UserName)
 		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", addUser.UserName)
 		if addUser.UserID != "" {
 			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", addUser.UserID}...)
@@ -853,4 +853,29 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 		}
 	}
 	return nil
+}
+
+// checkCustomizationSteps examines a struct and returns a slice
+// of state functions that need to be manually added. It expects
+// the image definition's customization struct to be passed in and
+// uses struct tags to identify which state must be added
+func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates []stateFunc) {
+	possibleStateFunc := map[string]stateFunc{
+		"add_extra_ppas":         stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+		"install_extra_packages": stateFunc{"install_extra_packages", (*StateMachine).installPackages},
+		"install_extra_snaps":    stateFunc{"install_extra_snaps", (*StateMachine).preseedClassicImage},
+	}
+	value := reflect.ValueOf(searchStruct)
+	elem := value.Elem()
+	for i := 0; i < elem.NumField(); i++ {
+		field := elem.Field(i)
+		if !field.IsNil() {
+			tags := elem.Type().Field(i).Tag
+			tagValue, hasTag := tags.Lookup(tag)
+			if hasTag {
+				extraStates = append(extraStates, possibleStateFunc[tagValue])
+			}
+		}
+	}
+	return extraStates
 }
