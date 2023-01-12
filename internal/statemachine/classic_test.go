@@ -848,6 +848,7 @@ func TestBuildRootfsFromTasks(t *testing.T) {
 
 // TestExtractRootfsTar unit tests the extractRootfsTar function
 func TestExtractRootfsTar(t *testing.T) {
+	wd, _ := os.Getwd()
 	testCases := []struct {
 		name          string
 		rootfsTar     string
@@ -856,6 +857,15 @@ func TestExtractRootfsTar(t *testing.T) {
 	}{
 		{
 			"vanilla_tar",
+			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar"),
+			"ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
+			[]string{
+				"test_tar1",
+				"test_tar2",
+			},
+		},
+		{
+			"vanilla_tar_relative_path",
 			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"),
 			"ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
 			[]string{
@@ -865,7 +875,7 @@ func TestExtractRootfsTar(t *testing.T) {
 		},
 		{
 			"gz",
-			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.gz"),
+			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.gz"),
 			"29152fd9cadbc92f174815ec642ab3aea98f08f902a4f317ec037f8fe60e40c3",
 			[]string{
 				"test_tar_gz1",
@@ -874,7 +884,7 @@ func TestExtractRootfsTar(t *testing.T) {
 		},
 		{
 			"xz",
-			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.xz"),
+			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.xz"),
 			"e3708f1d98ccea0e0c36843d9576580505ee36d523bfcf78b0f73a035ae9a14e",
 			[]string{
 				"test_tar_xz1",
@@ -883,7 +893,7 @@ func TestExtractRootfsTar(t *testing.T) {
 		},
 		{
 			"bz2",
-			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.bz2"),
+			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.bz2"),
 			"a1180a73b652d85d7330ef21d433b095363664f2f808363e67f798fae15abf0c",
 			[]string{
 				"test_tar_bz1",
@@ -892,7 +902,7 @@ func TestExtractRootfsTar(t *testing.T) {
 		},
 		{
 			"zst",
-			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.zst"),
+			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.zst"),
 			"5fb00513f84e28225a3155fd78c59a6a923b222e1c125aab35bbfd4091281829",
 			[]string{
 				"test_tar_zstd1",
@@ -909,20 +919,18 @@ func TestExtractRootfsTar(t *testing.T) {
 			var stateMachine ClassicStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
-			absTarPath, err := filepath.Abs(tc.rootfsTar)
-			asserter.AssertErrNil(err, true)
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
 				Architecture: getHostArch(),
 				Series:       getHostSuite(),
 				Rootfs: &imagedefinition.Rootfs{
 					Tarball: &imagedefinition.Tarball{
-						TarballURL: fmt.Sprintf("file://%s", absTarPath),
+						TarballURL: fmt.Sprintf("file://%s", tc.rootfsTar),
 					},
 				},
 			}
 
 			// need workdir set up for this
-			err = stateMachine.makeTemporaryDirectories()
+			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 
 			err = stateMachine.extractRootfsTar()
@@ -987,9 +995,9 @@ func TestFailedExtractRootfsTar(t *testing.T) {
 
 		// use a tarball that doesn't exist to trigger a failure in computing
 		// the SHA256 sum
-		stateMachine.ImageDef.Rootfs.Tarball.TarballURL = "fakefile"
+		stateMachine.ImageDef.Rootfs.Tarball.TarballURL = "file:///fakefile"
 		err = stateMachine.extractRootfsTar()
-		asserter.AssertErrContains(err, "Error opening file \"fakefile\" to calculate SHA256 sum")
+		asserter.AssertErrContains(err, "Error opening file \"/fakefile\" to calculate SHA256 sum")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
