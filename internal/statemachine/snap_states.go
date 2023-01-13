@@ -34,6 +34,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 	imageOpts.Preseed = snapStateMachine.Opts.Preseed
 	imageOpts.PreseedSignKey = snapStateMachine.Opts.PreseedSignKey
 	imageOpts.AppArmorKernelFeaturesDir = snapStateMachine.Opts.AppArmorKernelFeaturesDir
+	imageOpts.SeedManifestPath = filepath.Join(stateMachine.commonFlags.OutputDir, "seed.manifest")
 
 	customizations := *new(image.Customizations)
 	if snapStateMachine.Opts.DisableConsoleConf {
@@ -127,19 +128,5 @@ func (stateMachine *StateMachine) generateSnapManifest() error {
 	// snaps.manifest
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "snaps.manifest")
 	snapsDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "snaps")
-	err := WriteSnapManifest(snapsDir, outputPath)
-	if err != nil {
-		return err
-	}
-
-	// seed.manifest
-	outputPath = filepath.Join(stateMachine.commonFlags.OutputDir, "seed.manifest")
-	if stateMachine.IsSeeded {
-		snapsDir = filepath.Join(stateMachine.tempDirs.rootfs, "snaps")
-	} else {
-		snapsDir = filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "seed", "snaps")
-	}
-	err = WriteSnapManifest(snapsDir, outputPath)
-
-	return err
+	return WriteSnapManifest(snapsDir, outputPath)
 }

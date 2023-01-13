@@ -3,10 +3,10 @@ summary: Create Ubuntu images
 description: |
   Official tool for building Ubuntu images, currently supporing Ubuntu Core
   snap-based images and preinstalled Ubuntu classic images.
-version: 3.0+snap1~beta11
+version: 3.0+snap1~beta12
 grade: stable
 confinement: classic
-base: core20
+base: core22
 source-code: https://github.com/canonical/ubuntu-image
 issues: https://bugs.launchpad.net/ubuntu-image/+filebug
 
