@@ -24,7 +24,7 @@ var imageType string = ""
 var stateMachineLongDesc = `Options for controlling the internal state machine.
 Other than -w, these options are mutually exclusive. When -u or -t is given,
 the state machine can be resumed later with -r, but -w must be given in that
-case since the state is saved in a .ubuntu-image.gob file in the working directory.`
+case since the state is saved in a ubuntu-image.gob file in the working directory.`
 
 func executeStateMachine(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts, ubuntuImageCommand *commands.UbuntuImageCommand) {
 	// Set up the state machine
