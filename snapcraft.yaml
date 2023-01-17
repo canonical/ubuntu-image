@@ -41,6 +41,7 @@ parts:
       - squashfs-tools
       - debootstrap
       - gpg
+      - germinate
     override-build: |
       snapcraftctl build
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp

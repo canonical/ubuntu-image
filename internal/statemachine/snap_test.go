@@ -334,13 +334,20 @@ func TestGenerateSnapManifest(t *testing.T) {
 func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_snap_rootfs_contents", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
+
+		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
+		stateMachine.stateMachineFlags.WorkDir = workDir
 
 		// need workdir and gadget.yaml set up for this
-		err := stateMachine.makeTemporaryDirectories()
+		err = stateMachine.determineOutputDirectory()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.prepareImage()
