@@ -220,12 +220,16 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 			defer saveCWD()
 
 			var stateMachine SnapStateMachine
+			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			asserter.AssertErrNil(err, true)
+			defer os.RemoveAll(workDir)
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			stateMachine.Args.ModelAssertion = tc.modelAssertion
+			stateMachine.stateMachineFlags.WorkDir = workDir
 			stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
 
-			err := stateMachine.Setup()
+			err = stateMachine.Setup()
 			asserter.AssertErrNil(err, true)
 
 			err = stateMachine.Run()
