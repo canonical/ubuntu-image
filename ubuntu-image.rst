@@ -220,7 +220,7 @@ These are some options for controlling this state machine.  Other than
 ``--workdir``, these options are mutually exclusive.  When ``--until`` or
 ``--thru`` is given, the state machine can be resumed later with ``--resume``,
 but ``--workdir`` must be given in that case since the state is saved in a
-``.ubuntu-image.pck`` file in the working directory.
+``ubuntu-image.gob`` file in the working directory.
 
 -w DIRECTORY, --workdir DIRECTORY
     The working directory in which to download and unpack all the source files
