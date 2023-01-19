@@ -581,7 +581,7 @@ func (stateMachine *StateMachine) installPackages() error {
 	var installPackagesCmds []*exec.Cmd
 
 	// mount some necessary partitions from the host in the chroot
-	mounts := []string{"/dev", "/proc", "/sys"}
+	mounts := []string{"/dev", "/proc", "/sys", "/run"}
 	var umounts []*exec.Cmd
 	for _, mount := range mounts {
 		mountCmd, umountCmd := mountFromHost(stateMachine.tempDirs.chroot, mount)
@@ -982,6 +982,7 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	}
 
 	imageOpts.Classic = true
+	imageOpts.ModelFile = classicStateMachine.ImageDef.ModelAssertion
 	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
 	imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot
 	imageOpts.Customizations = *new(image.Customizations)
