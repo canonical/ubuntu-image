@@ -59,6 +59,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"valid_image_definition", "test_raspi.yaml", true, ""},
 		{"invalid_class", "test_bad_class.yaml", false, "Class must be one of the following"},
 		{"invalid_url", "test_bad_url.yaml", false, "Does not match format 'uri'"},
+		{"invalid_model_assertion_url", "test_invalid_model_assertion_url.yaml", false, "Does not match format 'uri'"},
 		{"invalid_ppa_name", "test_bad_ppa_name.yaml", false, "PPAName: Does not match pattern"},
 		{"invalid_ppa_auth", "test_bad_ppa_name.yaml", false, "Auth: Does not match pattern"},
 		{"both_seed_and_tasks", "test_both_seed_and_tasks.yaml", false, "Must validate one and only one schema"},
