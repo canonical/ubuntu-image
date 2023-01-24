@@ -581,7 +581,7 @@ func (stateMachine *StateMachine) installPackages() error {
 	var installPackagesCmds []*exec.Cmd
 
 	// mount some necessary partitions from the host in the chroot
-	mounts := []string{"/dev", "/proc", "/sys", "/run"}
+	mounts := []string{"/dev", "/proc", "/sys"}
 	var umounts []*exec.Cmd
 	for _, mount := range mounts {
 		mountCmd, umountCmd := mountFromHost(stateMachine.tempDirs.chroot, mount)
