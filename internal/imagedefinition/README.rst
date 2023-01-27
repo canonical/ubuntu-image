@@ -38,6 +38,7 @@ The following specification defines what is supported in the YAML:
          # The values for these environment variables are sourced
          # from this image definition file. For pre-built
          # gadget trees this must be a local path.
+         # The URI must begin with either http://, https://, or file://
          url: <string>
          # The type of gadget tree source. Currently supported values
          # are git, directory, and prebuilt. When git is used the url
@@ -52,7 +53,7 @@ The following specification defines what is supported in the YAML:
          # Defaults to "main"
          branch: <string> (optional)
        # A path to a model assertion to use when pre-seeding snaps
-       # in the image.
+       # in the image. Must be a local file URI beginning with file://
        model-assertion: <string> (optional)
        # Defines parameters needed to build the rootfs for a classic
        # image. Currently only building from a seed is supported.
@@ -88,7 +89,8 @@ The following specification defines what is supported in the YAML:
          # to be installed in the image.
          seed: (exactly 1 of archive-tasks, seed or tarball must be specified)
              # A list of git, bzr, or http locations from which to
-             # retrieve the seeds.
+             # retrieve the seeds. Must be a web address, local file paths
+             # are not supported
              urls: (required if seed dict is specified)
                - <string>
                - <string>
@@ -108,7 +110,8 @@ The following specification defines what is supported in the YAML:
          # an uncompressed tar archive or a tar archive with one of the
          # following compression types: bzip2, gzip, xz, zstd.
          tarball: (exactly 1 of archive-tasks, seed or tarball must be specified)
-             # The path to the tarball. Can be a local path or an URL.
+             # The path to the tarball. Currently only local paths beginning with
+             # file:// are supported
              url: <string> (required if tarball dict is specified)
              # URL to the gpg signature to verify the tarball against.
              gpg: <string> (optional)

@@ -9,7 +9,6 @@ gadget:
   url: "https://github.com/snapcore/pi-gadget.git"
   branch: classic
   type: "git"
-model-assertion: pi-generic.model
 rootfs:
   seed:
     urls:

@@ -9,7 +9,6 @@ gadget:
   url: "This is not a valid URL"
   branch: classic
   type: "git"
-model-assertion: pi-generic.model
 rootfs:
   seed:
     url: "And this isn't either!"

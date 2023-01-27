@@ -982,6 +982,7 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	}
 
 	imageOpts.Classic = true
+	imageOpts.ModelFile = strings.TrimPrefix(classicStateMachine.ImageDef.ModelAssertion, "file://")
 	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
 	imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot
 	imageOpts.Customizations = *new(image.Customizations)

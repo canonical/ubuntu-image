@@ -594,8 +594,12 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
-		"--include=ca-certificates", // ca-certificates is needed to use PPAs
 	)
+
+	if imageDefinition.Customization != nil && len(imageDefinition.Customization.ExtraPPAs) > 0 {
+		// ca-certificates is needed to use PPAs
+		debootstrapCmd.Args = append(debootstrapCmd.Args, "--include=ca-certificates")
+	}
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
 		components := strings.Join(imageDefinition.Rootfs.Components, ",")

@@ -9,7 +9,7 @@ gadget:
   url: "https://github.com/snapcore/pi-gadget.git"
   branch: "classic-redesign"
   type: "git"
-#model-assertion: pi-generic.model
+model-assertion: file://pi-generic.model
 rootfs:
   archive: ubuntu
   components:

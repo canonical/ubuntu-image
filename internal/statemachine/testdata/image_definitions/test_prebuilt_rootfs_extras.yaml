@@ -8,7 +8,6 @@ kernel: linux-raspi
 gadget:
   url: "file://test.tar"
   type: "directory"
-model-assertion: pi-generic.model
 rootfs:
   tarball:
     url: "file://test.tar"

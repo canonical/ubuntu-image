@@ -21,11 +21,11 @@ type ImageDefinition struct {
 	Series         string         `yaml:"series"          json:"Series"`
 	Kernel         string         `yaml:"kernel"          json:"Kernel,omitempty"`
 	Gadget         *Gadget        `yaml:"gadget"          json:"Gadget,omitempty"`
-	ModelAssertion string         `yaml:"model-assertion" json:"ModelAssertion,omitempty"`
+	ModelAssertion string         `yaml:"model-assertion" json:"ModelAssertion,omitempty" jsonschema:"type=string,format=uri"`
 	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *Customization `yaml:"customization"   json:"Customization,omitempty"`
 	Artifacts      *Artifact      `yaml:"artifacts"       json:"Artifacts"`
-	Class          string         `yaml:"class"           json:"Class" jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
+	Class          string         `yaml:"class"           json:"Class"                    jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
 }
 
 // Gadget defines the gadget section of the image definition file

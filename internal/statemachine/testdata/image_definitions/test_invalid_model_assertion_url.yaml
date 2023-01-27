@@ -5,13 +5,15 @@ architecture: arm64
 series: jammy
 class: preinstalled
 kernel: linux-raspi
+model-assertion: pi-generic.model
 gadget:
-  branch: classic
+  url: "https://github.com/snapcore/pi-gadget.git"
+  branch: "classic-redesign"
   type: "git"
 rootfs:
   seed:
     urls:
-      - "https://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
     branch: jammy
     names:
       - server
