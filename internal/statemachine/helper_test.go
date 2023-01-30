@@ -1265,3 +1265,19 @@ func TestCheckCustomizationSteps(t *testing.T) {
 		})
 	}
 }
+
+// TestFailedMountNewFS tests failures in the mountNewFS function
+func TestFailedMountNewFS(t *testing.T) {
+	t.Run("test_failed_mount_new_fs", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		// mock os.MkdirTemp
+		osMkdirTemp = mockMkdirTemp
+		defer func() {
+			osMkdirTemp = os.MkdirTemp
+		}()
+		_, _, err := mountNewFS("", "", "")
+		asserter.AssertErrContains(err, "Test error")
+		osMkdirTemp = os.MkdirTemp
+	})
+}

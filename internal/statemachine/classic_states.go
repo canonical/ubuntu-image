@@ -554,10 +554,10 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 
 // Install packages in the chroot environment. This is accomplished by
 // running commands to do the following:
-// 1. Mount /proc /sys and /dev in the chroot
+// 1. Mount /proc /sys /dev and /run in the chroot
 // 2. Run `apt update` in the chroot
 // 3. Run `apt install <package list>` in the chroot
-// 4. Unmount /proc /sys and /dev
+// 4. Unmount /proc /sys /dev and /run
 func (stateMachine *StateMachine) installPackages() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
@@ -581,10 +581,46 @@ func (stateMachine *StateMachine) installPackages() error {
 	var installPackagesCmds []*exec.Cmd
 
 	// mount some necessary partitions from the host in the chroot
-	mounts := []string{"/dev", "/proc", "/sys"}
+	type mountPoint struct {
+		dest     string
+		fromHost bool
+	}
+	mountPoints := []mountPoint{
+		{
+			dest:     "/dev",
+			fromHost: true,
+		},
+		{
+			dest:     "/proc",
+			fromHost: true,
+		},
+		{
+			dest:     "/sys",
+			fromHost: true,
+		},
+		{
+			dest:     "/run",
+			fromHost: false,
+		},
+	}
+
 	var umounts []*exec.Cmd
-	for _, mount := range mounts {
-		mountCmd, umountCmd := mountFromHost(stateMachine.tempDirs.chroot, mount)
+	for _, mount := range mountPoints {
+		var mountCmd, umountCmd *exec.Cmd
+		var err error
+		if mount.fromHost {
+			mountCmd, umountCmd = mountFromHost(stateMachine.tempDirs.chroot, mount.dest)
+		} else {
+			mountCmd, umountCmd, err = mountNewFS(stateMachine.tempDirs.chroot,
+				stateMachine.tempDirs.scratch,
+				mount.dest,
+			)
+			if err != nil {
+				return fmt.Errorf("Error creating temporary directory for mountpoint: \"%s\"",
+					err.Error())
+
+			}
+		}
 		defer umountCmd.Run()
 		installPackagesCmds = append(installPackagesCmds, mountCmd)
 		umounts = append(umounts, umountCmd)

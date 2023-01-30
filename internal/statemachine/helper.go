@@ -756,6 +756,17 @@ func mountFromHost(targetDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd)
 	return mountCmd, umountCmd
 }
 
+// mountNewFS creates a new filesystem and mounts it at the specified location
+func mountNewFS(targetDir, scratchDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd, err error) {
+	tempDir, err := osMkdirTemp(scratchDir, strings.Trim(mountpoint, "/"))
+	if err != nil {
+		return nil, nil, err
+	}
+	mountCmd = execCommand("mount", "--bind", tempDir, filepath.Join(targetDir, mountpoint))
+	umountCmd = execCommand("umount", filepath.Join(targetDir, mountpoint))
+	return mountCmd, umountCmd, nil
+}
+
 // manualCopyFile copies a file into the chroot
 func manualCopyFile(copyFileInterfaces interface{}, targetDir string, debug bool) error {
 	copyFileSlice := reflect.ValueOf(copyFileInterfaces)
