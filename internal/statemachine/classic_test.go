@@ -2365,13 +2365,22 @@ func TestFailedInstallPackages(t *testing.T) {
 			},
 		}
 
+		// mock os.MkdirTemp to cause a failure in mountTempFS
+		osMkdirTemp = mockMkdirTemp
+		defer func() {
+			osMkdirTemp = os.MkdirTemp
+		}()
+		err := stateMachine.installPackages()
+		asserter.AssertErrContains(err, "Error mounting temporary directory for mountpoint")
+		osMkdirTemp = os.MkdirTemp
+
 		// Setup the exec.Command mock
 		testCaseName = "TestFailedInstallPackages"
 		execCommand = fakeExecCommand
 		defer func() {
 			execCommand = exec.Command
 		}()
-		err := stateMachine.installPackages()
+		err = stateMachine.installPackages()
 		asserter.AssertErrContains(err, "Error running command")
 		execCommand = exec.Command
 
