@@ -1266,8 +1266,8 @@ func TestCheckCustomizationSteps(t *testing.T) {
 	}
 }
 
-// TestFailedMountNewFS tests failures in the mountTempFS function
-func TestFailedMountNewFS(t *testing.T) {
+// TestFailedMountTempFS tests failures in the mountTempFS function
+func TestFailedMountTempFS(t *testing.T) {
 	t.Run("test_failed_mount_new_fs", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 

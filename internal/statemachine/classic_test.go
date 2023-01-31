@@ -2365,7 +2365,7 @@ func TestFailedInstallPackages(t *testing.T) {
 			},
 		}
 
-		// mock os.MkdirTemp to cause a failure in mountNewFS
+		// mock os.MkdirTemp to cause a failure in mountTempFS
 		osMkdirTemp = mockMkdirTemp
 		defer func() {
 			osMkdirTemp = os.MkdirTemp

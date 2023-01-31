@@ -607,10 +607,10 @@ func (stateMachine *StateMachine) installPackages() error {
 	var umounts []*exec.Cmd
 	for _, mount := range mountPoints {
 		var mountCmd, umountCmd *exec.Cmd
-		var err error
 		if mount.fromHost {
 			mountCmd, umountCmd = mountFromHost(stateMachine.tempDirs.chroot, mount.dest)
 		} else {
+			var err error
 			mountCmd, umountCmd, err = mountTempFS(stateMachine.tempDirs.chroot,
 				stateMachine.tempDirs.scratch,
 				mount.dest,
