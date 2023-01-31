@@ -756,8 +756,8 @@ func mountFromHost(targetDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd)
 	return mountCmd, umountCmd
 }
 
-// mountNewFS creates a new filesystem and mounts it at the specified location
-func mountNewFS(targetDir, scratchDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd, err error) {
+// mountTempFS creates a temporary directory and mounts it at the specified location
+func mountTempFS(targetDir, scratchDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd, err error) {
 	tempDir, err := osMkdirTemp(scratchDir, strings.Trim(mountpoint, "/"))
 	if err != nil {
 		return nil, nil, err

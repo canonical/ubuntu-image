@@ -1266,7 +1266,7 @@ func TestCheckCustomizationSteps(t *testing.T) {
 	}
 }
 
-// TestFailedMountNewFS tests failures in the mountNewFS function
+// TestFailedMountNewFS tests failures in the mountTempFS function
 func TestFailedMountNewFS(t *testing.T) {
 	t.Run("test_failed_mount_new_fs", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
@@ -1276,7 +1276,7 @@ func TestFailedMountNewFS(t *testing.T) {
 		defer func() {
 			osMkdirTemp = os.MkdirTemp
 		}()
-		_, _, err := mountNewFS("", "", "")
+		_, _, err := mountTempFS("", "", "")
 		asserter.AssertErrContains(err, "Test error")
 		osMkdirTemp = os.MkdirTemp
 	})

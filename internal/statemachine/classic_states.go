@@ -611,13 +611,15 @@ func (stateMachine *StateMachine) installPackages() error {
 		if mount.fromHost {
 			mountCmd, umountCmd = mountFromHost(stateMachine.tempDirs.chroot, mount.dest)
 		} else {
-			mountCmd, umountCmd, err = mountNewFS(stateMachine.tempDirs.chroot,
+			mountCmd, umountCmd, err = mountTempFS(stateMachine.tempDirs.chroot,
 				stateMachine.tempDirs.scratch,
 				mount.dest,
 			)
 			if err != nil {
-				return fmt.Errorf("Error creating temporary directory for mountpoint: \"%s\"",
-					err.Error())
+				return fmt.Errorf("Error mounting temporary directory for mountpoint \"%s\": \"%s\"",
+					mount.dest,
+					err.Error(),
+				)
 
 			}
 		}
