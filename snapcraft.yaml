@@ -6,7 +6,7 @@ description: |
 version: 3.0+snap1~beta14
 grade: stable
 confinement: classic
-base: core22
+base: core20
 source-code: https://github.com/canonical/ubuntu-image
 issues: https://bugs.launchpad.net/ubuntu-image/+filebug
 
