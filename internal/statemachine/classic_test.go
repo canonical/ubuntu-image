@@ -1336,9 +1336,29 @@ func TestFailedManualCustomization(t *testing.T) {
 			},
 		}
 
-		err := stateMachine.manualCustomization()
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// create an /etc/resolv.conf in the chroot
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
+		asserter.AssertErrNil(err, true)
+		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
+		asserter.AssertErrNil(err, true)
+
+		// now test the failed touch file customization
+		err = stateMachine.manualCustomization()
 		asserter.AssertErrContains(err, "no such file or directory")
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+
+		// mock helper.BackupAndCopyResolvConf
+		helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConf
+		defer func() {
+			helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+		}()
+		err = stateMachine.manualCustomization()
+		asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 	})
 }
 
@@ -2409,23 +2429,17 @@ func TestFailedInstallPackages(t *testing.T) {
 		asserter.AssertErrContains(err, "Error running command")
 		execCommand = exec.Command
 
-		// mock os.Rename
-		osRename = mockRename
+		// delete the backed up resolv.conf to trigger another backup
+		err = os.Remove(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
+		asserter.AssertErrNil(err, true)
+		// mock helper.BackupAndCopyResolvConf
+		helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConf
 		defer func() {
-			osRename = os.Rename
+			helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 		}()
 		err = stateMachine.installPackages()
-		asserter.AssertErrContains(err, "Error moving file")
-		osRename = os.Rename
-
-		// mock osutil.CopyFile
-		osutilCopyFile = mockCopyFile
-		defer func() {
-			osutilCopyFile = osutil.CopyFile
-		}()
-		err = stateMachine.installPackages()
-		asserter.AssertErrContains(err, "Error copying file")
-		osutilCopyFile = osutil.CopyFile
+		asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 
 		// clean up
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)

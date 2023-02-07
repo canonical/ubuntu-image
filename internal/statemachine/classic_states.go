@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -562,6 +563,14 @@ func (stateMachine *StateMachine) installPackages() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
+	// copy /etc/resolv.conf from the host system into the chroot
+	if !osutil.FileExists(filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp")) {
+		err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
+		if err != nil {
+			return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
+		}
+	}
+
 	// if any extra packages are specified, install them alongside the seeded packages
 	if classicStateMachine.ImageDef.Customization != nil {
 		for _, packageInfo := range classicStateMachine.ImageDef.Customization.ExtraPackages {
@@ -632,18 +641,6 @@ func (stateMachine *StateMachine) installPackages() error {
 	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
 	installPackagesCmds = append(installPackagesCmds, aptCmds...)
 	installPackagesCmds = append(installPackagesCmds, umounts...) // don't forget to unmount!
-
-	// copy /etc/resolv.conf from the host system into the chroot
-	src := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf")
-	dest := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp")
-	if err := osRename(src, dest); err != nil {
-		return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
-	}
-	dest = src
-	src = filepath.Join("/etc", "resolv.conf")
-	if err := osutilCopyFile(src, dest, 0); err != nil {
-		return fmt.Errorf("Error copying file \"%s\" to \"%s\": %s", src, dest, err.Error())
-	}
 
 	for _, cmd := range installPackagesCmds {
 		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
@@ -945,6 +942,14 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
+	// copy /etc/resolv.conf from the host system into the chroot if it hasn't already been done
+	if !osutil.FileExists(filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp")) {
+		err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
+		if err != nil {
+			return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
+		}
+	}
+
 	type customizationHandler struct {
 		inputData   interface{}
 		handlerFunc func(interface{}, string, bool) error
@@ -1062,8 +1067,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
 	// if we backed up resolv.conf then restore it here
-	_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
-	if err == nil {
+	if osutil.FileExists(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp")) {
 		src := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp")
 		dest := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf")
 		if err := osRename(src, dest); err != nil {

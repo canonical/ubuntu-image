@@ -7,11 +7,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/invopop/jsonschema"
+	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -406,4 +408,18 @@ func CheckTags(searchStruct interface{}, tag string) (string, error) {
 	}
 	// no true value found
 	return "", nil
+}
+
+func BackupAndCopyResolvConf(chroot string) error {
+	src := filepath.Join(chroot, "etc", "resolv.conf")
+	dest := filepath.Join(chroot, "etc", "resolv.conf.tmp")
+	if err := os.Rename(src, dest); err != nil {
+		return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
+	}
+	dest = src
+	src = filepath.Join("/etc", "resolv.conf")
+	if err := osutil.CopyFile(src, dest, 0); err != nil {
+		return fmt.Errorf("Error copying file \"%s\" to \"%s\": %s", src, dest, err.Error())
+	}
+	return nil
 }
