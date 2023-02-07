@@ -13,8 +13,8 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/invopop/jsonschema"
-	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/osutil"
 	"github.com/xeipuuv/gojsonschema"
 )
 
