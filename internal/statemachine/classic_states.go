@@ -633,6 +633,18 @@ func (stateMachine *StateMachine) installPackages() error {
 	installPackagesCmds = append(installPackagesCmds, aptCmds...)
 	installPackagesCmds = append(installPackagesCmds, umounts...) // don't forget to unmount!
 
+	// copy /etc/resolv.conf from the host system into the chroot
+	src := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf")
+	dest := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp")
+	if err := osRename(src, dest); err != nil {
+		return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
+	}
+	dest = src
+	src = filepath.Join("/etc", "resolv.conf")
+	if err := osutilCopyFile(src, dest, 0); err != nil {
+		return fmt.Errorf("Error copying file \"%s\" to \"%s\": %s", src, dest, err.Error())
+	}
+
 	for _, cmd := range installPackagesCmds {
 		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
 		err := cmd.Run()
@@ -1048,6 +1060,16 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// if we backed up resolv.conf then restore it here
+	_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
+	if err == nil {
+		src := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp")
+		dest := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "resolv.conf")
+		if err := osRename(src, dest); err != nil {
+			return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
+		}
+	}
 
 	files, err := ioutilReadDir(stateMachine.tempDirs.chroot)
 	if err != nil {

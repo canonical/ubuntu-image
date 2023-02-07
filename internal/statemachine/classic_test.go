@@ -1549,6 +1549,21 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		err = stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrContains(err, "Error writing to fstab")
 		ioutilWriteFile = ioutil.WriteFile
+
+		// create an /etc/resolv.conf.tmp in the chroot
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
+		asserter.AssertErrNil(err, true)
+		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
+		asserter.AssertErrNil(err, true)
+
+		// mock os.Rename
+		osRename = mockRename
+		defer func() {
+			osRename = os.Rename
+		}()
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrContains(err, "Error moving file")
+		osRename = os.Rename
 	})
 }
 
@@ -1852,7 +1867,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		// make sure all the artifacts were created and are the correct file types
 		artifacts := map[string]string{
 			"pc-amd64.img":            "DOS/MBR boot sector",
-			"pc-amd64.qcow2":          "QEMU QCOW2 Image",
+			"pc-amd64.qcow2":          "QEMU QCOW",
 			"filesystem-manifest.txt": "text",
 			"filesystem-filelist.txt": "text",
 		}
@@ -2365,12 +2380,22 @@ func TestFailedInstallPackages(t *testing.T) {
 			},
 		}
 
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// create an /etc/resolv.conf in the chroot
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
+		asserter.AssertErrNil(err, true)
+		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
+		asserter.AssertErrNil(err, true)
+
 		// mock os.MkdirTemp to cause a failure in mountTempFS
 		osMkdirTemp = mockMkdirTemp
 		defer func() {
 			osMkdirTemp = os.MkdirTemp
 		}()
-		err := stateMachine.installPackages()
+		err = stateMachine.installPackages()
 		asserter.AssertErrContains(err, "Error mounting temporary directory for mountpoint")
 		osMkdirTemp = os.MkdirTemp
 
@@ -2384,6 +2409,25 @@ func TestFailedInstallPackages(t *testing.T) {
 		asserter.AssertErrContains(err, "Error running command")
 		execCommand = exec.Command
 
+		// mock os.Rename
+		osRename = mockRename
+		defer func() {
+			osRename = os.Rename
+		}()
+		err = stateMachine.installPackages()
+		asserter.AssertErrContains(err, "Error moving file")
+		osRename = os.Rename
+
+		// mock osutil.CopyFile
+		osutilCopyFile = mockCopyFile
+		defer func() {
+			osutilCopyFile = osutil.CopyFile
+		}()
+		err = stateMachine.installPackages()
+		asserter.AssertErrContains(err, "Error copying file")
+		osutilCopyFile = osutil.CopyFile
+
+		// clean up
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
