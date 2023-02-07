@@ -410,6 +410,8 @@ func CheckTags(searchStruct interface{}, tag string) (string, error) {
 	return "", nil
 }
 
+// BackupAndCopyResolvConf creates a backup of /etc/resolv.conf in a chroot
+// and copies the contents from the host system into the chroot
 func BackupAndCopyResolvConf(chroot string) error {
 	src := filepath.Join(chroot, "etc", "resolv.conf")
 	dest := filepath.Join(chroot, "etc", "resolv.conf.tmp")
