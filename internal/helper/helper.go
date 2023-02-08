@@ -420,7 +420,7 @@ func BackupAndCopyResolvConf(chroot string) error {
 	}
 	dest = src
 	src = filepath.Join("/etc", "resolv.conf")
-	if err := osutil.CopyFile(src, dest, 0); err != nil {
+	if err := osutil.CopyFile(src, dest, osutil.CopyFlagDefault); err != nil {
 		return fmt.Errorf("Error copying file \"%s\" to \"%s\": %s", src, dest, err.Error())
 	}
 	return nil
