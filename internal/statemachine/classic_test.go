@@ -1576,14 +1576,14 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
 		asserter.AssertErrNil(err, true)
 
-		// mock os.Rename
-		osRename = mockRename
+		// mock helper.RestoreResolvConf
+		helperRestoreResolvConf = mockRestoreResolvConf
 		defer func() {
-			osRename = os.Rename
+			helperRestoreResolvConf = helper.RestoreResolvConf
 		}()
 		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error moving file")
-		osRename = os.Rename
+		asserter.AssertErrContains(err, "Error restoring /etc/resolv.conf")
+		helperRestoreResolvConf = helper.RestoreResolvConf
 	})
 }
 

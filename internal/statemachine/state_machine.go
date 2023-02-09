@@ -38,6 +38,7 @@ var helperSetDefaults = helper.SetDefaults
 var helperCheckEmptyFields = helper.CheckEmptyFields
 var helperCheckTags = helper.CheckTags
 var helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+var helperRestoreResolvConf = helper.RestoreResolvConf
 var ioutilReadAll = ioutil.ReadAll
 var ioutilReadDir = ioutil.ReadDir
 var ioutilReadFile = ioutil.ReadFile

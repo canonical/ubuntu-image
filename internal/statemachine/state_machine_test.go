@@ -66,6 +66,9 @@ func mockCheckTags(interface{}, string) (string, error) {
 func mockBackupAndCopyResolvConf(string) error {
 	return fmt.Errorf("Test Error")
 }
+func mockRestoreResolvConf(string) error {
+	return fmt.Errorf("Test Error")
+}
 func mockCopyBlobSuccess([]string) error {
 	return nil
 }
