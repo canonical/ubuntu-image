@@ -562,6 +562,12 @@ func (stateMachine *StateMachine) installPackages() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
+	// copy /etc/resolv.conf from the host system into the chroot
+	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
+	if err != nil {
+		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
+	}
+
 	// if any extra packages are specified, install them alongside the seeded packages
 	if classicStateMachine.ImageDef.Customization != nil {
 		for _, packageInfo := range classicStateMachine.ImageDef.Customization.ExtraPackages {
@@ -933,6 +939,12 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
+	// copy /etc/resolv.conf from the host system into the chroot if it hasn't already been done
+	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
+	if err != nil {
+		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
+	}
+
 	type customizationHandler struct {
 		inputData   interface{}
 		handlerFunc func(interface{}, string, bool) error
@@ -1052,6 +1064,12 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// if we backed up resolv.conf then restore it here
+	err := helperRestoreResolvConf(classicStateMachine.tempDirs.chroot)
+	if err != nil {
+		return fmt.Errorf("Error restoring /etc/resolv.conf in the chroot: \"%s\"", err.Error())
+	}
 
 	files, err := ioutilReadDir(stateMachine.tempDirs.chroot)
 	if err != nil {
