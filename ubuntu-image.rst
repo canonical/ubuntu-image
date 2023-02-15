@@ -100,6 +100,11 @@ model_assertion
     that this flag will cause an error if the model assertion has a grade
     higher than dangerous
 
+--revision SNAP_NAME:REVISION
+    Install a specific revision of a snap, rather than the latest available
+    in a particular channel. The snap specified with SNAP_NAME must be
+    included either in the model assertion or as an argument to --snap
+
 Classic command options
 -----------------------
 
