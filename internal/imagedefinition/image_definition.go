@@ -107,7 +107,7 @@ type Package struct {
 // Snap contains information about snaps
 type Snap struct {
 	SnapName     string `yaml:"name"     json:"SnapName"`
-	SnapRevision string `yaml:"revision" json:"SnapRevision,omitempty"`
+	SnapRevision int    `yaml:"revision" json:"SnapRevision,omitempty" jsonschema:"type=integer"`
 	Store        string `yaml:"store"    json:"Store"                  default:"canonical"`
 	Channel      string `yaml:"channel"  json:"Channel"                default:"stable"`
 }

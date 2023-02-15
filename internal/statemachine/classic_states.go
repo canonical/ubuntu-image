@@ -1007,6 +1007,7 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 		}
 	}
 
+	imageOpts.Revisions = make(map[string]snap.Revision)
 	// add any extra snaps from the image definition to the list
 	if classicStateMachine.ImageDef.Customization != nil {
 		for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
@@ -1015,6 +1016,9 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 			}
 			if extraSnap.Channel != "" {
 				imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
+			}
+			if extraSnap.SnapRevision != 0 {
+				imageOpts.Revisions[extraSnap.SnapName] = snap.Revision{N: extraSnap.SnapRevision}
 			}
 		}
 	}
