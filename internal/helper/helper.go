@@ -7,12 +7,14 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/osutil"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -406,4 +408,37 @@ func CheckTags(searchStruct interface{}, tag string) (string, error) {
 	}
 	// no true value found
 	return "", nil
+}
+
+// BackupAndCopyResolvConf creates a backup of /etc/resolv.conf in a chroot
+// and copies the contents from the host system into the chroot
+func BackupAndCopyResolvConf(chroot string) error {
+	if osutil.FileExists(filepath.Join(chroot, "etc", "resolv.conf.tmp")) {
+		// already backed up/copied so do nothing
+		return nil
+	}
+	src := filepath.Join(chroot, "etc", "resolv.conf")
+	dest := filepath.Join(chroot, "etc", "resolv.conf.tmp")
+	if err := os.Rename(src, dest); err != nil {
+		return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
+	}
+	dest = src
+	src = filepath.Join("/etc", "resolv.conf")
+	if err := osutil.CopyFile(src, dest, osutil.CopyFlagDefault); err != nil {
+		return fmt.Errorf("Error copying file \"%s\" to \"%s\": %s", src, dest, err.Error())
+	}
+	return nil
+}
+
+// RestoreResolvConf restores the resolv.conf in the chroot from the
+// version that was backed up by BackupAndCopyResolvConf
+func RestoreResolvConf(chroot string) error {
+	if osutil.FileExists(filepath.Join(chroot, "etc", "resolv.conf.tmp")) {
+		src := filepath.Join(chroot, "etc", "resolv.conf.tmp")
+		dest := filepath.Join(chroot, "etc", "resolv.conf")
+		if err := os.Rename(src, dest); err != nil {
+			return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
+		}
+	}
+	return nil
 }
