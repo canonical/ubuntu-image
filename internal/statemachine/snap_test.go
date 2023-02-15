@@ -532,7 +532,7 @@ func TestSnapRevisions(t *testing.T) {
 		stateMachine.Opts.Snaps = []string{"hello", "core", "core20"}
 		stateMachine.Opts.Revisions = map[string]int{
 			"hello": 41,
-			"core": 14444,
+			"core":  14444,
 		}
 		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
