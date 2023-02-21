@@ -531,8 +531,8 @@ func TestSnapRevisions(t *testing.T) {
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 		stateMachine.Opts.Snaps = []string{"hello", "core", "core20"}
 		stateMachine.Opts.Revisions = map[string]int{
-			"hello": 41,
-			"core":  14444,
+			"hello": 38,
+			"core":  14784,
 		}
 		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
