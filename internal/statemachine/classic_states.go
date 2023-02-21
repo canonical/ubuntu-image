@@ -1030,6 +1030,10 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 				imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
 			}
 			if extraSnap.SnapRevision != 0 {
+				fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n",
+					extraSnap.SnapRevision,
+					extraSnap.SnapName,
+				)
 				imageOpts.Revisions[extraSnap.SnapName] = snap.Revision{N: extraSnap.SnapRevision}
 			}
 		}
