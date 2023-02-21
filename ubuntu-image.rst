@@ -103,7 +103,9 @@ model_assertion
 --revision SNAP_NAME:REVISION
     Install a specific revision of a snap, rather than the latest available
     in a particular channel. The snap specified with SNAP_NAME must be
-    included either in the model assertion or as an argument to --snap
+    included either in the model assertion or as an argument to --snap. If
+    both a revision and channel are provided, the revision specified will be
+    installed in the image, and updates will come from the specified channel
 
 Classic command options
 -----------------------
