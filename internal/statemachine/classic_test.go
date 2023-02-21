@@ -1427,6 +1427,9 @@ func TestPreseedClassicImage(t *testing.T) {
 // that the corresponding revisions are staged in the chroot
 func TestClassicSnapRevisions(t *testing.T) {
 	t.Run("test_classic_snap_revisions", func(t *testing.T) {
+		if runtime.GOARCH != "amd64" {
+			t.Skip("Test for amd64 only")
+		}
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
