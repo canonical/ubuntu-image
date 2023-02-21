@@ -1442,11 +1442,11 @@ func TestClassicSnapRevisions(t *testing.T) {
 				ExtraSnaps: []*imagedefinition.Snap{
 					{
 						SnapName:     "hello",
-						SnapRevision: 41,
+						SnapRevision: 38,
 					},
 					{
 						SnapName:     "ubuntu-image",
-						SnapRevision: 320,
+						SnapRevision: 330,
 					},
 				},
 			},
