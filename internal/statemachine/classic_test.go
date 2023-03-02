@@ -282,17 +282,18 @@ func TestPrintStates(t *testing.T) {
 [4] germinate
 [5] create_chroot
 [6] install_packages
-[7] preseed_image
-[8] customize_fstab
-[9] perform_manual_customization
-[10] populate_rootfs_contents
-[11] generate_disk_info
-[12] calculate_rootfs_size
-[13] populate_bootfs_contents
-[14] populate_prepare_partitions
-[15] make_disk
-[16] generate_manifest
-[17] finish
+[7] prepare_image
+[8] preseed_image
+[9] customize_fstab
+[10] perform_manual_customization
+[11] populate_rootfs_contents
+[12] generate_disk_info
+[13] calculate_rootfs_size
+[14] populate_bootfs_contents
+[15] populate_prepare_partitions
+[16] make_disk
+[17] generate_manifest
+[18] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -1364,9 +1365,9 @@ func TestFailedManualCustomization(t *testing.T) {
 	})
 }
 
-// TestPreseedClassicImage unit tests the preseedClassicImage function
-func TestPreseedClassicImage(t *testing.T) {
-	t.Run("test_preseed_classic_image", func(t *testing.T) {
+// TestPrepareClassicImage unit tests the prepareClassicImage function
+func TestPrepareClassicImage(t *testing.T) {
+	t.Run("test_prepare_classic_image", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -1391,11 +1392,11 @@ func TestPreseedClassicImage(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
-		err = stateMachine.preseedClassicImage()
+		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrNil(err, true)
 
 		// check that the lxd and hello snaps, as well as lxd's base, core20
-		// were preseeded in the correct location
+		// were prepareed in the correct location
 		snaps := map[string]string{"lxd": "stable", "hello": "candidate", "core20": "stable"}
 		for snapName, snapChannel := range snaps {
 			// reach out to the snap store to find the revision
@@ -1458,7 +1459,7 @@ func TestClassicSnapRevisions(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
-		err = stateMachine.preseedClassicImage()
+		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrNil(err, true)
 
 		for _, snapInfo := range stateMachine.ImageDef.Customization.ExtraSnaps {
@@ -1492,9 +1493,9 @@ func TestClassicSnapRevisions(t *testing.T) {
 	})
 }
 
-// TestFailedPreseedClassicImage tests failures in the preseedClassicImage function
-func TestFailedPreseedClassicImage(t *testing.T) {
-	t.Run("test_failed_preseed_classic_image", func(t *testing.T) {
+// TestFailedPrepareClassicImage tests failures in the prepareClassicImage function
+func TestFailedPrepareClassicImage(t *testing.T) {
+	t.Run("test_failed_prepare_classic_image", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -1516,13 +1517,13 @@ func TestFailedPreseedClassicImage(t *testing.T) {
 		// include an invalid snap snap name to trigger a failure in
 		// parseSnapsAndChannels
 		stateMachine.Snaps = []string{"lxd=test=invalid=name"}
-		err = stateMachine.preseedClassicImage()
+		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrContains(err, "Invalid syntax")
 
 		// try to include a nonexistent snap to trigger a failure
 		// in snapStore.SnapInfo
 		stateMachine.Snaps = []string{"test-this-snap-name-should-never-exist"}
-		err = stateMachine.preseedClassicImage()
+		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrContains(err, "Error getting info for snap")
 
 		// mock image.Prepare
@@ -1531,7 +1532,7 @@ func TestFailedPreseedClassicImage(t *testing.T) {
 		defer func() {
 			imagePrepare = image.Prepare
 		}()
-		err = stateMachine.preseedClassicImage()
+		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrContains(err, "Error preparing image")
 		imagePrepare = image.Prepare
 
@@ -2928,5 +2929,198 @@ func TestFailedMakeQcow2Img(t *testing.T) {
 
 		err := stateMachine.makeQcow2Img()
 		asserter.AssertErrContains(err, "Error creating qcow2 artifact")
+	})
+}
+
+// TestPreseedResetChroot tests that calling prepareClassicImage on a
+// preseeded chroot correctly resets the chroot and preseeds over it
+func TestPreseedResetChroot(t *testing.T) {
+	t.Run("test_preseed_reset_chroot", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Snaps = []string{"lxd"}
+		stateMachine.commonFlags.Channel = "stable"
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &imagedefinition.Rootfs{
+				Archive: "ubuntu",
+			},
+			Customization: &imagedefinition.Customization{
+				ExtraPackages: []*imagedefinition.Package{
+					{
+						PackageName: "squashfs-tools",
+					},
+					{
+						PackageName: "snapd",
+					},
+				},
+				ExtraSnaps: []*imagedefinition.Snap{
+					{
+						SnapName: "hello",
+					},
+					{
+						SnapName: "core",
+					},
+				},
+			},
+		}
+
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// create chroot to preseed
+		err = stateMachine.createChroot()
+		asserter.AssertErrNil(err, true)
+
+		// install the packages that snap-preseed needs
+		err = stateMachine.installPackages()
+		asserter.AssertErrNil(err, true)
+
+		// first call prepareClassicImage to eventually preseed it
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrNil(err, true)
+
+		// now preseed the chroot
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrNil(err, true)
+
+		// set up a new set of snaps to be installed
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Customization: &imagedefinition.Customization{
+				ExtraSnaps: []*imagedefinition.Snap{
+					{
+						SnapName: "ubuntu-image",
+					},
+				},
+			},
+		}
+
+		// call prepareClassicImage again to trigger the reset
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrNil(err, true)
+
+		// make sure the snaps from both prepares are present
+		expectedSnaps := []string{"lxd", "hello", "ubuntu-image"}
+		for _, expectedSnap := range expectedSnaps {
+			snapGlobs, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot,
+				"var", "lib", "snapd", "seed", "snaps", fmt.Sprintf("%s*.snap", expectedSnap)))
+			asserter.AssertErrNil(err, true)
+			if len(snapGlobs) == 0 {
+				t.Errorf("expected snap %s to exist in the chroot but it does not", expectedSnap)
+			}
+		}
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestPreseedClassicImage unit tests the prepareClassicImage function
+func TestPreseedClassicImage(t *testing.T) {
+	t.Run("test_preseed_classic_image", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Snaps = []string{"lxd"}
+		stateMachine.commonFlags.Channel = "stable"
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &imagedefinition.Rootfs{
+				Archive: "ubuntu",
+			},
+			Customization: &imagedefinition.Customization{
+				ExtraPackages: []*imagedefinition.Package{
+					{
+						PackageName: "squashfs-tools",
+					},
+					{
+						PackageName: "snapd",
+					},
+				},
+				ExtraSnaps: []*imagedefinition.Snap{
+					{
+						SnapName: "hello",
+					},
+					{
+						SnapName: "core",
+					},
+				},
+			},
+		}
+
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// create chroot to preseed
+		err = stateMachine.createChroot()
+		asserter.AssertErrNil(err, true)
+
+		// install the packages that snap-preseed needs
+		err = stateMachine.installPackages()
+		asserter.AssertErrNil(err, true)
+
+		// first call prepareClassicImage
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrNil(err, true)
+
+		// now preseed the chroot
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrNil(err, true)
+
+		// make sure the snaps are fully preseeded
+		expectedSnaps := []string{"lxc", "lxd", "hello"}
+		for _, expectedSnap := range expectedSnaps {
+			snapPath := filepath.Join(stateMachine.tempDirs.chroot, "snap", "bin", expectedSnap)
+			_, err := os.Stat(snapPath)
+			if err != nil {
+				t.Errorf("File %s should be in chroot, but is missing", snapPath)
+			}
+		}
+
+		//os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestFailedPreseedClassicImage tests failures in the preseedClassicImage function
+func TestFailedPreseedClassicImage(t *testing.T) {
+	t.Run("test_failed_preseed_classic_image", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		// mock os.MkdirAll
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		err := stateMachine.preseedClassicImage()
+		asserter.AssertErrContains(err, "Error creating mountpoint")
+		osMkdirAll = os.MkdirAll
+
+		testCaseName = "TestFailedPreseedClassicImage"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrContains(err, "Error running command")
+		execCommand = exec.Command
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

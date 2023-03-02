@@ -112,11 +112,11 @@ github.com/snapcore/bolt v1.3.2-0.20210908134111-63c8bfcf7af8/go.mod h1:Z6z3sf12
 github.com/snapcore/go-gettext v0.0.0-20191107141714-82bbea49e785/go.mod h1:D3SsWAXK7wCCBZu+Vk5hc1EuKj/L3XN1puEMXTU4LrQ=
 github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2 h1:nETXPg0CiJrMAwC2gqkcam9BiBWYGvTsSYRfrjOz2Kg=
 github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2/go.mod h1:D3SsWAXK7wCCBZu+Vk5hc1EuKj/L3XN1puEMXTU4LrQ=
-github.com/snapcore/secboot v0.0.0-20220922155412-5d2b29ff0ee2 h1:sPC5tmNoJ6H8Pu9OHZiYP1YIAlG98Nm44CYS9nliPz0=
-github.com/snapcore/secboot v0.0.0-20220922155412-5d2b29ff0ee2/go.mod h1:72paVOkm4sJugXt+v9ItmnjXgO921D8xqsbH2OekouY=
+github.com/snapcore/secboot v0.0.0-20230119174011-57239c9f324a h1:MwEn6ADhO9DYtqRnat71TOYxcNxBVUeqfDCBtrYcu7Y=
+github.com/snapcore/secboot v0.0.0-20230119174011-57239c9f324a/go.mod h1:72paVOkm4sJugXt+v9ItmnjXgO921D8xqsbH2OekouY=
 github.com/snapcore/snapd v0.0.0-20201005140838-501d14ac146e/go.mod h1:3xrn7QDDKymcE5VO2rgWEQ5ZAUGb9htfwlXnoel6Io8=
-github.com/snapcore/snapd v0.0.0-20230110165810-bb2514455dea h1:sKRBg9nQLoYJ11ySb7EHOdYJFTBoKXHDr8aLZcFet2Q=
-github.com/snapcore/snapd v0.0.0-20230110165810-bb2514455dea/go.mod h1:smkkw6QWeTo9l8t9gxqLcbFzBOPZpeJxa2bHZWWcTYY=
+github.com/snapcore/snapd v0.0.0-20230224164448-b0848d7c7799 h1:SqHJhBJDIcg42aG60Lv/Y8buLSo3QAjn2rWPTT3hYfo=
+github.com/snapcore/snapd v0.0.0-20230224164448-b0848d7c7799/go.mod h1:6f8/YFmYLQ3H4ySp21aAZ/LMlps3De9xPwCI3KfDr9k=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=

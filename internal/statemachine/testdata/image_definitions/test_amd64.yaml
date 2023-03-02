@@ -37,6 +37,8 @@ customization:
     -
       name: hello
       channel: candidate
+    -
+      name: core
   extra-ppas:
     -
       name: "canonical-foundations/ubuntu-image"

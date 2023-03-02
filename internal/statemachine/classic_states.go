@@ -18,6 +18,8 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/image/preseed"
+	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -266,6 +268,7 @@ func (stateMachine *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates,
 			[]stateFunc{
 				{"install_packages", (*StateMachine).installPackages},
+				{"prepare_image", (*StateMachine).prepareClassicImage},
 				{"preseed_image", (*StateMachine).preseedClassicImage},
 			}...,
 		)
@@ -982,8 +985,8 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	return nil
 }
 
-// preseedClassicImage calls image.Prepare to seed snaps in classic images
-func (stateMachine *StateMachine) preseedClassicImage() error {
+// prepareClassicImage calls image.Prepare to stage snaps in classic images
+func (stateMachine *StateMachine) prepareClassicImage() error {
 	var classicStateMachine *ClassicStateMachine
 	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
 
@@ -1001,6 +1004,40 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
 
+	// check if the rootfs is already preseeded. This can happen when building from a
+	// rootfs tarball
+	if osutil.FileExists(filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "snapd", "state.json")) {
+		// first get a list of all preseeded snaps
+		// seededSnaps maps the snap name and channel that was seeded
+		preseededSnaps, err := getPreseededSnaps(classicStateMachine.tempDirs.chroot)
+		if err != nil {
+			return fmt.Errorf("Error getting list of preseeded snaps from existing rootfs: %s",
+				err.Error())
+		}
+		for snap, channel := range preseededSnaps {
+			// if a channel is specified on the command line for a snap that was already
+			// preseeded, use the channel from the command line instead of the channel
+			// that was originally used for the preseeding
+			if !helper.SliceHasElement(imageOpts.Snaps, snap) {
+				imageOpts.Snaps = append(imageOpts.Snaps, snap)
+				imageOpts.SnapChannels[snap] = channel
+			}
+		}
+		// preseed.ClassicReset automatically has some output that we only want for
+		// verbose or greater logging
+		if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
+			oldPreseedStdout := preseed.Stdout
+			preseed.Stdout = ioutil.Discard
+			defer func() {
+				preseed.Stdout = oldPreseedStdout
+			}()
+		}
+		err = preseed.ClassicReset(stateMachine.tempDirs.chroot)
+		if err != nil {
+			return fmt.Errorf("error resetting preseeding in the chroot")
+		}
+	}
+
 	// iterate through the list of snaps and ensure that all of their bases
 	// are also set to be installed. Note we only do this for snaps that are
 	// seeded. Users are expected to specify all base and content provider
@@ -1014,16 +1051,17 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 			return fmt.Errorf("Error getting info for snap %s: \"%s\"",
 				seededSnap, err.Error())
 		}
-		if !helper.SliceHasElement(imageOpts.Snaps, snapInfo.Base) {
+		if snapInfo.Base != "" && !helper.SliceHasElement(imageOpts.Snaps, snapInfo.Base) {
 			imageOpts.Snaps = append(imageOpts.Snaps, snapInfo.Base)
 		}
 	}
 
 	imageOpts.Revisions = make(map[string]snap.Revision)
 	// add any extra snaps from the image definition to the list
+	// this is done last to ensure the correct channels are being used
 	if classicStateMachine.ImageDef.Customization != nil {
 		for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
-			if !helper.SliceHasElement(classicStateMachine.Snaps, extraSnap.SnapName) {
+			if !helper.SliceHasElement(imageOpts.Snaps, extraSnap.SnapName) {
 				imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
 			}
 			if extraSnap.Channel != "" {
@@ -1060,6 +1098,56 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
 
+	return nil
+}
+
+// preseedClassicImage preseeds the snaps that have already been staged in the chroot
+func (stateMachine *StateMachine) preseedClassicImage() error {
+	var classicStateMachine *ClassicStateMachine
+	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+
+	// create some directories in the chroot that we will bind mount from the
+	// host system. This is required or else the call to snap-preseed will fail
+	mkdirs := []string{
+		filepath.Join(stateMachine.tempDirs.chroot, "sys", "kernel", "security"),
+		filepath.Join(stateMachine.tempDirs.chroot, "sys", "fs", "cgroup"),
+	}
+	for _, mkdir := range mkdirs {
+		err := osMkdirAll(mkdir, 0755)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating mountpoint \"%s\": \"%s\"", mkdir, err.Error())
+		}
+	}
+
+	// slice to hold all of the commands to do the preseeding
+	var preseedCmds []*exec.Cmd
+
+	// set up the mount commands
+	mountPoints := []string{"/dev", "/proc", "/sys/kernel/security", "/sys/fs/cgroup"}
+	var mountCmds []*exec.Cmd
+	var umountCmds []*exec.Cmd
+	for _, mountPoint := range mountPoints {
+		var mountCmd, umountCmd *exec.Cmd
+		mountCmd, umountCmd = mountFromHost(stateMachine.tempDirs.chroot, mountPoint)
+		defer umountCmd.Run()
+		mountCmds = append(mountCmds, mountCmd)
+		umountCmds = append(umountCmds, umountCmd)
+	}
+
+	// assemble the commands in the correct order: mount, preseed, unmount
+	preseedCmds = append(preseedCmds, mountCmds...)
+	preseedCmds = append(preseedCmds,
+		exec.Command("/usr/lib/snapd/snap-preseed", stateMachine.tempDirs.chroot),
+	)
+	preseedCmds = append(preseedCmds, umountCmds...)
+	for _, cmd := range preseedCmds {
+		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
+		err := cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+				cmd.String(), err.Error(), cmdOutput.String())
+		}
+	}
 	return nil
 }
 
