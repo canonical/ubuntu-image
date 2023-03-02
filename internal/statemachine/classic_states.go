@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
+	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
@@ -310,7 +311,9 @@ func (stateMachine *StateMachine) calculateStates() error {
 		// only run makeDisk if there is an artifact to make
 		if classicStateMachine.ImageDef.Artifacts.Img != nil {
 			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"make_disk", (*StateMachine).makeDisk})
+				stateFunc{"make_disk", (*StateMachine).makeDisk},
+				stateFunc{"update_bootloader", (*StateMachine).updateGrub},
+			)
 		}
 	}
 
@@ -325,7 +328,9 @@ func (stateMachine *StateMachine) calculateStates() error {
 		}
 		if !found {
 			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"make_disk", (*StateMachine).makeDisk})
+				stateFunc{"make_disk", (*StateMachine).makeDisk},
+				stateFunc{"update_grub", (*StateMachine).updateGrub},
+			)
 		}
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img})
@@ -400,12 +405,18 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
 
 		// copy the source tree to the workdir
-		err := osutilCopySpecialFile(sourceURL.Path, gadgetDir)
+		files, err := ioutilReadDir(sourceURL.Path)
 		if err != nil {
-			return fmt.Errorf("Error copying gadget source: %s", err.Error())
+			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
+		}
+		for _, gadgetFile := range files {
+			srcFile := filepath.Join(sourceURL.Path, gadgetFile.Name())
+			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
+				return fmt.Errorf("Error copying gadget source: %s", err.Error())
+			}
 		}
 
-		sourceDir = filepath.Join(gadgetDir, path.Base(sourceURL.Path))
+		sourceDir = filepath.Join(gadgetDir)
 		break
 	}
 
@@ -1194,5 +1205,124 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 				qemuImgCommand.String(), err.Error(), qemuOutput.String())
 		}
 	}
+	return nil
+}
+
+// updateGrub sets up a loopback device, creates appropriate mountpoint, and runs update-grub
+func (stateMachine *StateMachine) updateGrub() error {
+	// make sure /dev/loop99 is not already in use
+	loops, err := filepath.Glob("/dev/mapper/loop99*")
+	if err != nil {
+		return fmt.Errorf("Error globbing for /dev/mapper/loop99", err.Error())
+	}
+	if len(loops) > 0 {
+		return fmt.Errorf("Error, /dev/loop99 already in use")
+	}
+
+	// create a directory in which to mount the rootfs
+	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+	err = osMkdir(mountDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
+	}
+
+	// determine which partition number is the rootfs and which volume it is in
+	// TODO should this be stored in the struct earlier on?
+	rootfsPartNum := -1
+	var rootfsVolName string
+	for _, volumeName := range stateMachine.VolumeOrder {
+		volume := stateMachine.GadgetInfo.Volumes[volumeName]
+		for structureNumber, structure := range volume.Structure {
+			if structure.Role == gadget.SystemData {
+				rootfsPartNum = structureNumber
+				rootfsVolName = volumeName
+				if volume.Bootloader != "grub" {
+					fmt.Println("WARNING: bootloader is not grub, so this step is a no-op")
+					return nil
+				}
+			}
+		}
+	}
+	if rootfsPartNum == -1 {
+		return fmt.Errorf("error determining partition number of the root filesystem")
+	}
+
+	// Slice used to store all the commands that need to be run
+	// to properly update grub.cfg in the chroot
+	var updateGrubCmds []*exec.Cmd
+
+	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
+
+	// set up the loopback
+	var umounts []*exec.Cmd
+	updateGrubCmds = append(updateGrubCmds,
+		[]*exec.Cmd{
+			// set up the loopback
+			exec.Command("losetup",
+				filepath.Join("/dev", "loop99"),
+				imgPath,
+			),
+			exec.Command("kpartx",
+				"-a",
+				filepath.Join("/dev", "loop99"),
+			),
+			// mount the rootfs partition in which to run update-grub
+			exec.Command("mount",
+				filepath.Join("/dev", "mapper", fmt.Sprintf("loop99p%d", rootfsPartNum)),
+				mountDir,
+			),
+		}...,
+	)
+
+
+	// set up the mountpoints
+	mountPoints := []string{"/dev", "/proc", "/sys"}
+	for _, mountPoint := range mountPoints {
+		mountCmd, umountCmd := mountFromHost(mountDir, mountPoint)
+		updateGrubCmds = append(updateGrubCmds, mountCmd)
+		umounts = append(umounts, umountCmd)
+		defer umountCmd.Run()
+	}
+	// make sure to unmount the disk too
+	umounts = append(umounts, exec.Command("umount", mountDir))
+
+	// actually run update-grub
+	updateGrubCmds = append(updateGrubCmds,
+		exec.Command("chroot",
+			mountDir,
+			"update-grub",
+		),
+	)
+
+	// unmount /dev /proc and /sys
+	updateGrubCmds = append(updateGrubCmds, umounts...)
+
+	// tear down the loopback
+	teardownCmds := []*exec.Cmd{
+		exec.Command("kpartx",
+			"-d",
+			filepath.Join("/dev", "loop99"),
+		),
+		exec.Command("losetup",
+			"--detach",
+			filepath.Join("/dev", "loop99"),
+		),
+	}
+
+	for _, teardownCmd := range teardownCmds {
+		defer teardownCmd.Run()
+	}
+	updateGrubCmds = append(updateGrubCmds, teardownCmds...)
+
+	// now run all the commands
+	for _, cmd := range updateGrubCmds {
+		cmdOutput := helper.SetCommandOutput(cmd, stateMachine.commonFlags.Debug)
+		err := cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+				cmd.String(), err.Error(), cmdOutput.String())
+		}
+	}
+
 	return nil
 }

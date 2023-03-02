@@ -3,7 +3,7 @@ summary: Create Ubuntu images
 description: |
   Official tool for building Ubuntu images, currently supporing Ubuntu Core
   snap-based images and preinstalled Ubuntu classic images.
-version: 3.0+snap1~beta15
+version: 3.0+snap1~beta16-update-grub3
 grade: stable
 confinement: classic
 base: core22
@@ -24,7 +24,7 @@ parts:
   ubuntu-image:
     plugin: go
     source: .
-    source-type: git
+      #source-type: git
     build-packages:
       - golang-go
       - fdisk
@@ -39,6 +39,7 @@ parts:
       - fakeroot
       - dosfstools
       - squashfs-tools
+      - kpartx
       - debootstrap
       - gpg
       - germinate
