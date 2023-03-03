@@ -148,6 +148,9 @@ func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
 func mockImagePrepare(*image.Options) error {
 	return fmt.Errorf("Test Error")
 }
+func mockPreseedClassicReset(string) error {
+	return fmt.Errorf("Test Error")
+}
 func mockGet(string) (*http.Response, error) {
 	return nil, fmt.Errorf("Test Error")
 }

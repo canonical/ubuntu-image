@@ -22,6 +22,7 @@ import (
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/image/preseed"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
@@ -61,6 +62,7 @@ var diskfsCreate = diskfs.Create
 var randRead = rand.Read
 var seedOpen = seed.Open
 var imagePrepare = image.Prepare
+var preseedClassicReset = preseed.ClassicReset
 var httpGet = http.Get
 var jsonUnmarshal = json.Unmarshal
 var yamlMarshal = yaml.Marshal

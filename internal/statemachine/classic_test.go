@@ -25,10 +25,11 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/pkg/xattr"
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/image/preseed"
 	"github.com/snapcore/snapd/osutil"
 
 	//"github.com/snapcore/snapd/osutil"
-	//"github.com/snapcore/snapd/seed"
+	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -1527,7 +1528,7 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 		asserter.AssertErrContains(err, "Error getting info for snap")
 
 		// mock image.Prepare
-		stateMachine.Snaps = []string{"hello"}
+		stateMachine.Snaps = []string{"hello", "core"}
 		imagePrepare = mockImagePrepare
 		defer func() {
 			imagePrepare = image.Prepare
@@ -1535,6 +1536,28 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrContains(err, "Error preparing image")
 		imagePrepare = image.Prepare
+
+		// preseed the chroot, create a state.json file to trigger a reset, and mock some related functions
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrNil(err, true)
+		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "snapd", "state.json"))
+		asserter.AssertErrNil(err, true)
+
+		seedOpen = mockSeedOpen
+		defer func() {
+			seedOpen = seed.Open
+		}()
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrContains(err, "Error getting list of preseeded snaps")
+		seedOpen = seed.Open
+
+		preseedClassicReset = mockPreseedClassicReset
+		defer func() {
+			preseedClassicReset = preseed.ClassicReset
+		}()
+		err = stateMachine.prepareClassicImage()
+		asserter.AssertErrContains(err, "Error resetting preseeding")
+		preseedClassicReset = preseed.ClassicReset
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
@@ -1901,7 +1924,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.Debug = true
-		stateMachine.commonFlags.Size = "4G"
+		stateMachine.commonFlags.Size = "5G"
 		stateMachine.commonFlags.OutputDir = outputDir
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 			"test_amd64.yaml")
