@@ -289,8 +289,9 @@ func TestPrintStates(t *testing.T) {
 [13] populate_bootfs_contents
 [14] populate_prepare_partitions
 [15] make_disk
-[16] generate_manifest
-[17] finish
+[16] update_bootloader
+[17] generate_manifest
+[18] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
