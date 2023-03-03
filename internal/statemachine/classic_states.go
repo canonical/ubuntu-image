@@ -1213,7 +1213,7 @@ func (stateMachine *StateMachine) updateGrub() error {
 	// make sure /dev/loop99 is not already in use
 	loops, err := filepath.Glob("/dev/mapper/loop99*")
 	if err != nil {
-		return fmt.Errorf("Error globbing for /dev/mapper/loop99", err.Error())
+		return fmt.Errorf("Error globbing for /dev/mapper/loop99: \"%s\"", err.Error())
 	}
 	if len(loops) > 0 {
 		return fmt.Errorf("Error, /dev/loop99 already in use")
