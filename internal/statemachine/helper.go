@@ -894,3 +894,101 @@ func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates 
 	}
 	return extraStates
 }
+
+// updateGrub mounts the resulting image and runs update-grub
+func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) error {
+	// make sure /dev/loop99 is not already in use
+	loops, err := filepath.Glob("/dev/mapper/loop99*")
+	if err != nil {
+		return fmt.Errorf("Error globbing for /dev/mapper/loop99: \"%s\"", err.Error())
+	}
+	if len(loops) > 0 {
+		return fmt.Errorf("Error, /dev/loop99 already in use")
+	}
+
+	// create a directory in which to mount the rootfs
+	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+	err = osMkdir(mountDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
+	}
+
+	// Slice used to store all the commands that need to be run
+	// to properly update grub.cfg in the chroot
+	var updateGrubCmds []*exec.Cmd
+
+	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
+
+	// set up the loopback
+	var umounts []*exec.Cmd
+	updateGrubCmds = append(updateGrubCmds,
+		[]*exec.Cmd{
+			// set up the loopback
+			exec.Command("losetup",
+				filepath.Join("/dev", "loop99"),
+				imgPath,
+			),
+			exec.Command("kpartx",
+				"-a",
+				filepath.Join("/dev", "loop99"),
+			),
+			// mount the rootfs partition in which to run update-grub
+			exec.Command("mount",
+				filepath.Join("/dev", "mapper", fmt.Sprintf("loop99p%d", rootfsPartNum)),
+				mountDir,
+			),
+		}...,
+	)
+
+
+	// set up the mountpoints
+	mountPoints := []string{"/dev", "/proc", "/sys"}
+	for _, mountPoint := range mountPoints {
+		mountCmd, umountCmd := mountFromHost(mountDir, mountPoint)
+		updateGrubCmds = append(updateGrubCmds, mountCmd)
+		umounts = append(umounts, umountCmd)
+		defer umountCmd.Run()
+	}
+	// make sure to unmount the disk too
+	umounts = append(umounts, exec.Command("umount", mountDir))
+
+	// actually run update-grub
+	updateGrubCmds = append(updateGrubCmds,
+		exec.Command("chroot",
+			mountDir,
+			"update-grub",
+		),
+	)
+
+	// unmount /dev /proc and /sys
+	updateGrubCmds = append(updateGrubCmds, umounts...)
+
+	// tear down the loopback
+	teardownCmds := []*exec.Cmd{
+		exec.Command("kpartx",
+			"-d",
+			filepath.Join("/dev", "loop99"),
+		),
+		exec.Command("losetup",
+			"--detach",
+			filepath.Join("/dev", "loop99"),
+		),
+	}
+
+	for _, teardownCmd := range teardownCmds {
+		defer teardownCmd.Run()
+	}
+	updateGrubCmds = append(updateGrubCmds, teardownCmds...)
+
+	// now run all the commands
+	for _, cmd := range updateGrubCmds {
+		cmdOutput := helper.SetCommandOutput(cmd, stateMachine.commonFlags.Debug)
+		err := cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+				cmd.String(), err.Error(), cmdOutput.String())
+		}
+	}
+
+	return nil
+}
