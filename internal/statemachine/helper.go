@@ -901,7 +901,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	freeDevLoop := 0
 	foundFree := false
 	for !foundFree {
-		freeDevLoop += 1
+		freeDevLoop++
 		loops, err := filepathGlob(fmt.Sprintf("/dev/loop%d*", freeDevLoop))
 		if err != nil {
 			return fmt.Errorf("Error globbing for /dev/loop%d: \"%s\"", freeDevLoop, err.Error())
