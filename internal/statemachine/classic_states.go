@@ -411,6 +411,12 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 
 	// now run "make" to build the gadget tree
 	makeCmd := execCommand("make")
+
+	// if a make target was specified then add it to the command
+	if classicStateMachine.ImageDef.Gadget.MakeTarget != "" {
+		makeCmd.Args = append(makeCmd.Args, classicStateMachine.ImageDef.Gadget.MakeTarget)
+	}
+
 	// add ARCH and SERIES environment variables for making the gadget tree
 	makeCmd.Env = append(makeCmd.Env, []string{
 		fmt.Sprintf("ARCH=%s", classicStateMachine.ImageDef.Architecture),

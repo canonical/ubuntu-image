@@ -52,6 +52,10 @@ The following specification defines what is supported in the YAML:
          # The branch to use if building a gadget tree from git.
          # Defaults to "main"
          branch: <string> (optional)
+         # The target to build when running "make". If none is specified
+         # make will be called with no target. This key/value pair has
+         # no effect when the gadget.type is "prebuilt"
+         target: <string> (optional)
        # A path to a model assertion to use when pre-seeding snaps
        # in the image. Must be a local file URI beginning with file://
        model-assertion: <string> (optional)
