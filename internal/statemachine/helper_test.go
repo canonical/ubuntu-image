@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -1279,5 +1280,42 @@ func TestFailedMountTempFS(t *testing.T) {
 		_, _, err := mountTempFS("", "", "")
 		asserter.AssertErrContains(err, "Test error")
 		osMkdirTemp = os.MkdirTemp
+	})
+}
+
+// TestFailedUpdateGrub tests failures in the updateGrub function
+func TestFailedUpdateGrub(t *testing.T) {
+	t.Run("test_failed_update_grub", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// mock filepath.Glob to return an error
+		filepathGlob = mockGlob
+		defer func() {
+			filepathGlob = filepath.Glob
+		}()
+		err := stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error globbing for /dev/loop")
+		filepathGlob = filepath.Glob
+
+		// mock os.Mkdir to return no error but show /dev/mapper/loop99 already in use
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err = stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
+		osMkdir = os.Mkdir
+
+		// Setup the exec.Command mock
+		testCaseName = "TestFailedUpdateGrub"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err = stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error running command")
+		execCommand = exec.Command
 	})
 }

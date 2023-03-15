@@ -1235,7 +1235,7 @@ func (stateMachine *StateMachine) updateBootloader() error {
 		}
 	}
 	if rootfsPartNum == -1 {
-		return fmt.Errorf("error determining partition number of the root filesystem")
+		return fmt.Errorf("Error: could not determine partition number of the root filesystem")
 	}
 	return nil
 }

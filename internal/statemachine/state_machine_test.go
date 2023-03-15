@@ -160,6 +160,9 @@ func mockMarshal(interface{}) ([]byte, error) {
 func mockRel(string, string) (string, error) {
 	return "", fmt.Errorf("Test error")
 }
+func mockGlob(string) ([]string, error) {
+	return []string{}, fmt.Errorf("Test error")
+}
 func mockGojsonschemaValidateError(gojsonschema.JSONLoader, gojsonschema.JSONLoader) (*gojsonschema.Result, error) {
 	return nil, fmt.Errorf("Test Error")
 }
@@ -213,6 +216,8 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestGenerateFilelist":
 		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
 		break
+	case "TestFailedUpdateGrub":
+		fallthrough
 	case "TestFailedMakeQcow2Image":
 		fallthrough
 	case "TestFailedGeneratePackageManifest":

@@ -897,18 +897,23 @@ func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates 
 
 // updateGrub mounts the resulting image and runs update-grub
 func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) error {
-	// make sure /dev/loop99 is not already in use
-	loops, err := filepath.Glob("/dev/mapper/loop99*")
-	if err != nil {
-		return fmt.Errorf("Error globbing for /dev/mapper/loop99: \"%s\"", err.Error())
-	}
-	if len(loops) > 0 {
-		return fmt.Errorf("Error, /dev/loop99 already in use")
+	// find a /dev/loop* that is not already in use
+	freeDevLoop := 0
+	foundFree := false
+	for !foundFree {
+		freeDevLoop += 1
+		loops, err := filepathGlob(fmt.Sprintf("/dev/loop%d*", freeDevLoop))
+		if err != nil {
+			return fmt.Errorf("Error globbing for /dev/loop%d: \"%s\"", freeDevLoop, err.Error())
+		}
+		if len(loops) == 0 {
+			foundFree = true
+		}
 	}
 
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
-	err = osMkdir(mountDir, 0755)
+	err := osMkdir(mountDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
 	}
@@ -925,21 +930,23 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		[]*exec.Cmd{
 			// set up the loopback
 			exec.Command("losetup",
-				filepath.Join("/dev", "loop99"),
+				filepath.Join("/dev", fmt.Sprintf("loop%d", freeDevLoop)),
 				imgPath,
 			),
 			exec.Command("kpartx",
 				"-a",
-				filepath.Join("/dev", "loop99"),
+				filepath.Join("/dev", fmt.Sprintf("loop%d", freeDevLoop)),
 			),
 			// mount the rootfs partition in which to run update-grub
 			exec.Command("mount",
-				filepath.Join("/dev", "mapper", fmt.Sprintf("loop99p%d", rootfsPartNum)),
+				filepath.Join("/dev",
+					"mapper",
+					fmt.Sprintf("loop%dp%d", freeDevLoop, rootfsPartNum),
+				),
 				mountDir,
 			),
 		}...,
 	)
-
 
 	// set up the mountpoints
 	mountPoints := []string{"/dev", "/proc", "/sys"}
@@ -967,11 +974,11 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	teardownCmds := []*exec.Cmd{
 		exec.Command("kpartx",
 			"-d",
-			filepath.Join("/dev", "loop99"),
+			filepath.Join("/dev", fmt.Sprintf("loop%d", freeDevLoop)),
 		),
 		exec.Command("losetup",
 			"--detach",
-			filepath.Join("/dev", "loop99"),
+			filepath.Join("/dev", fmt.Sprintf("loop%d", freeDevLoop)),
 		),
 	}
 
