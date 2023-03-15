@@ -511,6 +511,65 @@ func TestSnapFlagSyntax(t *testing.T) {
 	}
 }
 
+// TestSnapRevisions tests the --revision flag and ensures the correct
+// revisions are installed in the image
+func TestSnapRevisions(t *testing.T) {
+	t.Run("test_snap_revisions", func(t *testing.T) {
+		// many snaps aren't published on other architectures, so only run this on amd64
+		if runtime.GOARCH != "amd64" {
+			t.Skip("Test for amd64 only")
+		}
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine SnapStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		// use core18 because it builds the fastest
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
+		stateMachine.Opts.Snaps = []string{"hello", "core", "core20"}
+		stateMachine.Opts.Revisions = map[string]int{
+			"hello": 38,
+			"core":  14784,
+		}
+		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
+		stateMachine.stateMachineFlags.WorkDir = workDir
+		stateMachine.commonFlags.OutputDir = workDir
+
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
+
+		for snapName, expectedRevision := range stateMachine.Opts.Revisions {
+			// compile a regex used to get revision numbers from seed.manifest
+			revRegex, err := regexp.Compile(fmt.Sprintf(
+				"%s (.*?)\n", snapName))
+			asserter.AssertErrNil(err, true)
+			seedData, err := ioutil.ReadFile(filepath.Join(
+				stateMachine.stateMachineFlags.WorkDir, "seed.manifest"))
+			asserter.AssertErrNil(err, true)
+			revString := revRegex.FindStringSubmatch(string(seedData))
+			if len(revString) != 2 {
+				t.Fatal("Error finding snap revision via regex")
+			}
+			seededRevision, err := strconv.Atoi(revString[1])
+			asserter.AssertErrNil(err, true)
+
+			if seededRevision != expectedRevision {
+				t.Errorf("Error, expected snap %s to "+
+					"be revision %d, but it was %d",
+					snapName, expectedRevision, seededRevision)
+			}
+		}
+	})
+}
+
 // TestValidationFlag ensures that the the validation flag is passed through to image.Prepare
 // correctly. This is accomplished by enabling the flag and ensuring the correct version
 // of a snap is installed as a result

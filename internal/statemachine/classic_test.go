@@ -12,7 +12,9 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1418,6 +1420,75 @@ func TestPreseedClassicImage(t *testing.T) {
 				}
 			}
 		}
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestClassicSnapRevisions tests that if revisions are specified in the image definition
+// that the corresponding revisions are staged in the chroot
+func TestClassicSnapRevisions(t *testing.T) {
+	t.Run("test_classic_snap_revisions", func(t *testing.T) {
+		if runtime.GOARCH != "amd64" {
+			t.Skip("Test for amd64 only")
+		}
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Snaps = []string{"lxd"}
+		stateMachine.commonFlags.Channel = "stable"
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Customization: &imagedefinition.Customization{
+				ExtraSnaps: []*imagedefinition.Snap{
+					{
+						SnapName:     "hello",
+						SnapRevision: 38,
+					},
+					{
+						SnapName:     "ubuntu-image",
+						SnapRevision: 330,
+					},
+				},
+			},
+		}
+
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.preseedClassicImage()
+		asserter.AssertErrNil(err, true)
+
+		for _, snapInfo := range stateMachine.ImageDef.Customization.ExtraSnaps {
+			// compile a regex used to get revision numbers from seed.manifest
+			revRegex, err := regexp.Compile(fmt.Sprintf("%s_(.*?).snap\n", snapInfo.SnapName))
+			asserter.AssertErrNil(err, true)
+			seedData, err := ioutil.ReadFile(filepath.Join(
+				stateMachine.tempDirs.chroot,
+				"var",
+				"lib",
+				"snapd",
+				"seed",
+				"seed.yaml",
+			))
+			asserter.AssertErrNil(err, true)
+			revString := revRegex.FindStringSubmatch(string(seedData))
+			if len(revString) != 2 {
+				t.Fatal("Error finding snap revision via regex")
+			}
+			seededRevision, err := strconv.Atoi(revString[1])
+			asserter.AssertErrNil(err, true)
+
+			if seededRevision != snapInfo.SnapRevision {
+				t.Errorf("Error, expected snap %s to "+
+					"be revision %d, but it was %d",
+					snapInfo.SnapName, snapInfo.SnapRevision, seededRevision)
+			}
+		}
+
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

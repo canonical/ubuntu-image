@@ -29,6 +29,11 @@ func (stateMachine *StateMachine) prepareImage() error {
 	if snapStateMachine.commonFlags.Channel != "" {
 		imageOpts.Channel = snapStateMachine.commonFlags.Channel
 	}
+	imageOpts.Revisions = make(map[string]snap.Revision)
+	for snapName, snapRev := range snapStateMachine.Opts.Revisions {
+		fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n", snapRev, snapName)
+		imageOpts.Revisions[snapName] = snap.Revision{N: snapRev}
+	}
 
 	// preseeding-related
 	imageOpts.Preseed = snapStateMachine.Opts.Preseed

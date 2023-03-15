@@ -175,12 +175,17 @@ The following specification defines what is supported in the YAML:
              # The name of the snap.
              name: <string>
              # The channel from which to seed the snap.
+             # If both the revision and channel are provided
+             # the snap revision specified will be installed
+             # and updates will come from the channel specified
              channel: <string> (optional)
              # The store to retrieve the snap from. Not yet supported.
              # Defaults to "canonical".
              store: <string> (optional)
              # The revision of the snap to preseed in the rootfs.
-             # Not yet supported.
+             # If both the revision and channel are provided
+             # the snap revision specified will be installed
+             # and updates will come from the channel specified
              revision: <int> (optional)
          # After the rootfs has been created and before the image
          # artifacts are generated, ubuntu-image can automatically
