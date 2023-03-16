@@ -400,12 +400,18 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
 
 		// copy the source tree to the workdir
-		err := osutilCopySpecialFile(sourceURL.Path, gadgetDir)
+		files, err := ioutilReadDir(sourceURL.Path)
 		if err != nil {
-			return fmt.Errorf("Error copying gadget source: %s", err.Error())
+			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
+		}
+		for _, gadgetFile := range files {
+			srcFile := filepath.Join(sourceURL.Path, gadgetFile.Name())
+			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
+				return fmt.Errorf("Error copying gadget source: %s", err.Error())
+			}
 		}
 
-		sourceDir = filepath.Join(gadgetDir, path.Base(sourceURL.Path))
+		sourceDir = filepath.Join(gadgetDir)
 		break
 	}
 
