@@ -2397,27 +2397,7 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 		stateMachine.ImageDef = imageDef
 
 		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrContains(err, "Error reading gadget tree")
-
-		// mock osutil.CopySpecialFile and run with /tmp as the gadget source
-		imageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:  "file:///tmp",
-				GadgetType: "directory",
-			},
-		}
-		stateMachine.ImageDef = imageDef
-
-		// mock osutil.CopySpecialFile
-		osutilCopySpecialFile = mockCopySpecialFile
-		defer func() {
-			osutilCopySpecialFile = osutil.CopySpecialFile
-		}()
-		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrContains(err, "Error copying gadget source")
-		osutilCopySpecialFile = osutil.CopySpecialFile
 
 		// run a "make" command that will fail by mocking exec.Command
 		testCaseName = "TestFailedBuildGadgetTree"
