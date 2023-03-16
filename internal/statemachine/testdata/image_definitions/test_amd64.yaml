@@ -6,9 +6,9 @@ series: jammy
 class: preinstalled
 kernel: linux-image-generic
 gadget:
-  url: "https://github.com/snapcore/pc-amd64-gadget"
+  url: "https://github.com/snapcore/pc-amd64-gadget.git"
+  branch: classic
   type: "git"
-  branch: "classic"
 rootfs:
   components:
     - main

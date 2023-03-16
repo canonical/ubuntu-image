@@ -405,18 +405,12 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
 
 		// copy the source tree to the workdir
-		files, err := ioutilReadDir(sourceURL.Path)
+		err := osutilCopySpecialFile(sourceURL.Path, gadgetDir)
 		if err != nil {
-			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
-		}
-		for _, gadgetFile := range files {
-			srcFile := filepath.Join(sourceURL.Path, gadgetFile.Name())
-			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
-				return fmt.Errorf("Error copying gadget source: %s", err.Error())
-			}
+			return fmt.Errorf("Error copying gadget source: %s", err.Error())
 		}
 
-		sourceDir = filepath.Join(gadgetDir)
+		sourceDir = filepath.Join(gadgetDir, path.Base(sourceURL.Path))
 		break
 	}
 
@@ -1216,9 +1210,8 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 	return nil
 }
 
-// updateBootloader sets up a loopback device, creates appropriate
-// mountpoint, and runs the correct update command for the bootloader
-// that is specified in gadget.yaml
+// updateBootloader determines the bootloader for each volume
+// and runs the correct helper function to update the bootloader
 func (stateMachine *StateMachine) updateBootloader() error {
 	// determine which partition number is the rootfs and which volume it is in
 	// TODO should this be stored in the struct earlier on?
