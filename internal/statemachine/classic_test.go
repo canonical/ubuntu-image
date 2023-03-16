@@ -2265,6 +2265,75 @@ func TestBuildGadgetTree(t *testing.T) {
 	})
 }
 
+// TestGadgetMakeTargets tests using alternate make targets with gadget builds
+func TestGadgetMakeTargets(t *testing.T) {
+	testCases := []struct {
+		name           string
+		target         string
+		expectedOutput string
+	}{
+		{
+			"default",
+			"",
+			"make target test1",
+		},
+		{
+			"test2",
+			"test2",
+			"make target test2",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_gadget_make_targets_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.commonFlags.Debug = true
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			wd, _ := os.Getwd()
+			gadgetSrc := filepath.Join(wd, "testdata", "gadget_source")
+			imageDef := imagedefinition.ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Gadget: &imagedefinition.Gadget{
+					GadgetURL:  fmt.Sprintf("file://%s", gadgetSrc),
+					GadgetType: "directory",
+					MakeTarget: tc.target,
+				},
+			}
+			stateMachine.ImageDef = imageDef
+
+			// capture stdout, build the gadget tree, and make
+			// sure the expected output matches the make target
+			stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+			defer restoreStdout()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.buildGadgetTree()
+			asserter.AssertErrNil(err, true)
+
+			// restore stdout and examine what was printed
+			restoreStdout()
+			readStdout, err := ioutil.ReadAll(stdout)
+			asserter.AssertErrNil(err, true)
+			if !strings.Contains(string(readStdout), tc.expectedOutput) {
+				t.Errorf("Expected make output\n\"%s\"\nto contain the string \"%s\"",
+					string(readStdout),
+					tc.expectedOutput,
+				)
+			}
+		})
+	}
+}
+
 // TestFailedBuildGadgetTree tests failures in the  buildGadgetTree function
 func TestFailedBuildGadgetTree(t *testing.T) {
 	t.Run("test_failed_build_gadget_tree", func(t *testing.T) {
