@@ -39,7 +39,6 @@ parts:
       - fakeroot
       - dosfstools
       - squashfs-tools
-      - kpartx
       - debootstrap
       - gpg
       - germinate

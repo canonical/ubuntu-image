@@ -329,7 +329,7 @@ func (stateMachine *StateMachine) calculateStates() error {
 		if !found {
 			rootfsCreationStates = append(rootfsCreationStates,
 				stateFunc{"make_disk", (*StateMachine).makeDisk},
-				stateFunc{"update_grub", (*StateMachine).updateBootloader},
+				stateFunc{"update_bootloader", (*StateMachine).updateBootloader},
 			)
 		}
 		rootfsCreationStates = append(rootfsCreationStates,

@@ -3045,7 +3045,7 @@ func TestFailedUpdateBootloader(t *testing.T) {
 		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
 		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
 		asserter.AssertErrNil(err, true)
-		// also copy gadget.yaml to the root of the scratc/gadget dir
+		// also copy gadget.yaml to the root of the scratch/gadget dir
 		err = osutil.CopyFile(
 			filepath.Join(gadgetDest, "meta", "gadget.yaml"),
 			filepath.Join(gadgetDest, "gadget.yaml"),
@@ -3053,17 +3053,18 @@ func TestFailedUpdateBootloader(t *testing.T) {
 		)
 		asserter.AssertErrNil(err, true)
 
-		// parse gadget.yaml and run updateBootloader with the mocked Glob
+		// parse gadget.yaml and run updateBootloader with the mocked os.Mkdir
 		err = stateMachine.prepareGadgetTree()
 		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
-		filepathGlob = mockGlob
+		osMkdir = mockMkdir
 		defer func() {
-			filepathGlob = filepath.Glob
+			osMkdir = os.Mkdir
 		}()
+
 		err = stateMachine.updateBootloader()
-		asserter.AssertErrContains(err, "Error globbing for /dev/loop")
+		asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})

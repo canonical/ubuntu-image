@@ -66,7 +66,6 @@ var jsonUnmarshal = json.Unmarshal
 var yamlMarshal = yaml.Marshal
 var gojsonschemaValidate = gojsonschema.Validate
 var filepathRel = filepath.Rel
-var filepathGlob = filepath.Glob
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 

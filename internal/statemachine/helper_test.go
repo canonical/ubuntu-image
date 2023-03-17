@@ -1290,30 +1290,25 @@ func TestFailedUpdateGrub(t *testing.T) {
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-		// mock filepath.Glob to return an error
-		filepathGlob = mockGlob
-		defer func() {
-			filepathGlob = filepath.Glob
-		}()
-		err := stateMachine.updateGrub("", 0)
-		asserter.AssertErrContains(err, "Error globbing for /dev/loop")
-		filepathGlob = filepath.Glob
-
-		// mock os.Mkdir to return no error but show /dev/mapper/loop99 already in use
+		// mock os.Mkdir
 		osMkdir = mockMkdir
 		defer func() {
 			osMkdir = os.Mkdir
 		}()
-		err = stateMachine.updateGrub("", 0)
+		err := stateMachine.updateGrub("", 0)
 		asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
 		osMkdir = os.Mkdir
 
-		// Setup the exec.Command mock
-		testCaseName = "TestFailedUpdateGrub"
+		// Setup the exec.Command mock to mock losetup
+		testCaseName = "TestFailedUpdateGrubLosetup"
 		execCommand = fakeExecCommand
 		defer func() {
 			execCommand = exec.Command
 		}()
+		err = stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error running losetup command")
+		// now test a command failure that isn't losetup
+		testCaseName = "TestFailedUpdateGrubOther"
 		err = stateMachine.updateGrub("", 0)
 		asserter.AssertErrContains(err, "Error running command")
 		execCommand = exec.Command

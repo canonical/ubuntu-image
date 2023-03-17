@@ -897,20 +897,6 @@ func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates 
 
 // updateGrub mounts the resulting image and runs update-grub
 func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) error {
-	// find a /dev/loop* that is not already in use
-	freeDevLoop := 0
-	foundFree := false
-	for !foundFree {
-		freeDevLoop++
-		loops, err := filepathGlob(fmt.Sprintf("/dev/loop%d*", freeDevLoop))
-		if err != nil {
-			return fmt.Errorf("Error globbing for /dev/loop%d: \"%s\"", freeDevLoop, err.Error())
-		}
-		if len(loops) == 0 {
-			foundFree = true
-		}
-	}
-
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
 	err := osMkdir(mountDir, 0755)
@@ -924,28 +910,29 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 
 	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
 
-	// set up the loopback
+	// run the losetup command and read the output to determine which loopback was used
+	losetupCmd := execCommand("losetup",
+		"--find",
+		"--show",
+		"--partscan",
+		imgPath,
+	)
+	losetupOutput, err := losetupCmd.Output()
+	if err != nil {
+		return fmt.Errorf("Error running losetup command \"%s\". Error is %s",
+			losetupCmd.String(),
+			err.Error(),
+		)
+	}
+	loopUsed := strings.TrimSpace(string(losetupOutput))
+
 	var umounts []*exec.Cmd
 	updateGrubCmds = append(updateGrubCmds,
-		[]*exec.Cmd{
-			// set up the loopback
-			exec.Command("losetup",
-				filepath.Join("/dev", fmt.Sprintf("loop%d", freeDevLoop)),
-				imgPath,
-			),
-			exec.Command("kpartx",
-				"-a",
-				filepath.Join("/dev", fmt.Sprintf("loop%d", freeDevLoop)),
-			),
-			// mount the rootfs partition in which to run update-grub
-			exec.Command("mount",
-				filepath.Join("/dev",
-					"mapper",
-					fmt.Sprintf("loop%dp%d", freeDevLoop, rootfsPartNum),
-				),
-				mountDir,
-			),
-		}...,
+		// mount the rootfs partition in which to run update-grub
+		exec.Command("mount",
+			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
+			mountDir,
+		),
 	)
 
 	// set up the mountpoints
@@ -971,21 +958,12 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	updateGrubCmds = append(updateGrubCmds, umounts...)
 
 	// tear down the loopback
-	teardownCmds := []*exec.Cmd{
-		exec.Command("kpartx",
-			"-d",
-			filepath.Join("/dev", fmt.Sprintf("loop%d", freeDevLoop)),
-		),
-		exec.Command("losetup",
-			"--detach",
-			filepath.Join("/dev", fmt.Sprintf("loop%d", freeDevLoop)),
-		),
-	}
-
-	for _, teardownCmd := range teardownCmds {
-		defer teardownCmd.Run()
-	}
-	updateGrubCmds = append(updateGrubCmds, teardownCmds...)
+	teardownCmd := exec.Command("losetup",
+		"--detach",
+		loopUsed,
+	)
+	defer teardownCmd.Run()
+	updateGrubCmds = append(updateGrubCmds, teardownCmd)
 
 	// now run all the commands
 	for _, cmd := range updateGrubCmds {

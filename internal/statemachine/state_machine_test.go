@@ -160,9 +160,6 @@ func mockMarshal(interface{}) ([]byte, error) {
 func mockRel(string, string) (string, error) {
 	return "", fmt.Errorf("Test error")
 }
-func mockGlob(string) ([]string, error) {
-	return []string{}, fmt.Errorf("Test error")
-}
 func mockGojsonschemaValidateError(gojsonschema.JSONLoader, gojsonschema.JSONLoader) (*gojsonschema.Result, error) {
 	return nil, fmt.Errorf("Test Error")
 }
@@ -216,7 +213,7 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestGenerateFilelist":
 		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
 		break
-	case "TestFailedUpdateGrub":
+	case "TestFailedUpdateGrubLosetup":
 		fallthrough
 	case "TestFailedMakeQcow2Image":
 		fallthrough
@@ -235,6 +232,11 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
+		break
+	case "TestFailedUpdateGrubOther": // this passes the initial losetup command and fails a later command
+		if args[0] != "losetup" {
+			os.Exit(1)
+		}
 		break
 	case "TestFailedRunLiveBuild":
 		// Do nothing so we don't have to wait for actual lb commands
