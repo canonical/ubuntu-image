@@ -915,6 +915,8 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		"--find",
 		"--show",
 		"--partscan",
+		"--sector-size",
+		stateMachine.commonFlags.SectorSize,
 		imgPath,
 	)
 	losetupOutput, err := losetupCmd.Output()
