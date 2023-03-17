@@ -2265,8 +2265,8 @@ func TestBuildGadgetTree(t *testing.T) {
 	})
 }
 
-// TestGadgetMakeTargets tests using alternate make targets with gadget builds
-func TestGadgetMakeTargets(t *testing.T) {
+// TestGadgetGadgetTargets tests using alternate make targets with gadget builds
+func TestGadgetGadgetTargets(t *testing.T) {
 	testCases := []struct {
 		name           string
 		target         string
@@ -2304,9 +2304,9 @@ func TestGadgetMakeTargets(t *testing.T) {
 				Architecture: getHostArch(),
 				Series:       getHostSuite(),
 				Gadget: &imagedefinition.Gadget{
-					GadgetURL:  fmt.Sprintf("file://%s", gadgetSrc),
-					GadgetType: "directory",
-					MakeTarget: tc.target,
+					GadgetURL:    fmt.Sprintf("file://%s", gadgetSrc),
+					GadgetType:   "directory",
+					GadgetTarget: tc.target,
 				},
 			}
 			stateMachine.ImageDef = imageDef

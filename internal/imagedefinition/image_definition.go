@@ -31,7 +31,7 @@ type ImageDefinition struct {
 // Gadget defines the gadget section of the image definition file
 type Gadget struct {
 	Ref          string `yaml:"ref"    json:"Ref,omitempty"`
-	MakeTarget   string `yaml:"target" json:"MakeTarget,omitempty"`
+	GadgetTarget string `yaml:"target" json:"GadgetTarget,omitempty"`
 	GadgetBranch string `yaml:"branch" json:"GadgetBranch,omitempty"`
 	GadgetType   string `yaml:"type"   json:"GadgetType"             jsonschema:"enum=git,enum=directory,enum=prebuilt"`
 	GadgetURL    string `yaml:"url"    json:"GadgetURL,omitempty"    jsonschema:"type=string,format=uri"`
