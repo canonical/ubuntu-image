@@ -403,17 +403,29 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
 
 		// copy the source tree to the workdir
-		err := osutilCopySpecialFile(sourceURL.Path, gadgetDir)
+		files, err := ioutilReadDir(sourceURL.Path)
 		if err != nil {
-			return fmt.Errorf("Error copying gadget source: %s", err.Error())
+			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
+		}
+		for _, gadgetFile := range files {
+			srcFile := filepath.Join(sourceURL.Path, gadgetFile.Name())
+			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
+				return fmt.Errorf("Error copying gadget source: %s", err.Error())
+			}
 		}
 
-		sourceDir = filepath.Join(gadgetDir, path.Base(sourceURL.Path))
+		sourceDir = filepath.Join(gadgetDir)
 		break
 	}
 
 	// now run "make" to build the gadget tree
 	makeCmd := execCommand("make")
+
+	// if a make target was specified then add it to the command
+	if classicStateMachine.ImageDef.Gadget.GadgetTarget != "" {
+		makeCmd.Args = append(makeCmd.Args, classicStateMachine.ImageDef.Gadget.GadgetTarget)
+	}
+
 	// add ARCH and SERIES environment variables for making the gadget tree
 	makeCmd.Env = append(makeCmd.Env, []string{
 		fmt.Sprintf("ARCH=%s", classicStateMachine.ImageDef.Architecture),

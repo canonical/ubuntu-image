@@ -2236,9 +2236,9 @@ func TestFailedGerminate(t *testing.T) {
 	})
 }
 
-// TestBuildGadgetTree tests the successful build of a gadget tree
-func TestBuildGadgetTree(t *testing.T) {
-	t.Run("test_build_gadget_tree", func(t *testing.T) {
+// TestBuildGadgetTreeGit tests the successful build of a gadget tree
+func TestBuildGadgetTreeGit(t *testing.T) {
+	t.Run("test_build_gadget_tree_git", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -2287,6 +2287,150 @@ func TestBuildGadgetTree(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}
+
+// TestBuildGadgetTreeDirectory tests the successful build of a gadget tree
+func TestBuildGadgetTreeDirectory(t *testing.T) {
+	t.Run("test_build_gadget_tree_directory", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// test the directory method
+		wd, _ := os.Getwd()
+		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
+		sourcePath = "file://" + sourcePath
+		imageDef := imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget: &imagedefinition.Gadget{
+				GadgetURL:  sourcePath,
+				GadgetType: "directory",
+			},
+		}
+
+		stateMachine.ImageDef = imageDef
+
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrNil(err, true)
+
+		// git clone the gadget into a /tmp dir
+		gadgetDir, err := os.MkdirTemp("", "pc-amd64-gadget-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(gadgetDir)
+		gitCloneCommand := *exec.Command(
+			"git",
+			"clone",
+			"--branch",
+			"classic",
+			"https://github.com/snapcore/pc-amd64-gadget",
+			gadgetDir,
+		)
+		err = gitCloneCommand.Run()
+		asserter.AssertErrNil(err, true)
+
+		// now set up the image definition to build from this directory
+		imageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget: &imagedefinition.Gadget{
+				GadgetURL:  fmt.Sprintf("file://%s", gadgetDir),
+				GadgetType: "directory",
+			},
+		}
+
+		stateMachine.ImageDef = imageDef
+
+		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrNil(err, true)
+
+		// now make sure the gadget.yaml is in the expected location
+		// this was a bug reported by the CPC team
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(gadgetDir)
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestGadgetGadgetTargets tests using alternate make targets with gadget builds
+func TestGadgetGadgetTargets(t *testing.T) {
+	testCases := []struct {
+		name           string
+		target         string
+		expectedOutput string
+	}{
+		{
+			"default",
+			"",
+			"make target test1",
+		},
+		{
+			"test2",
+			"test2",
+			"make target test2",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_gadget_make_targets_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.commonFlags.Debug = true
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			wd, _ := os.Getwd()
+			gadgetSrc := filepath.Join(wd, "testdata", "gadget_source")
+			imageDef := imagedefinition.ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Gadget: &imagedefinition.Gadget{
+					GadgetURL:    fmt.Sprintf("file://%s", gadgetSrc),
+					GadgetType:   "directory",
+					GadgetTarget: tc.target,
+				},
+			}
+			stateMachine.ImageDef = imageDef
+
+			// capture stdout, build the gadget tree, and make
+			// sure the expected output matches the make target
+			stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+			defer restoreStdout()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.buildGadgetTree()
+			asserter.AssertErrNil(err, true)
+
+			// restore stdout and examine what was printed
+			restoreStdout()
+			readStdout, err := ioutil.ReadAll(stdout)
+			asserter.AssertErrNil(err, true)
+			if !strings.Contains(string(readStdout), tc.expectedOutput) {
+				t.Errorf("Expected make output\n\"%s\"\nto contain the string \"%s\"",
+					string(readStdout),
+					tc.expectedOutput,
+				)
+			}
+		})
+	}
 }
 
 // TestFailedBuildGadgetTree tests failures in the  buildGadgetTree function
@@ -2339,7 +2483,27 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 		stateMachine.ImageDef = imageDef
 
 		err = stateMachine.buildGadgetTree()
+		asserter.AssertErrContains(err, "Error reading gadget tree")
+
+		// mock osutil.CopySpecialFile and run with /tmp as the gadget source
+		imageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget: &imagedefinition.Gadget{
+				GadgetURL:  "file:///tmp",
+				GadgetType: "directory",
+			},
+		}
+		stateMachine.ImageDef = imageDef
+
+		// mock osutil.CopySpecialFile
+		osutilCopySpecialFile = mockCopySpecialFile
+		defer func() {
+			osutilCopySpecialFile = osutil.CopySpecialFile
+		}()
+		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrContains(err, "Error copying gadget source")
+		osutilCopySpecialFile = osutil.CopySpecialFile
 
 		// run a "make" command that will fail by mocking exec.Command
 		testCaseName = "TestFailedBuildGadgetTree"
