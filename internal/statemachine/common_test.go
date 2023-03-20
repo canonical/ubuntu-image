@@ -4,7 +4,6 @@ package statemachine
 import (
 	"bytes"
 	"crypto/rand"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -210,14 +209,14 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 		asserter.AssertErrContains(err, "Error copying gadget.yaml")
 		osutilCopyFile = osutil.CopyFile
 
-		// mock ioutilReadFile
-		ioutilReadFile = mockReadFile
+		// mock osReadFile
+		osReadFile = mockReadFile
 		defer func() {
-			ioutilReadFile = ioutil.ReadFile
+			osReadFile = os.ReadFile
 		}()
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrContains(err, "Error reading gadget.yaml bytes")
-		ioutilReadFile = ioutil.ReadFile
+		osReadFile = os.ReadFile
 
 		// now test with the invalid yaml file
 		stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -467,7 +466,7 @@ func TestPopulateBootfsContents(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -513,7 +512,7 @@ func TestPopulateBootfsContentsPiboot(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree_piboot"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree_piboot"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree_piboot", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -559,7 +558,7 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -638,7 +637,7 @@ func TestPopulatePreparePartitions(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -667,7 +666,7 @@ func TestPopulatePreparePartitions(t *testing.T) {
 		// check the contents of part0.img
 		partImg := filepath.Join(stateMachine.tempDirs.volumes,
 			"pc", "part0.img")
-		partImgBytes, _ := ioutil.ReadFile(partImg)
+		partImgBytes, _ := os.ReadFile(partImg)
 		dataBytes := make([]byte, 440)
 		// partImg should consist of these 11 bytes and 429 null bytes
 		copy(dataBytes[:11], []byte{84, 69, 83, 84, 32, 70, 73, 76, 69, 10})
@@ -702,7 +701,7 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -762,7 +761,7 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -791,7 +790,7 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 		// check part2.img, it should be empty and have a 4K size
 		partImg := filepath.Join(stateMachine.tempDirs.volumes,
 			"pc", "part2.img")
-		partImgBytes, _ := ioutil.ReadFile(partImg)
+		partImgBytes, _ := os.ReadFile(partImg)
 		// these are all zeroes
 		dataBytes := make([]byte, 4096)
 		if !bytes.Equal(partImgBytes, dataBytes) {
@@ -831,7 +830,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 			// also set up an output directory
-			outDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(outDir)
 			stateMachine.commonFlags.OutputDir = outDir
@@ -861,7 +860,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 			// populate unpack
-			files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+			files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 			for _, srcFile := range files {
 				srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 				osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -912,7 +911,7 @@ func TestFailedMakeDisk(t *testing.T) {
 		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 		// also set up an output directory
-		outDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(outDir)
 		stateMachine.commonFlags.OutputDir = outDir
@@ -939,7 +938,7 @@ func TestFailedMakeDisk(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -1114,7 +1113,7 @@ func TestImageSizeFlag(t *testing.T) {
 			//defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 			// also set up an output directory
-			outDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			//defer os.RemoveAll(outDir)
 			stateMachine.commonFlags.OutputDir = outDir
@@ -1137,7 +1136,7 @@ func TestImageSizeFlag(t *testing.T) {
 			os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 			// populate unpack
-			files, _ := ioutil.ReadDir(tc.gadgetTree)
+			files, _ := os.ReadDir(tc.gadgetTree)
 			for _, srcFile := range files {
 				srcFile := filepath.Join(tc.gadgetTree, srcFile.Name())
 				osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))

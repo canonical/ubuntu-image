@@ -7,7 +7,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -39,10 +39,10 @@ var helperCheckEmptyFields = helper.CheckEmptyFields
 var helperCheckTags = helper.CheckTags
 var helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 var helperRestoreResolvConf = helper.RestoreResolvConf
-var ioutilReadAll = ioutil.ReadAll
-var ioutilReadDir = ioutil.ReadDir
-var ioutilReadFile = ioutil.ReadFile
-var ioutilWriteFile = ioutil.WriteFile
+var ioReadAll = io.ReadAll
+var osReadDir = os.ReadDir
+var osReadFile = os.ReadFile
+var osWriteFile = os.WriteFile
 var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
 var osMkdirTemp = os.MkdirTemp
