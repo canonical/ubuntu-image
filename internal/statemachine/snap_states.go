@@ -46,6 +46,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 	// preseeding-related
 	imageOpts.Preseed = snapStateMachine.Opts.Preseed
 	imageOpts.PreseedSignKey = snapStateMachine.Opts.PreseedSignKey
+	imageOpts.SysfsOverlay = snapStateMachine.Opts.SysfsOverlay
 	imageOpts.AppArmorKernelFeaturesDir = snapStateMachine.Opts.AppArmorKernelFeaturesDir
 	imageOpts.SeedManifestPath = filepath.Join(stateMachine.commonFlags.OutputDir, "seed.manifest")
 
