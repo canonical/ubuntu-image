@@ -291,8 +291,9 @@ func TestPrintStates(t *testing.T) {
 [13] populate_bootfs_contents
 [14] populate_prepare_partitions
 [15] make_disk
-[16] generate_manifest
-[17] finish
+[16] update_bootloader
+[17] generate_manifest
+[18] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -1884,7 +1885,7 @@ func TestFailedGenerateFilelist(t *testing.T) {
 
 // TestSuccessfulClassicRun runs through a full classic state machine run and ensures
 // it is successful. It creates a .img and a .qcow2 file and ensures they are the
-// correct file types
+// correct file types it also mounts the resulting .img and ensures grub was updated
 func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
@@ -1978,6 +1979,87 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			if !strings.Contains(string(cmdOutput), fileType) {
 				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
 					fullPath, fileType, string(cmdOutput))
+			}
+		}
+
+		// create a directory in which to mount the rootfs
+		mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+		// Slice used to store all the commands that need to be run
+		// to properly update grub.cfg in the chroot
+		var mountImageCmds []*exec.Cmd
+		var umountImageCmds []*exec.Cmd
+
+		imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, "pc-amd64.img")
+
+		// set up the loopback
+		mountImageCmds = append(mountImageCmds,
+			[]*exec.Cmd{
+				// set up the loopback
+				exec.Command("losetup",
+					filepath.Join("/dev", "loop99"),
+					imgPath,
+				),
+				exec.Command("kpartx",
+					"-a",
+					filepath.Join("/dev", "loop99"),
+				),
+				// mount the rootfs partition in which to run update-grub
+				exec.Command("mount",
+					filepath.Join("/dev", "mapper", "loop99p3"), // with this example the rootfs is partition 3
+					mountDir,
+				),
+			}...,
+		)
+
+		// set up the mountpoints
+		mountPoints := []string{"/dev", "/proc", "/sys"}
+		for _, mountPoint := range mountPoints {
+			mountCmd, umountCmd := mountFromHost(mountDir, mountPoint)
+			mountImageCmds = append(mountImageCmds, mountCmd)
+			umountImageCmds = append(umountImageCmds, umountCmd)
+			defer umountCmd.Run()
+		}
+		// make sure to unmount the disk too
+		umountImageCmds = append(umountImageCmds, exec.Command("umount", mountDir))
+
+		// tear down the loopback
+		teardownCmds := []*exec.Cmd{
+			exec.Command("kpartx",
+				"-d",
+				filepath.Join("/dev", "loop99"),
+			),
+			exec.Command("losetup",
+				"--detach",
+				filepath.Join("/dev", "loop99"),
+			),
+		}
+
+		for _, teardownCmd := range teardownCmds {
+			defer teardownCmd.Run()
+		}
+		umountImageCmds = append(umountImageCmds, teardownCmds...)
+
+		// now run all the commands to mount the image
+		for _, cmd := range mountImageCmds {
+			err := cmd.Run()
+			if err != nil {
+				t.Errorf("Error running command %s", cmd.String())
+			}
+		}
+
+		grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
+		_, err = os.Stat(grubCfg)
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("File \"%s\" should exist, but does not", grubCfg)
+			}
+		}
+
+		// now run all the commands to unmount the image and clean up
+		for _, cmd := range umountImageCmds {
+			err := cmd.Run()
+			if err != nil {
+				t.Errorf("Error running command %s", cmd.String())
 			}
 		}
 
@@ -3092,5 +3174,124 @@ func TestFailedMakeQcow2Img(t *testing.T) {
 
 		err := stateMachine.makeQcow2Img()
 		asserter.AssertErrContains(err, "Error creating qcow2 artifact")
+	})
+}
+
+// TestFailedUpdateBootloader tests failures in the updateBootloader function
+func TestFailedUpdateBootloader(t *testing.T) {
+	t.Run("test_failed_update_bootloader", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget:       &imagedefinition.Gadget{},
+		}
+
+		// first run with an empty gadget to make sure we get an error
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// next use a gadget with grub as the bootloader and mock
+		// filepath.Glob to trigger a failure in updateGrub
+		err = stateMachine.updateBootloader()
+		asserter.AssertErrContains(err, "Error: could not determine partition number of the root filesystem")
+
+		// place a test gadget tree in the scratch directory so we don't
+		// have to build one
+		gadgetSource := filepath.Join("testdata", "gadget_tree")
+		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+		asserter.AssertErrNil(err, true)
+		// also copy gadget.yaml to the root of the scratch/gadget dir
+		err = osutil.CopyFile(
+			filepath.Join(gadgetDest, "meta", "gadget.yaml"),
+			filepath.Join(gadgetDest, "gadget.yaml"),
+			osutil.CopyFlagDefault,
+		)
+		asserter.AssertErrNil(err, true)
+
+		// parse gadget.yaml and run updateBootloader with the mocked os.Mkdir
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+
+		err = stateMachine.updateBootloader()
+		asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestUnsupportedBootloader tests that a warning is thrown if the
+// bootloader specified in gadget.yaml is not supported
+func TestUnsupportedBootloader(t *testing.T) {
+	t.Run("test_unsupported_bootloader", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget:       &imagedefinition.Gadget{},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// place a test gadget tree in the scratch directory so we don't
+		// have to build one
+		gadgetSource := filepath.Join("testdata", "gadget_tree")
+		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+		asserter.AssertErrNil(err, true)
+		// also copy gadget.yaml to the root of the scratc/gadget dir
+		err = osutil.CopyFile(
+			filepath.Join(gadgetDest, "meta", "gadget.yaml"),
+			filepath.Join(gadgetDest, "gadget.yaml"),
+			osutil.CopyFlagDefault,
+		)
+
+		// parse gadget.yaml
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		// set the bootloader for the volume to "test"
+		stateMachine.GadgetInfo.Volumes["pc"].Bootloader = "test"
+
+		// capture stdout, run updateBootloader and make sure the states were printed
+		stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+		defer restoreStdout()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.updateBootloader()
+
+		// restore stdout and examine what was printed
+		restoreStdout()
+		readStdout, err := ioutil.ReadAll(stdout)
+		asserter.AssertErrNil(err, true)
+		if !strings.Contains(string(readStdout), "WARNING: updating bootloader test not yet supported") {
+			t.Error("Warning for unsupported bootloader not printed")
+		}
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }

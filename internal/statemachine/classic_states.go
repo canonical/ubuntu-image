@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
+	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
@@ -310,7 +311,9 @@ func (stateMachine *StateMachine) calculateStates() error {
 		// only run makeDisk if there is an artifact to make
 		if classicStateMachine.ImageDef.Artifacts.Img != nil {
 			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"make_disk", (*StateMachine).makeDisk})
+				stateFunc{"make_disk", (*StateMachine).makeDisk},
+				stateFunc{"update_bootloader", (*StateMachine).updateBootloader},
+			)
 		}
 	}
 
@@ -325,7 +328,9 @@ func (stateMachine *StateMachine) calculateStates() error {
 		}
 		if !found {
 			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"make_disk", (*StateMachine).makeDisk})
+				stateFunc{"make_disk", (*StateMachine).makeDisk},
+				stateFunc{"update_bootloader", (*StateMachine).updateBootloader},
+			)
 		}
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img})
@@ -1213,6 +1218,37 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 				"Error is \"%s\". Full output below:\n%s",
 				qemuImgCommand.String(), err.Error(), qemuOutput.String())
 		}
+	}
+	return nil
+}
+
+// updateBootloader determines the bootloader for each volume
+// and runs the correct helper function to update the bootloader
+func (stateMachine *StateMachine) updateBootloader() error {
+	// determine which partition number is the rootfs and which volume it is in
+	// TODO should this be stored in the struct earlier on?
+	rootfsPartNum := -1
+	for _, volumeName := range stateMachine.VolumeOrder {
+		volume := stateMachine.GadgetInfo.Volumes[volumeName]
+		for structureNumber, structure := range volume.Structure {
+			if structure.Role == gadget.SystemData {
+				rootfsPartNum = structureNumber
+				switch volume.Bootloader {
+				case "grub":
+					err := stateMachine.updateGrub(volumeName, rootfsPartNum)
+					if err != nil {
+						return err
+					}
+				default:
+					fmt.Printf("WARNING: updating bootloader %s not yet supported\n",
+						volume.Bootloader,
+					)
+				}
+			}
+		}
+	}
+	if rootfsPartNum == -1 {
+		return fmt.Errorf("Error: could not determine partition number of the root filesystem")
 	}
 	return nil
 }
