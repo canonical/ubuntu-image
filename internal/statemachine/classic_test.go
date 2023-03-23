@@ -1458,7 +1458,8 @@ func TestClassicSnapRevisions(t *testing.T) {
 						SnapRevision: 330,
 					},
 					{
-						SnapName: "core20",
+						SnapName:     "core20",
+						SnapRevision: 1852,
 					},
 				},
 			},
