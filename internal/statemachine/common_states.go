@@ -76,7 +76,7 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 	}
 
 	// read in the gadget.yaml as bytes, because snapd expects it that way
-	gadgetYamlBytes, err := ioutilReadFile(stateMachine.YamlFilePath)
+	gadgetYamlBytes, err := osReadFile(stateMachine.YamlFilePath)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget.yaml bytes: %s", err.Error())
 	}

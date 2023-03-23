@@ -114,7 +114,7 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("Failed to create gadget dir: %s", err.Error())
 	}
-	files, err := ioutilReadDir(bootDir)
+	files, err := osReadDir(bootDir)
 	if err != nil {
 		return fmt.Errorf("Error reading lk bootloader dir: %s", err.Error())
 	}
@@ -205,7 +205,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			}
 		}
 		// check if any content exists in unpack
-		contentFiles, err := ioutilReadDir(contentRoot)
+		contentFiles, err := osReadDir(contentRoot)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error listing contents of volume \"%s\": %s",
 				contentRoot, err.Error())
@@ -256,7 +256,7 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 		return fmt.Errorf("Error creating ubuntu dir: %s", err.Error())
 	}
 
-	files, err := ioutilReadDir(bootDir)
+	files, err := osReadDir(bootDir)
 	if err != nil {
 		return fmt.Errorf("Error reading boot dir: %s", err.Error())
 	}
@@ -273,7 +273,7 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 
 // WriteSnapManifest generates a snap manifest based on the contents of the selected snapsDir
 func WriteSnapManifest(snapsDir string, outputPath string) error {
-	files, err := ioutilReadDir(snapsDir)
+	files, err := osReadDir(snapsDir)
 	if err != nil {
 		// As per previous ubuntu-image manifest generation, we skip generating
 		// manifests for non-existent/invalid paths
@@ -700,7 +700,7 @@ func importPPAKeys(ppa *imagedefinition.PPA, tmpGPGDir, keyFilePath string, debu
 				ppa.PPAName, err.Error())
 		}
 
-		body, err := ioutilReadAll(resp.Body)
+		body, err := ioReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("Error reading signing key for ppa \"%s\": %s",
 				ppa.PPAName, err.Error())

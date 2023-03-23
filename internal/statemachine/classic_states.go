@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -405,7 +405,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
 
 		// copy the source tree to the workdir
-		files, err := ioutilReadDir(sourceURL.Path)
+		files, err := osReadDir(sourceURL.Path)
 		if err != nil {
 			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 		}
@@ -467,7 +467,7 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	} else {
 		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
 	}
-	files, err := ioutilReadDir(gadgetTree)
+	files, err := osReadDir(gadgetTree)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 	}
@@ -1067,7 +1067,7 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	// verbose or greater logging
 	if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
 		oldImageStdout := image.Stdout
-		image.Stdout = ioutil.Discard
+		image.Stdout = io.Discard
 		defer func() {
 			image.Stdout = oldImageStdout
 		}()
@@ -1092,7 +1092,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 		return fmt.Errorf("Error restoring /etc/resolv.conf in the chroot: \"%s\"", err.Error())
 	}
 
-	files, err := ioutilReadDir(stateMachine.tempDirs.chroot)
+	files, err := osReadDir(stateMachine.tempDirs.chroot)
 	if err != nil {
 		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
 	}
@@ -1107,7 +1107,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	if classicStateMachine.ImageDef.Customization != nil {
 		if len(classicStateMachine.ImageDef.Customization.Fstab) == 0 {
 			fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
-			fstabBytes, err := ioutilReadFile(fstabPath)
+			fstabBytes, err := osReadFile(fstabPath)
 			if err == nil {
 				if !strings.Contains(string(fstabBytes), "LABEL=writable") {
 					re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
@@ -1115,7 +1115,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 					if !strings.Contains(string(newContents), "LABEL=writable") {
 						newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
 					}
-					err := ioutilWriteFile(fstabPath, newContents, 0644)
+					err := osWriteFile(fstabPath, newContents, 0644)
 					if err != nil {
 						return fmt.Errorf("Error writing to fstab: %s", err.Error())
 					}

@@ -3,7 +3,6 @@ package statemachine
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -88,8 +87,8 @@ func mockMkfs(typ, img, label string, deviceSize, sectorSize quantity.Size) erro
 func mockReadAll(io.Reader) ([]byte, error) {
 	return []byte{}, fmt.Errorf("Test Error")
 }
-func mockReadDir(string) ([]os.FileInfo, error) {
-	return []os.FileInfo{}, fmt.Errorf("Test Error")
+func mockReadDir(string) ([]os.DirEntry, error) {
+	return []os.DirEntry{}, fmt.Errorf("Test Error")
 }
 func mockReadFile(string) ([]byte, error) {
 	return []byte{}, fmt.Errorf("Test Error")
@@ -350,7 +349,7 @@ func TestDebug(t *testing.T) {
 
 		// restore stdout and check that the debug info was printed
 		restoreStdout()
-		readStdout, err := ioutil.ReadAll(stdout)
+		readStdout, err := io.ReadAll(stdout)
 		asserter.AssertErrNil(err, true)
 
 		if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
