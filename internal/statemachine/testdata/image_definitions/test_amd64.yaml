@@ -39,6 +39,8 @@ customization:
       channel: candidate
     -
       name: core
+    -
+      name: core20
   extra-ppas:
     -
       name: "canonical-foundations/ubuntu-image"
