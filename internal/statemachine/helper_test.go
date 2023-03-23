@@ -1304,7 +1304,7 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 		// run on each architecture and keeps the github repository
 		// free of large .snap files
 		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
+			"--classic", "--snap=core20", "--snap=core22", "--snap=snapd", "--snap=lxd",
 			filepath.Join("testdata", "modelAssertionClassic"),
 			stateMachine.tempDirs.rootfs)
 		err = snapPrepareImage.Run()

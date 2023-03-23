@@ -3242,6 +3242,9 @@ func TestFailedUpdateBootloader(t *testing.T) {
 					{
 						SnapName: "core",
 					},
+					{
+						SnapName: "core20",
+					},
 				},
 			},
 		}
@@ -3445,6 +3448,9 @@ func TestPreseedClassicImage(t *testing.T) {
 					},
 					{
 						SnapName: "core",
+					},
+					{
+						SnapName: "core20",
 					},
 				},
 			},
