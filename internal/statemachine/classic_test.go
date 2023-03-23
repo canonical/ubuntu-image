@@ -3286,7 +3286,7 @@ func TestUnsupportedBootloader(t *testing.T) {
 
 		// restore stdout and examine what was printed
 		restoreStdout()
-		readStdout, err := ioutil.ReadAll(stdout)
+		readStdout, err := io.ReadAll(stdout)
 		asserter.AssertErrNil(err, true)
 		if !strings.Contains(string(readStdout), "WARNING: updating bootloader test not yet supported") {
 			t.Error("Warning for unsupported bootloader not printed")
