@@ -1385,6 +1385,9 @@ func TestPreseedClassicImage(t *testing.T) {
 						SnapName: "hello",
 						Channel:  "candidate",
 					},
+					{
+						SnapName: "core20",
+					},
 				},
 			},
 		}
@@ -1451,6 +1454,9 @@ func TestClassicSnapRevisions(t *testing.T) {
 					{
 						SnapName:     "ubuntu-image",
 						SnapRevision: 330,
+					},
+					{
+						SnapName: "core20",
 					},
 				},
 			},
