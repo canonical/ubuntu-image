@@ -1456,7 +1456,8 @@ func TestClassicSnapRevisions(t *testing.T) {
 						SnapRevision: 330,
 					},
 					{
-						SnapName: "core20",
+						SnapName:     "core20",
+						SnapRevision: 1852,
 					},
 				},
 			},
@@ -1907,7 +1908,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.commonFlags.Debug = true
-		stateMachine.commonFlags.Size = "4G"
+		stateMachine.commonFlags.Size = "5G"
 		stateMachine.commonFlags.OutputDir = outputDir
 		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 			"test_amd64.yaml")
