@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -71,14 +71,14 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 		asserter.AssertErrContains(err, "Error reading boot dir")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock os.Rename
 		osRename = mockRename
@@ -123,14 +123,14 @@ func TestFailedHandleSecureBootPiboot(t *testing.T) {
 		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 		asserter.AssertErrContains(err, "Error reading boot dir")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock os.Rename
 		osRename = mockRename
@@ -214,14 +214,14 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 		asserter.AssertErrContains(err, "Failed to create gadget dir")
 		osMkdir = os.Mkdir
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.handleLkBootloader(volume)
 		asserter.AssertErrContains(err, "Error reading lk bootloader dir")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock osutil.CopySpecialFile
 		osutilCopySpecialFile = mockCopySpecialFile
@@ -292,15 +292,15 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		asserter.AssertErrContains(err, "Error zeroing image file")
 		helperCopyBlob = helper.CopyBlob
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
 			filepath.Join("/tmp", uuid.NewString()+".img"))
 		asserter.AssertErrContains(err, "Error listing contents of volume")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock gadget.MkfsWithContent
 		mkfsMakeWithContent = mockMkfsWithContent
@@ -468,7 +468,7 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 
 		// restore stdout and check that the warning was printed
 		restoreStdout()
-		readStdout, err := ioutil.ReadAll(stdout)
+		readStdout, err := io.ReadAll(stdout)
 		asserter.AssertErrNil(err, true)
 
 		if !strings.Contains(string(readStdout), "WARNING: rootfs structure size 0 B smaller than actual rootfs contents") {
@@ -1064,14 +1064,14 @@ func TestFailedImportPPAKeys(t *testing.T) {
 		asserter.AssertErrContains(err, "Error getting signing key")
 		httpGet = http.Get
 
-		// mock ioutil.ReadAll
-		ioutilReadAll = mockReadAll
+		// mock io.ReadAll
+		ioReadAll = mockReadAll
 		defer func() {
-			ioutilReadAll = ioutil.ReadAll
+			ioReadAll = io.ReadAll
 		}()
 		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 		asserter.AssertErrContains(err, "Error reading signing key")
-		ioutilReadAll = ioutil.ReadAll
+		ioReadAll = io.ReadAll
 
 		// mock json.Unmarshal
 		jsonUnmarshal = mockUnmarshal
@@ -1109,7 +1109,7 @@ func TestManifestRevisionFormat(t *testing.T) {
 
 		expectedManifestData := "test1 123\ntest2 456\ntest3 789\n"
 
-		manifestData, err := ioutil.ReadFile(manifestOutput)
+		manifestData, err := os.ReadFile(manifestOutput)
 		asserter.AssertErrNil(err, true)
 
 		if string(manifestData) != expectedManifestData {
@@ -1286,7 +1286,7 @@ func TestFailedMountTempFS(t *testing.T) {
 
 // TestFailedGetPreseededSnaps tests various failure scenarios in the getPreseededSnaps function
 func TestFailedGetPreseededSnaps(t *testing.T) {
-	t.Run("test_failed_remove_preseeding", func(t *testing.T) {
+	t.Run("test_failed_get_preseeded_snaps", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -1339,5 +1339,37 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestFailedUpdateGrub tests failures in the updateGrub function
+func TestFailedUpdateGrub(t *testing.T) {
+	t.Run("test_failed_update_grub", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err := stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
+		osMkdir = os.Mkdir
+
+		// Setup the exec.Command mock to mock losetup
+		testCaseName = "TestFailedUpdateGrubLosetup"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err = stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error running losetup command")
+		// now test a command failure that isn't losetup
+		testCaseName = "TestFailedUpdateGrubOther"
+		err = stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error running command")
+		execCommand = exec.Command
 	})
 }

@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
+	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/image/preseed"
 	"github.com/snapcore/snapd/osutil"
@@ -313,7 +314,9 @@ func (stateMachine *StateMachine) calculateStates() error {
 		// only run makeDisk if there is an artifact to make
 		if classicStateMachine.ImageDef.Artifacts.Img != nil {
 			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"make_disk", (*StateMachine).makeDisk})
+				stateFunc{"make_disk", (*StateMachine).makeDisk},
+				stateFunc{"update_bootloader", (*StateMachine).updateBootloader},
+			)
 		}
 	}
 
@@ -328,7 +331,9 @@ func (stateMachine *StateMachine) calculateStates() error {
 		}
 		if !found {
 			rootfsCreationStates = append(rootfsCreationStates,
-				stateFunc{"make_disk", (*StateMachine).makeDisk})
+				stateFunc{"make_disk", (*StateMachine).makeDisk},
+				stateFunc{"update_bootloader", (*StateMachine).updateBootloader},
+			)
 		}
 		rootfsCreationStates = append(rootfsCreationStates,
 			stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img})
@@ -403,7 +408,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
 
 		// copy the source tree to the workdir
-		files, err := ioutilReadDir(sourceURL.Path)
+		files, err := osReadDir(sourceURL.Path)
 		if err != nil {
 			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 		}
@@ -465,7 +470,7 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	} else {
 		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
 	}
-	files, err := ioutilReadDir(gadgetTree)
+	files, err := osReadDir(gadgetTree)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 	}
@@ -1039,7 +1044,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 		// verbose or greater logging
 		if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
 			oldPreseedStdout := preseed.Stdout
-			preseed.Stdout = ioutil.Discard
+			preseed.Stdout = io.Discard
 			defer func() {
 				preseed.Stdout = oldPreseedStdout
 			}()
@@ -1100,7 +1105,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	// verbose or greater logging
 	if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
 		oldImageStdout := image.Stdout
-		image.Stdout = ioutil.Discard
+		image.Stdout = io.Discard
 		defer func() {
 			image.Stdout = oldImageStdout
 		}()
@@ -1175,7 +1180,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 		return fmt.Errorf("Error restoring /etc/resolv.conf in the chroot: \"%s\"", err.Error())
 	}
 
-	files, err := ioutilReadDir(stateMachine.tempDirs.chroot)
+	files, err := osReadDir(stateMachine.tempDirs.chroot)
 	if err != nil {
 		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
 	}
@@ -1190,7 +1195,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	if classicStateMachine.ImageDef.Customization != nil {
 		if len(classicStateMachine.ImageDef.Customization.Fstab) == 0 {
 			fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
-			fstabBytes, err := ioutilReadFile(fstabPath)
+			fstabBytes, err := osReadFile(fstabPath)
 			if err == nil {
 				if !strings.Contains(string(fstabBytes), "LABEL=writable") {
 					re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
@@ -1198,7 +1203,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 					if !strings.Contains(string(newContents), "LABEL=writable") {
 						newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
 					}
-					err := ioutilWriteFile(fstabPath, newContents, 0644)
+					err := osWriteFile(fstabPath, newContents, 0644)
 					if err != nil {
 						return fmt.Errorf("Error writing to fstab: %s", err.Error())
 					}
@@ -1301,6 +1306,37 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 				"Error is \"%s\". Full output below:\n%s",
 				qemuImgCommand.String(), err.Error(), qemuOutput.String())
 		}
+	}
+	return nil
+}
+
+// updateBootloader determines the bootloader for each volume
+// and runs the correct helper function to update the bootloader
+func (stateMachine *StateMachine) updateBootloader() error {
+	// determine which partition number is the rootfs and which volume it is in
+	// TODO should this be stored in the struct earlier on?
+	rootfsPartNum := -1
+	for _, volumeName := range stateMachine.VolumeOrder {
+		volume := stateMachine.GadgetInfo.Volumes[volumeName]
+		for structureNumber, structure := range volume.Structure {
+			if structure.Role == gadget.SystemData {
+				rootfsPartNum = structureNumber
+				switch volume.Bootloader {
+				case "grub":
+					err := stateMachine.updateGrub(volumeName, rootfsPartNum)
+					if err != nil {
+						return err
+					}
+				default:
+					fmt.Printf("WARNING: updating bootloader %s not yet supported\n",
+						volume.Bootloader,
+					)
+				}
+			}
+		}
+	}
+	if rootfsPartNum == -1 {
+		return fmt.Errorf("Error: could not determine partition number of the root filesystem")
 	}
 	return nil
 }

@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -272,7 +272,7 @@ func TestPrintStates(t *testing.T) {
 
 		// restore stdout and examine what was printed
 		restoreStdout()
-		readStdout, err := ioutil.ReadAll(stdout)
+		readStdout, err := io.ReadAll(stdout)
 		asserter.AssertErrNil(err, true)
 
 		expectedStates := `The calculated states are as follows:
@@ -293,8 +293,9 @@ func TestPrintStates(t *testing.T) {
 [14] populate_bootfs_contents
 [15] populate_prepare_partitions
 [16] make_disk
-[17] generate_manifest
-[18] finish
+[17] update_bootloader
+[18] generate_manifest
+[19] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -419,7 +420,7 @@ func TestPrepareGadgetTreePrebuilt(t *testing.T) {
 	})
 }
 
-// TestFailedPrepareGadgetTree tests failures in os, osutil, and ioutil libraries
+// TestFailedPrepareGadgetTree tests failures in the prepareGadgetTree function
 func TestFailedPrepareGadgetTree(t *testing.T) {
 	t.Run("test_failed_prepare_gadget_tree", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
@@ -451,14 +452,14 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 		asserter.AssertErrContains(err, "Error creating unpack directory")
 		osMkdirAll = os.MkdirAll
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.prepareGadgetTree()
 		asserter.AssertErrContains(err, "Error reading gadget tree")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock osutil.CopySpecialFile
 		osutilCopySpecialFile = mockCopySpecialFile
@@ -1070,7 +1071,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 			if cloudInitConfig.MetaData != "" {
 				asserter.AssertErrNil(err, false)
 
-				metaDataFileContent, err := ioutil.ReadAll(metaDataFile)
+				metaDataFileContent, err := io.ReadAll(metaDataFile)
 				asserter.AssertErrNil(err, false)
 
 				if string(metaDataFileContent[:]) != cloudInitConfig.MetaData {
@@ -1084,7 +1085,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 			if cloudInitConfig.NetworkConfig != "" {
 				asserter.AssertErrNil(err, false)
 
-				networkConfigFileContent, err := ioutil.ReadAll(networkConfigFile)
+				networkConfigFileContent, err := io.ReadAll(networkConfigFile)
 				asserter.AssertErrNil(err, false)
 				if string(networkConfigFileContent[:]) != cloudInitConfig.NetworkConfig {
 					t.Errorf("un-expected network-config found: expected:\n%v\ngot:%v", cloudInitConfig.NetworkConfig, string(networkConfigFileContent[:]))
@@ -1097,7 +1098,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 			if cloudInitConfig.UserData != "" {
 				asserter.AssertErrNil(err, false)
 
-				userDataFileContent, err := ioutil.ReadAll(userDataFile)
+				userDataFileContent, err := io.ReadAll(userDataFile)
 				asserter.AssertErrNil(err, false)
 
 				if string(userDataFileContent[:]) != cloudInitConfig.UserData {
@@ -1299,7 +1300,7 @@ func TestManualCustomization(t *testing.T) {
 
 		// Check that the test user exists with the correct uid
 		passwdFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "passwd")
-		passwdContents, err := ioutil.ReadFile(passwdFile)
+		passwdContents, err := os.ReadFile(passwdFile)
 		asserter.AssertErrNil(err, true)
 		if !strings.Contains(string(passwdContents), "testuser:x:123456") {
 			t.Errorf("Test user was not created in the chroot")
@@ -1307,7 +1308,7 @@ func TestManualCustomization(t *testing.T) {
 
 		// Check that the test group exists with the correct gid
 		groupFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "group")
-		groupContents, err := ioutil.ReadFile(groupFile)
+		groupContents, err := os.ReadFile(groupFile)
 		asserter.AssertErrNil(err, true)
 		if !strings.Contains(string(groupContents), "testgroup:x:456789") {
 			t.Errorf("Test group was not created in the chroot")
@@ -1467,7 +1468,7 @@ func TestClassicSnapRevisions(t *testing.T) {
 			// compile a regex used to get revision numbers from seed.manifest
 			revRegex, err := regexp.Compile(fmt.Sprintf("%s_(.*?).snap\n", snapInfo.SnapName))
 			asserter.AssertErrNil(err, true)
-			seedData, err := ioutil.ReadFile(filepath.Join(
+			seedData, err := os.ReadFile(filepath.Join(
 				stateMachine.tempDirs.chroot,
 				"var",
 				"lib",
@@ -1638,14 +1639,14 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		err = stateMachine.createChroot()
 		asserter.AssertErrNil(err, true)
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrContains(err, "Error reading unpack/chroot dir")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock osutil.CopySpecialFile
 		osutilCopySpecialFile = mockCopySpecialFile
@@ -1656,14 +1657,14 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		asserter.AssertErrContains(err, "Error copying rootfs")
 		osutilCopySpecialFile = osutil.CopySpecialFile
 
-		// mock ioutil.WriteFile
-		ioutilWriteFile = mockWriteFile
+		// mock os.WriteFile
+		osWriteFile = mockWriteFile
 		defer func() {
-			ioutilWriteFile = ioutil.WriteFile
+			osWriteFile = os.WriteFile
 		}()
 		err = stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrContains(err, "Error writing to fstab")
-		ioutilWriteFile = ioutil.WriteFile
+		osWriteFile = os.WriteFile
 
 		// create an /etc/resolv.conf.tmp in the chroot
 		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
@@ -1694,7 +1695,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 			execCommand = exec.Command
 		}()
 		// We need the output directory set for this
-		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(outputDir)
 
@@ -1724,7 +1725,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		// Check if manifest file got generated and if it has expected contents
 		manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
-		manifestBytes, err := ioutil.ReadFile(manifestPath)
+		manifestBytes, err := os.ReadFile(manifestPath)
 		asserter.AssertErrNil(err, true)
 		// The order of packages shouldn't matter
 		examplePackages := []string{"foo 1.2", "bar 1.4-1ubuntu4.1", "libbaz 0.1.3ubuntu2"}
@@ -1758,7 +1759,7 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 		}
 
 		// We need the output directory set for this
-		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(outputDir)
 		stateMachine.commonFlags.OutputDir = outputDir
@@ -1803,7 +1804,7 @@ func TestGenerateFilelist(t *testing.T) {
 			execCommand = exec.Command
 		}()
 		// We need the output directory set for this
-		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(outputDir)
 
@@ -1873,7 +1874,7 @@ func TestFailedGenerateFilelist(t *testing.T) {
 		}
 
 		// We need the output directory set for this
-		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(outputDir)
 		stateMachine.commonFlags.OutputDir = outputDir
@@ -1908,7 +1909,7 @@ func TestFailedGenerateFilelist(t *testing.T) {
 
 // TestSuccessfulClassicRun runs through a full classic state machine run and ensures
 // it is successful. It creates a .img and a .qcow2 file and ensures they are the
-// correct file types
+// correct file types it also mounts the resulting .img and ensures grub was updated
 func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
@@ -1916,7 +1917,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		defer saveCWD()
 
 		// We need the output directory set for this
-		outputDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(outputDir)
 
@@ -2002,6 +2003,87 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			if !strings.Contains(string(cmdOutput), fileType) {
 				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
 					fullPath, fileType, string(cmdOutput))
+			}
+		}
+
+		// create a directory in which to mount the rootfs
+		mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+		// Slice used to store all the commands that need to be run
+		// to properly update grub.cfg in the chroot
+		var mountImageCmds []*exec.Cmd
+		var umountImageCmds []*exec.Cmd
+
+		imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, "pc-amd64.img")
+
+		// set up the loopback
+		mountImageCmds = append(mountImageCmds,
+			[]*exec.Cmd{
+				// set up the loopback
+				exec.Command("losetup",
+					filepath.Join("/dev", "loop99"),
+					imgPath,
+				),
+				exec.Command("kpartx",
+					"-a",
+					filepath.Join("/dev", "loop99"),
+				),
+				// mount the rootfs partition in which to run update-grub
+				exec.Command("mount",
+					filepath.Join("/dev", "mapper", "loop99p3"), // with this example the rootfs is partition 3
+					mountDir,
+				),
+			}...,
+		)
+
+		// set up the mountpoints
+		mountPoints := []string{"/dev", "/proc", "/sys"}
+		for _, mountPoint := range mountPoints {
+			mountCmd, umountCmd := mountFromHost(mountDir, mountPoint)
+			mountImageCmds = append(mountImageCmds, mountCmd)
+			umountImageCmds = append(umountImageCmds, umountCmd)
+			defer umountCmd.Run()
+		}
+		// make sure to unmount the disk too
+		umountImageCmds = append(umountImageCmds, exec.Command("umount", mountDir))
+
+		// tear down the loopback
+		teardownCmds := []*exec.Cmd{
+			exec.Command("kpartx",
+				"-d",
+				filepath.Join("/dev", "loop99"),
+			),
+			exec.Command("losetup",
+				"--detach",
+				filepath.Join("/dev", "loop99"),
+			),
+		}
+
+		for _, teardownCmd := range teardownCmds {
+			defer teardownCmd.Run()
+		}
+		umountImageCmds = append(umountImageCmds, teardownCmds...)
+
+		// now run all the commands to mount the image
+		for _, cmd := range mountImageCmds {
+			err := cmd.Run()
+			if err != nil {
+				t.Errorf("Error running command %s", cmd.String())
+			}
+		}
+
+		grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
+		_, err = os.Stat(grubCfg)
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("File \"%s\" should exist, but does not", grubCfg)
+			}
+		}
+
+		// now run all the commands to unmount the image and clean up
+		for _, cmd := range umountImageCmds {
+			err := cmd.Run()
+			if err != nil {
+				t.Errorf("Error running command %s", cmd.String())
 			}
 		}
 
@@ -2421,7 +2503,7 @@ func TestGadgetGadgetTargets(t *testing.T) {
 
 			// restore stdout and examine what was printed
 			restoreStdout()
-			readStdout, err := ioutil.ReadAll(stdout)
+			readStdout, err := io.ReadAll(stdout)
 			asserter.AssertErrNil(err, true)
 			if !strings.Contains(string(readStdout), tc.expectedOutput) {
 				t.Errorf("Expected make output\n\"%s\"\nto contain the string \"%s\"",
@@ -2878,7 +2960,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1`,
 			err = stateMachine.customizeFstab()
 			asserter.AssertErrNil(err, true)
 
-			fstabBytes, err := ioutil.ReadFile(
+			fstabBytes, err := os.ReadFile(
 				filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
 			)
 			asserter.AssertErrNil(err, true)
@@ -3119,10 +3201,9 @@ func TestFailedMakeQcow2Img(t *testing.T) {
 	})
 }
 
-// TestPreseedResetChroot tests that calling prepareClassicImage on a
-// preseeded chroot correctly resets the chroot and preseeds over it
-func TestPreseedResetChroot(t *testing.T) {
-	t.Run("test_preseed_reset_chroot", func(t *testing.T) {
+// TestFailedUpdateBootloader tests failures in the updateBootloader function
+func TestFailedUpdateBootloader(t *testing.T) {
+	t.Run("test_failed_update_bootloader", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -3203,8 +3284,124 @@ func TestPreseedResetChroot(t *testing.T) {
 				t.Errorf("expected snap %s to exist in the chroot but it does not", expectedSnap)
 			}
 		}
+	})
+}
+
+// TestPreseedResetChroot tests that calling prepareClassicImage on a
+// preseeded chroot correctly resets the chroot and preseeds over it
+func TestPreseedResetChroot(t *testing.T) {
+	t.Run("test_preseed_reset_chroot", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget:       &imagedefinition.Gadget{},
+		}
+
+		// first run with an empty gadget to make sure we get an error
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// next use a gadget with grub as the bootloader and mock
+		// filepath.Glob to trigger a failure in updateGrub
+		err = stateMachine.updateBootloader()
+		asserter.AssertErrContains(err, "Error: could not determine partition number of the root filesystem")
+
+		// place a test gadget tree in the scratch directory so we don't
+		// have to build one
+		gadgetSource := filepath.Join("testdata", "gadget_tree")
+		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+		asserter.AssertErrNil(err, true)
+		// also copy gadget.yaml to the root of the scratch/gadget dir
+		err = osutil.CopyFile(
+			filepath.Join(gadgetDest, "meta", "gadget.yaml"),
+			filepath.Join(gadgetDest, "gadget.yaml"),
+			osutil.CopyFlagDefault,
+		)
+		asserter.AssertErrNil(err, true)
+
+		// parse gadget.yaml and run updateBootloader with the mocked os.Mkdir
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+
+		err = stateMachine.updateBootloader()
+		asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestUnsupportedBootloader tests that a warning is thrown if the
+// bootloader specified in gadget.yaml is not supported
+func TestUnsupportedBootloader(t *testing.T) {
+	t.Run("test_unsupported_bootloader", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Gadget:       &imagedefinition.Gadget{},
+		}
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// place a test gadget tree in the scratch directory so we don't
+		// have to build one
+		gadgetSource := filepath.Join("testdata", "gadget_tree")
+		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+		asserter.AssertErrNil(err, true)
+		// also copy gadget.yaml to the root of the scratc/gadget dir
+		err = osutil.CopyFile(
+			filepath.Join(gadgetDest, "meta", "gadget.yaml"),
+			filepath.Join(gadgetDest, "gadget.yaml"),
+			osutil.CopyFlagDefault,
+		)
+
+		// parse gadget.yaml
+		err = stateMachine.prepareGadgetTree()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrNil(err, true)
+
+		// set the bootloader for the volume to "test"
+		stateMachine.GadgetInfo.Volumes["pc"].Bootloader = "test"
+
+		// capture stdout, run updateBootloader and make sure the states were printed
+		stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+		defer restoreStdout()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.updateBootloader()
+
+		// restore stdout and examine what was printed
+		restoreStdout()
+		readStdout, err := io.ReadAll(stdout)
+		asserter.AssertErrNil(err, true)
+		if !strings.Contains(string(readStdout), "WARNING: updating bootloader test not yet supported") {
+			t.Error("Warning for unsupported bootloader not printed")
+		}
 	})
 }
 
@@ -3275,7 +3472,7 @@ func TestPreseedClassicImage(t *testing.T) {
 			}
 		}
 
-		//os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 

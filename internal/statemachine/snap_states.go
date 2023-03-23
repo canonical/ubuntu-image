@@ -2,7 +2,7 @@ package statemachine
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -59,7 +59,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 	// verbose or greater logging
 	if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
 		oldImageStdout := image.Stdout
-		image.Stdout = ioutil.Discard
+		image.Stdout = io.Discard
 		defer func() {
 			image.Stdout = oldImageStdout
 		}()
@@ -106,7 +106,7 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 	}
 
 	// recursively copy the src to dst, skipping /boot for non-seeded images
-	files, err := ioutilReadDir(src)
+	files, err := osReadDir(src)
 	if err != nil {
 		return fmt.Errorf("Error reading unpack dir: %s", err.Error())
 	}

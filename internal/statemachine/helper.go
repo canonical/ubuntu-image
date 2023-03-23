@@ -116,7 +116,7 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("Failed to create gadget dir: %s", err.Error())
 	}
-	files, err := ioutilReadDir(bootDir)
+	files, err := osReadDir(bootDir)
 	if err != nil {
 		return fmt.Errorf("Error reading lk bootloader dir: %s", err.Error())
 	}
@@ -207,7 +207,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			}
 		}
 		// check if any content exists in unpack
-		contentFiles, err := ioutilReadDir(contentRoot)
+		contentFiles, err := osReadDir(contentRoot)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error listing contents of volume \"%s\": %s",
 				contentRoot, err.Error())
@@ -258,7 +258,7 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 		return fmt.Errorf("Error creating ubuntu dir: %s", err.Error())
 	}
 
-	files, err := ioutilReadDir(bootDir)
+	files, err := osReadDir(bootDir)
 	if err != nil {
 		return fmt.Errorf("Error reading boot dir: %s", err.Error())
 	}
@@ -275,7 +275,7 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 
 // WriteSnapManifest generates a snap manifest based on the contents of the selected snapsDir
 func WriteSnapManifest(snapsDir string, outputPath string) error {
-	files, err := ioutilReadDir(snapsDir)
+	files, err := osReadDir(snapsDir)
 	if err != nil {
 		// As per previous ubuntu-image manifest generation, we skip generating
 		// manifests for non-existent/invalid paths
@@ -702,7 +702,7 @@ func importPPAKeys(ppa *imagedefinition.PPA, tmpGPGDir, keyFilePath string, debu
 				ppa.PPAName, err.Error())
 		}
 
-		body, err := ioutilReadAll(resp.Body)
+		body, err := ioReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("Error reading signing key for ppa \"%s\": %s",
 				ppa.PPAName, err.Error())
@@ -932,4 +932,89 @@ func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error)
 	})
 
 	return seededSnaps, nil
+}
+
+// updateGrub mounts the resulting image and runs update-grub
+func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) error {
+	// create a directory in which to mount the rootfs
+	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+	err := osMkdir(mountDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
+	}
+
+	// Slice used to store all the commands that need to be run
+	// to properly update grub.cfg in the chroot
+	var updateGrubCmds []*exec.Cmd
+
+	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
+
+	// run the losetup command and read the output to determine which loopback was used
+	losetupCmd := execCommand("losetup",
+		"--find",
+		"--show",
+		"--partscan",
+		"--sector-size",
+		stateMachine.commonFlags.SectorSize,
+		imgPath,
+	)
+	losetupOutput, err := losetupCmd.Output()
+	if err != nil {
+		return fmt.Errorf("Error running losetup command \"%s\". Error is %s",
+			losetupCmd.String(),
+			err.Error(),
+		)
+	}
+	loopUsed := strings.TrimSpace(string(losetupOutput))
+
+	var umounts []*exec.Cmd
+	updateGrubCmds = append(updateGrubCmds,
+		// mount the rootfs partition in which to run update-grub
+		exec.Command("mount",
+			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
+			mountDir,
+		),
+	)
+
+	// set up the mountpoints
+	mountPoints := []string{"/dev", "/proc", "/sys"}
+	for _, mountPoint := range mountPoints {
+		mountCmd, umountCmd := mountFromHost(mountDir, mountPoint)
+		updateGrubCmds = append(updateGrubCmds, mountCmd)
+		umounts = append(umounts, umountCmd)
+		defer umountCmd.Run()
+	}
+	// make sure to unmount the disk too
+	umounts = append(umounts, exec.Command("umount", mountDir))
+
+	// actually run update-grub
+	updateGrubCmds = append(updateGrubCmds,
+		exec.Command("chroot",
+			mountDir,
+			"update-grub",
+		),
+	)
+
+	// unmount /dev /proc and /sys
+	updateGrubCmds = append(updateGrubCmds, umounts...)
+
+	// tear down the loopback
+	teardownCmd := exec.Command("losetup",
+		"--detach",
+		loopUsed,
+	)
+	defer teardownCmd.Run()
+	updateGrubCmds = append(updateGrubCmds, teardownCmd)
+
+	// now run all the commands
+	for _, cmd := range updateGrubCmds {
+		cmdOutput := helper.SetCommandOutput(cmd, stateMachine.commonFlags.Debug)
+		err := cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+				cmd.String(), err.Error(), cmdOutput.String())
+		}
+	}
+
+	return nil
 }

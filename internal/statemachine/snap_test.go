@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,7 +82,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 		stateMachine.Opts.FactoryImage = true
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
@@ -97,7 +96,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 		// make sure the "factory" boot flag was set
 		grubenvFile := filepath.Join(stateMachine.tempDirs.rootfs,
 			"EFI", "ubuntu", "grubenv")
-		grubenvBytes, err := ioutil.ReadFile(grubenvFile)
+		grubenvBytes, err := os.ReadFile(grubenvFile)
 		asserter.AssertErrNil(err, true)
 
 		if !strings.Contains(string(grubenvBytes), "snapd_boot_flags=factory") {
@@ -124,7 +123,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		stateMachine.commonFlags.Channel = "stable"
 		stateMachine.Opts.CloudInit = filepath.Join("testdata", "user-data")
 		stateMachine.Opts.Snaps = []string{"hello-world"}
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
@@ -220,7 +219,7 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 			defer saveCWD()
 
 			var stateMachine SnapStateMachine
-			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -266,7 +265,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
 
-			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
 			var stateMachine SnapStateMachine
@@ -316,7 +315,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 			}
 			for manifest, snapList := range testResultMap {
 				manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, manifest)
-				manifestBytes, err := ioutil.ReadFile(manifestPath)
+				manifestBytes, err := os.ReadFile(manifestPath)
 				asserter.AssertErrNil(err, false)
 				// The order of snaps shouldn't matter
 				for _, snap := range snapList {
@@ -335,7 +334,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_snap_rootfs_contents", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		var stateMachine SnapStateMachine
@@ -365,14 +364,14 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 		asserter.AssertErrContains(err, "Error creating boot dir")
 		osMkdirAll = os.MkdirAll
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.populateSnapRootfsContents()
 		asserter.AssertErrContains(err, "Error reading unpack dir")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock osutil.CopySpecialFile
 		osRename = mockRename
@@ -392,11 +391,11 @@ func TestFailedGenerateSnapManifest(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
-		ioutilReadDir = func(string) ([]os.FileInfo, error) {
-			return []os.FileInfo{}, nil
+		osReadDir = func(string) ([]os.DirEntry, error) {
+			return []os.DirEntry{}, nil
 		}
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		// Setup the mock for os.Create, making those fail
 		osCreate = mockCreate
@@ -445,7 +444,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 			// use core18 because it builds the fastest
 			stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 			stateMachine.Opts.Snaps = tc.snapArgs
-			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
 			stateMachine.stateMachineFlags.WorkDir = workDir
@@ -487,7 +486,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 					revRegex, err := regexp.Compile(fmt.Sprintf(
 						"%s (.*?)\n", snapName))
 					asserter.AssertErrNil(err, true)
-					seedData, err := ioutil.ReadFile(filepath.Join(
+					seedData, err := os.ReadFile(filepath.Join(
 						stateMachine.stateMachineFlags.WorkDir, "seed.manifest"))
 					asserter.AssertErrNil(err, true)
 					revString := revRegex.FindStringSubmatch(string(seedData))
@@ -534,7 +533,7 @@ func TestSnapRevisions(t *testing.T) {
 			"hello": 38,
 			"core":  14784,
 		}
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
@@ -551,7 +550,7 @@ func TestSnapRevisions(t *testing.T) {
 			revRegex, err := regexp.Compile(fmt.Sprintf(
 				"%s (.*?)\n", snapName))
 			asserter.AssertErrNil(err, true)
-			seedData, err := ioutil.ReadFile(filepath.Join(
+			seedData, err := os.ReadFile(filepath.Join(
 				stateMachine.stateMachineFlags.WorkDir, "seed.manifest"))
 			asserter.AssertErrNil(err, true)
 			revString := revRegex.FindStringSubmatch(string(seedData))
@@ -583,7 +582,7 @@ func TestValidationFlag(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
@@ -620,7 +619,7 @@ func TestGadgetEdgeCases(t *testing.T) {
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20Dangerous")
 		stateMachine.Opts.FactoryImage = true
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
@@ -658,7 +657,7 @@ func TestPreseedFlag(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir

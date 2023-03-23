@@ -3,7 +3,6 @@ package statemachine
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -88,8 +87,8 @@ func mockMkfs(typ, img, label string, deviceSize, sectorSize quantity.Size) erro
 func mockReadAll(io.Reader) ([]byte, error) {
 	return []byte{}, fmt.Errorf("Test Error")
 }
-func mockReadDir(string) ([]os.FileInfo, error) {
-	return []os.FileInfo{}, fmt.Errorf("Test Error")
+func mockReadDir(string) ([]os.DirEntry, error) {
+	return []os.DirEntry{}, fmt.Errorf("Test Error")
 }
 func mockReadFile(string) ([]byte, error) {
 	return []byte{}, fmt.Errorf("Test Error")
@@ -218,6 +217,8 @@ func TestExecHelperProcess(t *testing.T) {
 		break
 	case "TestFailedPreseedClassicImage":
 		fallthrough
+	case "TestFailedUpdateGrubLosetup":
+		fallthrough
 	case "TestFailedMakeQcow2Image":
 		fallthrough
 	case "TestFailedGeneratePackageManifest":
@@ -235,6 +236,11 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
+		break
+	case "TestFailedUpdateGrubOther": // this passes the initial losetup command and fails a later command
+		if args[0] != "losetup" {
+			os.Exit(1)
+		}
 		break
 	case "TestFailedRunLiveBuild":
 		// Do nothing so we don't have to wait for actual lb commands
@@ -348,7 +354,7 @@ func TestDebug(t *testing.T) {
 
 		// restore stdout and check that the debug info was printed
 		restoreStdout()
-		readStdout, err := ioutil.ReadAll(stdout)
+		readStdout, err := io.ReadAll(stdout)
 		asserter.AssertErrNil(err, true)
 
 		if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
