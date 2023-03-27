@@ -3208,9 +3208,10 @@ func TestFailedMakeQcow2Img(t *testing.T) {
 	})
 }
 
-// TestFailedUpdateBootloader tests failures in the updateBootloader function
-func TestFailedUpdateBootloader(t *testing.T) {
-	t.Run("test_failed_update_bootloader", func(t *testing.T) {
+// TestPreseedResetChroot tests that calling prepareClassicImage on a
+// preseeded chroot correctly resets the chroot and preseeds over it
+func TestPreseedResetChroot(t *testing.T) {
+	t.Run("test_preseed_reset_chroot", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -3297,10 +3298,9 @@ func TestFailedUpdateBootloader(t *testing.T) {
 	})
 }
 
-// TestPreseedResetChroot tests that calling prepareClassicImage on a
-// preseeded chroot correctly resets the chroot and preseeds over it
-func TestPreseedResetChroot(t *testing.T) {
-	t.Run("test_preseed_reset_chroot", func(t *testing.T) {
+// TestFailedUpdateBootloader tests failures in the updateBootloader function
+func TestFailedUpdateBootloader(t *testing.T) {
+	t.Run("test_failed_update_bootloader", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()

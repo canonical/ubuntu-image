@@ -283,16 +283,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			}
 
 			// update farthestOffset if needed
-			var offset quantity.Offset
-			if structure.Offset == nil {
-				if structure.Role != "mbr" && lastOffset < quantity.OffsetMiB {
-					offset = quantity.OffsetMiB
-				} else {
-					offset = lastOffset
-				}
-			} else {
-				offset = *structure.Offset
-			}
+			offset := *structure.Offset
 			lastOffset = offset + quantity.Offset(structure.Size)
 			farthestOffset = maxOffset(lastOffset, farthestOffset)
 			structure.Offset = &offset
