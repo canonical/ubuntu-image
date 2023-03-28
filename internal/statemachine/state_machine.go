@@ -22,6 +22,7 @@ import (
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/image/preseed"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
@@ -61,6 +62,7 @@ var diskfsCreate = diskfs.Create
 var randRead = rand.Read
 var seedOpen = seed.Open
 var imagePrepare = image.Prepare
+var preseedClassicReset = preseed.ClassicReset
 var httpGet = http.Get
 var jsonUnmarshal = json.Unmarshal
 var yamlMarshal = yaml.Marshal
@@ -281,16 +283,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			}
 
 			// update farthestOffset if needed
-			var offset quantity.Offset
-			if structure.Offset == nil {
-				if structure.Role != "mbr" && lastOffset < quantity.OffsetMiB {
-					offset = quantity.OffsetMiB
-				} else {
-					offset = lastOffset
-				}
-			} else {
-				offset = *structure.Offset
-			}
+			offset := *structure.Offset
 			lastOffset = offset + quantity.Offset(structure.Size)
 			farthestOffset = maxOffset(lastOffset, farthestOffset)
 			structure.Offset = &offset

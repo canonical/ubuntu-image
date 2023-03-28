@@ -147,6 +147,9 @@ func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
 func mockImagePrepare(*image.Options) error {
 	return fmt.Errorf("Test Error")
 }
+func mockPreseedClassicReset(string) error {
+	return fmt.Errorf("Test Error")
+}
 func mockGet(string) (*http.Response, error) {
 	return nil, fmt.Errorf("Test Error")
 }
@@ -212,6 +215,8 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestGenerateFilelist":
 		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
 		break
+	case "TestFailedPreseedClassicImage":
+		fallthrough
 	case "TestFailedUpdateGrubLosetup":
 		fallthrough
 	case "TestFailedMakeQcow2Image":

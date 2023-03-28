@@ -38,6 +38,8 @@ customization:
       name: hello
       channel: candidate
     -
+      name: core
+    -
       name: core20
   extra-ppas:
     -

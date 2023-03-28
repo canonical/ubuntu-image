@@ -22,6 +22,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/seed"
+	"github.com/snapcore/snapd/timings"
 )
 
 // validateInput ensures that command line flags for the state machine are valid. These
@@ -875,10 +877,17 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 // the image definition's customization struct to be passed in and
 // uses struct tags to identify which state must be added
 func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates []stateFunc) {
-	possibleStateFunc := map[string]stateFunc{
-		"add_extra_ppas":         stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs},
-		"install_extra_packages": stateFunc{"install_extra_packages", (*StateMachine).installPackages},
-		"install_extra_snaps":    stateFunc{"install_extra_snaps", (*StateMachine).preseedClassicImage},
+	possibleStateFunc := map[string][]stateFunc{
+		"add_extra_ppas": []stateFunc{
+			stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+		},
+		"install_extra_packages": []stateFunc{
+			stateFunc{"install_extra_packages", (*StateMachine).installPackages},
+		},
+		"install_extra_snaps": []stateFunc{
+			stateFunc{"install_extra_snaps", (*StateMachine).prepareClassicImage},
+			stateFunc{"preseed_extra_snaps", (*StateMachine).preseedClassicImage},
+		},
 	}
 	value := reflect.ValueOf(searchStruct)
 	elem := value.Elem()
@@ -888,11 +897,41 @@ func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates 
 			tags := elem.Type().Field(i).Tag
 			tagValue, hasTag := tags.Lookup(tag)
 			if hasTag {
-				extraStates = append(extraStates, possibleStateFunc[tagValue])
+				extraStates = append(extraStates, possibleStateFunc[tagValue]...)
 			}
 		}
 	}
 	return extraStates
+}
+
+// getPreseedsnaps returns a slice of the snaps that were preseeded in a chroot
+// and their channels
+func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error) {
+	// seededSnaps maps the snap name and channel that was seeded
+	seededSnaps = make(map[string]string)
+
+	// open the seed and run LoadAssertions and LoadMeta to get a list of snaps
+	snapdDir := filepath.Join(rootfs, "var", "lib", "snapd")
+	seedDir := filepath.Join(snapdDir, "seed")
+	preseed, err := seedOpen(seedDir, "")
+	if err != nil {
+		return seededSnaps, err
+	}
+	measurer := timings.New(nil)
+	if err := preseed.LoadAssertions(nil, nil); err != nil {
+		return seededSnaps, err
+	}
+	if err := preseed.LoadMeta(seed.AllModes, nil, measurer); err != nil {
+		return seededSnaps, err
+	}
+
+	// iterate over the snaps in the seed and add them to the list
+	preseed.Iter(func(sn *seed.Snap) error {
+		seededSnaps[sn.SnapName()] = sn.Channel
+		return nil
+	})
+
+	return seededSnaps, nil
 }
 
 // updateGrub mounts the resulting image and runs update-grub
