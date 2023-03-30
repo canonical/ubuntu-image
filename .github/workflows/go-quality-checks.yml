@@ -6,17 +6,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.16'
+          go-version: '1.18'
       - name: go-vet
         run: go vet ./...
       - name: go-fmt
         run: FMT=`go fmt ./...` && [ -z "$FMT" ]
       - name: install-golint
-        run: go get -u golang.org/x/lint/golint
+        run: sudo apt install -y golint
       - name: golint
         run: LINT=`golint ./...` && [ -z "$LINT" ]

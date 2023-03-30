@@ -3,10 +3,10 @@ summary: Create Ubuntu images
 description: |
   Official tool for building Ubuntu images, currently supporing Ubuntu Core
   snap-based images and preinstalled Ubuntu classic images.
-version: 2.2+snap11
+version: 3.0+snap1
 grade: stable
 confinement: classic
-base: core20
+base: core22
 source-code: https://github.com/canonical/ubuntu-image
 issues: https://bugs.launchpad.net/ubuntu-image/+filebug
 
@@ -32,13 +32,12 @@ parts:
       - mtools
       - python3-docutils
     stage-packages:
-      - mtools
       - fdisk
       - gdisk
-      - e2fsprogs
       - fakeroot
-      - dosfstools
-      - squashfs-tools
+      - debootstrap
+      - gpg
+      - germinate
     override-build: |
       snapcraftctl build
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp

@@ -1,0 +1,56 @@
+name: ubuntu-server-amd64
+display-name: Ubuntu Server amd64
+revision: 1
+architecture: amd64
+series: jammy
+class: preinstalled
+kernel: linux-image-generic
+gadget:
+  url: "https://github.com/snapcore/pc-amd64-gadget.git"
+  branch: classic
+  type: "git"
+rootfs:
+  components:
+    - main
+    - universe
+    - restricted
+  seed:
+    urls:
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+    branch: jammy
+    names:
+      - server
+      - minimal
+      - standard
+      - cloud-image
+customization:
+  cloud-init:
+    user-data: |
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
+  extra-snaps:
+    -
+      name: hello
+      channel: candidate
+  extra-ppas:
+    -
+      name: "canonical-foundations/ubuntu-image"
+      fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139"
+    -
+      name: "canonical-foundations/ubuntu-image-private-test"
+      auth: "jawn-smith:2NmzdXp7Ccmjt7v9Z1nq"
+      fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139"
+  extra-packages:
+    -
+      name: "hello-ubuntu-image-public"
+    -
+      name: "hello-ubuntu-image-private"
+artifacts:
+  qcow2:
+    -
+      name: pc-amd64.qcow2

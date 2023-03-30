@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -18,7 +19,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 	var err error
 	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
-		snapStateMachine.commonFlags.Snaps)
+		snapStateMachine.Opts.Snaps)
 	if err != nil {
 		return err
 	}
@@ -27,6 +28,11 @@ func (stateMachine *StateMachine) prepareImage() error {
 	imageOpts.ModelFile = snapStateMachine.Args.ModelAssertion
 	if snapStateMachine.commonFlags.Channel != "" {
 		imageOpts.Channel = snapStateMachine.commonFlags.Channel
+	}
+	imageOpts.Revisions = make(map[string]snap.Revision)
+	for snapName, snapRev := range snapStateMachine.Opts.Revisions {
+		fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n", snapRev, snapName)
+		imageOpts.Revisions[snapName] = snap.Revision{N: snapRev}
 	}
 
 	// preseeding-related
@@ -42,12 +48,22 @@ func (stateMachine *StateMachine) prepareImage() error {
 	if snapStateMachine.Opts.FactoryImage {
 		customizations.BootFlags = append(customizations.BootFlags, "factory")
 	}
-	customizations.CloudInitUserData = stateMachine.commonFlags.CloudInit
-	customizations.Validation = snapStateMachine.Opts.Validation
+	customizations.CloudInitUserData = snapStateMachine.Opts.CloudInit
+	customizations.Validation = stateMachine.commonFlags.Validation
 	imageOpts.Customizations = customizations
 
 	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
 	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+
+	// image.Prepare automatically has some output that we only want for
+	// verbose or greater logging
+	if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
+		oldImageStdout := image.Stdout
+		image.Stdout = io.Discard
+		defer func() {
+			image.Stdout = oldImageStdout
+		}()
+	}
 
 	if err := imagePrepare(&imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
@@ -56,6 +72,16 @@ func (stateMachine *StateMachine) prepareImage() error {
 	// set the gadget yaml location
 	snapStateMachine.YamlFilePath = filepath.Join(stateMachine.tempDirs.unpack, "gadget", "meta", "gadget.yaml")
 
+	return nil
+}
+
+// for snap/core image builds, the image name is always <volume-name>.img for
+// each volume in the gadget. This function stores that info in the struct
+func (stateMachine *StateMachine) setArtifactNames() error {
+	stateMachine.VolumeNames = make(map[string]string)
+	for volumeName := range stateMachine.GadgetInfo.Volumes {
+		stateMachine.VolumeNames[volumeName] = volumeName + ".img"
+	}
 	return nil
 }
 
@@ -80,7 +106,7 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 	}
 
 	// recursively copy the src to dst, skipping /boot for non-seeded images
-	files, err := ioutilReadDir(src)
+	files, err := osReadDir(src)
 	if err != nil {
 		return fmt.Errorf("Error reading unpack dir: %s", err.Error())
 	}

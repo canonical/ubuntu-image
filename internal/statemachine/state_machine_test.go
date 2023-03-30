@@ -2,10 +2,12 @@ package statemachine
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -13,11 +15,13 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/diskfs/go-diskfs/disk"
+	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 var testDir = "ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"
@@ -49,6 +53,21 @@ var allTestStates = []stateFunc{
 func mockCopyBlob([]string) error {
 	return fmt.Errorf("Test Error")
 }
+func mockSetDefaults(interface{}) error {
+	return fmt.Errorf("Test Error")
+}
+func mockCheckEmptyFields(interface{}, *gojsonschema.Result, *jsonschema.Schema) error {
+	return fmt.Errorf("Test Error")
+}
+func mockCheckTags(interface{}, string) (string, error) {
+	return "", fmt.Errorf("Test Error")
+}
+func mockBackupAndCopyResolvConf(string) error {
+	return fmt.Errorf("Test Error")
+}
+func mockRestoreResolvConf(string) error {
+	return fmt.Errorf("Test Error")
+}
 func mockCopyBlobSuccess([]string) error {
 	return nil
 }
@@ -65,8 +84,11 @@ func mockMkfsWithContent(typ, img, label, contentRootDir string, deviceSize, sec
 func mockMkfs(typ, img, label string, deviceSize, sectorSize quantity.Size) error {
 	return fmt.Errorf("Test Error")
 }
-func mockReadDir(string) ([]os.FileInfo, error) {
-	return []os.FileInfo{}, fmt.Errorf("Test Error")
+func mockReadAll(io.Reader) ([]byte, error) {
+	return []byte{}, fmt.Errorf("Test Error")
+}
+func mockReadDir(string) ([]os.DirEntry, error) {
+	return []os.DirEntry{}, fmt.Errorf("Test Error")
 }
 func mockReadFile(string) ([]byte, error) {
 	return []byte{}, fmt.Errorf("Test Error")
@@ -79,6 +101,12 @@ func mockMkdir(string, os.FileMode) error {
 }
 func mockMkdirAll(string, os.FileMode) error {
 	return fmt.Errorf("Test error")
+}
+func mockMkdirTemp(string, string) (string, error) {
+	return "", fmt.Errorf("Test error")
+}
+func mockOpen(string) (*os.File, error) {
+	return nil, fmt.Errorf("Test error")
 }
 func mockOpenFile(string, int, os.FileMode) (*os.File, error) {
 	return nil, fmt.Errorf("Test error")
@@ -118,6 +146,24 @@ func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
 }
 func mockImagePrepare(*image.Options) error {
 	return fmt.Errorf("Test Error")
+}
+func mockPreseedClassicReset(string) error {
+	return fmt.Errorf("Test Error")
+}
+func mockGet(string) (*http.Response, error) {
+	return nil, fmt.Errorf("Test Error")
+}
+func mockUnmarshal([]byte, any) error {
+	return fmt.Errorf("Test Error")
+}
+func mockMarshal(interface{}) ([]byte, error) {
+	return []byte{}, fmt.Errorf("Test Error")
+}
+func mockRel(string, string) (string, error) {
+	return "", fmt.Errorf("Test error")
+}
+func mockGojsonschemaValidateError(gojsonschema.JSONLoader, gojsonschema.JSONLoader) (*gojsonschema.Result, error) {
+	return nil, fmt.Errorf("Test Error")
 }
 
 func readOnlyDiskfsCreate(diskName string, size int64, format diskfs.Format, sectorSize diskfs.SectorSize) (*disk.Disk, error) {
@@ -166,9 +212,35 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestGeneratePackageManifest":
 		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
 		break
+	case "TestGenerateFilelist":
+		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
+		break
+	case "TestFailedPreseedClassicImage":
+		fallthrough
+	case "TestFailedUpdateGrubLosetup":
+		fallthrough
+	case "TestFailedMakeQcow2Image":
+		fallthrough
+	case "TestFailedGeneratePackageManifest":
+		fallthrough
+	case "TestFailedGenerateFilelist":
+		fallthrough
+	case "TestFailedGerminate":
+		fallthrough
 	case "TestFailedSetupLiveBuildCommands":
+		fallthrough
+	case "TestFailedCreateChroot":
+		fallthrough
+	case "TestFailedInstallPackages":
+		fallthrough
+	case "TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
+		break
+	case "TestFailedUpdateGrubOther": // this passes the initial losetup command and fails a later command
+		if args[0] != "losetup" {
+			os.Exit(1)
+		}
 		break
 	case "TestFailedRunLiveBuild":
 		// Do nothing so we don't have to wait for actual lb commands
@@ -257,36 +329,6 @@ func TestUntilThru(t *testing.T) {
 	}
 }
 
-// TestInvalidStateMachineArgs tests that invalid state machine command line arguments result in a failure
-func TestInvalidStateMachineArgs(t *testing.T) {
-	testCases := []struct {
-		name   string
-		until  string
-		thru   string
-		resume bool
-		errMsg string
-	}{
-		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, "cannot specify both --until and --thru"},
-		{"invalid_until_name", "fake step", "", false, "not a valid state name"},
-		{"invalid_thru_name", "", "fake step", false, "not a valid state name"},
-		{"resume_with_no_workdir", "", "", true, "must specify workdir when using --resume flag"},
-	}
-
-	for _, tc := range testCases {
-		t.Run("test "+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.stateMachineFlags.Until = tc.until
-			stateMachine.stateMachineFlags.Thru = tc.thru
-			stateMachine.stateMachineFlags.Resume = tc.resume
-
-			err := stateMachine.validateInput()
-			asserter.AssertErrContains(err, tc.errMsg)
-		})
-	}
-}
-
 // TestDebug ensures that the name of the states is printed when the --debug flag is used
 func TestDebug(t *testing.T) {
 	t.Run("test_debug", func(t *testing.T) {
@@ -312,7 +354,7 @@ func TestDebug(t *testing.T) {
 
 		// restore stdout and check that the debug info was printed
 		restoreStdout()
-		readStdout, err := ioutil.ReadAll(stdout)
+		readStdout, err := io.ReadAll(stdout)
 		asserter.AssertErrNil(err, true)
 
 		if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
@@ -532,6 +574,161 @@ func TestHandleContentSizes(t *testing.T) {
 	}
 }
 
+// TestPostProcessGadgetYaml runs through a variety of gadget.yaml files
+// and ensures the volume/structures are as expected
+func TestPostProcessGadgetYaml(t *testing.T) {
+	// helper function to define *quantity.Offsets inline
+	createOffsetPointer := func(x quantity.Offset) *quantity.Offset {
+		return &x
+	}
+	testCases := []struct {
+		name           string
+		gadgetYaml     string
+		expectedResult gadget.Volume
+	}{
+		{
+			"rootfs_gadget_source",
+			filepath.Join("testdata", "gadget_rootfs_source.yaml"),
+			gadget.Volume{
+				Schema:     "mbr",
+				Bootloader: "u-boot",
+				Name:       "pc",
+				Structure: []gadget.VolumeStructure{
+					{
+						VolumeName: "pc",
+						Type:       "0C",
+						Offset:     createOffsetPointer(1048576),
+						Size:       536870912,
+						Label:      "system-boot",
+						Filesystem: "vfat",
+						Content: []gadget.VolumeContent{
+							{
+								UnresolvedSource: "install/boot-assets/",
+								Target:           "/",
+							},
+							{
+								UnresolvedSource: "../../root/boot/vmlinuz",
+								Target:           "/",
+							},
+							{
+								UnresolvedSource: "../../root/boot/initrd.img",
+								Target:           "/",
+							},
+						},
+					},
+					{
+						Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+						Role:       "system-data",
+						Filesystem: "ext4",
+						Label:      "writable",
+						Offset:     createOffsetPointer(537919488),
+						Content:    []gadget.VolumeContent{},
+					},
+				},
+			},
+		},
+		{
+			"rootfs_unspecified",
+			filepath.Join("testdata", "gadget_no_rootfs.yaml"),
+			gadget.Volume{
+				Schema:     "gpt",
+				Bootloader: "grub",
+				Name:       "pc",
+				Structure: []gadget.VolumeStructure{
+					{
+						VolumeName: "pc",
+						Name:       "mbr",
+						Type:       "mbr",
+						Offset:     createOffsetPointer(0),
+						Role:       "mbr",
+						Size:       440,
+						Content: []gadget.VolumeContent{
+							{
+								Image:  "pc-boot.img",
+								Offset: createOffsetPointer(0),
+							},
+						},
+					},
+					{
+						VolumeName: "pc",
+						Name:       "BIOS Boot",
+						Type:       "DA,21686148-6449-6E6F-744E-656564454649",
+						Size:       1048576,
+						OffsetWrite: &gadget.RelativeOffset{
+							RelativeTo: "mbr",
+							Offset:     quantity.Offset(92),
+						},
+						Offset: createOffsetPointer(1048576),
+						Content: []gadget.VolumeContent{
+							{
+								Image: "pc-core.img",
+							},
+						},
+					},
+					{
+						VolumeName: "pc",
+						Name:       "EFI System",
+						Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+						Size:       52428800,
+						Filesystem: "vfat",
+						Offset:     createOffsetPointer(2097152),
+						Label:      "system-boot",
+						Content: []gadget.VolumeContent{
+							{
+								UnresolvedSource: "grubx64.efi",
+								Target:           "EFI/boot/grubx64.efi",
+							},
+							{
+								UnresolvedSource: "shim.efi.signed",
+								Target:           "EFI/boot/bootx64.efi",
+							},
+							{
+								UnresolvedSource: "grub-cpc.cfg",
+								Target:           "EFI/ubuntu/grub.cfg",
+							},
+						},
+					},
+					{
+						Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+						Role:       "system-data",
+						Filesystem: "ext4",
+						Label:      "writable",
+						Offset:     createOffsetPointer(54525952),
+						Content:    []gadget.VolumeContent{},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_post_process_gadget_yaml_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+			// need workdir and loaded gadget.yaml set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, false)
+
+			// load in the gadget.yaml file
+			stateMachine.YamlFilePath = tc.gadgetYaml
+
+			// ensure unpack exists and load gadget.yaml
+			os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, false)
+
+			if !reflect.DeepEqual(*stateMachine.GadgetInfo.Volumes["pc"], tc.expectedResult) {
+				t.Errorf("GadgetInfo after postProcessGadgetYaml:\n%+v "+
+					"does not match expected result:\n%+v",
+					*stateMachine.GadgetInfo.Volumes["pc"],
+					tc.expectedResult,
+				)
+			}
+		})
+	}
+}
+
 // TestFailedPostProcessGadgetYaml tests failues in the post processing of
 // the gadget.yaml file after loading it in. This is accomplished by mocking
 // os.MkdirAll
@@ -540,13 +737,27 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, false)
+
 		// set a valid yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
 		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
-		err := stateMachine.loadGadgetYaml()
+		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, false)
+
+		// mock filepath.Rel
+		filepathRel = mockRel
+		defer func() {
+			filepathRel = filepath.Rel
+		}()
+		err = stateMachine.postProcessGadgetYaml()
+		asserter.AssertErrContains(err, "Error creating relative path")
+		filepathRel = filepath.Rel
 
 		// mock os.MkdirAll
 		osMkdirAll = mockMkdirAll
@@ -556,5 +767,10 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 		err = stateMachine.postProcessGadgetYaml()
 		asserter.AssertErrContains(err, "Error creating volume dir")
 		osMkdirAll = os.MkdirAll
+
+		// use a gadget with a disallowed string in the content field
+		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_invalid_content.yaml")
+		err = stateMachine.loadGadgetYaml()
+		asserter.AssertErrContains(err, "disallowed for security purposes")
 	})
 }

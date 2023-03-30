@@ -35,11 +35,35 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
 	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
 	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
+	stateMachine.tempDirs.chroot = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "chroot")
+	stateMachine.tempDirs.scratch = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "scratch")
 
-	if err := osMkdir(stateMachine.tempDirs.rootfs, 0755); err != nil {
-		return fmt.Errorf("Error creating temporary directory: %s", err.Error())
+	tempDirs := []string{stateMachine.tempDirs.scratch, stateMachine.tempDirs.rootfs}
+	for _, tempDir := range tempDirs {
+		err := osMkdir(tempDir, 0755)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating temporary directory \"%s\": \"%s\"", tempDir, err.Error())
+		}
 	}
 
+	return nil
+}
+
+// determineOutputDirectory sets the directory in which to place artifacts
+// and creates it if it doesn't already exist
+func (stateMachine *StateMachine) determineOutputDirectory() error {
+	if stateMachine.commonFlags.OutputDir == "" {
+		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd
+			stateMachine.commonFlags.OutputDir, _ = os.Getwd()
+		} else {
+			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
+		}
+	} else {
+		err := osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("Error creating OutputDir: %s", err.Error())
+		}
+	}
 	return nil
 }
 
@@ -52,7 +76,7 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 	}
 
 	// read in the gadget.yaml as bytes, because snapd expects it that way
-	gadgetYamlBytes, err := ioutilReadFile(stateMachine.YamlFilePath)
+	gadgetYamlBytes, err := osReadFile(stateMachine.YamlFilePath)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget.yaml bytes: %s", err.Error())
 	}
@@ -91,30 +115,6 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 	// pre-parse the sector size argument here as it's a string and we will be using it
 	// in various places
 	stateMachine.SectorSize, _ = quantity.ParseSize(stateMachine.commonFlags.SectorSize)
-
-	return nil
-}
-
-// Run hooks specified by --hooks-directory after populating rootfs contents
-func (stateMachine *StateMachine) populateRootfsContentsHooks() error {
-	if stateMachine.IsSeeded {
-		if stateMachine.commonFlags.Debug {
-			fmt.Println("Building from a seeded gadget - " +
-				"skipping the post-populate-rootfs hook execution: unsupported")
-		}
-		return nil
-	}
-
-	if len(stateMachine.commonFlags.HooksDirectories) == 0 {
-		// no hooks, move on
-		return nil
-	}
-
-	err := stateMachine.runHooks("post-populate-rootfs",
-		"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -325,83 +325,72 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 
 // Make the disk
 func (stateMachine *StateMachine) makeDisk() error {
-	// ensure the output dir exists
-	if stateMachine.commonFlags.OutputDir == "" {
-		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd
-			stateMachine.commonFlags.OutputDir, _ = os.Getwd()
-		} else {
-			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
-		}
-	} else {
-		err := osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating OutputDir: %s", err.Error())
-		}
-	}
 	// TODO: this is only temporarily needed until go-diskfs is fixed - see below
 	var existingDiskIds [][]byte
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
-		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, volumeName+".img")
+		if _, found := stateMachine.VolumeNames[volumeName]; found {
+			imgName := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[volumeName])
 
-		// Create the disk image
-		imgSize, found := stateMachine.ImageSizes[volumeName]
-		if !found {
-			imgSize, _ = stateMachine.calculateImageSize()
-		}
-
-		if err := osRemoveAll(imgName); err != nil {
-			return fmt.Errorf("Error removing old disk image: %s", err.Error())
-		}
-		sectorSizeFlag := diskfs.SectorSize(int(stateMachine.SectorSize))
-		diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw, sectorSizeFlag)
-		if err != nil {
-			return fmt.Errorf("Error creating disk image: %s", err.Error())
-		}
-
-		// make sure the disk image size is a multiple of its block/sector size
-		imgSize = quantity.Size(math.Ceil(float64(imgSize)/float64(stateMachine.SectorSize))) *
-			stateMachine.SectorSize
-		if err := osTruncate(diskImg.File.Name(), int64(imgSize)); err != nil {
-			return fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
-				err.Error())
-		}
-
-		// set up the partitions on the device
-		partitionTable := createPartitionTable(volumeName, volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
-
-		// Write the partition table to disk
-		if err := diskImg.Partition(*partitionTable); err != nil {
-			return fmt.Errorf("Error partitioning image file: %s", err.Error())
-		}
-
-		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
-		// this function is a temporary workaround, but we should change upstream go-diskfs
-		if volume.Schema == "mbr" {
-			randomBytes, err := generateUniqueDiskID(&existingDiskIds)
-			if err != nil {
-				return fmt.Errorf("Error generating disk ID: %s", err.Error())
+			// Create the disk image
+			imgSize, found := stateMachine.ImageSizes[volumeName]
+			if !found {
+				imgSize, _ = stateMachine.calculateImageSize()
 			}
-			diskFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
-			defer diskFile.Close()
+
+			if err := osRemoveAll(imgName); err != nil {
+				return fmt.Errorf("Error removing old disk image: %s", err.Error())
+			}
+			sectorSizeFlag := diskfs.SectorSize(int(stateMachine.SectorSize))
+			diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw, sectorSizeFlag)
 			if err != nil {
-				return fmt.Errorf("Error opening disk to write MBR disk identifier: %s",
+				return fmt.Errorf("Error creating disk image: %s", err.Error())
+			}
+
+			// make sure the disk image size is a multiple of its block/sector size
+			imgSize = quantity.Size(math.Ceil(float64(imgSize)/float64(stateMachine.SectorSize))) *
+				stateMachine.SectorSize
+			if err := osTruncate(diskImg.File.Name(), int64(imgSize)); err != nil {
+				return fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
 					err.Error())
 			}
-			_, err = diskFile.WriteAt(randomBytes, 440)
-			if err != nil {
-				return fmt.Errorf("Error writing MBR disk identifier: %s", err.Error())
+
+			// set up the partitions on the device
+			partitionTable := createPartitionTable(volumeName, volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
+
+			// Write the partition table to disk
+			if err := diskImg.Partition(*partitionTable); err != nil {
+				return fmt.Errorf("Error partitioning image file: %s", err.Error())
 			}
-			diskFile.Close()
-		}
 
-		// After the partitions have been created, copy the data into the correct locations
-		if err := stateMachine.copyDataToImage(volumeName, volume, diskImg); err != nil {
-			return err
-		}
+			// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
+			// this function is a temporary workaround, but we should change upstream go-diskfs
+			if volume.Schema == "mbr" {
+				randomBytes, err := generateUniqueDiskID(&existingDiskIds)
+				if err != nil {
+					return fmt.Errorf("Error generating disk ID: %s", err.Error())
+				}
+				diskFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
+				defer diskFile.Close()
+				if err != nil {
+					return fmt.Errorf("Error opening disk to write MBR disk identifier: %s",
+						err.Error())
+				}
+				_, err = diskFile.WriteAt(randomBytes, 440)
+				if err != nil {
+					return fmt.Errorf("Error writing MBR disk identifier: %s", err.Error())
+				}
+				diskFile.Close()
+			}
 
-		// Open the file and write any OffsetWrite values
-		if err := writeOffsetValues(volume, imgName, uint64(stateMachine.SectorSize), uint64(imgSize)); err != nil {
-			return err
+			// After the partitions have been created, copy the data into the correct locations
+			if err := stateMachine.copyDataToImage(volumeName, volume, diskImg); err != nil {
+				return err
+			}
+
+			// Open the file and write any OffsetWrite values
+			if err := writeOffsetValues(volume, imgName, uint64(stateMachine.SectorSize), uint64(imgSize)); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

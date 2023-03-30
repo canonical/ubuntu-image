@@ -1,49 +1,37 @@
 package statemachine
 
 import (
-	"fmt"
-
 	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 // classicStates are the names and function variables to be executed by the state machine for classic images
-var classicStates = []stateFunc{
+var startingClassicStates = []stateFunc{
+	{"parse_image_definition", (*StateMachine).parseImageDefinition},
+	{"calculate_states", (*StateMachine).calculateStates},
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
-	{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree},
-	{"run_live_build", (*StateMachine).runLiveBuild},
-	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
-	{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents},
-	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
-	{"prepare_classic_image", (*StateMachine).prepareClassicImage},
-	{"generate_disk_info", (*StateMachine).generateDiskInfo},
+	{"determine_output_directory", (*StateMachine).determineOutputDirectory},
+}
+
+var rootfsSeedStates = []stateFunc{
+	{"germinate", (*StateMachine).germinate},
+	{"create_chroot", (*StateMachine).createChroot},
+}
+
+var imageCreationStates = []stateFunc{
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
 	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
-	{"make_disk", (*StateMachine).makeDisk},
-	{"generate_manifest", (*StateMachine).generatePackageManifest},
-	{"finish", (*StateMachine).finish},
 }
 
 // ClassicStateMachine embeds StateMachine and adds the command line flags specific to classic images
 type ClassicStateMachine struct {
 	StateMachine
-	Opts commands.ClassicOpts
-	Args commands.ClassicArgs
-}
-
-// validateClassicInput validates command line flags specific to classic images
-func (classicStateMachine *ClassicStateMachine) validateClassicInput() error {
-	// --project or --filesystem must be specified, but not both
-	if classicStateMachine.Opts.Project == "" && classicStateMachine.Opts.Filesystem == "" {
-		return fmt.Errorf("project or filesystem is required")
-	} else if classicStateMachine.Opts.Project != "" && classicStateMachine.Opts.Filesystem != "" {
-		return fmt.Errorf("project and filesystem are mutually exclusive")
-	}
-	if classicStateMachine.commonFlags.Channel == "" {
-		classicStateMachine.commonFlags.Channel = "stable"
-	}
-
-	return nil
+	ImageDef imagedefinition.ImageDefinition
+	Opts     commands.ClassicOpts
+	Args     commands.ClassicArgs
+	Packages []string
+	Snaps    []string
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run()
@@ -51,8 +39,8 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 	// set the parent pointer of the embedded struct
 	classicStateMachine.parent = classicStateMachine
 
-	// set the states that will be used for this image type
-	classicStateMachine.states = classicStates
+	// set the beginning states that will be used by all classic image builds
+	classicStateMachine.states = startingClassicStates
 
 	// do the validation common to all image types
 	if err := classicStateMachine.validateInput(); err != nil {
@@ -64,9 +52,5 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 		return err
 	}
 
-	// do the validation specific to classic images
-	if err := classicStateMachine.validateClassicInput(); err != nil {
-		return err
-	}
 	return nil
 }

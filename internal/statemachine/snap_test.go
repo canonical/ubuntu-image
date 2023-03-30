@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,22 +21,34 @@ import (
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
-func TestFailedValidateInputSnap(t *testing.T) {
-	t.Run("test_failed_validate_input", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+func TestFailedSnapSetup(t *testing.T) {
+	testCases := []struct {
+		name   string
+		until  string
+		thru   string
+		errMsg string
+	}{
+		{"invalid_until_name", "fake step", "", "not a valid state name"},
+		{"invalid_thru_name", "", "fake step", "not a valid state name"},
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", "cannot specify both --until and --thru"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_failed_snap_setup_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
 
-		// use both --until and --thru to trigger this failure
-		var stateMachine SnapStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.stateMachineFlags.Until = "until-test"
-		stateMachine.stateMachineFlags.Thru = "thru-test"
+			// use both --until and --thru to trigger this failure
+			var stateMachine SnapStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.stateMachineFlags.Until = tc.until
+			stateMachine.stateMachineFlags.Thru = tc.thru
 
-		err := stateMachine.Setup()
-		asserter.AssertErrContains(err, "cannot specify both --until and --thru")
-	})
+			err := stateMachine.Setup()
+			asserter.AssertErrContains(err, tc.errMsg)
+		})
+	}
 }
 
 // TestFailedReadMetadataSnap tests a failed metadata read by passing --resume with no previous partial state machine run
@@ -71,7 +82,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 		stateMachine.Opts.FactoryImage = true
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
@@ -85,7 +96,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 		// make sure the "factory" boot flag was set
 		grubenvFile := filepath.Join(stateMachine.tempDirs.rootfs,
 			"EFI", "ubuntu", "grubenv")
-		grubenvBytes, err := ioutil.ReadFile(grubenvFile)
+		grubenvBytes, err := os.ReadFile(grubenvFile)
 		asserter.AssertErrNil(err, true)
 
 		if !strings.Contains(string(grubenvBytes), "snapd_boot_flags=factory") {
@@ -110,9 +121,9 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 		stateMachine.Opts.DisableConsoleConf = true
 		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.commonFlags.Snaps = []string{"hello-world"}
-		stateMachine.commonFlags.CloudInit = filepath.Join("testdata", "user-data")
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		stateMachine.Opts.CloudInit = filepath.Join("testdata", "user-data")
+		stateMachine.Opts.Snaps = []string{"hello-world"}
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
@@ -208,12 +219,16 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 			defer saveCWD()
 
 			var stateMachine SnapStateMachine
+			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			asserter.AssertErrNil(err, true)
+			defer os.RemoveAll(workDir)
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			stateMachine.Args.ModelAssertion = tc.modelAssertion
+			stateMachine.stateMachineFlags.WorkDir = workDir
 			stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
 
-			err := stateMachine.Setup()
+			err = stateMachine.Setup()
 			asserter.AssertErrNil(err, true)
 
 			err = stateMachine.Run()
@@ -250,7 +265,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
 
-			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
 			var stateMachine SnapStateMachine
@@ -300,7 +315,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 			}
 			for manifest, snapList := range testResultMap {
 				manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, manifest)
-				manifestBytes, err := ioutil.ReadFile(manifestPath)
+				manifestBytes, err := os.ReadFile(manifestPath)
 				asserter.AssertErrNil(err, false)
 				// The order of snaps shouldn't matter
 				for _, snap := range snapList {
@@ -318,13 +333,20 @@ func TestGenerateSnapManifest(t *testing.T) {
 func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_snap_rootfs_contents", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
+
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
 		var stateMachine SnapStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
+		stateMachine.stateMachineFlags.WorkDir = workDir
 
 		// need workdir and gadget.yaml set up for this
-		err := stateMachine.makeTemporaryDirectories()
+		err = stateMachine.determineOutputDirectory()
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.prepareImage()
@@ -342,14 +364,14 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 		asserter.AssertErrContains(err, "Error creating boot dir")
 		osMkdirAll = os.MkdirAll
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.populateSnapRootfsContents()
 		asserter.AssertErrContains(err, "Error reading unpack dir")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock osutil.CopySpecialFile
 		osRename = mockRename
@@ -369,11 +391,11 @@ func TestFailedGenerateSnapManifest(t *testing.T) {
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
 
-		ioutilReadDir = func(string) ([]os.FileInfo, error) {
-			return []os.FileInfo{}, nil
+		osReadDir = func(string) ([]os.DirEntry, error) {
+			return []os.DirEntry{}, nil
 		}
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		// Setup the mock for os.Create, making those fail
 		osCreate = mockCreate
@@ -403,7 +425,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 	}{
 		{"no_channel_specified", []string{"hello", "core20"}, true},
 		{"channel_specified", []string{"hello=edge", "core20"}, true},
-		{"mixed_syntax", []string{"hello", "core20=edge"}, true},
+		{"mixed_syntax", []string{"hello", "core20=candidate"}, true},
 		{"invalid_syntax", []string{"hello=edge=stable", "core20"}, false},
 	}
 	for _, tc := range testCases {
@@ -421,8 +443,8 @@ func TestSnapFlagSyntax(t *testing.T) {
 
 			// use core18 because it builds the fastest
 			stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
-			stateMachine.commonFlags.Snaps = tc.snapArgs
-			workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			stateMachine.Opts.Snaps = tc.snapArgs
+			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(workDir)
 			stateMachine.stateMachineFlags.WorkDir = workDir
@@ -464,7 +486,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 					revRegex, err := regexp.Compile(fmt.Sprintf(
 						"%s (.*?)\n", snapName))
 					asserter.AssertErrNil(err, true)
-					seedData, err := ioutil.ReadFile(filepath.Join(
+					seedData, err := os.ReadFile(filepath.Join(
 						stateMachine.stateMachineFlags.WorkDir, "seed.manifest"))
 					asserter.AssertErrNil(err, true)
 					revString := revRegex.FindStringSubmatch(string(seedData))
@@ -488,6 +510,65 @@ func TestSnapFlagSyntax(t *testing.T) {
 	}
 }
 
+// TestSnapRevisions tests the --revision flag and ensures the correct
+// revisions are installed in the image
+func TestSnapRevisions(t *testing.T) {
+	t.Run("test_snap_revisions", func(t *testing.T) {
+		// many snaps aren't published on other architectures, so only run this on amd64
+		if runtime.GOARCH != "amd64" {
+			t.Skip("Test for amd64 only")
+		}
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine SnapStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		// use core18 because it builds the fastest
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
+		stateMachine.Opts.Snaps = []string{"hello", "core", "core20"}
+		stateMachine.Opts.Revisions = map[string]int{
+			"hello": 38,
+			"core":  14784,
+		}
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		defer os.RemoveAll(workDir)
+		stateMachine.stateMachineFlags.WorkDir = workDir
+		stateMachine.commonFlags.OutputDir = workDir
+
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
+
+		for snapName, expectedRevision := range stateMachine.Opts.Revisions {
+			// compile a regex used to get revision numbers from seed.manifest
+			revRegex, err := regexp.Compile(fmt.Sprintf(
+				"%s (.*?)\n", snapName))
+			asserter.AssertErrNil(err, true)
+			seedData, err := os.ReadFile(filepath.Join(
+				stateMachine.stateMachineFlags.WorkDir, "seed.manifest"))
+			asserter.AssertErrNil(err, true)
+			revString := revRegex.FindStringSubmatch(string(seedData))
+			if len(revString) != 2 {
+				t.Fatal("Error finding snap revision via regex")
+			}
+			seededRevision, err := strconv.Atoi(revString[1])
+			asserter.AssertErrNil(err, true)
+
+			if seededRevision != expectedRevision {
+				t.Errorf("Error, expected snap %s to "+
+					"be revision %d, but it was %d",
+					snapName, expectedRevision, seededRevision)
+			}
+		}
+	})
+}
+
 // TestValidationFlag ensures that the the validation flag is passed through to image.Prepare
 // correctly. This is accomplished by enabling the flag and ensuring the correct version
 // of a snap is installed as a result
@@ -501,12 +582,12 @@ func TestValidationFlag(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
 		stateMachine.stateMachineFlags.Thru = "prepare_image"
-		stateMachine.Opts.Validation = "enforce"
+		stateMachine.commonFlags.Validation = "enforce"
 
 		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
@@ -538,13 +619,13 @@ func TestGadgetEdgeCases(t *testing.T) {
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20Dangerous")
 		stateMachine.Opts.FactoryImage = true
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir
 		// use the custom snap with a complicated gadget.yaml
 		customSnap := filepath.Join("testdata", "pc_20-gadget-edge-cases.snap")
-		stateMachine.commonFlags.Snaps = []string{customSnap}
+		stateMachine.Opts.Snaps = []string{customSnap}
 
 		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
@@ -576,7 +657,7 @@ func TestPreseedFlag(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
-		workDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(workDir)
 		stateMachine.stateMachineFlags.WorkDir = workDir

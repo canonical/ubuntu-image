@@ -6,8 +6,8 @@
 
 
 This tool is used to build Ubuntu images.  Currently builds Ubuntu Core snap-based
-images from model assertions and Ubuntu classic preinstalled images using gadget trees,
-but it will be generalized to build more (eventually all) Ubuntu images.
+images from model assertions and Ubuntu classic preinstalled images using image definition
+files, but it will be generalized to build more (eventually all) Ubuntu images.
 
 
 # Requirements
@@ -38,6 +38,7 @@ The "gadget.yaml" specification has moved to [the snapcraft forum](https://forum
 
 # Build Instructions
 
+* Ensure golang >= 1.18 is installed
 * Clone the git repository using `git clone https://github.com/canonical/ubuntu-image.git`
 * `cd` into the newly cloned repository
 * Run `go build -o . ./...`

@@ -3,15 +3,19 @@ package statemachine
 import (
 	"bytes"
 	"crypto/rand"
-	"io/ioutil"
+	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -19,77 +23,6 @@ import (
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
 )
-
-// TestSetupCrossArch tests that the lb commands are set up correctly for cross arch compilation
-func TestSetupCrossArch(t *testing.T) {
-	t.Run("test_setup_cross_arch", func(t *testing.T) {
-		if runtime.GOARCH == "s390x" || runtime.GOARCH == "ppc64le" {
-			t.Skipf("No qemu-user-static available on %s", runtime.GOARCH)
-		}
-		asserter := helper.Asserter{T: t}
-		// set up a temp dir for this
-		os.MkdirAll(testDir, 0755)
-		defer os.RemoveAll(testDir)
-
-		// make sure we always call with a different arch than we are currently running tests on
-		var arch string
-		if getHostArch() != "arm64" {
-			arch = "arm64"
-		} else {
-			arch = "armhf"
-		}
-
-		lbConfig, _, err := setupLiveBuildCommands(testDir, arch, []string{}, true)
-		asserter.AssertErrNil(err, true)
-
-		// make sure the qemu args were appended to "lb config"
-		qemuArgFound := false
-		for _, arg := range lbConfig.Args {
-			if arg == "--bootstrap-qemu-arch" {
-				qemuArgFound = true
-			}
-		}
-		if !qemuArgFound {
-			t.Errorf("lb config command \"%s\" is missing qemu arguments",
-				lbConfig.String())
-		}
-	})
-}
-
-// TestFailedSetupLiveBuildCommands tests failures in the setupLiveBuildCommands helper function
-func TestFailedSetupLiveBuildCommands(t *testing.T) {
-	t.Run("test_failed_setup_live_build_commands", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		// set up a temp dir for this
-		os.MkdirAll(testDir, 0755)
-		defer os.RemoveAll(testDir)
-
-		// first test a failure in the dpkg command
-		// Setup the exec.Command mock
-		testCaseName = "TestFailedSetupLiveBuildCommands"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		_, _, err := setupLiveBuildCommands(testDir, "amd64", []string{}, true)
-		asserter.AssertErrContains(err, "exit status 1")
-		execCommand = exec.Command
-
-		// mock osutil.CopySpecialFile
-		osutilCopySpecialFile = mockCopySpecialFile
-		defer func() {
-			osutilCopySpecialFile = osutil.CopySpecialFile
-		}()
-		_, _, err = setupLiveBuildCommands(testDir, "amd64", []string{}, true)
-		asserter.AssertErrContains(err, "Error copying livecd-rootfs/auto")
-		osutilCopySpecialFile = osutil.CopySpecialFile
-
-		// use an arch with no qemu-static binary
-		os.Unsetenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
-		_, _, err = setupLiveBuildCommands(testDir, "fake64", []string{}, true)
-		asserter.AssertErrContains(err, "in case of non-standard archs or custom paths")
-	})
-}
 
 // TestMaxOffset tests the functionality of the maxOffset function
 func TestMaxOffset(t *testing.T) {
@@ -105,42 +38,6 @@ func TestMaxOffset(t *testing.T) {
 		if maxOffset(greater, lesser) != greater {
 			t.Errorf("maxOffset returned the lower number")
 		}
-	})
-}
-
-// TestFailedRunHooks tests failures in the runHooks function. This is accomplished by mocking
-// functions and calling hook scripts that intentionally return errors
-func TestFailedRunHooks(t *testing.T) {
-	t.Run("test_failed_run_hooks", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.commonFlags.Debug = true // for coverage!
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// first set a good hooks directory
-		stateMachine.commonFlags.HooksDirectories = []string{filepath.Join(
-			"testdata", "good_hookscript")}
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
-		defer func() {
-			ioutilReadDir = ioutil.ReadDir
-		}()
-		err = stateMachine.runHooks("post-populate-rootfs",
-			"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Error reading hooks directory")
-		ioutilReadDir = ioutil.ReadDir
-
-		// now set a hooks directory that will fail
-		stateMachine.commonFlags.HooksDirectories = []string{filepath.Join(
-			"testdata", "hooks_return_error")}
-		err = stateMachine.runHooks("post-populate-rootfs",
-			"UBUNTU_IMAGE_HOOK_ROOTFS", stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Error running hook")
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -174,14 +71,14 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 		asserter.AssertErrContains(err, "Error reading boot dir")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock os.Rename
 		osRename = mockRename
@@ -226,14 +123,14 @@ func TestFailedHandleSecureBootPiboot(t *testing.T) {
 		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 		asserter.AssertErrContains(err, "Error reading boot dir")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock os.Rename
 		osRename = mockRename
@@ -317,14 +214,14 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 		asserter.AssertErrContains(err, "Failed to create gadget dir")
 		osMkdir = os.Mkdir
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.handleLkBootloader(volume)
 		asserter.AssertErrContains(err, "Error reading lk bootloader dir")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock osutil.CopySpecialFile
 		osutilCopySpecialFile = mockCopySpecialFile
@@ -395,15 +292,15 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		asserter.AssertErrContains(err, "Error zeroing image file")
 		helperCopyBlob = helper.CopyBlob
 
-		// mock ioutil.ReadDir
-		ioutilReadDir = mockReadDir
+		// mock os.ReadDir
+		osReadDir = mockReadDir
 		defer func() {
-			ioutilReadDir = ioutil.ReadDir
+			osReadDir = os.ReadDir
 		}()
 		err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
 			filepath.Join("/tmp", uuid.NewString()+".img"))
 		asserter.AssertErrContains(err, "Error listing contents of volume")
-		ioutilReadDir = ioutil.ReadDir
+		osReadDir = os.ReadDir
 
 		// mock gadget.MkfsWithContent
 		mkfsMakeWithContent = mockMkfsWithContent
@@ -432,9 +329,13 @@ func TestFailedCopyStructureContent(t *testing.T) {
 // state machine has finished running
 func TestCleanup(t *testing.T) {
 	t.Run("test_cleanup", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
 		var stateMachine StateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.Run()
+		// create the workdir and make sure it is set to be cleaned up
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+		stateMachine.cleanWorkDir = true
 		stateMachine.Teardown()
 		if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err == nil {
 			t.Errorf("Error: temporary workdir %s was not cleaned up\n",
@@ -567,7 +468,7 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 
 		// restore stdout and check that the warning was printed
 		restoreStdout()
-		readStdout, err := ioutil.ReadAll(stdout)
+		readStdout, err := io.ReadAll(stdout)
 		asserter.AssertErrNil(err, true)
 
 		if !strings.Contains(string(readStdout), "WARNING: rootfs structure size 0 B smaller than actual rootfs contents") {
@@ -665,73 +566,521 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 	}
 }
 
-// TestFailedRemovePreseeding tests various failure scenarios in the removePreseeding function
-func TestFailedRemovePreseeding(t *testing.T) {
-	t.Run("test_failed_remove_preseeding", func(t *testing.T) {
+// TestGetHostArch unit tests the getHostArch function
+func TestGetHostArch(t *testing.T) {
+	t.Run("test_get_host_arch", func(t *testing.T) {
+		hostArch := getHostArch()
+		switch runtime.GOARCH {
+		case "amd64":
+			expected := "amd64"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", expected, hostArch)
+			}
+			break
+		case "arm":
+			expected := "armhf"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		case "arm64":
+			expected := "arm64"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		case "ppc64le":
+			expected := "ppc64el"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		case "s390x":
+			expected := "s390x"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		case "riscv64":
+			expected := "riscv64"
+			if hostArch != expected {
+				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
+			}
+			break
+		default:
+			t.Skipf("Test not supported on architecture %s", runtime.GOARCH)
+			break
+		}
+	})
+}
+
+// TestGetHostSuite unit tests the getHostSuite function to make sure
+// it returns a string with length greater than zero
+func TestGetHostSuite(t *testing.T) {
+	t.Run("test_get_host_suite", func(t *testing.T) {
+		hostSuite := getHostSuite()
+		if len(hostSuite) == 0 {
+			t.Error("getHostSuite could not get the host suite")
+		}
+	})
+}
+
+// TestGetQemuStaticForArch unit tests the getQemuStaticForArch function
+func TestGetQemuStaticForArch(t *testing.T) {
+	testCases := []struct {
+		arch     string
+		expected string
+	}{
+		{"amd64", ""},
+		{"armhf", "qemu-arm-static"},
+		{"arm64", "qemu-aarch64-static"},
+		{"ppc64el", "qemu-ppc64le-static"},
+		{"s390x", ""},
+		{"riscv64", ""},
+	}
+	for _, tc := range testCases {
+		t.Run("test_get_qemu_static_for_"+tc.arch, func(t *testing.T) {
+			qemuStatic := getQemuStaticForArch(tc.arch)
+			if qemuStatic != tc.expected {
+				t.Errorf("Expected qemu static \"%s\" for arch \"%s\", instead got \"%s\"",
+					tc.expected, tc.arch, qemuStatic)
+			}
+		})
+	}
+}
+
+// TestGenerateGerminateCmd unit tests the generateGerminateCmd function
+func TestGenerateGerminateCmd(t *testing.T) {
+	testCases := []struct {
+		name   string
+		mirror string
+	}{
+		{"amd64", "http://archive.ubuntu.com/ubuntu/"},
+		{"armhf", "http://ports.ubuntu.com/ubuntu/"},
+		{"arm64", "http://ports.ubuntu.com/ubuntu/"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_germinate_cmd_"+tc.name, func(t *testing.T) {
+			imageDef := imagedefinition.ImageDefinition{
+				Architecture: tc.name,
+				Rootfs: &imagedefinition.Rootfs{
+					Mirror: tc.mirror,
+					Seed: &imagedefinition.Seed{
+						SeedURLs:   []string{"git://test.git"},
+						SeedBranch: "testbranch",
+					},
+					Components: []string{"main", "universe"},
+				},
+			}
+			germinateCmd := generateGerminateCmd(imageDef)
+
+			if !strings.Contains(germinateCmd.String(), tc.mirror) {
+				t.Errorf("germinate command \"%s\" has incorrect mirror. Expected \"%s\"",
+					germinateCmd.String(), tc.mirror)
+			}
+
+			if !strings.Contains(germinateCmd.String(), "--components=main,universe") {
+				t.Errorf("Expected germinate command \"%s\" to contain "+
+					"\"--components=main,universe\"", germinateCmd.String())
+			}
+		})
+	}
+}
+
+// TestValidateInput tests that invalid state machine command line arguments result in a failure
+func TestValidateInput(t *testing.T) {
+	testCases := []struct {
+		name    string
+		until   string
+		thru    string
+		debug   bool
+		verbose bool
+		resume  bool
+		errMsg  string
+	}{
+		{"both_until_and_thru", "make_temporary_directories", "calculate_rootfs_size", false, false, false, "cannot specify both --until and --thru"},
+		{"resume_with_no_workdir", "", "", false, false, true, "must specify workdir when using --resume flag"},
+		{"both_debug_and_verbose", "", "", true, true, false, "--quiet, --verbose, and --debug flags are mutually exclusive"},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.Until = tc.until
+			stateMachine.stateMachineFlags.Thru = tc.thru
+			stateMachine.stateMachineFlags.Resume = tc.resume
+			stateMachine.commonFlags.Debug = tc.debug
+			stateMachine.commonFlags.Verbose = tc.verbose
+
+			err := stateMachine.validateInput()
+			asserter.AssertErrContains(err, tc.errMsg)
+		})
+	}
+}
+
+// TestValidateUntilThru ensures that using invalid value for --thru
+// or --until returns an error
+func TestValidateUntilThru(t *testing.T) {
+	testCases := []struct {
+		name  string
+		until string
+		thru  string
+	}{
+		{"invalid_until_name", "fake step", ""},
+		{"invalid_thru_name", "", "fake step"},
+	}
+	for _, tc := range testCases {
+		t.Run("test "+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.Until = tc.until
+			stateMachine.stateMachineFlags.Thru = tc.thru
+
+			err := stateMachine.validateUntilThru()
+			asserter.AssertErrContains(err, "not a valid state name")
+
+		})
+	}
+}
+
+// TestFailedManualCopyFile tests the fail case of the manualCopyFile function
+func TestFailedManualCopyFile(t *testing.T) {
+	t.Run("test_failed_manual_copy_file", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
+		copyFiles := []*imagedefinition.CopyFile{
+			{
+				Dest:   "/test/does/not/exist",
+				Source: "/test/does/not/exist",
+			},
+		}
+		err := manualCopyFile(copyFiles, "/fakedir", true)
+		asserter.AssertErrContains(err, "Error copying file")
+	})
+}
+
+// TestFailedManualTouchFile tests the fail case of the manualTouchFile function
+func TestFailedManualTouchFile(t *testing.T) {
+	t.Run("test_failed_manual_touch_file", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		touchFiles := []*imagedefinition.TouchFile{
+			{
+				TouchPath: "/test/does/not/exist",
+			},
+		}
+		err := manualTouchFile(touchFiles, "/fakedir", true)
+		asserter.AssertErrContains(err, "Error creating file")
+	})
+}
+
+// TestFailedManualExecute tests the fail case of the manualExecute function
+func TestFailedManualExecute(t *testing.T) {
+	t.Run("test_failed_manual_execute", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		executes := []*imagedefinition.Execute{
+			{
+				ExecutePath: "/test/does/not/exist",
+			},
+		}
+		err := manualExecute(executes, "fakedir", true)
+		asserter.AssertErrContains(err, "Error running script")
+	})
+}
+
+// TestFailedManualAddGroup tests the fail case of the manualAddGroup function
+func TestFailedManualAddGroup(t *testing.T) {
+	t.Run("test_failed_manual_add_group", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		addGroups := []*imagedefinition.AddGroup{
+			{
+				GroupName: "testgroup",
+				GroupID:   "123",
+			},
+		}
+		err := manualAddGroup(addGroups, "fakedir", true)
+		asserter.AssertErrContains(err, "Error adding group")
+	})
+}
+
+// TestFailedManualAddUser tests the fail case of the manualAddUser function
+func TestFailedManualAddUser(t *testing.T) {
+	t.Run("test_failed_manual_add_user", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		addUsers := []*imagedefinition.AddUser{
+			{
+				UserName: "testuser",
+				UserID:   "123",
+			},
+		}
+		err := manualAddUser(addUsers, "fakedir", true)
+		asserter.AssertErrContains(err, "Error adding user")
+	})
+}
+
+// TestGenerateAptCmd unit tests the generateAptCmd function
+func TestGenerateAptCmds(t *testing.T) {
+	testCases := []struct {
+		name        string
+		targetDir   string
+		packageList []string
+		expected    string
+	}{
+		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test"},
+		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test1 test2"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
+			aptCmds := generateAptCmds(tc.targetDir, tc.packageList)
+			if !strings.Contains(aptCmds[1].String(), tc.expected) {
+				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmds[1].String())
+			}
+		})
+	}
+}
+
+// TestCreatePPAInfo unit tests the createPPAInfo function
+/* TODO: this is the logic for deb822 sources. When other projects
+(software-properties, ubuntu-release-upgrader) are ready, update
+to this logic instead.
+func TestCreatePPAInfo(t *testing.T) {
+	testCases := []struct {
+		name             string
+		ppa              *imagedefinition.PPA
+		series           string
+		expectedName     string
+		expectedContents string
+	}{
+		{
+			"public_ppa",
+			&imagedefinition.PPA{
+				PPAName: "public/ppa",
+			},
+			"focal",
+			"public-ubuntu-ppa-focal.sources",
+			`X-Repolib-Name: public/ppa
+Enabled: yes
+Types: deb
+URIS: https://ppa.launchpadcontent.net/public/ppa/ubuntu
+Suites: focal
+Components: main`,
+		},
+		{
+			"private_ppa",
+			&imagedefinition.PPA{
+				PPAName: "private/ppa",
+				Auth:    "testuser:testpass",
+			},
+			"jammy",
+			"private-ubuntu-ppa-jammy.sources",
+			`X-Repolib-Name: private/ppa
+Enabled: yes
+Types: deb
+URIS: https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubuntu
+Suites: jammy
+Components: main`,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_create_ppa_info_"+tc.name, func(t *testing.T) {
+			fileName, fileContents := createPPAInfo(tc.ppa, tc.series)
+			if fileName != tc.expectedName {
+				t.Errorf("Expected PPA filename \"%s\" but got \"%s\"",
+					tc.expectedName, fileName)
+			}
+			if fileContents != tc.expectedContents {
+				t.Errorf("Expected PPA file contents \"%s\" but got \"%s\"",
+					tc.expectedContents, fileContents)
+			}
+		})
+	}
+}
+*/
+// TestCreatePPAInfo unit tests the createPPAInfo function
+func TestCreatePPAInfo(t *testing.T) {
+	testCases := []struct {
+		name             string
+		ppa              *imagedefinition.PPA
+		series           string
+		expectedName     string
+		expectedContents string
+	}{
+		{
+			"public_ppa",
+			&imagedefinition.PPA{
+				PPAName: "public/ppa",
+			},
+			"focal",
+			"public-ubuntu-ppa-focal.list",
+			"deb https://ppa.launchpadcontent.net/public/ppa/ubuntu focal main",
+		},
+		{
+			"private_ppa",
+			&imagedefinition.PPA{
+				PPAName: "private/ppa",
+				Auth:    "testuser:testpass",
+			},
+			"jammy",
+			"private-ubuntu-ppa-jammy.list",
+			"deb https://testuser:testpass@private-ppa.launchpadcontent.net/private/ppa/ubuntu jammy main"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_create_ppa_info_"+tc.name, func(t *testing.T) {
+			fileName, fileContents := createPPAInfo(tc.ppa, tc.series)
+			if fileName != tc.expectedName {
+				t.Errorf("Expected PPA filename \"%s\" but got \"%s\"",
+					tc.expectedName, fileName)
+			}
+			if fileContents != tc.expectedContents {
+				t.Errorf("Expected PPA file contents \"%s\" but got \"%s\"",
+					tc.expectedContents, fileContents)
+			}
+		})
+	}
+}
+
+// TestImportPPAKeys unit tests the importPPAKeys function
+func TestImportPPAKeys(t *testing.T) {
+	testCases := []struct {
+		name        string
+		ppa         *imagedefinition.PPA
+		keyFileName string
+	}{
+		{
+			"public_ppa",
+			&imagedefinition.PPA{
+				PPAName: "canonical-foundations/ubuntu-image",
+			},
+			"public-canonical-foundations-ubuntu-image.key",
+		},
+		{
+			"private_ppa",
+			&imagedefinition.PPA{
+				PPAName:     "canonical-foundations/ubuntu-image-private-test",
+				Auth:        "testuser:testpass",
+				Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
+			},
+			"private-canonical-foundations-ubuntu-image-private-test.key",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_import_ppa_keys_"+tc.name, func(t *testing.T) {
+			// a byte representation of the canonical-foundations public key
+			expectedContents := []byte{152, 141, 4, 80, 190, 39, 112, 1, 4, 0,
+				230, 108, 176, 170, 73, 12, 198, 74, 110, 107, 31, 246, 81, 240,
+				148, 160, 52, 188, 222, 178, 67, 75, 14, 32, 247, 57, 211, 76, 26,
+				31, 124, 83, 11, 75, 21, 150, 164, 28, 222, 149, 49, 8, 135, 97, 83,
+				234, 138, 214, 97, 246, 15, 157, 69, 24, 112, 219, 231, 78, 36, 208,
+				186, 91, 248, 177, 57, 233, 53, 154, 253, 125, 241, 173, 154, 148,
+				65, 125, 20, 15, 87, 242, 144, 74, 238, 71, 133, 182, 9, 217, 23, 93,
+				155, 230, 52, 19, 90, 180, 79, 70, 186, 180, 122, 167, 141, 59, 95,
+				148, 196, 15, 231, 101, 80, 175, 225, 32, 163, 66, 111, 155, 167,
+				76, 72, 165, 5, 190, 22, 192, 10, 241, 0, 17, 1, 0, 1, 180, 44, 76,
+				97, 117, 110, 99, 104, 112, 97, 100, 32, 80, 80, 65, 32, 102, 111,
+				114, 32, 67, 97, 110, 111, 110, 105, 99, 97, 108, 32, 70, 111, 117,
+				110, 100, 97, 116, 105, 111, 110, 115, 32, 84, 101, 97, 109, 136,
+				184, 4, 19, 1, 2, 0, 34, 5, 2, 80, 190, 39, 112, 2, 27, 3, 6, 11, 9, 8,
+				7, 3, 2, 6, 21, 8, 2, 9, 10, 11, 4, 22, 2, 3, 1, 2, 30, 1, 2, 23, 128, 0,
+				10, 9, 16, 212, 192, 182, 104, 253, 76, 145, 57, 187, 243, 3, 255,
+				104, 246, 106, 227, 175, 235, 102, 20, 23, 4, 251, 60, 236, 165,
+				143, 184, 161, 133, 147, 154, 172, 228, 130, 18, 36, 6, 138, 214,
+				188, 32, 142, 251, 143, 144, 40, 43, 147, 187, 230, 224, 254, 161,
+				7, 57, 165, 220, 85, 55, 99, 70, 96, 62, 81, 208, 249, 131, 8, 241,
+				77, 213, 22, 252, 235, 214, 35, 182, 195, 224, 45, 231, 196, 7, 238,
+				147, 115, 81, 142, 71, 216, 96, 159, 11, 146, 83, 153, 107, 194, 167,
+				80, 30, 223, 236, 146, 29, 176, 101, 33, 237, 38, 7, 163, 183, 217,
+				42, 32, 163, 33, 163, 92, 45, 99, 62, 217, 78, 163, 45, 55, 209, 137,
+				43, 69, 78, 53, 177, 207, 209, 123, 186,
+			}
+
+			asserter := helper.Asserter{T: t}
+
+			// create a temporary gpg keyring directory
+			tmpGPGDir, err := os.MkdirTemp("/tmp", "ubuntu-image-gpg-test")
+			defer os.RemoveAll(tmpGPGDir)
+			asserter.AssertErrNil(err, true)
+
+			// create a temporary trusted.gpg.d directory
+			tmpTrustedDir, err := os.MkdirTemp("/tmp", "ubuntu-image-trusted.gpg.d")
+			//defer os.RemoveAll(tmpTrustedDir)
+			asserter.AssertErrNil(err, true)
+
+			keyFilePath := filepath.Join(tmpTrustedDir, tc.keyFileName)
+			err = importPPAKeys(tc.ppa, tmpGPGDir, keyFilePath, false)
+			asserter.AssertErrNil(err, true)
+
+			keyData, err := os.ReadFile(keyFilePath)
+			asserter.AssertErrNil(err, true)
+
+			if !reflect.DeepEqual(keyData, expectedContents) {
+				t.Errorf("Expected key file to be:\n%d\n\nbut got\n%d",
+					expectedContents, keyData)
+			}
+		})
+	}
+}
+
+// TestFailedImportPPAKeys tests failures in the importPPAKeys function
+func TestFailedImportPPAKeys(t *testing.T) {
+	t.Run("test_failed_import_ppa_keys", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		// create a temporary gpg keyring directory
+		tmpGPGDir, err := os.MkdirTemp("/tmp", "ubuntu-image-gpg-test")
+		defer os.RemoveAll(tmpGPGDir)
 		asserter.AssertErrNil(err, true)
 
-		seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "snapd", "seed")
-		err = os.MkdirAll(seedDir, 0755)
+		// create a temporary trusted.gpg.d directory
+		tmpTrustedDir, err := os.MkdirTemp("/tmp", "ubuntu-image-trusted.gpg.d")
+		defer os.RemoveAll(tmpTrustedDir)
 		asserter.AssertErrNil(err, true)
+		keyFilePath := filepath.Join(tmpTrustedDir, "test.key")
 
-		// call "snap prepare image" to preseed the filesystem.
-		// Doing the preseed at the time of the test allows it to
-		// run on each architecture and keeps the github repository
-		// free of large .snap files
-		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-			"--classic", "--snap=core20", "--snap=snapd", "--snap=lxd",
-			filepath.Join("testdata", "modelAssertionClassic"),
-			stateMachine.tempDirs.rootfs)
-		err = snapPrepareImage.Run()
-		asserter.AssertErrNil(err, true)
+		// try to import an invalid gpg fingerprint
+		ppa := &imagedefinition.PPA{
+			PPAName:     "test-bad/fingerprint",
+			Fingerprint: "testfakefingperint",
+		}
 
-		// mock os.RemoveAll so the directory isn't cleared out every time
-		osRemoveAll = mockRemoveAll
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
+		asserter.AssertErrContains(err, "Error running gpg command")
+
+		// now use a valid PPA and mock some functions
+		ppa = &imagedefinition.PPA{
+			PPAName: "canonical-foundations/ubuntu-image",
+		}
+
+		// mock http.Get
+		httpGet = mockGet
 		defer func() {
-			osRemoveAll = os.RemoveAll
+			httpGet = http.Get
 		}()
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
+		asserter.AssertErrContains(err, "Error getting signing key")
+		httpGet = http.Get
 
-		// mock seed.Open
-		seedOpen = mockSeedOpen
+		// mock io.ReadAll
+		ioReadAll = mockReadAll
 		defer func() {
-			seedOpen = seed.Open
+			ioReadAll = io.ReadAll
 		}()
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Test error")
-		seedOpen = seed.Open
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
+		asserter.AssertErrContains(err, "Error reading signing key")
+		ioReadAll = io.ReadAll
 
-		// move the model from var/lib/snapd/seed/assertions to cause an error
-		err = os.Rename(filepath.Join(seedDir, "assertions", "model"),
-			filepath.Join(stateMachine.tempDirs.rootfs, "model"))
-		asserter.AssertErrNil(err, true)
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "seed must have a model assertion")
-		err = os.Rename(filepath.Join(stateMachine.tempDirs.rootfs, "model"),
-			filepath.Join(seedDir, "assertions", "model"))
-		asserter.AssertErrNil(err, true)
-
-		// move seed.yaml to cause an error in LoadMeta
-		err = os.Rename(filepath.Join(seedDir, "seed.yaml"),
-			filepath.Join(seedDir, "seed.yaml.bak"))
-		asserter.AssertErrNil(err, true)
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "no seed metadata")
-		err = os.Rename(filepath.Join(seedDir, "seed.yaml.bak"),
-			filepath.Join(seedDir, "seed.yaml"))
-		asserter.AssertErrNil(err, true)
-
-		// the files have been restored, just test the failure in os.RemoveAll
-		_, err = removePreseeding(stateMachine.tempDirs.rootfs)
-		asserter.AssertErrContains(err, "Test error")
-		osRemoveAll = os.RemoveAll
-
-		//os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		// mock json.Unmarshal
+		jsonUnmarshal = mockUnmarshal
+		defer func() {
+			jsonUnmarshal = json.Unmarshal
+		}()
+		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
+		asserter.AssertErrContains(err, "Error unmarshalling launchpad API response")
+		jsonUnmarshal = json.Unmarshal
 	})
 }
 
@@ -760,7 +1109,7 @@ func TestManifestRevisionFormat(t *testing.T) {
 
 		expectedManifestData := "test1 123\ntest2 456\ntest3 789\n"
 
-		manifestData, err := ioutil.ReadFile(manifestOutput)
+		manifestData, err := os.ReadFile(manifestOutput)
 		asserter.AssertErrNil(err, true)
 
 		if string(manifestData) != expectedManifestData {
@@ -819,5 +1168,208 @@ func TestLP1981720(t *testing.T) {
 		}
 
 		os.RemoveAll(contentRoot)
+	})
+}
+
+// TestCheckCustomizationSteps unit tests the checkCustomizationSteps function
+func TestCheckCustomizationSteps(t *testing.T) {
+	testCases := []struct {
+		name          string
+		customization *imagedefinition.Customization
+		expectedSteps []string
+	}{
+		{
+			"add_extra_ppas",
+			&imagedefinition.Customization{
+				ExtraPPAs: []*imagedefinition.PPA{
+					{
+						PPAName: "test",
+					},
+				},
+			},
+			[]string{
+				"add_extra_ppas",
+			},
+		},
+		{
+			"install_extra_packages",
+			&imagedefinition.Customization{
+				ExtraPackages: []*imagedefinition.Package{
+					{
+						PackageName: "test",
+					},
+				},
+			},
+			[]string{
+				"install_extra_packages",
+			},
+		},
+		{
+			"install_extra_snaps",
+			&imagedefinition.Customization{
+				ExtraSnaps: []*imagedefinition.Snap{
+					{
+						SnapName: "test",
+					},
+				},
+			},
+			[]string{
+				"install_extra_snaps",
+			},
+		},
+		{
+			"all_extra_states",
+			&imagedefinition.Customization{
+				ExtraPPAs: []*imagedefinition.PPA{
+					{
+						PPAName: "test",
+					},
+				},
+				ExtraPackages: []*imagedefinition.Package{
+					{
+						PackageName: "test",
+					},
+				},
+				ExtraSnaps: []*imagedefinition.Snap{
+					{
+						SnapName: "test",
+					},
+				},
+			},
+			[]string{
+				"add_extra_ppas",
+				"install_extra_packages",
+				"install_extra_snaps",
+			},
+		},
+		{
+			"no_extra_states",
+			&imagedefinition.Customization{},
+			[]string{},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_check_customization_steps_"+tc.name, func(t *testing.T) {
+			extraSteps := checkCustomizationSteps(tc.customization, "extra_step_prebuilt_rootfs")
+			for _, stepName := range tc.expectedSteps {
+				found := false
+				for _, extraStep := range extraSteps {
+					if stepName == extraStep.name {
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("Expected state \"%s\" to be added to the state machine but it was not",
+						stepName,
+					)
+				}
+			}
+		})
+	}
+}
+
+// TestFailedMountTempFS tests failures in the mountTempFS function
+func TestFailedMountTempFS(t *testing.T) {
+	t.Run("test_failed_mount_new_fs", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		// mock os.MkdirTemp
+		osMkdirTemp = mockMkdirTemp
+		defer func() {
+			osMkdirTemp = os.MkdirTemp
+		}()
+		_, _, err := mountTempFS("", "", "")
+		asserter.AssertErrContains(err, "Test error")
+		osMkdirTemp = os.MkdirTemp
+	})
+}
+
+// TestFailedGetPreseededSnaps tests various failure scenarios in the getPreseededSnaps function
+func TestFailedGetPreseededSnaps(t *testing.T) {
+	t.Run("test_failed_get_preseeded_snaps", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "snapd", "seed")
+		err = os.MkdirAll(seedDir, 0755)
+		asserter.AssertErrNil(err, true)
+
+		// call "snap prepare image" to preseed the filesystem.
+		// Doing the preseed at the time of the test allows it to
+		// run on each architecture and keeps the github repository
+		// free of large .snap files
+		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
+			"--classic", "--snap=core20", "--snap=core22", "--snap=snapd", "--snap=lxd",
+			filepath.Join("testdata", "modelAssertionClassic"),
+			stateMachine.tempDirs.rootfs)
+		err = snapPrepareImage.Run()
+		asserter.AssertErrNil(err, true)
+
+		// mock seed.Open
+		seedOpen = mockSeedOpen
+		defer func() {
+			seedOpen = seed.Open
+		}()
+		_, err = getPreseededSnaps(stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "Test error")
+		seedOpen = seed.Open
+
+		// move the model from var/lib/snapd/seed/assertions to cause an error
+		err = os.Rename(filepath.Join(seedDir, "assertions", "model"),
+			filepath.Join(stateMachine.tempDirs.rootfs, "model"))
+		asserter.AssertErrNil(err, true)
+		_, err = getPreseededSnaps(stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "seed must have a model assertion")
+		err = os.Rename(filepath.Join(stateMachine.tempDirs.rootfs, "model"),
+			filepath.Join(seedDir, "assertions", "model"))
+
+		// move seed.yaml to cause an error in LoadMeta
+		err = os.Rename(filepath.Join(seedDir, "seed.yaml"),
+			filepath.Join(seedDir, "seed.yaml.bak"))
+		asserter.AssertErrNil(err, true)
+		_, err = getPreseededSnaps(stateMachine.tempDirs.rootfs)
+		asserter.AssertErrContains(err, "no seed metadata")
+		err = os.Rename(filepath.Join(seedDir, "seed.yaml.bak"),
+			filepath.Join(seedDir, "seed.yaml"))
+		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestFailedUpdateGrub tests failures in the updateGrub function
+func TestFailedUpdateGrub(t *testing.T) {
+	t.Run("test_failed_update_grub", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		// mock os.Mkdir
+		osMkdir = mockMkdir
+		defer func() {
+			osMkdir = os.Mkdir
+		}()
+		err := stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
+		osMkdir = os.Mkdir
+
+		// Setup the exec.Command mock to mock losetup
+		testCaseName = "TestFailedUpdateGrubLosetup"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		err = stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error running losetup command")
+		// now test a command failure that isn't losetup
+		testCaseName = "TestFailedUpdateGrubOther"
+		err = stateMachine.updateGrub("", 0)
+		asserter.AssertErrContains(err, "Error running command")
+		execCommand = exec.Command
 	})
 }

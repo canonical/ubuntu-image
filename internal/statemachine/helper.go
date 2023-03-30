@@ -8,15 +8,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/partition"
 	"github.com/diskfs/go-diskfs/partition/gpt"
 	"github.com/diskfs/go-diskfs/partition/mbr"
-
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/seed"
@@ -34,6 +37,28 @@ func (stateMachine *StateMachine) validateInput() error {
 		return fmt.Errorf("must specify workdir when using --resume flag")
 	}
 
+	logLevelFlags := []bool{stateMachine.commonFlags.Debug,
+		stateMachine.commonFlags.Verbose,
+		stateMachine.commonFlags.Quiet,
+	}
+
+	logLevels := 0
+	for _, logLevelFlag := range logLevelFlags {
+		if logLevelFlag {
+			logLevels++
+		}
+	}
+
+	if logLevels > 1 {
+		return fmt.Errorf("--quiet, --verbose, and --debug flags are mutually exclusive")
+	}
+
+	return nil
+}
+
+// validateUntilThru validates that the the state passed as --until
+// or --thru exists in the state machine's list of states
+func (stateMachine *StateMachine) validateUntilThru() error {
 	// if --until or --thru was given, make sure the specified state exists
 	var searchState string
 	var stateFound bool = false
@@ -70,43 +95,6 @@ func (stateMachine *StateMachine) cleanup() error {
 	return nil
 }
 
-// runHooks reads through the --hooks-directory flags and calls a helper function to execute the scripts
-func (stateMachine *StateMachine) runHooks(hookName, envKey, envVal string) error {
-	os.Setenv(envKey, envVal)
-	for _, hooksDir := range stateMachine.commonFlags.HooksDirectories {
-		hooksDirectoryd := filepath.Join(hooksDir, hookName+".d")
-		hookScripts, err := ioutilReadDir(hooksDirectoryd)
-
-		// It's okay for hooks-directory.d to not exist, but if it does exist run all the scripts in it
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("Error reading hooks directory: %s", err.Error())
-		}
-
-		for _, hookScript := range hookScripts {
-			hookScriptPath := filepath.Join(hooksDirectoryd, hookScript.Name())
-			if stateMachine.commonFlags.Debug {
-				fmt.Printf("Running hook script: %s\n", hookScriptPath)
-			}
-			if err := helper.RunScript(hookScriptPath); err != nil {
-				return fmt.Errorf("Error running hook %s: %s", hookScriptPath, err.Error())
-			}
-		}
-
-		// if hookName exists in the hook directory, run it
-		hookScript := filepath.Join(hooksDir, hookName)
-		_, err = os.Stat(hookScript)
-		if err == nil {
-			if stateMachine.commonFlags.Debug {
-				fmt.Printf("Running hook script: %s\n", hookScript)
-			}
-			if err := helper.RunScript(hookScript); err != nil {
-				return fmt.Errorf("Error running hook %s: %s", hookScript, err.Error())
-			}
-		}
-	}
-	return nil
-}
-
 // handleLkBootloader handles the special "lk" bootloader case where some extra
 // files need to be added to the bootfs
 func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) error {
@@ -128,7 +116,7 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("Failed to create gadget dir: %s", err.Error())
 	}
-	files, err := ioutilReadDir(bootDir)
+	files, err := osReadDir(bootDir)
 	if err != nil {
 		return fmt.Errorf("Error reading lk bootloader dir: %s", err.Error())
 	}
@@ -191,10 +179,12 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			// system-data and system-seed structures are not required to have
 			// an explicit size set in the yaml file
 			if structure.Size < stateMachine.RootfsSize {
-				fmt.Printf("WARNING: rootfs structure size %s smaller "+
-					"than actual rootfs contents %s\n",
-					structure.Size.IECString(),
-					stateMachine.RootfsSize.IECString())
+				if !stateMachine.commonFlags.Quiet {
+					fmt.Printf("WARNING: rootfs structure size %s smaller "+
+						"than actual rootfs contents %s\n",
+						structure.Size.IECString(),
+						stateMachine.RootfsSize.IECString())
+				}
 				blockSize = stateMachine.RootfsSize
 				structure.Size = stateMachine.RootfsSize
 				volume.Structure[structureNumber] = structure
@@ -217,7 +207,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			}
 		}
 		// check if any content exists in unpack
-		contentFiles, err := ioutilReadDir(contentRoot)
+		contentFiles, err := osReadDir(contentRoot)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error listing contents of volume \"%s\": %s",
 				contentRoot, err.Error())
@@ -268,7 +258,7 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 		return fmt.Errorf("Error creating ubuntu dir: %s", err.Error())
 	}
 
-	files, err := ioutilReadDir(bootDir)
+	files, err := osReadDir(bootDir)
 	if err != nil {
 		return fmt.Errorf("Error reading boot dir: %s", err.Error())
 	}
@@ -285,7 +275,7 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 
 // WriteSnapManifest generates a snap manifest based on the contents of the selected snapsDir
 func WriteSnapManifest(snapsDir string, outputPath string) error {
-	files, err := ioutilReadDir(snapsDir)
+	files, err := osReadDir(snapsDir)
 	if err != nil {
 		// As per previous ubuntu-image manifest generation, we skip generating
 		// manifests for non-existent/invalid paths
@@ -332,56 +322,6 @@ func getQemuStaticForArch(arch string) string {
 		return static
 	}
 	return ""
-}
-
-// setupLiveBuildCommands creates the live build commands used in classic images
-func setupLiveBuildCommands(rootfs, arch string, env []string, enableCrossBuild bool) (lbConfig, lbBuild exec.Cmd, err error) {
-
-	lbConfig = *execCommand("lb", "config")
-	lbBuild = *execCommand("lb", "build")
-
-	lbConfig.Stdout = os.Stdout
-	lbConfig.Stderr = os.Stderr
-	lbConfig.Env = append(os.Environ(), env...)
-	lbBuild.Stdout = os.Stdout
-	lbBuild.Stderr = os.Stderr
-	lbBuild.Env = append(os.Environ(), env...)
-
-	autoSrc := os.Getenv("UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH")
-	if autoSrc == "" {
-		dpkgArgs := "dpkg -L livecd-rootfs | grep \"auto$\""
-		dpkgCommand := execCommand("bash", "-c", dpkgArgs)
-		dpkgBytes, err := dpkgCommand.Output()
-		if err != nil {
-			return lbConfig, lbBuild, err
-		}
-		autoSrc = strings.TrimSpace(string(dpkgBytes))
-	}
-	autoDst := rootfs + "/auto"
-	if err := osutilCopySpecialFile(autoSrc, autoDst); err != nil {
-		return lbConfig, lbBuild, fmt.Errorf("Error copying livecd-rootfs/auto: %s", err.Error())
-	}
-
-	if arch != getHostArch() && enableCrossBuild {
-		// For cases where we want to cross-build, we need to pass
-		// additional options to live-build with the arch to use and path
-		// to the qemu static
-		var qemuPath string
-		qemuPath = os.Getenv("UBUNTU_IMAGE_QEMU_USER_STATIC_PATH")
-		if qemuPath == "" {
-			static := getQemuStaticForArch(arch)
-			qemuPath, err = exec.LookPath(static)
-			if err != nil {
-				return lbConfig, lbBuild, fmt.Errorf("Use " +
-					"UBUNTU_IMAGE_QEMU_USER_STATIC_PATH in case " +
-					"of non-standard archs or custom paths")
-			}
-		}
-		lbConfig.Args = append(lbConfig.Args, []string{"--bootstrap-qemu-arch",
-			arch, "--bootstrap-qemu-static", qemuPath, "--architectures", arch}...)
-	}
-
-	return lbConfig, lbBuild, nil
 }
 
 // maxOffset returns the maximum of two quantity.Offset types
@@ -600,9 +540,373 @@ func parseSnapsAndChannels(snaps []string) (snapNames []string, snapChannels map
 	return snapNames, snapChannels, nil
 }
 
-// removePreseeding removes preseeded snaps from an existing rootfs and returns
-// a slice of the snaps and their channels that were removed this way
-func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) {
+// generateGerminateCmd creates the appropriate germinate command for the
+// values configured in the image definition yaml file
+func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec.Cmd {
+	// determine the value for the seed-dist in the form of <archive>.<series>
+	seedDist := imageDefinition.Rootfs.Flavor
+	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
+		seedDist = seedDist + "." + imageDefinition.Rootfs.Seed.SeedBranch
+	}
+
+	seedSource := strings.Join(imageDefinition.Rootfs.Seed.SeedURLs, ",")
+
+	germinateCmd := execCommand("germinate",
+		"--mirror", imageDefinition.Rootfs.Mirror,
+		"--arch", imageDefinition.Architecture,
+		"--dist", imageDefinition.Series,
+		"--seed-source", seedSource,
+		"--seed-dist", seedDist,
+		"--no-rdepends",
+	)
+
+	if imageDefinition.Rootfs.Seed.Vcs {
+		germinateCmd.Args = append(germinateCmd.Args, "--vcs=auto")
+	}
+
+	if len(imageDefinition.Rootfs.Components) > 0 {
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
+		germinateCmd.Args = append(germinateCmd.Args, "--components="+components)
+	}
+
+	return germinateCmd
+}
+
+// cloneGitRepo takes options from the image definition and clones the git
+// repo with the corresponding options
+func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir string) error {
+	// clone the repo
+	cloneOptions := &git.CloneOptions{
+		URL:          imageDefinition.Gadget.GadgetURL,
+		SingleBranch: true,
+	}
+	if imageDefinition.Gadget.GadgetBranch != "" {
+		cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(imageDefinition.Gadget.GadgetBranch)
+	}
+
+	cloneOptions.Validate()
+
+	_, err := git.PlainClone(workDir, false, cloneOptions)
+	return err
+}
+
+// generateDebootstrapCmd generates the debootstrap command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
+	debootstrapCmd := execCommand("debootstrap",
+		"--arch", imageDefinition.Architecture,
+		"--variant=minbase",
+	)
+
+	if imageDefinition.Customization != nil && len(imageDefinition.Customization.ExtraPPAs) > 0 {
+		// ca-certificates is needed to use PPAs
+		debootstrapCmd.Args = append(debootstrapCmd.Args, "--include=ca-certificates")
+	}
+
+	if len(imageDefinition.Rootfs.Components) > 0 {
+		components := strings.Join(imageDefinition.Rootfs.Components, ",")
+		debootstrapCmd.Args = append(debootstrapCmd.Args, "--components="+components)
+	}
+
+	// add the SUITE TARGET and MIRROR arguments
+	debootstrapCmd.Args = append(debootstrapCmd.Args, []string{
+		imageDefinition.Series,
+		targetDir,
+		imageDefinition.Rootfs.Mirror,
+	}...)
+
+	return debootstrapCmd
+}
+
+// generateAptCmd generates the apt command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
+	updateCmd := execCommand("chroot", targetDir, "apt", "update")
+
+	installCmd := execCommand("chroot", targetDir, "apt", "install",
+		"--assume-yes",
+		"--quiet",
+		"--option=Dpkg::options::=--force-unsafe-io",
+		"--option=Dpkg::Options::=--force-confold",
+	)
+
+	for _, aptPackage := range packageList {
+		installCmd.Args = append(installCmd.Args, aptPackage)
+	}
+
+	// Env is sometimes used for mocking command calls in tests,
+	// so only overwrite env if it is nil
+	if installCmd.Env == nil {
+		installCmd.Env = os.Environ()
+	}
+	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+
+	return []*exec.Cmd{updateCmd, installCmd}
+}
+
+// createPPAInfo generates the name for a PPA sources.list file
+// in the convention of add-apt-repository, and the contents
+// that define the sources.list in the DEB822 format
+func createPPAInfo(ppa *imagedefinition.PPA, series string) (fileName string, fileContents string) {
+	splitName := strings.Split(ppa.PPAName, "/")
+	user := splitName[0]
+	ppaName := splitName[1]
+
+	/* TODO: this is the logic for deb822 sources. When other projects
+	(software-properties, ubuntu-release-upgrader) are ready, update
+	to this logic instead.
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.sources", user, ppaName, series)
+	*/
+	fileName = fmt.Sprintf("%s-ubuntu-%s-%s.list", user, ppaName, series)
+
+	var domain string
+	if ppa.Auth == "" {
+		domain = "https://ppa.launchpadcontent.net"
+	} else {
+		domain = fmt.Sprintf("https://%s@private-ppa.launchpadcontent.net", ppa.Auth)
+	}
+
+	fullDomain := fmt.Sprintf("%s/%s/%s/ubuntu", domain, user, ppaName)
+	/* TODO: this is the logic for deb822 sources. When other projects
+	(software-properties, ubuntu-release-upgrader) are ready, update
+	to this logic instead.
+	fileContents = fmt.Sprintf("X-Repolib-Name: %s\nEnabled: yes\nTypes: deb\n"+
+		"URIS: %s\nSuites: %s\nComponents: main",
+		ppa.PPAName, fullDomain, series)*/
+	fileContents = fmt.Sprintf("deb %s %s main", fullDomain, series)
+
+	return fileName, fileContents
+}
+
+// importPPAKeys imports keys for ppas with specified fingerprints.
+// The schema parsing has already validated that either Fingerprint is
+// specified or the PPA is public. If no fingerprint is provided, this
+// function reaches out to the Launchpad API to get the signing key
+func importPPAKeys(ppa *imagedefinition.PPA, tmpGPGDir, keyFilePath string, debug bool) error {
+	if ppa.Fingerprint == "" {
+		// The YAML schema has already validated that if no fingerprint is
+		// provided, then this is a public PPA. We will get the fingerprint
+		// from the Launchpad API
+		type launchpadAPI struct {
+			SigningKeyFingerprint string `json:"signing_key_fingerprint"`
+			// plus many other fields that aren't needed at the moment
+		}
+		launchpadInstance := launchpadAPI{}
+
+		splitName := strings.Split(ppa.PPAName, "/")
+		launchpadURL := fmt.Sprintf("https://api.launchpad.net/devel/~%s/+archive/ubuntu/%s",
+			splitName[0], splitName[1])
+		resp, err := httpGet(launchpadURL)
+		if err != nil {
+			return fmt.Errorf("Error getting signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+
+		body, err := ioReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("Error reading signing key for ppa \"%s\": %s",
+				ppa.PPAName, err.Error())
+		}
+
+		err = jsonUnmarshal(body, &launchpadInstance)
+		if err != nil {
+			return fmt.Errorf("Error unmarshalling launchpad API response: %s", err.Error())
+		}
+
+		ppa.Fingerprint = launchpadInstance.SigningKeyFingerprint
+	}
+	commonGPGArgs := []string{
+		"--no-default-keyring",
+		"--no-options",
+		"--homedir",
+		tmpGPGDir,
+		"--secret-keyring",
+		filepath.Join(tmpGPGDir, "tempring.gpg"),
+		"--keyserver",
+		"hkp://keyserver.ubuntu.com:80",
+	}
+	recvKeyArgs := append(commonGPGArgs, []string{"--recv-keys", ppa.Fingerprint}...)
+	exportKeyArgs := append(commonGPGArgs, []string{"--output", keyFilePath, "--export", ppa.Fingerprint}...)
+	gpgCmds := []*exec.Cmd{
+		execCommand(
+			"gpg",
+			recvKeyArgs...,
+		),
+		execCommand(
+			"gpg",
+			exportKeyArgs...,
+		),
+	}
+
+	for _, gpgCmd := range gpgCmds {
+		gpgOutput := helper.SetCommandOutput(gpgCmd, debug)
+		err := gpgCmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running gpg command \"%s\". Error is \"%s\". Full output below:\n%s",
+				gpgCmd.String(), err.Error(), gpgOutput.String())
+		}
+	}
+
+	return nil
+}
+
+// mountFromHost mounts mountpoints from the host system in the chroot
+// for certain operations that require this
+func mountFromHost(targetDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd) {
+	mountCmd = execCommand("mount", "--bind", mountpoint, filepath.Join(targetDir, mountpoint))
+	umountCmd = execCommand("umount", filepath.Join(targetDir, mountpoint))
+	return mountCmd, umountCmd
+}
+
+// mountTempFS creates a temporary directory and mounts it at the specified location
+func mountTempFS(targetDir, scratchDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd, err error) {
+	tempDir, err := osMkdirTemp(scratchDir, strings.Trim(mountpoint, "/"))
+	if err != nil {
+		return nil, nil, err
+	}
+	mountCmd = execCommand("mount", "--bind", tempDir, filepath.Join(targetDir, mountpoint))
+	umountCmd = execCommand("umount", filepath.Join(targetDir, mountpoint))
+	return mountCmd, umountCmd, nil
+}
+
+// manualCopyFile copies a file into the chroot
+func manualCopyFile(copyFileInterfaces interface{}, targetDir string, debug bool) error {
+	copyFileSlice := reflect.ValueOf(copyFileInterfaces)
+	for i := 0; i < copyFileSlice.Len(); i++ {
+		copyFile := copyFileSlice.Index(i).Interface().(*imagedefinition.CopyFile)
+
+		// Copy the file into the specified location in the chroot
+		dest := filepath.Join(targetDir, copyFile.Dest)
+		if debug {
+			fmt.Printf("Copying file \"%s\" to \"%s\"\n", copyFile.Source, dest)
+		}
+		if err := osutilCopySpecialFile(copyFile.Source, dest); err != nil {
+			return fmt.Errorf("Error copying file \"%s\" into chroot: %s",
+				copyFile.Source, err.Error())
+		}
+	}
+	return nil
+}
+
+// manualExecute executes an executable file in the chroot
+func manualExecute(executeInterfaces interface{}, targetDir string, debug bool) error {
+	executeSlice := reflect.ValueOf(executeInterfaces)
+	for i := 0; i < executeSlice.Len(); i++ {
+		execute := executeSlice.Index(i).Interface().(*imagedefinition.Execute)
+		executeCmd := execCommand("chroot", targetDir, execute.ExecutePath)
+		if debug {
+			fmt.Printf("Executing command \"%s\"\n", executeCmd.String())
+		}
+		executeOutput := helper.SetCommandOutput(executeCmd, debug)
+		err := executeCmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running script \"%s\". Error is %s. Full output below:\n%s",
+				executeCmd.String(), err.Error(), executeOutput.String())
+		}
+	}
+	return nil
+}
+
+// manualTouchFile touches a file in the chroot
+func manualTouchFile(touchFileInterfaces interface{}, targetDir string, debug bool) error {
+	touchFileSlice := reflect.ValueOf(touchFileInterfaces)
+	for i := 0; i < touchFileSlice.Len(); i++ {
+		touchFile := touchFileSlice.Index(i).Interface().(*imagedefinition.TouchFile)
+		fullPath := filepath.Join(targetDir, touchFile.TouchPath)
+		if debug {
+			fmt.Printf("Creating empty file \"%s\"\n", fullPath)
+		}
+		_, err := osCreate(fullPath)
+		if err != nil {
+			return fmt.Errorf("Error creating file in chroot: %s", err.Error())
+		}
+	}
+	return nil
+}
+
+// manualAddGroup adds a group in the chroot
+func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool) error {
+	addGroupSlice := reflect.ValueOf(addGroupInterfaces)
+	for i := 0; i < addGroupSlice.Len(); i++ {
+		addGroup := addGroupSlice.Index(i).Interface().(*imagedefinition.AddGroup)
+		addGroupCmd := execCommand("chroot", targetDir, "groupadd", addGroup.GroupName)
+		debugStatement := fmt.Sprintf("Adding group \"%s\"\n", addGroup.GroupName)
+		if addGroup.GroupID != "" {
+			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", addGroup.GroupID}...)
+			debugStatement = fmt.Sprintf("%s with GID %s\n", strings.TrimSpace(debugStatement), addGroup.GroupID)
+		}
+		if debug {
+			fmt.Printf(debugStatement)
+		}
+		addGroupOutput := helper.SetCommandOutput(addGroupCmd, debug)
+		err := addGroupCmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error adding group. Command used is \"%s\". Error is %s. Full output below:\n%s",
+				addGroupCmd.String(), err.Error(), addGroupOutput.String())
+		}
+	}
+	return nil
+}
+
+// manualAddUser adds a group in the chroot
+func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) error {
+	addUserSlice := reflect.ValueOf(addUserInterfaces)
+	for i := 0; i < addUserSlice.Len(); i++ {
+		addUser := addUserSlice.Index(i).Interface().(*imagedefinition.AddUser)
+		addUserCmd := execCommand("chroot", targetDir, "useradd", addUser.UserName)
+		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", addUser.UserName)
+		if addUser.UserID != "" {
+			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", addUser.UserID}...)
+			debugStatement = fmt.Sprintf("%s with UID %s\n", strings.TrimSpace(debugStatement), addUser.UserID)
+		}
+		if debug {
+			fmt.Printf(debugStatement)
+		}
+		addUserOutput := helper.SetCommandOutput(addUserCmd, debug)
+		err := addUserCmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error adding user. Command used is \"%s\". Error is %s. Full output below:\n%s",
+				addUserCmd.String(), err.Error(), addUserOutput.String())
+		}
+	}
+	return nil
+}
+
+// checkCustomizationSteps examines a struct and returns a slice
+// of state functions that need to be manually added. It expects
+// the image definition's customization struct to be passed in and
+// uses struct tags to identify which state must be added
+func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates []stateFunc) {
+	possibleStateFunc := map[string][]stateFunc{
+		"add_extra_ppas": []stateFunc{
+			stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+		},
+		"install_extra_packages": []stateFunc{
+			stateFunc{"install_extra_packages", (*StateMachine).installPackages},
+		},
+		"install_extra_snaps": []stateFunc{
+			stateFunc{"install_extra_snaps", (*StateMachine).prepareClassicImage},
+			stateFunc{"preseed_extra_snaps", (*StateMachine).preseedClassicImage},
+		},
+	}
+	value := reflect.ValueOf(searchStruct)
+	elem := value.Elem()
+	for i := 0; i < elem.NumField(); i++ {
+		field := elem.Field(i)
+		if !field.IsNil() {
+			tags := elem.Type().Field(i).Tag
+			tagValue, hasTag := tags.Lookup(tag)
+			if hasTag {
+				extraStates = append(extraStates, possibleStateFunc[tagValue]...)
+			}
+		}
+	}
+	return extraStates
+}
+
+// getPreseedsnaps returns a slice of the snaps that were preseeded in a chroot
+// and their channels
+func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error) {
 	// seededSnaps maps the snap name and channel that was seeded
 	seededSnaps = make(map[string]string)
 
@@ -627,9 +931,90 @@ func removePreseeding(rootfs string) (seededSnaps map[string]string, err error) 
 		return nil
 	})
 
-	// now delete the preseeded snaps from the rootfs
-	if err := osRemoveAll(snapdDir); err != nil {
-		return seededSnaps, err
-	}
 	return seededSnaps, nil
+}
+
+// updateGrub mounts the resulting image and runs update-grub
+func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) error {
+	// create a directory in which to mount the rootfs
+	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+	err := osMkdir(mountDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
+	}
+
+	// Slice used to store all the commands that need to be run
+	// to properly update grub.cfg in the chroot
+	var updateGrubCmds []*exec.Cmd
+
+	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
+
+	// run the losetup command and read the output to determine which loopback was used
+	losetupCmd := execCommand("losetup",
+		"--find",
+		"--show",
+		"--partscan",
+		"--sector-size",
+		stateMachine.commonFlags.SectorSize,
+		imgPath,
+	)
+	losetupOutput, err := losetupCmd.Output()
+	if err != nil {
+		return fmt.Errorf("Error running losetup command \"%s\". Error is %s",
+			losetupCmd.String(),
+			err.Error(),
+		)
+	}
+	loopUsed := strings.TrimSpace(string(losetupOutput))
+
+	var umounts []*exec.Cmd
+	updateGrubCmds = append(updateGrubCmds,
+		// mount the rootfs partition in which to run update-grub
+		exec.Command("mount",
+			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
+			mountDir,
+		),
+	)
+
+	// set up the mountpoints
+	mountPoints := []string{"/dev", "/proc", "/sys"}
+	for _, mountPoint := range mountPoints {
+		mountCmd, umountCmd := mountFromHost(mountDir, mountPoint)
+		updateGrubCmds = append(updateGrubCmds, mountCmd)
+		umounts = append(umounts, umountCmd)
+		defer umountCmd.Run()
+	}
+	// make sure to unmount the disk too
+	umounts = append(umounts, exec.Command("umount", mountDir))
+
+	// actually run update-grub
+	updateGrubCmds = append(updateGrubCmds,
+		exec.Command("chroot",
+			mountDir,
+			"update-grub",
+		),
+	)
+
+	// unmount /dev /proc and /sys
+	updateGrubCmds = append(updateGrubCmds, umounts...)
+
+	// tear down the loopback
+	teardownCmd := exec.Command("losetup",
+		"--detach",
+		loopUsed,
+	)
+	defer teardownCmd.Run()
+	updateGrubCmds = append(updateGrubCmds, teardownCmd)
+
+	// now run all the commands
+	for _, cmd := range updateGrubCmds {
+		cmdOutput := helper.SetCommandOutput(cmd, stateMachine.commonFlags.Debug)
+		err := cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+				cmd.String(), err.Error(), cmdOutput.String())
+		}
+	}
+
+	return nil
 }

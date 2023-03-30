@@ -8,7 +8,7 @@ Generate a bootable disk image
 
 :Authors:
     Barry Warsaw <barry@ubuntu.com>,
-    Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>
+    Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>,
     William 'jawn-smith' Wilson <william.wilson@canonical.com>
 :Date: 2021-10-21
 :Copyright: 2016-2021 Canonical Ltd.
@@ -93,43 +93,30 @@ model_assertion
 --validation=<ignore|enforce>
     Control whether validations should be ignored or enforced.
 
+--snap SNAP
+    Install an extra snap.  This is passed through to ``snap prepare-image``.
+    The snap argument can include additional information about the channel
+    and/or risk with the following syntax: ``<snap>=<channel|risk>``. Note
+    that this flag will cause an error if the model assertion has a grade
+    higher than dangerous
+
+--revision SNAP_NAME:REVISION
+    Install a specific revision of a snap, rather than the latest available
+    in a particular channel. The snap specified with SNAP_NAME must be
+    included either in the model assertion or as an argument to --snap. If
+    both a revision and channel are provided, the revision specified will be
+    installed in the image, and updates will come from the specified channel
+
 Classic command options
 -----------------------
 
 These are the options for defining the contents of classic preinstalled Ubuntu
 images.  Can only be used when the ``ubuntu-image classic`` command is used.
 
-GADGET_TREE_URI
-    An URI to the gadget tree to be used to build the image.  This positional
-    argument must be given for this mode of operation.  Must be a local path.
-
--p PROJECT, --project PROJECT
-    Project name to be passed on to ``livecd-rootfs``. Mutually exclusive
-    with --filesystem
-
--f FILESYSTEM, --filesystem FILESYSTEM
-    Unpacked Ubuntu filesystem to be copied to the system partition.
-    Mutually exclusive with --project.
-
--s SUITE, --suite SUITE
-    Distribution name to be passed on to ``livecd-rootfs``.
-
--a CPU-ARCHITECTURE, --arch CPU-ARCHITECTURE
-    CPU architecture to be passed on to ``livecd-rootfs``.  Default value is
-    the architecture of the host.
-
---subproject SUBPROJECT
-    Sub-project name to be passed on ``livecd-rootfs``.
-
---subarch SUBARCH
-    Sub-architecture to be passed on to ``livecd-rootfs``.
-
---with-proposed
-    Defines if the image should be built with -proposed enabled.  This is
-    passed through to ``livecd-rootfs``.
-
---extra-ppas EXTRA_PPAS
-    Extra ppas to install. This is passed through to ``livecd-rootfs``.
+image_definition
+    Path to the image definition file. This file defines all of the
+    customization required when building your image. This positional
+    argument must be given for this mode of operation.
 
 
 Common options
@@ -147,10 +134,18 @@ in more detail below.
 -d, --debug
     Enable debugging output.
 
+--verbose
+    Enable verbose output.
+
+--quiet
+    Only print error messages. Suppress all other output.
+
 -O DIRECTORY, --output-dir DIRECTORY
     Write generated disk image files to this directory.  The files will be
     named after the ``gadget.yaml`` volume names, with ``.img`` suffix
-    appended.  If not given, the current working directory is used.  This
+    appended.  If not given, the value of the --workdir flag is used if
+    --workdir is specified.  If neither --output-dir or --workdir is used,
+    the image(s) will be placed in the current working directory.  This
     option replaces, and cannot be used with, the deprecated ``--output``
     option.
 
@@ -179,29 +174,13 @@ in more detail below.
     In the case of ambiguities, the size hint is ignored and the calculated
     size for the volume will be used instead.
 
---image-file-list FILENAME
-    Print to ``FILENAME``, a list of the file system paths to all the disk
-    images created by the command, if any.
-
---hooks-directory DIRECTORY
-    Directories in which scripts for build-time hooks will be located. This
-    flag must be specified once for each hook directory. ``ubuntu-image``
-    will look for hooks in ``hooks_directory/name_of_hooks_step.d`` and
-    a script with the name ``hooks_directory/name_of_hooks_step``. Currently
-    the only supported hooks step is ``populate_rootfs_contents``.
-
 --disk-info DISK-INFO-CONTENTS
     File to be used as .disk/info on the image's rootfs.  This file can
     contain useful information about the target image, like image
     identification data, system name, build timestamp etc.
 
---snap SNAP
-    Install an extra snap.  This is passed through to ``snap prepare-image``.
-    The snap argument can include additional information about the channel
-    and/or risk with the following syntax: ``<snap>=<channel|risk>``
-
 -c CHANNEL, --channel CHANNEL
-    The snap channel to use.
+    The default snap channel to use while preseeding the image.
 
 --sector-size SIZE
     When creating the disk image file, use the given sector size.  This
@@ -274,13 +253,6 @@ The following environment variables are recognized by ``ubuntu-image``.
     ``<workdir>/unpack`` directory after the ``snap prepare-image`` subcommand
     has run will be copied here.
 
-``UBUNTU_IMAGE_LIVECD_ROOTFS_AUTO_PATH``
-    ``ubuntu-image`` uses ``livecd-rootfs`` configuration files for its
-    ``live-build`` runs.  If this variable is set, ``ubuntu-image`` will use
-    the configuration files from the selected path for its auto configuration.
-    Otherwise it will attempt to localize ``livecd-rootfs`` through a call to
-    ``dpkg``.
-
 ``UBUNTU_IMAGE_QEMU_USER_STATIC_PATH``
     In case of classic image cross-compilation for a different architecture,
     ``ubuntu-image`` will attempt to use the qemu-user-static emulator with
@@ -292,31 +264,6 @@ There are a few other environment variables used for building and testing
 only.
 
 
-HOOKS
-=====
-
-During image build at certain stages of the build process the user can execute
-custom scripts modifying its contents or otherwise affecting the process
-itself.  Whenever a hook is to be fired, the directories as listed in the
-``--hooks-directory`` parameter are scanned for matching scripts.  There can be
-multiple scripts for a specific hook defined.  The ``HookManager`` will first
-look for executable files in ``<hookdir>/<name-of-the-hook>.d`` and execute
-them in an alphanumerical order.  Finally the ``<hookdir>/<name-of-the-hook>``
-file is executed if existing.
-
-Hook scripts can have various additional data passed onto them through
-environment variables depending on the hook being fired.
-
-Currently supported hooks:
-
-post-populate-rootfs
-    Executed after the rootfs directory has been populated, allowing
-    custom modification of its contents.  Added in version 1.2.  Environment
-    variables present:
-
-        ``UBUNTU_IMAGE_HOOK_ROOTFS``
-            Includes the absolute path to the rootfs contents.
-
 STEPS
 =====
 
@@ -326,12 +273,26 @@ type are listed below
 Classic image steps
 -------------------
 
+State machines are dynamically created for classic image builds based on
+the contents of the image definition. The list of all possible states
+is as follows:
+
 #. make_temporary_directories
+#. parse_image_definition
+#. calculate_states
+#. build_gadget_tree
 #. prepare_gadget_tree
-#. run_live_build
 #. load_gadget_yaml
+#. create_chroot
+#. germinate
+#. add_extra_ppas
+#. install_packages
+#. verify_artifact_names
+#. customize_cloud_init
+#. customize_fstab
+#. manual_customization
+#. preseed_image
 #. populate_rootfs_contents
-#. populate_rootfs_contents_hooks
 #. generate_disk_info
 #. calculate_rootfs_size
 #. populate_bootfs_contents
@@ -339,6 +300,9 @@ Classic image steps
 #. make_disk
 #. generate_manifest
 #. finish
+
+To check the steps that are going to be used for a specific image
+definition file, use the ``--print-states`` flag.
 
 Snap image steps
 ----------------
@@ -395,3 +359,4 @@ FOOTNOTES
 .. _`gadget snap`: https://github.com/snapcore/snapd/wiki/Gadget-snap
 .. _`gadget tree`: Example: https://github.com/snapcore/pc-amd64-gadget
 .. _`gadget.yaml`: https://github.com/snapcore/snapd/wiki/Gadget-snap#gadget.yaml
+.. _`image_definition.yaml`: https://github.com/canonical/ubuntu-image/tree/main/internal/imagedefinition#readme

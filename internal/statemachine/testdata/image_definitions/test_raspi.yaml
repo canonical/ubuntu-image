@@ -1,0 +1,71 @@
+name: ubuntu-server-raspi-arm64
+display-name: Ubuntu Server Raspberry Pi arm64
+revision: 2
+architecture: arm64
+series: kinetic
+class: preinstalled
+kernel: linux-image-raspi
+gadget:
+  url: "https://github.com/snapcore/pi-gadget.git"
+  branch: "classic-redesign"
+  type: "git"
+model-assertion: file://pi-generic.model
+rootfs:
+  archive: ubuntu
+  components:
+    - main
+    - universe
+    - multiverse
+    - restricted
+  mirror: "http://ports.ubuntu.com/"
+  pocket: updates
+  seed:
+    urls:
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+    branch: kinetic
+    names:
+      - server
+      - server-raspi
+      - raspi-common
+      - minimal
+      - standard
+      - cloud-image
+      - server-raspi
+customization:
+  extra-packages:
+    - name: ubuntu-minimal
+    - name: linux-firmware-raspi
+    - name: pi-bluetooth
+    - name: ubuntu-raspi-settings
+  extra-snaps:
+    - name: core
+    - name: snapd
+  fstab:
+    -
+      label: "writable"
+      mountpoint: "/"
+      filesystem-type: "ext4"
+      dump: false
+      fsck-order: 1
+    -
+      label: "system-boot"
+      mountpoint: "/boot/firmware"
+      filesystem-type: "vfat"
+      mount-options: "defaults"
+      dump: false
+      fsck-order: 1
+  manual:
+    copy-file:
+      -
+        source: /etc/hosts
+        destination: /etc/hosts
+    touch-file:
+      -
+        path: /etc/foo
+artifacts:
+  img:
+    -
+      name: raspi.img
+  manifest:
+    name: raspi.manifest

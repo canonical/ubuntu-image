@@ -5,8 +5,10 @@ package statemachine
 import (
 	"crypto/rand"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,20 +22,32 @@ import (
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/image/preseed"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
+	"github.com/xeipuuv/gojsonschema"
+
+	"gopkg.in/yaml.v2"
 )
 
 // define some functions that can be mocked by test cases
 var gadgetLayoutVolume = gadget.LayoutVolume
 var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 var helperCopyBlob = helper.CopyBlob
-var ioutilReadDir = ioutil.ReadDir
-var ioutilReadFile = ioutil.ReadFile
-var ioutilWriteFile = ioutil.WriteFile
+var helperSetDefaults = helper.SetDefaults
+var helperCheckEmptyFields = helper.CheckEmptyFields
+var helperCheckTags = helper.CheckTags
+var helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+var helperRestoreResolvConf = helper.RestoreResolvConf
+var ioReadAll = io.ReadAll
+var osReadDir = os.ReadDir
+var osReadFile = os.ReadFile
+var osWriteFile = os.WriteFile
 var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
+var osMkdirTemp = os.MkdirTemp
+var osOpen = os.Open
 var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
 var osRename = os.Rename
@@ -48,6 +62,12 @@ var diskfsCreate = diskfs.Create
 var randRead = rand.Read
 var seedOpen = seed.Open
 var imagePrepare = image.Prepare
+var preseedClassicReset = preseed.ClassicReset
+var httpGet = http.Get
+var jsonUnmarshal = json.Unmarshal
+var yamlMarshal = yaml.Marshal
+var gojsonschemaValidate = gojsonschema.Validate
+var filepathRel = filepath.Rel
 
 var mockableBlockSize string = "1" //used for mocking dd calls
 
@@ -69,6 +89,8 @@ type temporaryDirectories struct {
 	rootfs  string
 	unpack  string
 	volumes string
+	chroot  string
+	scratch string
 }
 
 // StateMachine will hold the command line data, track the current state, and handle all function calls
@@ -97,6 +119,9 @@ type StateMachine struct {
 	// image sizes for parsing the --image-size flags
 	ImageSizes  map[string]quantity.Size
 	VolumeOrder []string
+
+	// names of images for each volume
+	VolumeNames map[string]string
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
@@ -212,9 +237,11 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 		// look for the rootfs and check if the image is seeded
 		for ii, structure := range volume.Structure {
 			if structure.Role == "" && structure.Label == gadget.SystemBoot {
-				fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
-					"used for defining partition roles; use role instead\n",
-					volumeName, ii)
+				if !stateMachine.commonFlags.Quiet {
+					fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
+						"used for defining partition roles; use role instead\n",
+						volumeName, ii)
+				}
 			} else if structure.Role == gadget.SystemData {
 				rootfsSeen = true
 			} else if structure.Role == gadget.SystemSeed {
@@ -225,17 +252,38 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				}
 			}
 
-			// update farthestOffset if needed
-			var offset quantity.Offset
-			if structure.Offset == nil {
-				if structure.Role != "mbr" && lastOffset < quantity.OffsetMiB {
-					offset = quantity.OffsetMiB
-				} else {
-					offset = lastOffset
+			// make sure there are no "../" paths in the structure's contents
+			for _, content := range structure.Content {
+				if strings.Contains(content.UnresolvedSource, "../") {
+					return fmt.Errorf("filesystem content source \"%s\" contains \"../\". "+
+						"This is disallowed for security purposes",
+						content.UnresolvedSource)
 				}
-			} else {
-				offset = *structure.Offset
 			}
+			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+				// handle special syntax of rootfs:/<file path> in
+				// structure content. This is needed to allow images
+				// such as raspberry pi to source their kernel and
+				// initrd from the staged rootfs later in the build
+				// process.
+				relativeRootfsPath, err := filepathRel(
+					filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
+					stateMachine.tempDirs.rootfs,
+				)
+				if err != nil {
+					return fmt.Errorf("Error creating relative path from unpack/gadget to rootfs: \"%s\"", err.Error())
+				}
+				for jj, content := range structure.Content {
+					content.UnresolvedSource = strings.ReplaceAll(content.UnresolvedSource,
+						"rootfs:",
+						relativeRootfsPath,
+					)
+					volume.Structure[ii].Content[jj] = content
+				}
+			}
+
+			// update farthestOffset if needed
+			offset := *structure.Offset
 			lastOffset = offset + quantity.Offset(structure.Size)
 			farthestOffset = maxOffset(lastOffset, farthestOffset)
 			structure.Offset = &offset
@@ -356,11 +404,12 @@ func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Off
 // Run iterates through the state functions, stopping when appropriate based on --until and --thru
 func (stateMachine *StateMachine) Run() error {
 	// iterate through the states
-	for _, stateFunc := range stateMachine.states {
+	for i := 0; i < len(stateMachine.states); i++ {
+		stateFunc := stateMachine.states[i]
 		if stateFunc.name == stateMachine.stateMachineFlags.Until {
 			break
 		}
-		if stateMachine.commonFlags.Debug {
+		if !stateMachine.commonFlags.Quiet {
 			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
 		}
 		if err := stateFunc.function(stateMachine); err != nil {

@@ -7,14 +7,14 @@ type SnapArgs struct {
 
 // SnapOpts holds all flags that are specific to the snap command
 type SnapOpts struct {
-	DisableConsoleConf bool `long:"disable-console-conf" description:"Disable console-conf on the resulting image."`
-	FactoryImage       bool `long:"factory-image" description:"Hint that the image is meant to boot in a device factory."`
-	Preseed            bool `long:"preseed" description:"Pressed the image (UC20 only)."`
-
-	AppArmorKernelFeaturesDir string `long:"apparmor-features-dir" description:"Optional path to apparmor kernel features directory"`
-	PreseedSignKey            string `long:"preseed-sign-key" description:"Name of the key to use to sign preseed assertion, otherwise use the default key"`
-
-	Validation string `long:"validation" description:"Control whether validations should be ignored or enforced" choice:"ignore" choice:"enforce"`
+	DisableConsoleConf        bool           `long:"disable-console-conf" description:"Disable console-conf on the resulting image."`
+	FactoryImage              bool           `long:"factory-image" description:"Hint that the image is meant to boot in a device factory."`
+	Preseed                   bool           `long:"preseed" description:"Pressed the image (UC20 only)."`
+	AppArmorKernelFeaturesDir string         `long:"apparmor-features-dir" description:"Optional path to apparmor kernel features directory"`
+	PreseedSignKey            string         `long:"preseed-sign-key" description:"Name of the key to use to sign preseed assertion, otherwise use the default key"`
+	Snaps                     []string       `long:"snap" description:"Install extra snaps. These are passed through to \"snap prepare-image\". The snap argument can include additional information about the channel and/or risk with the following syntax: <snap>=<channel|risk>" value-name:"SNAP"`
+	CloudInit                 string         `long:"cloud-init" description:"cloud-config data to be copied to the image" value-name:"USER-DATA-FILE"`
+	Revisions                 map[string]int `long:"revision" description:"The revision of a specific snap to install in the image." value-name:"REVISION"`
 }
 
 type snapCommand struct {

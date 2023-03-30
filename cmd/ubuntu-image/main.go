@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
@@ -99,7 +99,7 @@ func main() {
 			case flags.ErrHelp:
 				restoreStdout()
 				restoreStderr()
-				readStdout, err := ioutil.ReadAll(stdout)
+				readStdout, err := io.ReadAll(stdout)
 				if err != nil {
 					fmt.Printf("Error reading from stdout: %s\n", err.Error())
 					osExit(1)
@@ -113,7 +113,7 @@ func main() {
 				if !stateMachineOpts.Resume && !commonOpts.Version {
 					restoreStdout()
 					restoreStderr()
-					readStderr, err := ioutil.ReadAll(stderr)
+					readStderr, err := io.ReadAll(stderr)
 					if err != nil {
 						fmt.Printf("Error reading from stderr: %s\n", err.Error())
 						osExit(1)

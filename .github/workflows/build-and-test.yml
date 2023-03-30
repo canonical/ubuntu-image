@@ -4,21 +4,19 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
       - name: install-go
         run: sudo snap install go --classic
       - name: build
         run: go build ./...
-      - name: add-sil2100-ppa
-        run: sudo add-apt-repository -y ppa:sil2100/live-build-fix-attempt
       - name: apt-update
         run: sudo apt update
       - name: install-test-dependencies
-        run: sudo apt install -y live-build livecd-rootfs=2.765.14.1~ppa1 snapd fdisk gdisk qemu-system-aarch64 qemu-user-static
+        run: sudo apt install -y snapd germinate mtools debootstrap fdisk gdisk qemu-system-aarch64 qemu-user-static ubuntu-dev-tools
       - name: test
         run: sudo go test -timeout 0 -v -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage to Codecov

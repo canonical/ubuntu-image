@@ -4,7 +4,6 @@ package statemachine
 import (
 	"bytes"
 	"crypto/rand"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -84,6 +83,75 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 	})
 }
 
+// TestDetermineOutputDirectory unit tests the determineOutputDirectory function
+func TestDetermineOutputDirectory(t *testing.T) {
+	testDir1 := "/tmp/determine_output_dir-" + uuid.NewString()
+	testDir2 := "/tmp/determine_output_dir-" + uuid.NewString()
+	cwd, _ := os.Getwd()
+	testCases := []struct {
+		name              string
+		workDir           string
+		outputDir         string
+		expectedOutputDir string
+		cleanUp           bool
+	}{
+		{"no_workdir_no_outputdir", "", "", cwd, false},
+		{"yes_workdir_no_outputdir", testDir1, "", testDir1, true},
+		{"no_workdir_yes_outputdir", "", testDir1, testDir1, true},
+		{"different_workdir_and_outputdir", testDir1, testDir2, testDir2, true},
+		{"same_workdir_and_outputdir", testDir1, testDir1, testDir1, true},
+	}
+	for _, tc := range testCases {
+		t.Run("test_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.WorkDir = tc.workDir
+			stateMachine.commonFlags.OutputDir = tc.outputDir
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.determineOutputDirectory()
+			asserter.AssertErrNil(err, true)
+			if tc.cleanUp {
+				defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
+			}
+
+			// ensure the correct output dir was set and that it exists
+			if stateMachine.commonFlags.OutputDir != tc.expectedOutputDir {
+				t.Errorf("OutputDir set in in struct \"%s\" does not match expected value \"%s\"",
+					stateMachine.commonFlags.OutputDir, tc.expectedOutputDir)
+			}
+			if _, err := os.Stat(stateMachine.commonFlags.OutputDir); err != nil {
+				t.Errorf("Failed to create output directory %s",
+					stateMachine.stateMachineFlags.WorkDir)
+			}
+
+		})
+	}
+}
+
+// TestFailedDetermineOutputDirectory tests failures in the determineOutputDirectory function
+func TestFailedDetermineOutputDirectory(t *testing.T) {
+	t.Run("test_failed_determine_output_dir", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		var stateMachine StateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.commonFlags.OutputDir = "testdir"
+
+		// mock os.MkdirAll
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		err := stateMachine.determineOutputDirectory()
+		asserter.AssertErrContains(err, "Error creating OutputDir")
+		osMkdirAll = os.MkdirAll
+	})
+}
+
 // TestLoadGadgetYaml tests a successful load of gadget.yaml. It also tests that the unpack
 // directory is preserved if the relevant environment variable is set
 func TestLoadGadgetYaml(t *testing.T) {
@@ -141,14 +209,14 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 		asserter.AssertErrContains(err, "Error copying gadget.yaml")
 		osutilCopyFile = osutil.CopyFile
 
-		// mock ioutilReadFile
-		ioutilReadFile = mockReadFile
+		// mock osReadFile
+		osReadFile = mockReadFile
 		defer func() {
-			ioutilReadFile = ioutil.ReadFile
+			osReadFile = os.ReadFile
 		}()
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrContains(err, "Error reading gadget.yaml bytes")
-		ioutilReadFile = ioutil.ReadFile
+		osReadFile = os.ReadFile
 
 		// now test with the invalid yaml file
 		stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -196,80 +264,6 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
-}
-
-// TestPopulateRootfsContentsHooks ensures that the PopulateSnapRootfsContentsHooks
-// function can successfully run hook scripts and that core20 skips them
-func TestPopulateRootfsContentsHooks(t *testing.T) {
-	testCases := []struct {
-		name         string
-		isSeeded     bool
-		hooksCreated []string
-	}{
-		{"hooks_succeed", false, []string{"post-populate-rootfs-hookfile", "post-populate-rootfs-hookfile.d1", "post-populate-rootfs-hookfile.d2"}},
-		{"hooks_not_allowed", true, []string{}},
-	}
-	for _, tc := range testCases {
-		t.Run("test_"+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.commonFlags.Debug = true
-			stateMachine.commonFlags.HooksDirectories = []string{
-				filepath.Join("testdata", "good_hooksd"),
-				filepath.Join("testdata", "good_hookscript"),
-			}
-			stateMachine.IsSeeded = tc.isSeeded
-
-			// need workdir set up for this
-			err := stateMachine.makeTemporaryDirectories()
-			asserter.AssertErrNil(err, true)
-
-			err = stateMachine.populateRootfsContentsHooks()
-			asserter.AssertErrNil(err, false)
-
-			// the hook scripts used for testing simply touches some files.
-			// make sure they were successfully created
-			for _, file := range tc.hooksCreated {
-				_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
-				if err != nil {
-					if os.IsNotExist(err) {
-						t.Errorf("File %s should exist, but does not", file)
-					}
-				}
-			}
-
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		})
-	}
-}
-
-// TestFailedPopulateRootfsContentsHooks tests a variety of failures in running the hooks
-func TestFailedPopulateRootfsContentsHooks(t *testing.T) {
-	testCases := []struct {
-		name      string
-		hooksDirs []string
-	}{
-		{"hooks_not_executable", []string{filepath.Join("testdata", "hooks_not_executable")}},
-		{"hooks_return_error", []string{filepath.Join("testdata", "hooks_return_error")}},
-	}
-	for _, tc := range testCases {
-		t.Run("test_"+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.commonFlags.HooksDirectories = tc.hooksDirs
-			stateMachine.IsSeeded = false
-
-			// need workdir set up for this
-			err := stateMachine.makeTemporaryDirectories()
-			asserter.AssertErrNil(err, true)
-
-			err = stateMachine.populateRootfsContentsHooks()
-			asserter.AssertErrContains(err, "Error running hook")
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		})
-	}
 }
 
 // TestGenerateDiskInfo tests that diskInfo can be generated
@@ -472,7 +466,7 @@ func TestPopulateBootfsContents(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -518,7 +512,7 @@ func TestPopulateBootfsContentsPiboot(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree_piboot"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree_piboot"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree_piboot", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -564,7 +558,7 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -589,9 +583,12 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter
 
 		// set rootfs to an empty string in order to trigger a failure in Write()
+		oldRootfs := stateMachine.tempDirs.rootfs
 		stateMachine.tempDirs.rootfs = ""
 		err = stateMachine.populateBootfsContents()
 		asserter.AssertErrContains(err, "Error in mountedFilesystem.Write")
+		// restore rootfs
+		stateMachine.tempDirs.rootfs = oldRootfs
 
 		// cause a failure in handleSecureBoot. First change to un-seeded yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -640,7 +637,7 @@ func TestPopulatePreparePartitions(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -669,7 +666,7 @@ func TestPopulatePreparePartitions(t *testing.T) {
 		// check the contents of part0.img
 		partImg := filepath.Join(stateMachine.tempDirs.volumes,
 			"pc", "part0.img")
-		partImgBytes, _ := ioutil.ReadFile(partImg)
+		partImgBytes, _ := os.ReadFile(partImg)
 		dataBytes := make([]byte, 440)
 		// partImg should consist of these 11 bytes and 429 null bytes
 		copy(dataBytes[:11], []byte{84, 69, 83, 84, 32, 70, 73, 76, 69, 10})
@@ -704,7 +701,7 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -764,7 +761,7 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -793,7 +790,7 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 		// check part2.img, it should be empty and have a 4K size
 		partImg := filepath.Join(stateMachine.tempDirs.volumes,
 			"pc", "part2.img")
-		partImgBytes, _ := ioutil.ReadFile(partImg)
+		partImgBytes, _ := os.ReadFile(partImg)
 		// these are all zeroes
 		dataBytes := make([]byte, 4096)
 		if !bytes.Equal(partImgBytes, dataBytes) {
@@ -833,10 +830,15 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 			// also set up an output directory
-			outDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(outDir)
 			stateMachine.commonFlags.OutputDir = outDir
+
+			// set up volume names
+			stateMachine.VolumeNames = map[string]string{
+				"pc": "pc.img",
+			}
 
 			// set a valid yaml file and load it in
 			stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -858,7 +860,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 			// populate unpack
-			files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+			files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 			for _, srcFile := range files {
 				srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 				osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
@@ -909,10 +911,17 @@ func TestFailedMakeDisk(t *testing.T) {
 		defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 		// also set up an output directory
-		outDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+		outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(outDir)
 		stateMachine.commonFlags.OutputDir = outDir
+		err = stateMachine.determineOutputDirectory()
+		asserter.AssertErrNil(err, true)
+
+		// set up volume names
+		stateMachine.VolumeNames = map[string]string{
+			"pc": "pc.img",
+		}
 
 		// set a valid yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-mbr.yaml")
@@ -929,20 +938,11 @@ func TestFailedMakeDisk(t *testing.T) {
 		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 		// populate unpack
-		files, _ := ioutil.ReadDir(filepath.Join("testdata", "gadget_tree"))
+		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
 			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
 		}
-
-		// mock os.MkdirAll
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		err = stateMachine.makeDisk()
-		asserter.AssertErrContains(err, "Error creating OutputDir")
-		osMkdirAll = os.MkdirAll
 
 		// mock os.RemoveAll
 		osRemoveAll = mockRemoveAll
@@ -1051,9 +1051,14 @@ func TestFailedMakeDisk(t *testing.T) {
 		}()
 		stateMachine.cleanWorkDir = true // for coverage!
 		stateMachine.commonFlags.OutputDir = ""
+		defer os.Remove("pc.img")
 		err = stateMachine.makeDisk()
 		asserter.AssertErrContains(err, "Error writing disk image")
 		helperCopyBlob = helper.CopyBlob
+
+		// make sure with no OutputDir the image was created in the cwd
+		_, err = os.Stat("pc.img")
+		asserter.AssertErrNil(err, true)
 	})
 }
 
@@ -1066,14 +1071,32 @@ func TestImageSizeFlag(t *testing.T) {
 		sizeArg    string
 		gadgetTree string
 		imageSize  map[string]quantity.Size
+		volNames   map[string]string
 	}{
-		{"one_volume", "4G", filepath.Join("testdata", "gadget_tree"),
-			map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
-		{"multi_volume", "first:4G,second:1G",
+		{
+			"one_volume",
+			"4G",
+			filepath.Join("testdata", "gadget_tree"),
+			map[string]quantity.Size{
+				"pc": 4 * quantity.SizeGiB,
+			},
+			map[string]string{
+				"pc": "pc.img",
+			},
+		},
+		{
+			"multi_volume",
+			"first:4G,second:1G",
 			filepath.Join("testdata", "gadget_tree_multi"),
 			map[string]quantity.Size{
 				"first":  4 * quantity.SizeGiB,
-				"second": 1 * quantity.SizeGiB}},
+				"second": 1 * quantity.SizeGiB,
+			},
+			map[string]string{
+				"first":  "first.img",
+				"second": "second.img",
+			},
+		},
 	}
 	for _, tc := range testCases {
 
@@ -1090,10 +1113,13 @@ func TestImageSizeFlag(t *testing.T) {
 			//defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 
 			// also set up an output directory
-			outDir, err := ioutil.TempDir("/tmp", "ubuntu-image-")
+			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			//defer os.RemoveAll(outDir)
 			stateMachine.commonFlags.OutputDir = outDir
+
+			// set up volume names
+			stateMachine.VolumeNames = tc.volNames
 
 			// set up a "rootfs" that we can eventually copy into the disk
 			os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
@@ -1110,7 +1136,7 @@ func TestImageSizeFlag(t *testing.T) {
 			os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
 
 			// populate unpack
-			files, _ := ioutil.ReadDir(tc.gadgetTree)
+			files, _ := os.ReadDir(tc.gadgetTree)
 			for _, srcFile := range files {
 				srcFile := filepath.Join(tc.gadgetTree, srcFile.Name())
 				osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))

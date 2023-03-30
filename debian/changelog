@@ -1,3 +1,9 @@
+ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
+
+  * Redesign classic image builds to use image definition file.
+
+ -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Fri, 21 Oct 2022 09:17:21 -0500
+
 ubuntu-image (2.2+22.10ubuntu1) kinetic; urgency=medium
 
   [ Pawel Stolowski ]
@@ -13,7 +19,7 @@ ubuntu-image (2.2+22.10ubuntu1) kinetic; urgency=medium
   * Fix map ordering bug in populate_bootfs_contents step
   * Update to latest snapd volume layout API (LP: #1990979)
 
- -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Wed, 08 Jun 2022 10:25:57 -0500
+ -- William 'jawn-smith' Wilson <jawn-smith@ubuntu.com>  Mon, 17 Oct 2022 16:38:25 -0500
 
 ubuntu-image (2.2+22.04ubuntu3) jammy; urgency=medium
 

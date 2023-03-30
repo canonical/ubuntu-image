@@ -7,10 +7,11 @@ import (
 // snapStates are the names and function variables to be executed by the state machine for snap images
 var snapStates = []stateFunc{
 	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
+	{"determine_output_directory", (*StateMachine).determineOutputDirectory},
 	{"prepare_image", (*StateMachine).prepareImage},
 	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
+	{"set_artifact_names", (*StateMachine).setArtifactNames},
 	{"populate_rootfs_contents", (*StateMachine).populateSnapRootfsContents},
-	{"populate_rootfs_contents_hooks", (*StateMachine).populateRootfsContentsHooks},
 	{"generate_disk_info", (*StateMachine).generateDiskInfo},
 	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
 	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
@@ -38,6 +39,11 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 
 	// do the validation common to all image types
 	if err := snapStateMachine.validateInput(); err != nil {
+		return err
+	}
+
+	// validate values of until and thru
+	if err := snapStateMachine.validateUntilThru(); err != nil {
 		return err
 	}
 

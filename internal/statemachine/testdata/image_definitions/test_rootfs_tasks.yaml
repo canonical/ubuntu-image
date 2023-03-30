@@ -1,0 +1,34 @@
+name: ubuntu-server-raspi-arm64
+display-name: Ubuntu Server Raspberry Pi arm64
+revision: 2
+architecture: arm64
+series: jammy
+class: preinstalled
+kernel: linux-raspi
+gadget:
+  url: "https://github.com/snapcore/pi-gadget.git"
+  branch: classic
+  type: "git"
+rootfs:
+  archive-tasks:
+    - ubuntu-server-minimal
+    - ubuntu-server
+customization:
+  cloud-init:
+    user-data: |
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
+  extra-packages:
+    - name: ubuntu-minimal
+    - name: linux-firmware-raspi
+    - name: pi-bluetooth
+artifacts:
+  img:
+    -
+      name: raspi.img
+  manifest:
+    name: raspi.manifest
