@@ -355,7 +355,10 @@ func (stateMachine *StateMachine) makeDisk() error {
 			}
 
 			// set up the partitions on the device
-			partitionTable := createPartitionTable(volumeName, volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
+			partitionTable, err := createPartitionTable(volumeName, volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
+			if err != nil {
+				return fmt.Errorf("Error partitioning image file: %s", err.Error())
+			}
 
 			// Write the partition table to disk
 			if err := diskImg.Partition(*partitionTable); err != nil {

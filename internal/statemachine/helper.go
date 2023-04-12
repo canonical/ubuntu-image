@@ -333,7 +333,7 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 }
 
 // createPartitionTable creates a disk image file and writes the partition table to it
-func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize uint64, isSeeded bool) *partition.Table {
+func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, error) {
 	var gptPartitions = make([]*gpt.Partition, 0)
 	var mbrPartitions = make([]*mbr.Partition, 0)
 	var partitionTable partition.Table
@@ -373,6 +373,20 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 			}
 			mbrPartitions = append(mbrPartitions, mbrPartition)
 		} else {
+			// If the block size is 512, the First Usable LBA must be greater than or equal
+			// to 34 (allowing 1 block for the Protective MBR, 1 block for the Partition
+			// Table Header, and 32 blocks for the GPT Partition Entry Array)
+			// If the logical block size is 4096, the First Useable LBA must be greater than
+			// or equal to 6 (allowing 1 block for the Protective MBR, 1 block for the GPT
+			// Header, and 4 blocks for the GPT Partition Entry Array)
+			start := uint64(*structure.Offset)
+			end := start + uint64(structure.Size)
+			if (sectorSize == 512 && start < 512 * 34 && end > 512) ||
+				(sectorSize == 4096 && start < 4096 * 6 && end > 4096) {
+				return nil, fmt.Errorf("The structure \"%s\" overlaps GPT header or " +
+							"GPT partition table", structure.Name)
+			}
+
 			var partitionName string
 			if structure.Role == "system-data" && structure.Name == "" {
 				partitionName = "writable"
@@ -407,7 +421,7 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 		}
 		partitionTable = gptTable
 	}
-	return &partitionTable
+	return &partitionTable, nil
 }
 
 // calculateImageSize calculates the total sum of all partition sizes in an image
