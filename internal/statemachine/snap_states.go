@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/seed/seedwriter"
 	"github.com/snapcore/snapd/snap"
 )
 
@@ -29,10 +30,14 @@ func (stateMachine *StateMachine) prepareImage() error {
 	if snapStateMachine.commonFlags.Channel != "" {
 		imageOpts.Channel = snapStateMachine.commonFlags.Channel
 	}
-	imageOpts.Revisions = make(map[string]snap.Revision)
-	for snapName, snapRev := range snapStateMachine.Opts.Revisions {
-		fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n", snapRev, snapName)
-		imageOpts.Revisions[snapName] = snap.Revision{N: snapRev}
+
+	// setup the pre-provided manifest if revisions are passed
+	if len(snapStateMachine.Opts.Revisions) > 0 {
+		imageOpts.SeedManifest = seedwriter.NewManifest()
+		for snapName, snapRev := range snapStateMachine.Opts.Revisions {
+			fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n", snapRev, snapName)
+			imageOpts.SeedManifest.SetAllowedSnapRevision(snapName, snap.R(snapRev))
+		}
 	}
 
 	// preseeding-related

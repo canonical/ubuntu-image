@@ -21,6 +21,7 @@ import (
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/image/preseed"
 	"github.com/snapcore/snapd/osutil"
+	"github.com/snapcore/snapd/seed/seedwriter"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
@@ -1073,10 +1074,10 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 		}
 	}
 
-	imageOpts.Revisions = make(map[string]snap.Revision)
 	// add any extra snaps from the image definition to the list
 	// this is done last to ensure the correct channels are being used
 	if classicStateMachine.ImageDef.Customization != nil {
+		imageOpts.SeedManifest = seedwriter.NewManifest()
 		for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
 			if !helper.SliceHasElement(imageOpts.Snaps, extraSnap.SnapName) {
 				imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
@@ -1089,7 +1090,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 					extraSnap.SnapRevision,
 					extraSnap.SnapName,
 				)
-				imageOpts.Revisions[extraSnap.SnapName] = snap.Revision{N: extraSnap.SnapRevision}
+				imageOpts.SeedManifest.SetAllowedSnapRevision(extraSnap.SnapName, snap.R(extraSnap.SnapRevision))
 			}
 		}
 	}
