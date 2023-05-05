@@ -1320,7 +1320,10 @@ func (stateMachine *StateMachine) updateBootloader() error {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
 		for structureNumber, structure := range volume.Structure {
 			if structure.Role == gadget.SystemData {
-				rootfsPartNum = structureNumber
+				// The rootfs is 2nd partition of image be mounted as loopXXp2 by losetup,
+				// but structureNumber index is start from 0, and the rootfs index is 1.
+				// We should plus index 1 to mount correct partition.
+				rootfsPartNum = structureNumber + 1
 				switch volume.Bootloader {
 				case "grub":
 					err := stateMachine.updateGrub(volumeName, rootfsPartNum)
