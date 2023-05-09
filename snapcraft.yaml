@@ -34,10 +34,12 @@ parts:
     stage-packages:
       - fdisk
       - gdisk
+      - mtools
       - fakeroot
       - debootstrap
       - gpg
       - germinate
+      - python3-germinate
     override-build: |
       snapcraftctl build
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
