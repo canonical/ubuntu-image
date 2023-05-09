@@ -10,15 +10,14 @@ base: core22
 source-code: https://github.com/canonical/ubuntu-image
 issues: https://bugs.launchpad.net/ubuntu-image/+filebug
 
-# Force the snap to use fakeroot staged within the snap
-environment:
-  FAKEROOT_FLAGS: "--lib $SNAP/usr/lib/lib-arch/libfakeroot/libfakeroot-tcp.so --faked $SNAP/usr/bin/faked-tcp"
-  PATH: $SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$PATH
-  GCONV_PATH: /snap/core20/current/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/gconv
-
 apps:
   ubuntu-image:
     command: bin/ubuntu-image
+    environment:
+      # Force the snap to use fakeroot staged within the snap
+      FAKEROOT_FLAGS: "--lib $SNAP/usr/lib/lib-arch/libfakeroot/libfakeroot-tcp.so --faked $SNAP/usr/bin/faked-tcp"
+      PATH: $SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$PATH
+      GCONV_PATH: /snap/core20/current/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/gconv
 
 parts:
   ubuntu-image:
