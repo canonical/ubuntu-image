@@ -40,10 +40,10 @@ parts:
       - germinate
       - python3-germinate
     override-build: |
-      snapcraftctl build
+      craftctl default
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
-      cd $SNAPCRAFT_PART_INSTALL/usr/bin/
+      cd $CRAFT_PART_INSTALL/usr/bin/
       ln -s fakeroot-tcp fakeroot
       # Create a symbolic link to /usr/lib/<arch> where libfakeroot will live
-      cd $SNAPCRAFT_PART_INSTALL/usr/lib/
-      ln -s ${SNAPCRAFT_ARCH_TRIPLET} lib-arch
+      cd $CRAFT_PART_INSTALL/usr/lib/
+      ln -s ${CRAFT_ARCH_TRIPLET} lib-arch
