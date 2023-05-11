@@ -38,6 +38,10 @@ parts:
       - debootstrap
       - gpg
       - germinate
+      - mtools
+      - make
+      - kpartx
+      - qemu-utils
     override-build: |
       snapcraftctl build
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
