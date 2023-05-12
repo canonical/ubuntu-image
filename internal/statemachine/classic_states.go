@@ -1076,7 +1076,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 
 	// add any extra snaps from the image definition to the list
 	// this is done last to ensure the correct channels are being used
-	if classicStateMachine.ImageDef.Customization != nil {
+	if classicStateMachine.ImageDef.Customization != nil && len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
 		imageOpts.SeedManifest = seedwriter.NewManifest()
 		for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
 			if !helper.SliceHasElement(imageOpts.Snaps, extraSnap.SnapName) {
