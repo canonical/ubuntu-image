@@ -17,6 +17,6 @@ jobs:
       - name: go-fmt
         run: FMT=`go fmt ./...` && [ -z "$FMT" ]
       - name: install-golint
-        run: sudo apt install -y golint
+        run: sudo apt update && sudo apt install -y golint
       - name: golint
         run: LINT=`golint ./...` && [ -z "$LINT" ]
