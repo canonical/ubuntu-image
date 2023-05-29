@@ -894,6 +894,11 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 				t.Errorf("Disk image size %d is not an multiple of the block size: %d",
 					diskImg.Size, int64(stateMachine.SectorSize))
 			}
+
+			// while at it, ensure that the root partition has been found
+			if stateMachine.rootfsPartNum == -1 || stateMachine.rootfsVolName == "" {
+				t.Errorf("Root partition was not found")
+			}
 		})
 	}
 }
