@@ -3401,6 +3401,11 @@ func TestUnsupportedBootloader(t *testing.T) {
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
+		// prepare state in such a way that the rootfs partition was found in
+		// earlier steps
+		stateMachine.rootfsPartNum = 3
+		stateMachine.rootfsVolName = "pc"
+
 		// set the bootloader for the volume to "test"
 		stateMachine.GadgetInfo.Volumes["pc"].Bootloader = "test"
 
