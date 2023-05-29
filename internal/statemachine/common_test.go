@@ -803,17 +803,20 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 // TestMakeDiskPartitionSchemes tests that makeDisk() can successfully parse
 // mbr, gpt, and hybrid schemes. It then runs "dumpe2fs" to ensure the
 // resulting disk has the correct type of partition table.
-// We also check various sector sizes while at it.
+// We also check various sector sizes while at it and rootfs placements
 func TestMakeDiskPartitionSchemes(t *testing.T) {
 	testCases := []struct {
-		name       string
-		tableType  string
-		sectorSize string
+		name          string
+		tableType     string
+		sectorSize    string
+		rootfsVolName string
+		rootfsPartNum int
 	}{
-		{"gpt", "gpt", "512"},
-		{"mbr", "dos", "512"},
-		{"hybrid", "gpt", "512"},
-		{"gpt4k", "PMBR", "4096"}, // PMBR still seems valid GPT
+		{"gpt", "gpt", "512", "pc", 3},
+		{"mbr", "dos", "512", "pc", 3},
+		{"hybrid", "gpt", "512", "pc", 3},
+		{"gpt4k", "PMBR", "4096", "pc", 3}, // PMBR still seems valid GPT
+		{"gpt-efi-only", "gpt", "512", "pc", 2},
 	}
 	for _, tc := range testCases {
 		t.Run("test_make_disk_partition_type_"+tc.name, func(t *testing.T) {
@@ -896,8 +899,9 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			}
 
 			// while at it, ensure that the root partition has been found
-			if stateMachine.rootfsPartNum == -1 || stateMachine.rootfsVolName == "" {
-				t.Errorf("Root partition was not found")
+			if stateMachine.rootfsPartNum != tc.rootfsPartNum || stateMachine.rootfsVolName != tc.rootfsVolName {
+				t.Errorf("Root partition volume/numbe not detected correctly, expected %s/%d, got %s/%d",
+					tc.rootfsVolName, tc.rootfsPartNum, stateMachine.rootfsVolName, stateMachine.rootfsPartNum)
 			}
 		})
 	}
