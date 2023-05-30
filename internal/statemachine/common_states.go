@@ -355,7 +355,13 @@ func (stateMachine *StateMachine) makeDisk() error {
 			}
 
 			// set up the partitions on the device
-			partitionTable := createPartitionTable(volumeName, volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
+			partitionTable, rootfsPartitionNumber := createPartitionTable(volumeName, volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
+
+			// Save the rootfs partition number, if found, for later use
+			if rootfsPartitionNumber != -1 {
+				stateMachine.rootfsVolName = volumeName
+				stateMachine.rootfsPartNum = rootfsPartitionNumber
+			}
 
 			// Write the partition table to disk
 			if err := diskImg.Partition(*partitionTable); err != nil {

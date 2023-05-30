@@ -3314,13 +3314,14 @@ func TestFailedUpdateBootloader(t *testing.T) {
 			Gadget:       &imagedefinition.Gadget{},
 		}
 
-		// first run with an empty gadget to make sure we get an error
-		// need workdir set up for this
+		// set up work dir
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
-		// next use a gadget with grub as the bootloader and mock
-		// filepath.Glob to trigger a failure in updateGrub
+		// first, test that updateBootloader fails when the rootfs partition
+		// has not been found in earlier steps
+		stateMachine.rootfsPartNum = -1
+		stateMachine.rootfsVolName = ""
 		err = stateMachine.updateBootloader()
 		asserter.AssertErrContains(err, "Error: could not determine partition number of the root filesystem")
 
@@ -3337,6 +3338,11 @@ func TestFailedUpdateBootloader(t *testing.T) {
 			osutil.CopyFlagDefault,
 		)
 		asserter.AssertErrNil(err, true)
+
+		// prepare state in such a way that the rootfs partition was found in
+		// earlier steps
+		stateMachine.rootfsPartNum = 3
+		stateMachine.rootfsVolName = "pc"
 
 		// parse gadget.yaml and run updateBootloader with the mocked os.Mkdir
 		err = stateMachine.prepareGadgetTree()
@@ -3394,6 +3400,11 @@ func TestUnsupportedBootloader(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
+
+		// prepare state in such a way that the rootfs partition was found in
+		// earlier steps
+		stateMachine.rootfsPartNum = 3
+		stateMachine.rootfsVolName = "pc"
 
 		// set the bootloader for the volume to "test"
 		stateMachine.GadgetInfo.Volumes["pc"].Bootloader = "test"

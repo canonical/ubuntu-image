@@ -17,7 +17,6 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
-	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/image/preseed"
 	"github.com/snapcore/snapd/osutil"
@@ -1313,30 +1312,20 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 // updateBootloader determines the bootloader for each volume
 // and runs the correct helper function to update the bootloader
 func (stateMachine *StateMachine) updateBootloader() error {
-	// determine which partition number is the rootfs and which volume it is in
-	// TODO should this be stored in the struct earlier on?
-	rootfsPartNum := -1
-	for _, volumeName := range stateMachine.VolumeOrder {
-		volume := stateMachine.GadgetInfo.Volumes[volumeName]
-		for structureNumber, structure := range volume.Structure {
-			if structure.Role == gadget.SystemData {
-				rootfsPartNum = structureNumber
-				switch volume.Bootloader {
-				case "grub":
-					err := stateMachine.updateGrub(volumeName, rootfsPartNum)
-					if err != nil {
-						return err
-					}
-				default:
-					fmt.Printf("WARNING: updating bootloader %s not yet supported\n",
-						volume.Bootloader,
-					)
-				}
-			}
-		}
-	}
-	if rootfsPartNum == -1 {
+	if stateMachine.rootfsPartNum == -1 || stateMachine.rootfsVolName == "" {
 		return fmt.Errorf("Error: could not determine partition number of the root filesystem")
+	}
+	volume := stateMachine.GadgetInfo.Volumes[stateMachine.rootfsVolName]
+	switch volume.Bootloader {
+	case "grub":
+		err := stateMachine.updateGrub(stateMachine.rootfsVolName, stateMachine.rootfsPartNum)
+		if err != nil {
+			return err
+		}
+	default:
+		fmt.Printf("WARNING: updating bootloader %s not yet supported\n",
+			volume.Bootloader,
+		)
 	}
 	return nil
 }

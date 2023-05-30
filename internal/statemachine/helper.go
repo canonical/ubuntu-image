@@ -332,16 +332,25 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	return offset2
 }
 
-// createPartitionTable creates a disk image file and writes the partition table to it
-func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize uint64, isSeeded bool) *partition.Table {
+// createPartitionTable creates a disk image file and writes the partition table to it,
+// returning the partition table and the partition number of the root partition.
+func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, int) {
 	var gptPartitions = make([]*gpt.Partition, 0)
 	var mbrPartitions = make([]*mbr.Partition, 0)
 	var partitionTable partition.Table
+	partitionNumber, rootfsPartitionNumber := 1, -1
 
 	for _, structure := range volume.Structure {
 		if structure.Role == "mbr" || structure.Type == "bare" ||
 			shouldSkipStructure(structure, isSeeded) {
 			continue
+		}
+
+		// Record the actual partition number of the root partition, as it
+		// might be useful for certain operations (like updating the
+		// bootloader)
+		if structure.Role == gadget.SystemData {
+			rootfsPartitionNumber = partitionNumber
 		}
 
 		var structureType string
@@ -389,6 +398,8 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 			}
 			gptPartitions = append(gptPartitions, gptPartition)
 		}
+
+		partitionNumber++
 	}
 
 	if volume.Schema == "mbr" {
@@ -407,7 +418,8 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 		}
 		partitionTable = gptTable
 	}
-	return &partitionTable
+
+	return &partitionTable, rootfsPartitionNumber
 }
 
 // calculateImageSize calculates the total sum of all partition sizes in an image
