@@ -949,7 +949,7 @@ func (stateMachine *StateMachine) customizeFstab() error {
 		)
 		fstabEntries = append(fstabEntries, fstabEntry)
 	}
-	fstabIO.Write([]byte(strings.Join(fstabEntries, "\n")))
+	fstabIO.Write([]byte(strings.Join(fstabEntries, "\n") + "\n"))
 	return nil
 }
 
@@ -1200,7 +1200,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 					re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
 					newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
 					if !strings.Contains(string(newContents), "LABEL=writable") {
-						newContents = []byte("LABEL=writable   /    ext4   defaults    0 0")
+						newContents = []byte("LABEL=writable   /    ext4   defaults    0 0\n")
 					}
 					err := osWriteFile(fstabPath, newContents, 0644)
 					if err != nil {
