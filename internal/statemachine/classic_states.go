@@ -507,6 +507,12 @@ func (stateMachine *StateMachine) createChroot() error {
 			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
 	}
 
+	// debootstrap copies /etc/hostname from build environment; replace it
+	// with a fresh version
+	hostname := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
+	hostnameFile, _ := os.OpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
+	hostnameFile.WriteString("ubuntu\n")
+
 	// add any extra apt sources to /etc/apt/sources.list
 	aptSources := classicStateMachine.ImageDef.GeneratePocketList()
 
