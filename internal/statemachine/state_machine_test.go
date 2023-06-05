@@ -664,6 +664,7 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 								Image: "pc-core.img",
 							},
 						},
+						YamlIndex: 1,
 					},
 					{
 						VolumeName: "pc",
@@ -687,6 +688,7 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 								Target:           "EFI/ubuntu/grub.cfg",
 							},
 						},
+						YamlIndex: 2,
 					},
 					{
 						Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",

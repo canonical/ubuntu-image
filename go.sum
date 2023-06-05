@@ -5,6 +5,7 @@ github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 h1:YoJbenK9C6
 github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7/go.mod h1:z4/9nQmJSSwwds7ejkxaJwO37dru3geImFUdJlaLzQo=
 github.com/acomagu/bufpipe v1.0.3 h1:fxAGrHZTgQ9w5QqVItgzwj235/uYZYgbXitB+dLupOk=
 github.com/acomagu/bufpipe v1.0.3/go.mod h1:mxdxdup/WdsKVreO5GpW4+M/1CE2sMG4jeGJ2sYmHc4=
+github.com/alexkohler/nakedret v1.0.1/go.mod h1:FIP5ubTIqmK2D35Xct6bjnYc4O027gqCYLqXLQM4xuY=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 h1:kFOfPq6dUM1hTo4JG6LR5AXSUEsOjtdm0kw0FtQtMJA=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
@@ -114,9 +115,15 @@ github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2 h1:nETXPg0CiJr
 github.com/snapcore/go-gettext v0.0.0-20201130093759-38740d1bd3d2/go.mod h1:D3SsWAXK7wCCBZu+Vk5hc1EuKj/L3XN1puEMXTU4LrQ=
 github.com/snapcore/secboot v0.0.0-20230228104443-f41f07c101e1 h1:HANKyba/BJ8iWRlcrkWG1SQt2CY0jPnCj/zO3mcz/WM=
 github.com/snapcore/secboot v0.0.0-20230228104443-f41f07c101e1/go.mod h1:72paVOkm4sJugXt+v9ItmnjXgO921D8xqsbH2OekouY=
+github.com/snapcore/secboot v0.0.0-20230428184943-be3902241d8a h1:0mHd/TdxsyR6XWqznXRuCHxHltX736XspJlPFSUzHxU=
+github.com/snapcore/secboot v0.0.0-20230428184943-be3902241d8a/go.mod h1:72paVOkm4sJugXt+v9ItmnjXgO921D8xqsbH2OekouY=
 github.com/snapcore/snapd v0.0.0-20201005140838-501d14ac146e/go.mod h1:3xrn7QDDKymcE5VO2rgWEQ5ZAUGb9htfwlXnoel6Io8=
 github.com/snapcore/snapd v0.0.0-20230328104537-3d627c740f16 h1:IP79eb5PkZe7/f6yXXqVpac+QYzKwbn/kEPIHqz6Vtc=
 github.com/snapcore/snapd v0.0.0-20230328104537-3d627c740f16/go.mod h1:wGun6rbVA2uJSMckvjQsDQsPEieJ1dY6o3nrYWwHmxE=
+github.com/snapcore/snapd v0.0.0-20230417120123-30b11fae293a h1:CxbDPBQwGEw/BKPZUo7bF77JZoIhVLNDIi1O+JvNH1w=
+github.com/snapcore/snapd v0.0.0-20230417120123-30b11fae293a/go.mod h1:cuS/HJElAZt0mJmpWdeiAtZnc6l1lDXfFK6HpJaXrx4=
+github.com/snapcore/snapd v0.0.0-20230501100657-635f08b765bb h1:5a83ZsjTD77fKfpvDFeBT97MSO2f6dTC6SKwEDgRmXU=
+github.com/snapcore/snapd v0.0.0-20230501100657-635f08b765bb/go.mod h1:5UPR3Qk1W3C80VeYCh0CU0Id/tRJs2c3jvrTaG1/dhU=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
