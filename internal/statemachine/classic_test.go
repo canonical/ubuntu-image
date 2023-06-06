@@ -2894,7 +2894,8 @@ func TestCustomizeFstab(t *testing.T) {
 					FsckOrder:    1,
 				},
 			},
-			`LABEL=writable	/	ext4	defaults	1	1`,
+			`LABEL=writable	/	ext4	defaults	1	1
+`,
 		},
 		{
 			"two_entries",
@@ -2917,7 +2918,8 @@ func TestCustomizeFstab(t *testing.T) {
 				},
 			},
 			`LABEL=writable	/	ext4	defaults	0	1
-LABEL=system-boot	/boot/firmware	vfat	defaults	0	1`,
+LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
+`,
 		},
 		{
 			"defaults_assumed",
@@ -2929,7 +2931,8 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1`,
 					FsckOrder:  1,
 				},
 			},
-			`LABEL=writable	/	ext4	defaults	0	1`,
+			`LABEL=writable	/	ext4	defaults	0	1
+`,
 		},
 	}
 
