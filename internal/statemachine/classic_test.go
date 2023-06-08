@@ -2393,24 +2393,6 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
-		// test the directory method
-		wd, _ := os.Getwd()
-		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
-		sourcePath = "file://" + sourcePath
-		imageDef := imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:  sourcePath,
-				GadgetType: "directory",
-			},
-		}
-
-		stateMachine.ImageDef = imageDef
-
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrNil(err, true)
-
 		// git clone the gadget into a /tmp dir
 		gadgetDir, err := os.MkdirTemp("", "pc-amd64-gadget-")
 		asserter.AssertErrNil(err, true)
@@ -2427,7 +2409,7 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// now set up the image definition to build from this directory
-		imageDef = imagedefinition.ImageDefinition{
+		imageDef := imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
