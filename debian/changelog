@@ -6,6 +6,13 @@ ubuntu-image (3.0+23.04ubuntu2) UNRELEASED; urgency=medium
   [ mjdonis ]
   * Add missing dependencies for classic images (LP: #2018758)
 
+  [ Loïc Minier ]
+  * Set hostname to ubuntu instead of letting debootstrap copy it from the
+    build environment.
+  * Add trailing newline at end of fstab.
+  * Don't scan build machine for OS entries when generating GRUB config:
+    dpkg-divert os-prober around update-grub.
+
  -- mjdonis <marinajdonis@gmail.com>  Thu, 11 May 2023 12:29:08 +0200
 
 ubuntu-image (2.2+22.10ubuntu1) kinetic; urgency=medium
