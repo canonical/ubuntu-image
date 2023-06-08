@@ -2363,7 +2363,7 @@ func TestBuildGadgetTreeGit(t *testing.T) {
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
-				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
+				GadgetURL:    "https://github.com/snapcore/pc-gadget",
 				GadgetType:   "git",
 				GadgetBranch: "classic",
 			},
@@ -2394,7 +2394,7 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// git clone the gadget into a /tmp dir
-		gadgetDir, err := os.MkdirTemp("", "pc-amd64-gadget-")
+		gadgetDir, err := os.MkdirTemp("", "pc-gadget-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(gadgetDir)
 		gitCloneCommand := *exec.Command(
@@ -2402,7 +2402,7 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 			"clone",
 			"--branch",
 			"classic",
-			"https://github.com/snapcore/pc-amd64-gadget",
+			"https://github.com/snapcore/pc-gadget",
 			gadgetDir,
 		)
 		err = gitCloneCommand.Run()
