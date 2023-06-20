@@ -22,7 +22,7 @@ apps:
 
 parts:
   ubuntu-image:
-    plugin: go
+    plugin: nil
     source: .
     source-type: git
     build-packages:
@@ -42,8 +42,15 @@ parts:
       - make
       - kpartx
       - qemu-utils
+    build-attributes: [ enable-patchelf ]
     override-build: |
-      snapcraftctl build
+      ins_bin=$SNAPCRAFT_PART_INSTALL/bin/
+      mkdir -p "$ins_bin"
+      # Make ubuntu-image statically compiled to avoid libc deps.
+      # We need this as setting interpreter/rpath is known to cause
+      # issues with go binaries (https://github.com/NixOS/patchelf/issues/146).
+      # On compiling statically go, see https://mt165.co.uk/blog/static-link-go/
+      CGO_ENABLED=0 go build -o "$ins_bin" ./cmd/ubuntu-image/
       # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
       cd $SNAPCRAFT_PART_INSTALL/usr/bin/
       ln -s fakeroot-tcp fakeroot
