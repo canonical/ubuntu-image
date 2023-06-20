@@ -235,7 +235,7 @@ model assertion
     https://developer.ubuntu.com/en/snappy/guides/prepare-image/
 
 gadget tree (example)
-    https://github.com/snapcore/pc-amd64-gadget
+    https://github.com/snapcore/pc-gadget
 
 cloud-config
     https://help.ubuntu.com/community/CloudInit
@@ -357,6 +357,6 @@ FOOTNOTES
 .. _snap: http://snapcraft.io/
 .. _YAML: https://developer.ubuntu.com/en/snappy/guides/prepare-image/
 .. _`gadget snap`: https://github.com/snapcore/snapd/wiki/Gadget-snap
-.. _`gadget tree`: Example: https://github.com/snapcore/pc-amd64-gadget
+.. _`gadget tree`: Example: https://github.com/snapcore/pc-gadget
 .. _`gadget.yaml`: https://github.com/snapcore/snapd/wiki/Gadget-snap#gadget.yaml
 .. _`image_definition.yaml`: https://github.com/canonical/ubuntu-image/tree/main/internal/imagedefinition#readme

@@ -999,11 +999,39 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	// make sure to unmount the disk too
 	umounts = append(umounts, exec.Command("umount", mountDir))
 
+	// divert GRUB's os-prober as we don't want to scan for other OSes on
+	// the build system
+	updateGrubCmds = append(updateGrubCmds,
+		exec.Command("chroot",
+			mountDir,
+			"dpkg-divert",
+			"--local",
+			"--divert",
+			"/etc/grub.d/30_os-prober.dpkg-divert",
+			"--rename",
+			"/etc/grub.d/30_os-prober",
+		),
+	)
+
 	// actually run update-grub
 	updateGrubCmds = append(updateGrubCmds,
 		exec.Command("chroot",
 			mountDir,
 			"update-grub",
+		),
+	)
+
+	// undivert GRUB's os-prober
+	updateGrubCmds = append(updateGrubCmds,
+		exec.Command("chroot",
+			mountDir,
+			"dpkg-divert",
+			"--remove",
+			"--local",
+			"--divert",
+			"/etc/grub.d/30_os-prober.dpkg-divert",
+			"--rename",
+			"/etc/grub.d/30_os-prober",
 		),
 	)
 

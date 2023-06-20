@@ -2363,7 +2363,7 @@ func TestBuildGadgetTreeGit(t *testing.T) {
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
-				GadgetURL:    "https://github.com/snapcore/pc-amd64-gadget",
+				GadgetURL:    "https://github.com/snapcore/pc-gadget",
 				GadgetType:   "git",
 				GadgetBranch: "classic",
 			},
@@ -2393,26 +2393,8 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
-		// test the directory method
-		wd, _ := os.Getwd()
-		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
-		sourcePath = "file://" + sourcePath
-		imageDef := imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:  sourcePath,
-				GadgetType: "directory",
-			},
-		}
-
-		stateMachine.ImageDef = imageDef
-
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrNil(err, true)
-
 		// git clone the gadget into a /tmp dir
-		gadgetDir, err := os.MkdirTemp("", "pc-amd64-gadget-")
+		gadgetDir, err := os.MkdirTemp("", "pc-gadget-")
 		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(gadgetDir)
 		gitCloneCommand := *exec.Command(
@@ -2420,14 +2402,14 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 			"clone",
 			"--branch",
 			"classic",
-			"https://github.com/snapcore/pc-amd64-gadget",
+			"https://github.com/snapcore/pc-gadget",
 			gadgetDir,
 		)
 		err = gitCloneCommand.Run()
 		asserter.AssertErrNil(err, true)
 
 		// now set up the image definition to build from this directory
-		imageDef = imagedefinition.ImageDefinition{
+		imageDef := imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
@@ -2894,7 +2876,8 @@ func TestCustomizeFstab(t *testing.T) {
 					FsckOrder:    1,
 				},
 			},
-			`LABEL=writable	/	ext4	defaults	1	1`,
+			`LABEL=writable	/	ext4	defaults	1	1
+`,
 		},
 		{
 			"two_entries",
@@ -2917,7 +2900,8 @@ func TestCustomizeFstab(t *testing.T) {
 				},
 			},
 			`LABEL=writable	/	ext4	defaults	0	1
-LABEL=system-boot	/boot/firmware	vfat	defaults	0	1`,
+LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
+`,
 		},
 		{
 			"defaults_assumed",
@@ -2929,7 +2913,8 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1`,
 					FsckOrder:  1,
 				},
 			},
-			`LABEL=writable	/	ext4	defaults	0	1`,
+			`LABEL=writable	/	ext4	defaults	0	1
+`,
 		},
 	}
 
