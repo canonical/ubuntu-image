@@ -1366,6 +1366,7 @@ func TestFailedUpdateGrub(t *testing.T) {
 		}()
 		err = stateMachine.updateGrub("", 0)
 		asserter.AssertErrContains(err, "Error running losetup command")
+
 		// now test a command failure that isn't losetup
 		testCaseName = "TestFailedUpdateGrubOther"
 		err = stateMachine.updateGrub("", 0)

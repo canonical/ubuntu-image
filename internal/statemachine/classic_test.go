@@ -2644,6 +2644,14 @@ func TestCreateChroot(t *testing.T) {
 			}
 		}
 
+		// check that the hostname is set correctly
+		hostnameFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
+		hostnameData, err := os.ReadFile(hostnameFile)
+		asserter.AssertErrNil(err, true)
+		if string(hostnameData) != "ubuntu\n" {
+			t.Errorf("Expected hostname to be \"ubuntu\", but is \"%s\"", string(hostnameData))
+		}
+
 		// check that security, updates, and proposed were added to /etc/apt/sources.list
 		sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
 		sourcesListData, err := os.ReadFile(sourcesList)
