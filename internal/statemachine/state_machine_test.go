@@ -242,6 +242,8 @@ func TestExecHelperProcess(t *testing.T) {
 			os.Exit(1)
 		}
 		break
+	case "TestFailedCreateChrootSkip":
+		fallthrough
 	case "TestFailedRunLiveBuild":
 		// Do nothing so we don't have to wait for actual lb commands
 		break
