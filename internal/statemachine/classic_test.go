@@ -25,7 +25,6 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/pkg/xattr"
 	"github.com/snapcore/snapd/image"
-	"github.com/snapcore/snapd/image/preseed"
 	"github.com/snapcore/snapd/osutil"
 
 	//"github.com/snapcore/snapd/osutil"
@@ -1559,13 +1558,14 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 		asserter.AssertErrContains(err, "Error getting list of preseeded snaps")
 		seedOpen = seed.Open
 
-		preseedResetPreseededChroot = mockPreseedResetPreseededChroot
+		// Setup the exec.Command mock
+		testCaseName = "TestFailedPrepareClassicImage"
+		execCommand = fakeExecCommand
 		defer func() {
-			preseedResetPreseededChroot = preseed.ResetPreseededChroot
+			execCommand = exec.Command
 		}()
 		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrContains(err, "Error resetting preseeding")
-		preseedResetPreseededChroot = preseed.ResetPreseededChroot
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})

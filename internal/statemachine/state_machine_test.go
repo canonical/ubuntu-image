@@ -147,9 +147,6 @@ func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
 func mockImagePrepare(*image.Options) error {
 	return fmt.Errorf("Test Error")
 }
-func mockPreseedResetPreseededChroot(string) error {
-	return fmt.Errorf("Test Error")
-}
 func mockGet(string) (*http.Response, error) {
 	return nil, fmt.Errorf("Test Error")
 }
@@ -232,6 +229,8 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestFailedCreateChroot":
 		fallthrough
 	case "TestFailedInstallPackages":
+		fallthrough
+	case "TestFailedPrepareClassicImage":
 		fallthrough
 	case "TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
