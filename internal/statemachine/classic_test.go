@@ -2652,6 +2652,14 @@ func TestCreateChroot(t *testing.T) {
 			t.Errorf("Expected hostname to be \"ubuntu\", but is \"%s\"", string(hostnameData))
 		}
 
+		// check that the resolv.conf file was truncated
+		resolvConfFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf")
+		resolvConfData, err := os.ReadFile(resolvConfFile)
+		asserter.AssertErrNil(err, true)
+		if string(resolvConfData) != "" {
+			t.Errorf("Expected resolv.conf to be empty, but is \"%s\"", string(resolvConfData))
+		}
+
 		// check that security, updates, and proposed were added to /etc/apt/sources.list
 		sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
 		sourcesListData, err := os.ReadFile(sourcesList)
@@ -2709,6 +2717,28 @@ func TestFailedCreateChroot(t *testing.T) {
 		}()
 		err = stateMachine.createChroot()
 		asserter.AssertErrContains(err, "Error running debootstrap command")
+		execCommand = exec.Command
+
+		// Check if failure of truncation is detected
+
+		// Clean the work directory
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		err = stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// Prepare a fallthrough debootstrap
+		testCaseName = "TestFailedCreateChrootSkip"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		osTruncate = mockTruncate
+		defer func() {
+			osTruncate = os.Truncate
+		}()
+		err = stateMachine.createChroot()
+		asserter.AssertErrContains(err, "Error truncating resolv.conf")
+		osTruncate = os.Truncate
 		execCommand = exec.Command
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)

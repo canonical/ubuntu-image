@@ -513,6 +513,14 @@ func (stateMachine *StateMachine) createChroot() error {
 	hostname := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
 	hostnameFile, _ := os.OpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
 	hostnameFile.WriteString("ubuntu\n")
+	hostnameFile.Close()
+
+	// debootstrap also copies /etc/resolv.conf from build environment; truncate it
+	// as to not leak the host files into the built image
+	resolvConf := filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf")
+	if err := osTruncate(resolvConf, 0); err != nil {
+		return fmt.Errorf("Error truncating resolv.conf: %s", err.Error())
+	}
 
 	// add any extra apt sources to /etc/apt/sources.list
 	aptSources := classicStateMachine.ImageDef.GeneratePocketList()
