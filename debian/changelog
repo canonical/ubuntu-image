@@ -19,8 +19,9 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   [ Łukasz 'sil2100' Zemczak ]
   * Fix handling of resolv.conf in chroot, making sure we don't leak the build
     environment by accident.
+  * Use snap-preseed --reset for preseed resetting
 
- -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Wed, 12 Jul 2023 12:55:52 +0200
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Fri, 14 Jul 2023 15:56:27 +0200
 
 ubuntu-image (2.2+22.10ubuntu1) kinetic; urgency=medium
 
