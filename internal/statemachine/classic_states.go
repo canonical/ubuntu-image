@@ -1055,7 +1055,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 				preseed.Stdout = oldPreseedStdout
 			}()
 		}
-		err = preseedClassicReset(stateMachine.tempDirs.chroot)
+		err = preseedResetPreseededChroot(stateMachine.tempDirs.chroot)
 		if err != nil {
 			return fmt.Errorf("Error resetting preseeding in the chroot")
 		}

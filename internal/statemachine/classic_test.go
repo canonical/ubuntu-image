@@ -1559,13 +1559,13 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 		asserter.AssertErrContains(err, "Error getting list of preseeded snaps")
 		seedOpen = seed.Open
 
-		preseedClassicReset = mockPreseedClassicReset
+		preseedResetPreseededChroot = mockPreseedResetPreseededChroot
 		defer func() {
-			preseedClassicReset = preseed.ClassicReset
+			preseedResetPreseededChroot = preseed.ResetPreseededChroot
 		}()
 		err = stateMachine.prepareClassicImage()
 		asserter.AssertErrContains(err, "Error resetting preseeding")
-		preseedClassicReset = preseed.ClassicReset
+		preseedResetPreseededChroot = preseed.ResetPreseededChroot
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
