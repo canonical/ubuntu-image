@@ -1063,9 +1063,12 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 				preseed.Stdout = oldPreseedStdout
 			}()
 		}
-		err = preseedClassicReset(stateMachine.tempDirs.chroot)
+		// We need to use the snap-preseed binary for the reset as well, as using
+		// preseed.ClassicReset() might leave us in a chroot jail
+		cmd := execCommand("/usr/lib/snapd/snap-preseed", "--reset", stateMachine.tempDirs.chroot)
+		err = cmd.Run()
 		if err != nil {
-			return fmt.Errorf("Error resetting preseeding in the chroot")
+			return fmt.Errorf("Error resetting preseeding in the chroot. Error is \"%s\"", err.Error())
 		}
 	}
 
