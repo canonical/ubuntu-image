@@ -601,6 +601,7 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 						VolumeName: "pc",
 						Type:       "0C",
 						Offset:     createOffsetPointer(1048576),
+						MinSize:    536870912,
 						Size:       536870912,
 						Label:      "system-boot",
 						Filesystem: "vfat",
@@ -644,6 +645,7 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 						Type:       "mbr",
 						Offset:     createOffsetPointer(0),
 						Role:       "mbr",
+						MinSize:    440,
 						Size:       440,
 						Content: []gadget.VolumeContent{
 							{
@@ -656,6 +658,7 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 						VolumeName: "pc",
 						Name:       "BIOS Boot",
 						Type:       "DA,21686148-6449-6E6F-744E-656564454649",
+						MinSize:    1048576,
 						Size:       1048576,
 						OffsetWrite: &gadget.RelativeOffset{
 							RelativeTo: "mbr",
@@ -673,6 +676,7 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 						VolumeName: "pc",
 						Name:       "EFI System",
 						Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+						MinSize:    52428800,
 						Size:       52428800,
 						Filesystem: "vfat",
 						Offset:     createOffsetPointer(2097152),
@@ -722,6 +726,13 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 			os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
 			err = stateMachine.loadGadgetYaml()
 			asserter.AssertErrNil(err, false)
+
+			// we now need to also ensure the expectedResult to have properly set volume pointers
+			for i := range tc.expectedResult.Structure {
+				if tc.expectedResult.Structure[i].VolumeName != "" {
+					tc.expectedResult.Structure[i].EnclosingVolume = stateMachine.GadgetInfo.Volumes[tc.expectedResult.Structure[i].VolumeName]
+				}
+			}
 
 			if !reflect.DeepEqual(*stateMachine.GadgetInfo.Volumes["pc"], tc.expectedResult) {
 				t.Errorf("GadgetInfo after postProcessGadgetYaml:\n%+v "+
