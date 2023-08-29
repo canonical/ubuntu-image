@@ -387,8 +387,9 @@ func (stateMachine *StateMachine) writeMetadata() error {
 		gadget.ResetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
 	}
 
-	// no need to check errors, as it will panic if there is one
-	enc.Encode(stateMachine)
+	if err := enc.Encode(stateMachine); err != nil {
+		return fmt.Errorf("failed to encode metatdata: %s", err.Error())
+	}
 	return nil
 }
 
