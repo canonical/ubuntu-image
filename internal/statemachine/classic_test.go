@@ -2045,10 +2045,10 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		// set up the mountpoints
 		mountPoints := []string{"/dev", "/proc", "/sys"}
 		for _, mountPoint := range mountPoints {
-			mountCmd, umountCmd := mountFromHost(mountDir, mountPoint)
-			mountImageCmds = append(mountImageCmds, mountCmd)
-			umountImageCmds = append(umountImageCmds, umountCmd)
-			defer umountCmd.Run()
+			mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
+			mountImageCmds = append(mountImageCmds, mountCmds...)
+			umountImageCmds = append(umountImageCmds, umountCmds...)
+			defer runAll(umountCmds)
 		}
 		// make sure to unmount the disk too
 		umountImageCmds = append(umountImageCmds, exec.Command("umount", mountDir))

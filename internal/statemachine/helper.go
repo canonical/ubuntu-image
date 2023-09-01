@@ -764,21 +764,23 @@ func importPPAKeys(ppa *imagedefinition.PPA, tmpGPGDir, keyFilePath string, debu
 
 // mountFromHost mounts mountpoints from the host system in the chroot
 // for certain operations that require this
-func mountFromHost(targetDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd) {
-	mountCmd = execCommand("mount", "--bind", mountpoint, filepath.Join(targetDir, mountpoint))
-	umountCmd = execCommand("umount", filepath.Join(targetDir, mountpoint))
-	return mountCmd, umountCmd
+func mountFromHost(targetDir, mountpoint string) (mountCmds, umountCmds []*exec.Cmd) {
+	targetPath := filepath.Join(targetDir, mountpoint)
+	mountCmds = []*exec.Cmd{execCommand("mount", "--bind", mountpoint, targetPath)}
+	umountCmds = []*exec.Cmd{execCommand("umount", targetPath)}
+	return mountCmds, umountCmds
 }
 
 // mountTempFS creates a temporary directory and mounts it at the specified location
-func mountTempFS(targetDir, scratchDir, mountpoint string) (mountCmd, umountCmd *exec.Cmd, err error) {
+func mountTempFS(targetDir, scratchDir, mountpoint string) (mountCmds, umountCmds []*exec.Cmd, err error) {
 	tempDir, err := osMkdirTemp(scratchDir, strings.Trim(mountpoint, "/"))
 	if err != nil {
 		return nil, nil, err
 	}
-	mountCmd = execCommand("mount", "--bind", tempDir, filepath.Join(targetDir, mountpoint))
-	umountCmd = execCommand("umount", filepath.Join(targetDir, mountpoint))
-	return mountCmd, umountCmd, nil
+	targetPath := filepath.Join(targetDir, mountpoint)
+	mountCmds = []*exec.Cmd{execCommand("mount", "--bind", tempDir, targetPath)}
+	umountCmds = []*exec.Cmd{execCommand("umount", targetPath)}
+	return mountCmds, umountCmds, nil
 }
 
 // manualCopyFile copies a file into the chroot
@@ -946,6 +948,12 @@ func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error)
 	return seededSnaps, nil
 }
 
+func runAll(cmds []*exec.Cmd) {
+	for _, cmd := range cmds {
+		cmd.Run()
+	}
+}
+
 // updateGrub mounts the resulting image and runs update-grub
 func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) error {
 	// create a directory in which to mount the rootfs
@@ -991,10 +999,10 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	// set up the mountpoints
 	mountPoints := []string{"/dev", "/proc", "/sys"}
 	for _, mountPoint := range mountPoints {
-		mountCmd, umountCmd := mountFromHost(mountDir, mountPoint)
-		updateGrubCmds = append(updateGrubCmds, mountCmd)
-		umounts = append(umounts, umountCmd)
-		defer umountCmd.Run()
+		mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
+		updateGrubCmds = append(updateGrubCmds, mountCmds...)
+		umounts = append(umounts, umountCmds...)
+		defer runAll(umountCmds)
 	}
 	// make sure to unmount the disk too
 	umounts = append(umounts, exec.Command("umount", mountDir))
