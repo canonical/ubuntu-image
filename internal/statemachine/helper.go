@@ -767,7 +767,10 @@ func importPPAKeys(ppa *imagedefinition.PPA, tmpGPGDir, keyFilePath string, debu
 func mountFromHost(targetDir, mountpoint string) (mountCmds, umountCmds []*exec.Cmd) {
 	targetPath := filepath.Join(targetDir, mountpoint)
 	mountCmds = []*exec.Cmd{execCommand("mount", "--bind", mountpoint, targetPath)}
-	umountCmds = []*exec.Cmd{execCommand("umount", targetPath)}
+	umountCmds = []*exec.Cmd{
+		execCommand("mount", "--make-rprivate", targetPath),
+		execCommand("umount", "--recursive", targetPath),
+	}
 	return mountCmds, umountCmds
 }
 
