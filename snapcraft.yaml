@@ -13,8 +13,11 @@ issues: https://bugs.launchpad.net/ubuntu-image/+filebug
 # Force the snap to use fakeroot staged within the snap
 environment:
   FAKEROOT_FLAGS: "--lib $SNAP/usr/lib/lib-arch/libfakeroot/libfakeroot-tcp.so --faked $SNAP/usr/bin/faked-tcp"
-  PATH: $SNAP/usr/bin:$SNAP/bin:$SNAP/sbin:$PATH
+  PATH: $SNAP/usr/bin:$SNAP/bin:$SNAP/usr/sbin:$SNAP/sbin:$PATH
   GCONV_PATH: /snap/core20/current/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/gconv
+  PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$PYTHONPATH
+  DEBOOTSTRAP_DIR: $SNAP/usr/share/debootstrap
+  PERL5LIB: $SNAP/usr/share/perl5:$SNAP/usr/share/perl:$PERL5LIB
 
 apps:
   ubuntu-image:
@@ -42,6 +45,8 @@ parts:
       - make
       - kpartx
       - qemu-utils
+      - devscripts
+      - grub-common
     build-attributes: [ enable-patchelf ]
     override-build: |
       ins_bin=$SNAPCRAFT_PART_INSTALL/bin/
