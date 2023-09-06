@@ -128,6 +128,8 @@ github.com/snapcore/snapd v0.0.0-20230501100657-635f08b765bb h1:5a83ZsjTD77fKfpv
 github.com/snapcore/snapd v0.0.0-20230501100657-635f08b765bb/go.mod h1:5UPR3Qk1W3C80VeYCh0CU0Id/tRJs2c3jvrTaG1/dhU=
 github.com/snapcore/snapd v0.0.0-20230801133100-22e1eb37ca26 h1:fvFTZ03lGBeXFmgn/V2ugNM7aEDU68EvwYdsKUTwuBk=
 github.com/snapcore/snapd v0.0.0-20230801133100-22e1eb37ca26/go.mod h1:M+wSEB8eBfffw7I69nDtilqKfbdkmCNbtXY1wMJV1v0=
+github.com/snapcore/snapd v0.0.0-20230906082059-1def7c6bfd02 h1:LvYq7FYSFOYCBWMJovo6Mvt2N8GHTHLSyS/9rIfUxYs=
+github.com/snapcore/snapd v0.0.0-20230906082059-1def7c6bfd02/go.mod h1:M+wSEB8eBfffw7I69nDtilqKfbdkmCNbtXY1wMJV1v0=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
