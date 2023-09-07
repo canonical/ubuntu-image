@@ -646,12 +646,12 @@ func (stateMachine *StateMachine) installPackages() error {
 
 	var umounts []*exec.Cmd
 	for _, mount := range mountPoints {
-		var mountCmd, umountCmd *exec.Cmd
+		var mountCmds, umountCmds []*exec.Cmd
 		if mount.fromHost {
-			mountCmd, umountCmd = mountFromHost(stateMachine.tempDirs.chroot, mount.dest)
+			mountCmds, umountCmds = mountFromHost(stateMachine.tempDirs.chroot, mount.dest)
 		} else {
 			var err error
-			mountCmd, umountCmd, err = mountTempFS(stateMachine.tempDirs.chroot,
+			mountCmds, umountCmds, err = mountTempFS(stateMachine.tempDirs.chroot,
 				stateMachine.tempDirs.scratch,
 				mount.dest,
 			)
@@ -663,9 +663,9 @@ func (stateMachine *StateMachine) installPackages() error {
 
 			}
 		}
-		defer umountCmd.Run()
-		installPackagesCmds = append(installPackagesCmds, mountCmd)
-		umounts = append(umounts, umountCmd)
+		defer runAll(umountCmds)
+		installPackagesCmds = append(installPackagesCmds, mountCmds...)
+		umounts = append(umounts, umountCmds...)
 	}
 
 	// generate the apt update/install commands and append them to the slice of commands
@@ -1161,11 +1161,10 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	var mountCmds []*exec.Cmd
 	var umountCmds []*exec.Cmd
 	for _, mountPoint := range mountPoints {
-		var mountCmd, umountCmd *exec.Cmd
-		mountCmd, umountCmd = mountFromHost(stateMachine.tempDirs.chroot, mountPoint)
-		defer umountCmd.Run()
-		mountCmds = append(mountCmds, mountCmd)
-		umountCmds = append(umountCmds, umountCmd)
+		thisMountCmds, thisUmountCmds := mountFromHost(stateMachine.tempDirs.chroot, mountPoint)
+		defer runAll(umountCmds)
+		mountCmds = append(mountCmds, thisMountCmds...)
+		umountCmds = append(umountCmds, thisUmountCmds...)
 	}
 
 	// assemble the commands in the correct order: mount, preseed, unmount
