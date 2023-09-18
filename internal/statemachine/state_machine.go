@@ -360,6 +360,12 @@ func (stateMachine *StateMachine) readMetadata() error {
 
 		// delete all of the stateFuncs that have already run
 		stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
+
+		// due to https://github.com/golang/go/issues/10415 we need to set back the volume
+		// structs we reset before encoding (see writeMetadata())
+		if stateMachine.GadgetInfo != nil {
+			gadget.SetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
+		}
 	}
 	return nil
 }
@@ -374,6 +380,12 @@ func (stateMachine *StateMachine) writeMetadata() error {
 	}
 	defer gobfile.Close()
 	enc := gob.NewEncoder(gobfile)
+
+	// due to https://github.com/golang/go/issues/10415 we need to reset potentially tricky
+	// fields in the gadget before encoding
+	if stateMachine.GadgetInfo != nil {
+		gadget.ResetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
+	}
 
 	// no need to check errors, as it will panic if there is one
 	enc.Encode(stateMachine)
