@@ -506,13 +506,16 @@ func (stateMachine *StateMachine) createChroot() error {
 	// with a fresh version
 	hostname := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
 	hostnameFile, _ := os.OpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
-	hostnameFile.WriteString("ubuntu\n")
+	_, err := hostnameFile.WriteString("ubuntu\n")
+	if err != nil {
+		return fmt.Errorf("unable to write hostname: %w", err)
+	}
 	hostnameFile.Close()
 
 	// debootstrap also copies /etc/resolv.conf from build environment; truncate it
 	// as to not leak the host files into the built image
 	resolvConf := filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf")
-	if err := osTruncate(resolvConf, 0); err != nil {
+	if err = osTruncate(resolvConf, 0); err != nil {
 		return fmt.Errorf("Error truncating resolv.conf: %s", err.Error())
 	}
 
@@ -522,7 +525,10 @@ func (stateMachine *StateMachine) createChroot() error {
 	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
 	sourcesListFile, _ := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
 	for _, aptSource := range aptSources {
-		sourcesListFile.WriteString(aptSource)
+		_, err = sourcesListFile.WriteString(aptSource)
+		if err != nil {
+			return fmt.Errorf("unable to write apt sources: %w", err)
+		}
 	}
 
 	return nil
@@ -544,7 +550,15 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 	if err != nil {
 		return fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
 	}
-	defer osRemoveAll(tmpGPGDir)
+	defer func() {
+		if tmpErr := osRemoveAll(tmpGPGDir); tmpErr != nil {
+			if err != nil {
+				err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+			} else {
+				err = tmpErr
+			}
+		}
+	}()
 	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
 		ppaFileName, ppaFileContents := createPPAInfo(ppa,
 			classicStateMachine.ImageDef.Series)
@@ -554,7 +568,10 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 		if err != nil {
 			return fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
 		}
-		ppaIO.Write([]byte(ppaFileContents))
+		_, err = ppaIO.Write([]byte(ppaFileContents))
+		if err != nil {
+			return fmt.Errorf("unable to write ppa file %s: %w", ppaFile, err)
+		}
 		ppaIO.Close()
 
 		// Import keys either from the specified fingerprint or via the Launchpad API
@@ -655,7 +672,15 @@ func (stateMachine *StateMachine) installPackages() error {
 
 			}
 		}
-		defer runAll(umountCmds)
+		defer func(cmds []*exec.Cmd) {
+			if tmpErr := runAll(cmds); tmpErr != nil {
+				if err != nil {
+					err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+				} else {
+					err = tmpErr
+				}
+			}
+		}(umountCmds)
 		installPackagesCmds = append(installPackagesCmds, mountCmds...)
 		umounts = append(umounts, umountCmds...)
 	}
@@ -951,7 +976,10 @@ func (stateMachine *StateMachine) customizeFstab() error {
 		)
 		fstabEntries = append(fstabEntries, fstabEntry)
 	}
-	fstabIO.Write([]byte(strings.Join(fstabEntries, "\n") + "\n"))
+	_, err = fstabIO.Write([]byte(strings.Join(fstabEntries, "\n") + "\n"))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1091,7 +1119,10 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 					extraSnap.SnapRevision,
 					extraSnap.SnapName,
 				)
-				imageOpts.SeedManifest.SetAllowedSnapRevision(extraSnap.SnapName, snap.R(extraSnap.SnapRevision))
+				err = imageOpts.SeedManifest.SetAllowedSnapRevision(extraSnap.SnapName, snap.R(extraSnap.SnapRevision))
+				if err != nil {
+					return fmt.Errorf("error dealing with the extra snap %s: %w", extraSnap.SnapName, err)
+				}
 			}
 		}
 	}
@@ -1147,7 +1178,15 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	var umountCmds []*exec.Cmd
 	for _, mountPoint := range mountPoints {
 		thisMountCmds, thisUmountCmds := mountFromHost(stateMachine.tempDirs.chroot, mountPoint)
-		defer runAll(umountCmds)
+		defer func(cmds []*exec.Cmd) {
+			if tmpErr := runAll(cmds); tmpErr != nil {
+				if err != nil {
+					err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+				} else {
+					err = tmpErr
+				}
+			}
+		}(umountCmds)
 		mountCmds = append(mountCmds, thisMountCmds...)
 		umountCmds = append(umountCmds, thisUmountCmds...)
 	}
@@ -1236,7 +1275,10 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 		return fmt.Errorf("Error creating manifest file: %s", err.Error())
 	}
 	defer manifest.Close()
-	manifest.Write(cmdOutput.Bytes())
+	_, err = manifest.Write(cmdOutput.Bytes())
+	if err != nil {
+		return fmt.Errorf("error writing the manifest file: %w", err)
+	}
 	return nil
 }
 
@@ -1262,7 +1304,10 @@ func (stateMachine *StateMachine) generateFilelist() error {
 		return fmt.Errorf("Error creating filelist file: %s", err.Error())
 	}
 	defer filelist.Close()
-	filelist.Write(cmdOutput.Bytes())
+	_, err = filelist.Write(cmdOutput.Bytes())
+	if err != nil {
+		return fmt.Errorf("error writing the filelist file: %w", err)
+	}
 	return nil
 }
 

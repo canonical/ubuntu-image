@@ -351,14 +351,16 @@ func TestDebug(t *testing.T) {
 		stateMachine.stateMachineFlags.WorkDir = workDir
 		stateMachine.commonFlags.Debug = true
 
-		stateMachine.Setup()
+		err := stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
 
 		// just use the one state
 		stateMachine.states = testStates
 		stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
 		asserter.AssertErrNil(err, true)
 
-		stateMachine.Run()
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
 
 		// restore stdout and check that the debug info was printed
 		restoreStdout()
@@ -396,7 +398,8 @@ func TestFunctionErrors(t *testing.T) {
 			var stateMachine testStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.stateMachineFlags.WorkDir = workDir
-			stateMachine.Setup()
+			err = stateMachine.Setup()
+			asserter.AssertErrNil(err, true)
 
 			// override the function, but save the old one
 			oldStateFunc := stateMachine.states[tc.overrideState]
@@ -713,7 +716,8 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 			stateMachine.YamlFilePath = tc.gadgetYaml
 
 			// ensure unpack exists and load gadget.yaml
-			os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+			err = os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+			asserter.AssertErrNil(err, true)
 			err = stateMachine.loadGadgetYaml()
 			asserter.AssertErrNil(err, false)
 
@@ -752,7 +756,8 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
-		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, false)
 

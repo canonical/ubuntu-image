@@ -72,8 +72,18 @@ func main() {
 
 	// set up the go-flags parser for command line options
 	parser := flags.NewParser(ubuntuImageCommand, flags.Default)
-	parser.AddGroup("State Machine Options", stateMachineLongDesc, stateMachineOpts)
-	parser.AddGroup("Common Options", "Options common to both commands", commonOpts)
+	_, err := parser.AddGroup("State Machine Options", stateMachineLongDesc, stateMachineOpts)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		osExit(1)
+		return
+	}
+	_, err = parser.AddGroup("Common Options", "Options common to both commands", commonOpts)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		osExit(1)
+		return
+	}
 
 	// go-flags can be overzealous about printing errors that aren't actually errors
 	// so we capture stdout/stderr while parsing and later decide whether to print

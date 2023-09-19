@@ -70,7 +70,7 @@ func RunScript(hookScript string) error {
 func SaveCWD() func() {
 	wd, _ := os.Getwd()
 	return func() {
-		os.Chdir(wd)
+		_ = os.Chdir(wd)
 	}
 }
 
@@ -117,12 +117,18 @@ func SetDefaults(needsDefaults interface{}) error {
 			field.Cap() > 0 &&
 			field.Index(0).Kind() == reflect.Pointer {
 			for i := 0; i < field.Cap(); i++ {
-				SetDefaults(field.Index(i).Interface())
+				err := SetDefaults(field.Index(i).Interface())
+				if err != nil {
+					return err
+				}
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
 			// otherwise if it's just a pointer, look for default types
 			if field.Elem().Kind() == reflect.Struct {
-				SetDefaults(field.Interface())
+				err := SetDefaults(field.Interface())
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			tags := elem.Type().Field(i).Tag

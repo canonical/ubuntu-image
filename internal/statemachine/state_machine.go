@@ -65,7 +65,6 @@ var seedOpen = seed.Open
 var imagePrepare = image.Prepare
 var httpGet = http.Get
 var jsonUnmarshal = json.Unmarshal
-var yamlMarshal = yaml.Marshal
 var gojsonschemaValidate = gojsonschema.Validate
 var filepathRel = filepath.Rel
 
@@ -439,7 +438,10 @@ func (stateMachine *StateMachine) Run() error {
 		}
 		if err := stateFunc.function(stateMachine); err != nil {
 			// clean up work dir on error
-			stateMachine.cleanup()
+			cleanupErr := stateMachine.cleanup()
+			if cleanupErr != nil {
+				return fmt.Errorf("error during cleanup: %w while cleaning after stateFunc error: %w", cleanupErr, err)
+			}
 			return err
 		}
 		stateMachine.StepsTaken++

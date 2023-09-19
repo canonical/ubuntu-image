@@ -275,15 +275,19 @@ func TestGenerateSnapManifest(t *testing.T) {
 			stateMachine.tempDirs.rootfs = filepath.Join(workDir, "rootfs")
 			stateMachine.IsSeeded = tc.seeded
 			stateMachine.commonFlags.OutputDir = filepath.Join(workDir, "output")
-			osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+			err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+			asserter.AssertErrNil(err, true)
 
 			// Prepare direcory structure for installed and seeded snaps
 			snapsDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "snaps")
 			seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "seed", "snaps")
 			uc20Dir := filepath.Join(stateMachine.tempDirs.rootfs, "snaps")
-			osMkdirAll(snapsDir, 0755)
-			osMkdirAll(seedDir, 0755)
-			osMkdirAll(uc20Dir, 0755)
+			err = osMkdirAll(snapsDir, 0755)
+			asserter.AssertErrNil(err, true)
+			err = osMkdirAll(seedDir, 0755)
+			asserter.AssertErrNil(err, true)
+			err = osMkdirAll(uc20Dir, 0755)
+			asserter.AssertErrNil(err, true)
 			var testEnvMap map[string][]string
 			if tc.seeded {
 				testEnvMap = map[string][]string{

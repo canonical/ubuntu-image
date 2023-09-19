@@ -35,7 +35,10 @@ func (stateMachine *StateMachine) prepareImage() error {
 		imageOpts.SeedManifest = seedwriter.NewManifest()
 		for snapName, snapRev := range snapStateMachine.Opts.Revisions {
 			fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n", snapRev, snapName)
-			imageOpts.SeedManifest.SetAllowedSnapRevision(snapName, snap.R(snapRev))
+			err = imageOpts.SeedManifest.SetAllowedSnapRevision(snapName, snap.R(snapRev))
+			if err != nil {
+				return fmt.Errorf("error dealing with the extra snap %s: %w", snapName, err)
+			}
 		}
 	}
 

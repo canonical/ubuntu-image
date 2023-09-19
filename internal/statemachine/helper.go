@@ -196,8 +196,14 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			blockSize = structure.Size
 		}
 		if structure.Role == gadget.SystemData {
-			os.Create(partImg)
-			os.Truncate(partImg, int64(stateMachine.RootfsSize))
+			_, err := os.Create(partImg)
+			if err != nil {
+				return fmt.Errorf("unable to create partImg file: %w", err)
+			}
+			err = os.Truncate(partImg, int64(stateMachine.RootfsSize))
+			if err != nil {
+				return fmt.Errorf("unable to truncate partImg file: %w", err)
+			}
 		} else {
 			// zero out the .img file
 			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
@@ -597,9 +603,12 @@ func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir strin
 		cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(imageDefinition.Gadget.GadgetBranch)
 	}
 
-	cloneOptions.Validate()
+	err := cloneOptions.Validate()
+	if err != nil {
+		return err
+	}
 
-	_, err := git.PlainClone(workDir, false, cloneOptions)
+	_, err = git.PlainClone(workDir, false, cloneOptions)
 	return err
 }
 
@@ -942,18 +951,25 @@ func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error)
 	}
 
 	// iterate over the snaps in the seed and add them to the list
-	preseed.Iter(func(sn *seed.Snap) error {
+	err = preseed.Iter(func(sn *seed.Snap) error {
 		seededSnaps[sn.SnapName()] = sn.Channel
 		return nil
 	})
+	if err != nil {
+		return seededSnaps, err
+	}
 
 	return seededSnaps, nil
 }
 
-func runAll(cmds []*exec.Cmd) {
+func runAll(cmds []*exec.Cmd) error {
 	for _, cmd := range cmds {
-		cmd.Run()
+		err := cmd.Run()
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // updateGrub mounts the resulting image and runs update-grub
@@ -992,6 +1008,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	var umounts []*exec.Cmd
 	updateGrubCmds = append(updateGrubCmds,
 		// mount the rootfs partition in which to run update-grub
+		//nolint:gosec,G204
 		exec.Command("mount",
 			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
 			mountDir,
@@ -1004,7 +1021,16 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
 		updateGrubCmds = append(updateGrubCmds, mountCmds...)
 		umounts = append(umounts, umountCmds...)
-		defer runAll(umountCmds)
+		defer func(cmds []*exec.Cmd) {
+			if tmpErr := runAll(cmds); tmpErr != nil {
+				if err != nil {
+					err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+				} else {
+					err = tmpErr
+				}
+			}
+		}(umountCmds)
+
 	}
 	// make sure to unmount the disk too
 	umounts = append(umounts, exec.Command("umount", mountDir))

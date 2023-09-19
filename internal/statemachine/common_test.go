@@ -172,7 +172,8 @@ func TestLoadGadgetYaml(t *testing.T) {
 			os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
 		}()
 		// ensure unpack exists
-		os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(preserveDir)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
@@ -347,7 +348,8 @@ func TestCalculateRootfsSizeNoImageSize(t *testing.T) {
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
@@ -396,7 +398,8 @@ func TestCalculateRootfsSizeImageSize(t *testing.T) {
 			stateMachine.YamlFilePath = filepath.Join("testdata",
 				"gadget_tree", "meta", "gadget.yaml")
 			// ensure unpack exists
-			os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+			asserter.AssertErrNil(err, true)
 			err = stateMachine.loadGadgetYaml()
 			asserter.AssertErrNil(err, true)
 
@@ -436,7 +439,8 @@ func TestFailedCalculateRootfsSize(t *testing.T) {
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
@@ -462,7 +466,8 @@ func TestPopulateBootfsContents(t *testing.T) {
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
@@ -470,11 +475,13 @@ func TestPopulateBootfsContents(t *testing.T) {
 		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
-			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			err = osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			asserter.AssertErrNil(err, true)
 		}
 
 		// ensure volumes exists
-		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.populateBootfsContents()
 		asserter.AssertErrNil(err, true)
 
@@ -508,7 +515,8 @@ func TestPopulateBootfsContentsPiboot(t *testing.T) {
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree_piboot", "meta", "gadget.yaml")
 		// ensure unpack exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
@@ -516,11 +524,13 @@ func TestPopulateBootfsContentsPiboot(t *testing.T) {
 		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree_piboot"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree_piboot", srcFile.Name())
-			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			err = osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			asserter.AssertErrNil(err, true)
 		}
 
 		// ensure volumes exists
-		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.populateBootfsContents()
 		asserter.AssertErrNil(err, true)
 
@@ -551,18 +561,21 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		// set a valid yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-seed.yaml")
 		// ensure unpack exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
-		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		asserter.AssertErrNil(err, true)
 
 		// populate unpack
 		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
-			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			err = osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			asserter.AssertErrNil(err, true)
 		}
 
 		// mock gadget.LayoutVolume
@@ -599,8 +612,9 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 		stateMachine.IsSeeded = false
 		// now ensure grub dir exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack,
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "grub"), 0755)
+		asserter.AssertErrNil(err, true)
 		// mock os.MkdirAll
 		osMkdirAll = mockMkdirAll
 		defer func() {
@@ -630,18 +644,21 @@ func TestPopulatePreparePartitions(t *testing.T) {
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
-		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		asserter.AssertErrNil(err, true)
 
 		// populate unpack
 		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
-			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			err = osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			asserter.AssertErrNil(err, true)
 		}
 
 		// populate bootfs contents to ensure no failures there
@@ -694,18 +711,21 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget_tree", "meta", "gadget.yaml")
 		// ensure unpack exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
-		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		asserter.AssertErrNil(err, true)
 
 		// populate unpack
 		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
-			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			err = osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			asserter.AssertErrNil(err, true)
 		}
 
 		// populate bootfs contents to ensure no failures there
@@ -754,18 +774,21 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 		stateMachine.YamlFilePath = filepath.Join("testdata",
 			"gadget-empty-part.yaml")
 		// ensure unpack exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
-		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		asserter.AssertErrNil(err, true)
 
 		// populate unpack
 		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
-			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			err = osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			asserter.AssertErrNil(err, true)
 		}
 
 		// populate bootfs contents to ensure no failures there
@@ -848,26 +871,31 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			stateMachine.YamlFilePath = filepath.Join("testdata",
 				"gadget-"+tc.name+".yaml")
 			// ensure unpack exists
-			os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+			asserter.AssertErrNil(err, true)
 			err = stateMachine.loadGadgetYaml()
 			asserter.AssertErrNil(err, true)
 
 			// set up a "rootfs" that we can eventually copy into the disk
-			os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
-			osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+			err = os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
+			asserter.AssertErrNil(err, true)
+			err = osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+			asserter.AssertErrNil(err, true)
 
 			// also need to set the rootfs size to avoid partition errors
 			err = stateMachine.calculateRootfsSize()
 			asserter.AssertErrNil(err, true)
 
 			// ensure volumes exists
-			os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+			err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+			asserter.AssertErrNil(err, true)
 
 			// populate unpack
 			files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 			for _, srcFile := range files {
 				srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
-				osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+				err = osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+				asserter.AssertErrNil(err, true)
 			}
 
 			// run through the rest of the states
@@ -936,7 +964,8 @@ func TestFailedMakeDisk(t *testing.T) {
 		// set a valid yaml file and load it in
 		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-mbr.yaml")
 		// ensure unpack exists
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
 
@@ -945,13 +974,15 @@ func TestFailedMakeDisk(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
-		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		asserter.AssertErrNil(err, true)
 
 		// populate unpack
 		files, _ := os.ReadDir(filepath.Join("testdata", "gadget_tree"))
 		for _, srcFile := range files {
 			srcFile := filepath.Join("testdata", "gadget_tree", srcFile.Name())
-			osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			err = osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+			asserter.AssertErrNil(err, true)
 		}
 
 		// mock os.RemoveAll
@@ -1132,24 +1163,28 @@ func TestImageSizeFlag(t *testing.T) {
 			stateMachine.VolumeNames = tc.volNames
 
 			// set up a "rootfs" that we can eventually copy into the disk
-			os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
-			osutil.CopySpecialFile(tc.gadgetTree, stateMachine.tempDirs.rootfs)
+			err = os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
+			asserter.AssertErrNil(err, true)
+			err = osutil.CopySpecialFile(tc.gadgetTree, stateMachine.tempDirs.rootfs)
+			asserter.AssertErrNil(err, true)
 
 			// set a valid yaml file and load it in
 			stateMachine.YamlFilePath = filepath.Join(tc.gadgetTree, "meta", "gadget.yaml")
 			// ensure unpack exists
-			os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+			asserter.AssertErrNil(err, true)
 			err = stateMachine.loadGadgetYaml()
 			asserter.AssertErrNil(err, true)
 
 			// ensure volumes exists
-			os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
-
+			err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+			asserter.AssertErrNil(err, true)
 			// populate unpack
 			files, _ := os.ReadDir(tc.gadgetTree)
 			for _, srcFile := range files {
 				srcFile := filepath.Join(tc.gadgetTree, srcFile.Name())
-				osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+				err = osutil.CopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+				asserter.AssertErrNil(err, true)
 			}
 
 			// also need to set the rootfs size to avoid partition errors

@@ -1046,14 +1046,21 @@ func TestCustomizeCloudInit(t *testing.T) {
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			tmpDir, err := os.MkdirTemp("", "")
+			asserter.AssertErrNil(err, true)
+			defer func() {
+				if tmpErr := osRemoveAll(tmpDir); tmpErr != nil {
 			if err != nil {
-				t.Fatal(err)
+						err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+					} else {
+						err = tmpErr
 			}
-			defer os.RemoveAll(tmpDir)
+				}
+			}()
 			stateMachine.tempDirs.chroot = tmpDir
 
 			// this directory is expected to be present as it is installed by cloud-init
-			os.MkdirAll(path.Join(tmpDir, "etc/cloud/cloud.cfg.d"), 0777)
+			err = os.MkdirAll(path.Join(tmpDir, "etc/cloud/cloud.cfg.d"), 0777)
+			asserter.AssertErrNil(err, true)
 
 			stateMachine.ImageDef.Customization = &imagedefinition.Customization{
 				CloudInit: &cloudInitConfig,
@@ -1122,9 +1129,7 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	tmpDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	asserter.AssertErrNil(err, true)
 	defer os.RemoveAll(tmpDir)
 	stateMachine.tempDirs.chroot = tmpDir
 
@@ -1148,7 +1153,8 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 		t.Run("test_failed_customize_cloud_init_"+file, func(t *testing.T) {
 			// this directory is expected to be present as it is installed by cloud-init
 			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
-			os.MkdirAll(cloudInitConfigDirPath, 0777)
+			err = os.MkdirAll(cloudInitConfigDirPath, 0777)
+			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(cloudInitConfigDirPath)
 
 			osCreate = func(name string) (*os.File, error) {
@@ -1168,7 +1174,8 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 		t.Run("test_failed_customize_cloud_init_"+file, func(t *testing.T) {
 			// this directory is expected to be present as it is installed by cloud-init
 			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
-			os.MkdirAll(cloudInitConfigDirPath, 0777)
+			err = os.MkdirAll(cloudInitConfigDirPath, 0777)
+			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(cloudInitConfigDirPath)
 
 			osCreate = func(name string) (*os.File, error) {
@@ -1192,7 +1199,8 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 	t.Run("test_failed_customize_cloud_init_mkdir", func(t *testing.T) {
 		// this directory is expected to be present as it is installed by cloud-init
 		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
-		os.MkdirAll(cloudInitConfigDirPath, 0777)
+		err = os.MkdirAll(cloudInitConfigDirPath, 0777)
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(cloudInitConfigDirPath)
 
 		osMkdirAll = mockMkdirAll
@@ -1210,7 +1218,8 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 	t.Run("Test_failed_customize_cloud_init_yaml_marshal", func(t *testing.T) {
 		// this directory is expected to be present as it is installed by cloud-init
 		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
-		os.MkdirAll(cloudInitConfigDirPath, 0777)
+		err = os.MkdirAll(cloudInitConfigDirPath, 0777)
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(cloudInitConfigDirPath)
 
 		yamlMarshal = mockMarshal
@@ -1722,7 +1731,8 @@ func TestGeneratePackageManifest(t *testing.T) {
 				},
 			},
 		}
-		osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
 
 		err = stateMachine.generatePackageManifest()
@@ -1831,7 +1841,8 @@ func TestGenerateFilelist(t *testing.T) {
 				},
 			},
 		}
-		osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
 
 		err = stateMachine.generateFilelist()
@@ -2050,7 +2061,15 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
 			mountImageCmds = append(mountImageCmds, mountCmds...)
 			umountImageCmds = append(umountImageCmds, umountCmds...)
-			defer runAll(umountCmds)
+			defer func(cmds []*exec.Cmd) {
+				if tmpErr := runAll(cmds); tmpErr != nil {
+					if err != nil {
+						err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+					} else {
+						err = tmpErr
+					}
+				}
+			}(umountCmds)
 		}
 		// make sure to unmount the disk too
 		umountImageCmds = append(umountImageCmds, exec.Command("umount", mountDir))
@@ -2070,7 +2089,16 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		}
 
 		for _, teardownCmd := range teardownCmds {
-			defer teardownCmd.Run()
+			defer func(teardownCmd *exec.Cmd) {
+				if tmpErr := teardownCmd.Run(); tmpErr != nil {
+					if err != nil {
+						err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+					} else {
+						err = tmpErr
+					}
+				}
+
+			}(teardownCmd)
 		}
 		umountImageCmds = append(umountImageCmds, teardownCmds...)
 
@@ -2851,7 +2879,8 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// create the /etc/apt/ dir in workdir
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d"), 0755)
+		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
 		osMkdir = mockMkdir
@@ -3421,7 +3450,7 @@ func TestUnsupportedBootloader(t *testing.T) {
 			filepath.Join(gadgetDest, "gadget.yaml"),
 			osutil.CopyFlagDefault,
 		)
-
+		asserter.AssertErrNil(err, true)
 		// parse gadget.yaml
 		err = stateMachine.prepareGadgetTree()
 		asserter.AssertErrNil(err, true)
@@ -3442,6 +3471,7 @@ func TestUnsupportedBootloader(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.updateBootloader()
+		asserter.AssertErrNil(err, true)
 
 		// restore stdout and examine what was printed
 		restoreStdout()

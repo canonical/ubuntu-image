@@ -60,15 +60,17 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 		// make the u-boot directory and add a file
 		bootDir := filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "uboot")
-		os.MkdirAll(bootDir, 0755)
-		osutil.CopySpecialFile(filepath.Join("testdata", "grubenv"), bootDir)
+		err := os.MkdirAll(bootDir, 0755)
+		asserter.AssertErrNil(err, true)
+		err = osutil.CopySpecialFile(filepath.Join("testdata", "grubenv"), bootDir)
+		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
 		osMkdirAll = mockMkdirAll
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
+		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 
@@ -111,16 +113,18 @@ func TestFailedHandleSecureBootPiboot(t *testing.T) {
 		// make the piboot directory and add a file
 		bootDir := filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "piboot")
-		os.MkdirAll(bootDir, 0755)
-		osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree_piboot",
+		err := os.MkdirAll(bootDir, 0755)
+		asserter.AssertErrNil(err, true)
+		err = osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree_piboot",
 			"piboot.conf"), bootDir)
+		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
 		osMkdirAll = mockMkdirAll
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
+		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 
@@ -337,7 +341,8 @@ func TestCleanup(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 		stateMachine.cleanWorkDir = true
-		stateMachine.Teardown()
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
 		if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err == nil {
 			t.Errorf("Error: temporary workdir %s was not cleaned up\n",
 				stateMachine.stateMachineFlags.WorkDir)
@@ -391,9 +396,10 @@ func TestFailedWriteOffsetValues(t *testing.T) {
 
 		// create an empty pc.img
 		imgPath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "pc.img")
-		os.Create(imgPath)
-		os.Truncate(imgPath, 0)
-
+		_, err = os.Create(imgPath)
+		asserter.AssertErrNil(err, true)
+		err = os.Truncate(imgPath, 0)
+		asserter.AssertErrNil(err, true)
 		volume, found := stateMachine.GadgetInfo.Volumes["pc"]
 		if !found {
 			t.Fatalf("Failed to find gadget volume")
@@ -433,11 +439,14 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// set up a "rootfs" that we can calculate the size of
-		os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
-		osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+		err = os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
+		asserter.AssertErrNil(err, true)
+		err = osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
-		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		asserter.AssertErrNil(err, true)
 
 		// calculate the size of the rootfs
 		err = stateMachine.calculateRootfsSize()
@@ -1322,7 +1331,7 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 		asserter.AssertErrContains(err, "seed must have a model assertion")
 		err = os.Rename(filepath.Join(stateMachine.tempDirs.rootfs, "model"),
 			filepath.Join(seedDir, "assertions", "model"))
-
+		asserter.AssertErrNil(err, true)
 		// move seed.yaml to cause an error in LoadMeta
 		err = os.Rename(filepath.Join(seedDir, "seed.yaml"),
 			filepath.Join(seedDir, "seed.yaml.bak"))
