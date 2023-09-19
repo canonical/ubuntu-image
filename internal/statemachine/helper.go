@@ -1079,7 +1079,15 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		"--detach",
 		loopUsed,
 	)
-	defer teardownCmd.Run()
+	defer func() {
+		if tmpErr := teardownCmd.Run(); tmpErr != nil {
+			if err != nil {
+				err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
+			} else {
+				err = tmpErr
+			}
+		}
+	}()
 	updateGrubCmds = append(updateGrubCmds, teardownCmd)
 
 	// now run all the commands

@@ -1194,6 +1194,7 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	// assemble the commands in the correct order: mount, preseed, unmount
 	preseedCmds = append(preseedCmds, mountCmds...)
 	preseedCmds = append(preseedCmds,
+		//nolint:gosec,G204
 		exec.Command("/usr/lib/snapd/snap-preseed", stateMachine.tempDirs.chroot),
 	)
 	preseedCmds = append(preseedCmds, umountCmds...)
