@@ -789,6 +789,7 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 func TestStateMachine_readMetadata(t *testing.T) {
 	type args struct {
 		metadataFile string
+		resume       bool
 	}
 
 	cmpOpts := []cmp.Option{
@@ -813,6 +814,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 			name: "successful read",
 			args: args{
 				metadataFile: "successful_read.json",
+				resume:       true,
 			},
 			wantStateMachine: &StateMachine{
 				stateMachineFlags: &commands.StateMachineOpts{
@@ -867,6 +869,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 			name: "invalid format",
 			args: args{
 				metadataFile: "invalid_format.json",
+				resume:       true,
 			},
 			wantStateMachine: nil,
 			shouldPass:       false,
@@ -876,15 +879,33 @@ func TestStateMachine_readMetadata(t *testing.T) {
 			name: "missing state file",
 			args: args{
 				metadataFile: "inexistent.json",
+				resume:       true,
 			},
 			wantStateMachine: nil,
 			shouldPass:       false,
 			expectedError:    "error reading metadata file",
 		},
 		{
+			name: "do nothing if not resuming",
+			args: args{
+				metadataFile: "unimportant.json",
+				resume:       false,
+			},
+			wantStateMachine: &StateMachine{
+				stateMachineFlags: &commands.StateMachineOpts{
+					Resume:  false,
+					WorkDir: filepath.Join(testDataDir, "metadata"),
+				},
+				states: allTestStates,
+			},
+			shouldPass:    true,
+			expectedError: "error reading metadata file",
+		},
+		{
 			name: "state file with too many steps",
 			args: args{
 				metadataFile: "too_many_steps.json",
+				resume:       true,
 			},
 			wantStateMachine: nil,
 			shouldPass:       false,
@@ -896,7 +917,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			gotStateMachine := &StateMachine{
 				stateMachineFlags: &commands.StateMachineOpts{
-					Resume:  true,
+					Resume:  tc.args.resume,
 					WorkDir: filepath.Join(testDataDir, "metadata"),
 				},
 				states: allTestStates,
