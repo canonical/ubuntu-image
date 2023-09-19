@@ -409,29 +409,6 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	return nil
 }
 
-// writeMetadata writes the state machine info to disk. This will be used when resuming a
-// partial state machine run
-func (stateMachine *StateMachine) writeMetadata() error {
-	gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
-	gobfile, err := os.OpenFile(gobfilePath, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("error opening metadata file for writing: %s", gobfilePath)
-	}
-	defer gobfile.Close()
-	enc := gob.NewEncoder(gobfile)
-
-	// due to https://github.com/golang/go/issues/10415 we need to reset potentially tricky
-	// fields in the gadget before encoding
-	if stateMachine.GadgetInfo != nil {
-		gadget.ResetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
-	}
-
-	if err := enc.Encode(stateMachine); err != nil {
-		return fmt.Errorf("failed to encode metatdata: %s", err.Error())
-	}
-	return nil
-}
-
 // writeMetadataJSON writes the state machine info to disk, encoded as JSON. This will be used when resuming a
 // partial state machine run
 func (stateMachine *StateMachine) writeMetadataJSON(metadataFile string) error {
