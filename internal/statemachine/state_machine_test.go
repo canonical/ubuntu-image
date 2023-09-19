@@ -15,6 +15,8 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/diskfs/go-diskfs/disk"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -22,6 +24,10 @@ import (
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed"
 	"github.com/xeipuuv/gojsonschema"
+)
+
+const (
+	testDataDir = "testdata"
 )
 
 var testDir = "ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"
@@ -47,6 +53,10 @@ var allTestStates = []stateFunc{
 	{"make_disk", func(statemachine *StateMachine) error { return nil }},
 	{"generate_manifest", func(statemachine *StateMachine) error { return nil }},
 	{"finish", (*StateMachine).finish},
+}
+
+func ptrToOffset(offset quantity.Offset) *quantity.Offset {
+	return &offset
 }
 
 // define some mocked versions of go package functions
@@ -267,7 +277,7 @@ func (TestStateMachine *testStateMachine) Setup() error {
 	}
 
 	// if --resume was passed, figure out where to start
-	if err := TestStateMachine.readMetadata(); err != nil {
+	if err := TestStateMachine.readMetadataGob(); err != nil {
 		return err
 	}
 
@@ -438,7 +448,7 @@ func TestFailedMetadataParse(t *testing.T) {
 		stateMachine.stateMachineFlags.Resume = true
 		stateMachine.stateMachineFlags.WorkDir = "testdata"
 
-		err := stateMachine.readMetadata()
+		err := stateMachine.readMetadataGob()
 		asserter.AssertErrContains(err, "failed to parse metadata file")
 	})
 }
@@ -789,4 +799,130 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrContains(err, "disallowed for security purposes")
 	})
+}
+
+func TestStateMachine_readMetadataJSON(t *testing.T) {
+	type args struct {
+		metadataFile string
+	}
+
+	cmpOpts := []cmp.Option{
+		cmp.AllowUnexported(
+			StateMachine{},
+			gadget.Info{},
+			temporaryDirectories{},
+			stateFunc{},
+		),
+		cmpopts.IgnoreFields(stateFunc{}, "function"),
+		cmpopts.IgnoreFields(gadget.VolumeStructure{}, "EnclosingVolume"),
+	}
+
+	testCases := []struct {
+		name             string
+		wantStateMachine *StateMachine
+		args             args
+		shouldPass       bool
+		expectedError    string
+	}{
+		{
+			name: "successful read",
+			args: args{
+				metadataFile: "successful_read.json",
+			},
+			wantStateMachine: &StateMachine{
+				stateMachineFlags: &commands.StateMachineOpts{
+					Resume:  true,
+					WorkDir: filepath.Join(testDataDir, "metadata"),
+				},
+				CurrentStep:  "",
+				StepsTaken:   2,
+				YamlFilePath: "/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
+				IsSeeded:     true,
+				SectorSize:   quantity.Size(512),
+				RootfsSize:   quantity.Size(775915520),
+				states:       allTestStates[2:],
+				GadgetInfo: &gadget.Info{
+					Volumes: map[string]*gadget.Volume{
+						"pc": {
+							Schema:     "gpt",
+							Bootloader: "grub",
+							Structure: []gadget.VolumeStructure{
+								{
+									Name:    "mbr",
+									Offset:  ptrToOffset(quantity.Offset(quantity.Size(0))),
+									MinSize: quantity.Size(440),
+									Size:    quantity.Size(440),
+									Role:    "mbr",
+									Type:    "mbr",
+									Content: []gadget.VolumeContent{
+										{
+											Image: "pc-boot.img",
+										},
+									},
+									Update: gadget.VolumeUpdate{
+										Edition: 1,
+									},
+								},
+							},
+						},
+					},
+				},
+				ImageSizes:  map[string]quantity.Size{"pc": 3155165184},
+				VolumeOrder: []string{"pc"},
+				VolumeNames: nil,
+				tempDirs: temporaryDirectories{
+					rootfs:  filepath.Join(testDataDir, "metadata", "root"),
+					unpack:  filepath.Join(testDataDir, "metadata", "unpack"),
+					volumes: filepath.Join(testDataDir, "metadata", "volumes"),
+				},
+			},
+			shouldPass: true,
+		},
+		{
+			name: "invalid format",
+			args: args{
+				metadataFile: "invalid_format.json",
+			},
+			wantStateMachine: nil,
+			shouldPass:       false,
+			expectedError:    "failed to parse metadata file",
+		},
+		{
+			name: "missing state file",
+			args: args{
+				metadataFile: "inexistent.json",
+			},
+			wantStateMachine: nil,
+			shouldPass:       false,
+			expectedError:    "error reading metadata file",
+		},
+		{
+			name: "state file with too many steps",
+			args: args{
+				metadataFile: "too_many_steps.json",
+			},
+			wantStateMachine: nil,
+			shouldPass:       false,
+			expectedError:    "invalid steps taken count",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			gotStateMachine := &StateMachine{
+				stateMachineFlags: &commands.StateMachineOpts{
+					Resume:  true,
+					WorkDir: filepath.Join(testDataDir, "metadata"),
+				},
+				states: allTestStates,
+			}
+
+			err := gotStateMachine.readMetadataJSON(tc.args.metadataFile)
+			if tc.shouldPass {
+				asserter.AssertEqual(tc.wantStateMachine, gotStateMachine, cmpOpts...)
+			} else {
+				asserter.AssertErrContains(err, tc.expectedError)
+			}
+		})
+	}
 }

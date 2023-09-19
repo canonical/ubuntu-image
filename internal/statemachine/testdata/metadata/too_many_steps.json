@@ -1,0 +1,59 @@
+{
+    "CurrentStep": "",
+    "StepsTaken": 30,
+    "YamlFilePath": "/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
+    "IsSeeded": true,
+    "SectorSize": 512,
+    "RootfsSize": 775915520,
+    "GadgetInfo": {
+        "Volumes": {
+            "pc": {
+                "schema": "gpt",
+                "bootloader": "grub",
+                "id": "",
+                "structure": [
+                    {
+                        "name": "mbr",
+                        "filesystem-label": "",
+                        "offset": 0,
+                        "offset-write": null,
+                        "min-size": 440,
+                        "size": 440,
+                        "type": "mbr",
+                        "role": "mbr",
+                        "id": "",
+                        "filesystem": "",
+                        "content": [
+                            {
+                                "source": "",
+                                "target": "",
+                                "image": "pc-boot.img",
+                                "offset": null,
+                                "size": 0,
+                                "unpack": false
+                            }
+                        ],
+                        "update": {
+                            "edition": 1,
+                            "preserve": null
+                        }
+                    }
+                ]
+            }
+        },
+        "Defaults": null,
+        "Connections": null,
+        "KernelCmdline": {
+            "Allow": null
+        }
+    },
+    "ImageSizes": {
+        "pc": 3155165184
+    },
+    "VolumeOrder": [
+        "pc"
+    ],
+    "VolumeNames": {
+        "pc": "pc.img"
+    }
+}

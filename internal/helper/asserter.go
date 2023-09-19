@@ -4,6 +4,8 @@ import (
 	"runtime/debug"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // Asserter for testing purposes
@@ -35,5 +37,13 @@ func (asserter *Asserter) AssertErrContains(err error, errString string) {
 			debug.PrintStack()
 			asserter.Errorf("Expected error to contain \"%s\", but got \"%s\"", errString, err.Error())
 		}
+	}
+}
+
+// AssertEqual asserts that two objects are equal using go-cmp
+func (asserter *Asserter) AssertEqual(want, got interface{}, cmpOpts ...cmp.Option) {
+	diff := cmp.Diff(want, got, cmpOpts...)
+	if want != nil && diff != "" {
+		asserter.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
