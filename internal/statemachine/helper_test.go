@@ -532,7 +532,7 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 		{"collision", [][]byte{{0, 1, 2, 3}}, [][]byte{{0, 1, 2, 3}, {4, 5, 6, 7}}, []byte{4, 5, 6, 7}, false},
 		{"broken", [][]byte{{0, 0, 0, 0}}, nil, []byte{0, 0, 0, 0}, true},
 	}
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		t.Run("test_generate_unique_diskid_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			// create a test rng reader, using data from our testcase
@@ -552,7 +552,7 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 				randRead = rand.Read
 			}()
 
-			randomBytes, err := generateUniqueDiskID(&tc.existing)
+			randomBytes, err := generateUniqueDiskID(&testCases[i].existing)
 			if tc.expectedErr {
 				asserter.AssertErrContains(err, "Failed to generate unique disk ID")
 			} else {

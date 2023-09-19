@@ -1035,7 +1035,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 		},
 	}
 
-	for _, cloudInitConfig := range cloudInitConfigs {
+	for i, cloudInitConfig := range cloudInitConfigs {
 		t.Run("test_customize_cloud_init", func(t *testing.T) {
 			// Test setup
 			asserter := helper.Asserter{T: t}
@@ -1049,11 +1049,11 @@ func TestCustomizeCloudInit(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 			defer func() {
 				if tmpErr := osRemoveAll(tmpDir); tmpErr != nil {
-			if err != nil {
+					if err != nil {
 						err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
 					} else {
 						err = tmpErr
-			}
+					}
 				}
 			}()
 			stateMachine.tempDirs.chroot = tmpDir
@@ -1063,7 +1063,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			stateMachine.ImageDef.Customization = &imagedefinition.Customization{
-				CloudInit: &cloudInitConfig,
+				CloudInit: &cloudInitConfigs[i],
 			}
 
 			// Running function to test
@@ -2158,12 +2158,12 @@ func TestCheckEmptyFields(t *testing.T) {
 		{"missing_implicitly_required", testStruct{A: "foo", C: "baz"}, false},
 		{"missing_omitempty", testStruct{A: "foo", B: "bar"}, true},
 	}
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		t.Run("test_check_empty_fields_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 
 			result := new(gojsonschema.Result)
-			err := helper.CheckEmptyFields(&tc.structData, result, schema)
+			err := helper.CheckEmptyFields(&testCases[i].structData, result, schema)
 			asserter.AssertErrNil(err, false)
 			schema.Required = append(schema.Required, "fieldA")
 
