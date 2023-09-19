@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/diskfs/go-diskfs v0.0.0-20211104185512-274de576a1a5
 	github.com/go-git/go-git/v5 v5.4.2
+	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/invopop/jsonschema v0.4.0
 	github.com/jessevdk/go-flags v1.5.1-0.20210607101731-3927b71304df

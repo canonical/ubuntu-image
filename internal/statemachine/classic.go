@@ -48,7 +48,7 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 	}
 
 	// if --resume was passed, figure out where to start
-	if err := classicStateMachine.readMetadata(); err != nil {
+	if err := classicStateMachine.readMetadataJSON(metadataStateFile); err != nil {
 		return err
 	}
 
