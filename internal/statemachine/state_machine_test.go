@@ -277,7 +277,7 @@ func (TestStateMachine *testStateMachine) Setup() error {
 	}
 
 	// if --resume was passed, figure out where to start
-	if err := TestStateMachine.readMetadataJSON(metadataStateFile); err != nil {
+	if err := TestStateMachine.readMetadata(metadataStateFile); err != nil {
 		return err
 	}
 
@@ -786,7 +786,7 @@ func TestFailedPostProcessGadgetYaml(t *testing.T) {
 	})
 }
 
-func TestStateMachine_readMetadataJSON(t *testing.T) {
+func TestStateMachine_readMetadata(t *testing.T) {
 	type args struct {
 		metadataFile string
 	}
@@ -902,7 +902,7 @@ func TestStateMachine_readMetadataJSON(t *testing.T) {
 				states: allTestStates,
 			}
 
-			err := gotStateMachine.readMetadataJSON(tc.args.metadataFile)
+			err := gotStateMachine.readMetadata(tc.args.metadataFile)
 			if tc.shouldPass {
 				asserter.AssertEqual(tc.wantStateMachine, gotStateMachine, cmpOpts...)
 			} else {
@@ -912,7 +912,7 @@ func TestStateMachine_readMetadataJSON(t *testing.T) {
 	}
 }
 
-func TestStateMachine_writeMetadataJSON(t *testing.T) {
+func TestStateMachine_writeMetadata(t *testing.T) {
 	tests := []struct {
 		name          string
 		stateMachine  *StateMachine
@@ -989,7 +989,7 @@ func TestStateMachine_writeMetadataJSON(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			tName := strings.ReplaceAll(tc.name, " ", "_")
-			err := tc.stateMachine.writeMetadataJSON(fmt.Sprintf("result_%s.json", tName))
+			err := tc.stateMachine.writeMetadata(fmt.Sprintf("result_%s.json", tName))
 
 			if tc.shouldPass {
 				want, err := os.ReadFile(filepath.Join(testDataDir, "metadata", fmt.Sprintf("reference_%s.json", tName)))

@@ -4,7 +4,6 @@ package statemachine
 
 import (
 	"crypto/rand"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -333,32 +332,8 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	return nil
 }
 
-// readMetadataGob reads info about a partial state machine encoded as gob from disk
-func (stateMachine *StateMachine) readMetadataGob() error {
-	// handle the resume case
-	if !stateMachine.stateMachineFlags.Resume {
-		return nil
-	}
-	// open the ubuntu-image.gob file and load the state
-	var partialStateMachine = new(StateMachine)
-	gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
-	gobfile, err := os.Open(gobfilePath)
-	if err != nil {
-		return fmt.Errorf("error reading metadata file: %s", err.Error())
-	}
-	defer gobfile.Close()
-
-	dec := gob.NewDecoder(gobfile)
-	err = dec.Decode(&partialStateMachine)
-	if err != nil {
-		return fmt.Errorf("failed to parse metadata file: %s", err.Error())
-	}
-
-	return stateMachine.loadState(partialStateMachine)
-}
-
-// readMetadataJSON reads info about a partial state machine encoded as JSON from disk
-func (stateMachine *StateMachine) readMetadataJSON(metadataFile string) error {
+// readMetadata reads info about a partial state machine encoded as JSON from disk
+func (stateMachine *StateMachine) readMetadata(metadataFile string) error {
 	if !stateMachine.stateMachineFlags.Resume {
 		return nil
 	}
@@ -409,9 +384,9 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	return nil
 }
 
-// writeMetadataJSON writes the state machine info to disk, encoded as JSON. This will be used when resuming a
+// writeMetadata writes the state machine info to disk, encoded as JSON. This will be used when resuming a
 // partial state machine run
-func (stateMachine *StateMachine) writeMetadataJSON(metadataFile string) error {
+func (stateMachine *StateMachine) writeMetadata(metadataFile string) error {
 	jsonfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, metadataFile)
 	jsonfile, err := os.OpenFile(jsonfilePath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil && !os.IsExist(err) {
@@ -481,5 +456,5 @@ func (stateMachine *StateMachine) Teardown() error {
 	if stateMachine.cleanWorkDir {
 		return stateMachine.cleanup()
 	}
-	return stateMachine.writeMetadataJSON(metadataStateFile)
+	return stateMachine.writeMetadata(metadataStateFile)
 }
