@@ -35,8 +35,3 @@ type UbuntuImageCommand struct {
 		ClassicOptsPassed ClassicOpts
 	} `command:"classic"`
 }
-
-type commonOptions struct {
-	CommonOptsPassed       CommonOpts
-	StateMachineOptsPassed StateMachineOpts
-}
