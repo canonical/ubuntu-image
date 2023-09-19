@@ -1,0 +1,20 @@
+linters:
+  disable-all: true
+  enable:
+    - gci
+    - errcheck
+    - gosec
+    - gosimple
+linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - Prefix(github.com/canonical/ubuntu-image)
+issues:
+  # these values ensure that all issues will be surfaced
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+run:
+  timeout: 5m
