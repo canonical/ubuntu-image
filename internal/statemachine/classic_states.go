@@ -553,7 +553,7 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 	defer func() {
 		if tmpErr := osRemoveAll(tmpGPGDir); tmpErr != nil {
 			if err != nil {
-				err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+				err = fmt.Errorf("%s after previous error: %w", tmpErr.Error(), err)
 			} else {
 				err = tmpErr
 			}
@@ -675,7 +675,7 @@ func (stateMachine *StateMachine) installPackages() error {
 		defer func(cmds []*exec.Cmd) {
 			if tmpErr := runAll(cmds); tmpErr != nil {
 				if err != nil {
-					err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+					err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
 				} else {
 					err = tmpErr
 				}
@@ -1181,7 +1181,7 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 		defer func(cmds []*exec.Cmd) {
 			if tmpErr := runAll(cmds); tmpErr != nil {
 				if err != nil {
-					err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+					err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
 				} else {
 					err = tmpErr
 				}

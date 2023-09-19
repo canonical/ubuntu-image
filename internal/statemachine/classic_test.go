@@ -1050,7 +1050,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 			defer func() {
 				if tmpErr := osRemoveAll(tmpDir); tmpErr != nil {
 					if err != nil {
-						err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
 					} else {
 						err = tmpErr
 					}
@@ -2064,7 +2064,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			defer func(cmds []*exec.Cmd) {
 				if tmpErr := runAll(cmds); tmpErr != nil {
 					if err != nil {
-						err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
 					} else {
 						err = tmpErr
 					}
@@ -2092,7 +2092,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			defer func(teardownCmd *exec.Cmd) {
 				if tmpErr := teardownCmd.Run(); tmpErr != nil {
 					if err != nil {
-						err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
 					} else {
 						err = tmpErr
 					}

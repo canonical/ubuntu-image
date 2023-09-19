@@ -1024,7 +1024,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		defer func(cmds []*exec.Cmd) {
 			if tmpErr := runAll(cmds); tmpErr != nil {
 				if err != nil {
-					err = fmt.Errorf("%w after previous error: %w", tmpErr, err)
+					err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
 				} else {
 					err = tmpErr
 				}

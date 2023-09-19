@@ -440,7 +440,7 @@ func (stateMachine *StateMachine) Run() error {
 			// clean up work dir on error
 			cleanupErr := stateMachine.cleanup()
 			if cleanupErr != nil {
-				return fmt.Errorf("error during cleanup: %w while cleaning after stateFunc error: %w", cleanupErr, err)
+				return fmt.Errorf("error during cleanup: %s while cleaning after stateFunc error: %w", cleanupErr.Error(), err)
 			}
 			return err
 		}
