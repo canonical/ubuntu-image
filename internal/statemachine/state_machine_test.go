@@ -277,7 +277,7 @@ func (TestStateMachine *testStateMachine) Setup() error {
 	}
 
 	// if --resume was passed, figure out where to start
-	if err := TestStateMachine.readMetadataGob(); err != nil {
+	if err := TestStateMachine.readMetadataJSON(metadataStateFile); err != nil {
 		return err
 	}
 
@@ -435,21 +435,6 @@ func TestSetCommonOpts(t *testing.T) {
 		if !stateMachine.commonFlags.Debug || stateMachine.stateMachineFlags.WorkDir != testDir {
 			t.Error("SetCommonOpts failed to set the correct options")
 		}
-	})
-}
-
-// TestFailedMetadataParse tests a failure in parsing the metadata file. This is accomplished
-// by giving the state machine a syntactically invalid metadata file to parse
-func TestFailedMetadataParse(t *testing.T) {
-	t.Run("test_failed_metadata_parse", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.stateMachineFlags.Resume = true
-		stateMachine.stateMachineFlags.WorkDir = "testdata"
-
-		err := stateMachine.readMetadataGob()
-		asserter.AssertErrContains(err, "failed to parse metadata file")
 	})
 }
 
