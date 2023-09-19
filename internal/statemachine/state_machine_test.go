@@ -989,7 +989,7 @@ func TestStateMachine_writeMetadataJSON(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			tName := strings.ReplaceAll(tc.name, " ", "_")
-			err := tc.stateMachine.writeMetadataJSON(fmt.Sprintf("%s.json", tName))
+			err := tc.stateMachine.writeMetadataJSON(fmt.Sprintf("result_%s.json", tName))
 
 			if tc.shouldPass {
 				want, err := os.ReadFile(filepath.Join(testDataDir, "metadata", fmt.Sprintf("reference_%s.json", tName)))
@@ -997,7 +997,7 @@ func TestStateMachine_writeMetadataJSON(t *testing.T) {
 					t.Fatal("Unable to load reference metadata file: %w", err)
 				}
 
-				got, err := os.ReadFile(filepath.Join(testDataDir, "metadata", fmt.Sprintf("%s.json", tName)))
+				got, err := os.ReadFile(filepath.Join(testDataDir, "metadata", fmt.Sprintf("result_%s.json", tName)))
 				if err != nil {
 					t.Fatal("Unable to load metadata file: %w", err)
 				}
