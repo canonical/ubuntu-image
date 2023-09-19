@@ -340,19 +340,19 @@ func (stateMachine *StateMachine) readMetadataGob() error {
 		return nil
 	}
 	// open the ubuntu-image.gob file and load the state
-		var partialStateMachine = new(StateMachine)
-		gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
-		gobfile, err := os.Open(gobfilePath)
-		if err != nil {
-			return fmt.Errorf("error reading metadata file: %s", err.Error())
-		}
-		defer gobfile.Close()
+	var partialStateMachine = new(StateMachine)
+	gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
+	gobfile, err := os.Open(gobfilePath)
+	if err != nil {
+		return fmt.Errorf("error reading metadata file: %s", err.Error())
+	}
+	defer gobfile.Close()
 
-		dec := gob.NewDecoder(gobfile)
-		err = dec.Decode(&partialStateMachine)
-		if err != nil {
-			return fmt.Errorf("failed to parse metadata file: %s", err.Error())
-		}
+	dec := gob.NewDecoder(gobfile)
+	err = dec.Decode(&partialStateMachine)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata file: %s", err.Error())
+	}
 
 	return stateMachine.loadState(partialStateMachine)
 }
@@ -388,23 +388,23 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	// delete all of the stateFuncs that have already run
 	stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
 
-		stateMachine.CurrentStep = partialStateMachine.CurrentStep
-		stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
-		stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
-		stateMachine.ImageSizes = partialStateMachine.ImageSizes
-		stateMachine.RootfsSize = partialStateMachine.RootfsSize
-		stateMachine.IsSeeded = partialStateMachine.IsSeeded
-		stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
+	stateMachine.CurrentStep = partialStateMachine.CurrentStep
+	stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
+	stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
+	stateMachine.ImageSizes = partialStateMachine.ImageSizes
+	stateMachine.RootfsSize = partialStateMachine.RootfsSize
+	stateMachine.IsSeeded = partialStateMachine.IsSeeded
+	stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
 	stateMachine.SectorSize = partialStateMachine.SectorSize
-		stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
-		stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
-		stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
+	stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
+	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
+	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
 
-		// due to https://github.com/golang/go/issues/10415 we need to set back the volume
-		// structs we reset before encoding (see writeMetadata())
-		if stateMachine.GadgetInfo != nil {
-			gadget.SetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
-		}
+	// due to https://github.com/golang/go/issues/10415 we need to set back the volume
+	// structs we reset before encoding (see writeMetadata())
+	if stateMachine.GadgetInfo != nil {
+		gadget.SetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
+	}
 
 	return nil
 }
@@ -501,12 +501,8 @@ func (stateMachine *StateMachine) Run() error {
 
 // Teardown handles anything else that needs to happen after the states have finished running
 func (stateMachine *StateMachine) Teardown() error {
-	if !stateMachine.cleanWorkDir {
-		if err := stateMachine.writeMetadata(); err != nil {
-			return err
-		}
-	} else {
-		stateMachine.cleanup()
+	if stateMachine.cleanWorkDir {
+		return stateMachine.cleanup()
 	}
-	return nil
+	return stateMachine.writeMetadataJSON()
 }
