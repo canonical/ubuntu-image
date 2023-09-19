@@ -11,8 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/commands"
-	"github.com/canonical/ubuntu-image/internal/helper"
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/google/go-cmp/cmp"
@@ -24,6 +22,9 @@ import (
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed"
 	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 const (
@@ -126,9 +127,6 @@ func mockOpenFile(string, int, os.FileMode) (*os.File, error) {
 func mockOpenFileAppend(name string, flag int, perm os.FileMode) (*os.File, error) {
 	return os.OpenFile(name, flag|os.O_APPEND, perm)
 }
-func mockOpenFileBadPerms(name string, flag int, perm os.FileMode) (*os.File, error) {
-	return os.OpenFile(name, os.O_RDONLY|os.O_CREATE, perm)
-}
 func mockRemoveAll(string) error {
 	return fmt.Errorf("Test error")
 }
@@ -190,6 +188,7 @@ var testCaseName string
 func fakeExecCommand(command string, args ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestExecHelperProcess", "--", command}
 	cs = append(cs, args...)
+	//nolint:gosec,G204
 	cmd := exec.Command(os.Args[0], cs...)
 	tc := "TEST_CASE=" + testCaseName
 	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", tc}
@@ -220,10 +219,8 @@ func TestExecHelperProcess(t *testing.T) {
 	switch os.Getenv("TEST_CASE") {
 	case "TestGeneratePackageManifest":
 		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
-		break
 	case "TestGenerateFilelist":
 		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
-		break
 	case "TestFailedPreseedClassicImage":
 		fallthrough
 	case "TestFailedUpdateGrubLosetup":
@@ -247,12 +244,10 @@ func TestExecHelperProcess(t *testing.T) {
 	case "TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
-		break
 	case "TestFailedUpdateGrubOther": // this passes the initial losetup command and fails a later command
 		if args[0] != "losetup" {
 			os.Exit(1)
 		}
-		break
 	case "TestFailedCreateChrootSkip":
 		fallthrough
 	case "TestFailedRunLiveBuild":

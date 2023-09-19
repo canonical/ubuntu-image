@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/partition"
 	"github.com/diskfs/go-diskfs/partition/gpt"
@@ -24,6 +22,9 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 // validateInput ensures that command line flags for the state machine are valid. These
@@ -511,7 +512,7 @@ func generateUniqueDiskID(existing *[][]byte) ([]byte, error) {
 			continue
 		}
 		for _, id := range *existing {
-			if bytes.Compare(randomBytes, id) == 0 {
+			if bytes.Equal(randomBytes, id) {
 				retry = true
 				break
 			}
@@ -642,9 +643,7 @@ func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
 		"--option=Dpkg::Options::=--force-confold",
 	)
 
-	for _, aptPackage := range packageList {
-		installCmd.Args = append(installCmd.Args, aptPackage)
-	}
+	installCmd.Args = append(installCmd.Args, packageList...)
 
 	// Env is sometimes used for mocking command calls in tests,
 	// so only overwrite env if it is nil
@@ -853,7 +852,7 @@ func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool
 			debugStatement = fmt.Sprintf("%s with GID %s\n", strings.TrimSpace(debugStatement), addGroup.GroupID)
 		}
 		if debug {
-			fmt.Printf(debugStatement)
+			fmt.Print(debugStatement)
 		}
 		addGroupOutput := helper.SetCommandOutput(addGroupCmd, debug)
 		err := addGroupCmd.Run()
@@ -877,7 +876,7 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 			debugStatement = fmt.Sprintf("%s with UID %s\n", strings.TrimSpace(debugStatement), addUser.UserID)
 		}
 		if debug {
-			fmt.Printf(debugStatement)
+			fmt.Print(debugStatement)
 		}
 		addUserOutput := helper.SetCommandOutput(addUserCmd, debug)
 		err := addUserCmd.Run()
@@ -895,15 +894,15 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 // uses struct tags to identify which state must be added
 func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates []stateFunc) {
 	possibleStateFunc := map[string][]stateFunc{
-		"add_extra_ppas": []stateFunc{
-			stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+		"add_extra_ppas": {
+			{"add_extra_ppas", (*StateMachine).addExtraPPAs},
 		},
-		"install_extra_packages": []stateFunc{
-			stateFunc{"install_extra_packages", (*StateMachine).installPackages},
+		"install_extra_packages": {
+			{"install_extra_packages", (*StateMachine).installPackages},
 		},
-		"install_extra_snaps": []stateFunc{
-			stateFunc{"install_extra_snaps", (*StateMachine).prepareClassicImage},
-			stateFunc{"preseed_extra_snaps", (*StateMachine).preseedClassicImage},
+		"install_extra_snaps": {
+			{"install_extra_snaps", (*StateMachine).prepareClassicImage},
+			{"preseed_extra_snaps", (*StateMachine).preseedClassicImage},
 		},
 	}
 	value := reflect.ValueOf(searchStruct)

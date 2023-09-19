@@ -11,12 +11,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 // TestMakeTemporaryDirectories tests a successful execution of the
@@ -891,8 +892,8 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 
 			// ensure the resulting image file is a multiple of the block size
 			diskImg, err := diskfs.Open(imgFile)
-			defer diskImg.File.Close()
 			asserter.AssertErrNil(err, true)
+			defer diskImg.File.Close()
 			if diskImg.Size%int64(stateMachine.SectorSize) != 0 {
 				t.Errorf("Disk image size %d is not an multiple of the block size: %d",
 					diskImg.Size, int64(stateMachine.SectorSize))

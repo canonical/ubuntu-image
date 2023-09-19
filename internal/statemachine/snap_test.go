@@ -15,9 +15,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/store"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input

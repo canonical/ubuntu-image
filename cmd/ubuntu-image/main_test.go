@@ -7,9 +7,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jessevdk/go-flags"
+
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/jessevdk/go-flags"
 )
 
 type MockedStateMachine struct {
@@ -263,7 +264,7 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 				} else {
 					err = nil
 				}
-				return tc.readFrom, func() { return }, err
+				return tc.readFrom, func() {}, err
 			}
 
 			// set up the flags for the test cases

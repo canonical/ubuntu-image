@@ -14,14 +14,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 // TestMaxOffset tests the functionality of the maxOffset function
@@ -547,13 +548,13 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 				asserter.AssertErrContains(err, "Failed to generate unique disk ID")
 			} else {
 				asserter.AssertErrNil(err, true)
-				if bytes.Compare(randomBytes, tc.expected) != 0 {
+				if !bytes.Equal(randomBytes, tc.expected) {
 					t.Errorf("Error, expected ID %v but got %v", tc.expected, randomBytes)
 				}
 				// check if the ID was added to the list of existing IDs
 				found := false
 				for _, id := range tc.existing {
-					if bytes.Compare(id, randomBytes) == 0 {
+					if bytes.Equal(id, randomBytes) {
 						found = true
 						break
 					}
@@ -576,40 +577,33 @@ func TestGetHostArch(t *testing.T) {
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", expected, hostArch)
 			}
-			break
 		case "arm":
 			expected := "armhf"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		case "arm64":
 			expected := "arm64"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		case "ppc64le":
 			expected := "ppc64el"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		case "s390x":
 			expected := "s390x"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		case "riscv64":
 			expected := "riscv64"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		default:
 			t.Skipf("Test not supported on architecture %s", runtime.GOARCH)
-			break
 		}
 	})
 }
@@ -1303,6 +1297,7 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 		// Doing the preseed at the time of the test allows it to
 		// run on each architecture and keeps the github repository
 		// free of large .snap files
+		//nolint:gosec,G204
 		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
 			"--classic", "--snap=core20", "--snap=core22", "--snap=snapd", "--snap=lxd",
 			filepath.Join("testdata", "modelAssertionClassic"),

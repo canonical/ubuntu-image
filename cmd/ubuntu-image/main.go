@@ -5,10 +5,11 @@ import (
 	"io"
 	"os"
 
+	"github.com/jessevdk/go-flags"
+
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/statemachine"
-	"github.com/jessevdk/go-flags"
 )
 
 // Version holds the ubuntu-image version number
@@ -123,7 +124,6 @@ func main() {
 					osExit(1)
 					return
 				}
-				break
 			default:
 				restoreStdout()
 				restoreStderr()

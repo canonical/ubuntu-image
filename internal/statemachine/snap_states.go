@@ -13,8 +13,7 @@ import (
 
 // Prepare the image
 func (stateMachine *StateMachine) prepareImage() error {
-	var snapStateMachine *SnapStateMachine
-	snapStateMachine = stateMachine.parent.(*SnapStateMachine)
+	snapStateMachine := stateMachine.parent.(*SnapStateMachine)
 
 	var imageOpts image.Options
 

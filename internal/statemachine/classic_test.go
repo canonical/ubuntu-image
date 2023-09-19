@@ -18,20 +18,20 @@ import (
 	"strings"
 	"testing"
 
-	"gopkg.in/yaml.v2"
-
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/pkg/xattr"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
-
-	//"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
+	"gopkg.in/yaml.v2"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
+
+var yamlMarshal = yaml.Marshal
 
 // TestClassicSetup tests a successful run of the polymorphed Setup function
 func TestClassicSetup(t *testing.T) {
@@ -1411,8 +1411,7 @@ func TestPrepareClassicImage(t *testing.T) {
 			snapInfo, err := snapStore.SnapInfo(context, snapSpec, nil)
 			asserter.AssertErrNil(err, true)
 
-			var storeRevision int
-			storeRevision = snapInfo.Channels["latest/"+snapChannel].Revision.N
+			storeRevision := snapInfo.Channels["latest/"+snapChannel].Revision.N
 			snapFileName := fmt.Sprintf("%s_%d.snap", snapName, storeRevision)
 
 			snapPath := filepath.Join(stateMachine.tempDirs.chroot,
@@ -1965,8 +1964,8 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			"var", "lib", "snapd", "seed", "seed.yaml")
 
 		seedFile, err := os.Open(seedYaml)
-		defer seedFile.Close()
 		asserter.AssertErrNil(err, true)
+		defer seedFile.Close()
 
 		var seededSnaps snapList
 		err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
@@ -2026,15 +2025,18 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		mountImageCmds = append(mountImageCmds,
 			[]*exec.Cmd{
 				// set up the loopback
+				//nolint:gosec,G204
 				exec.Command("losetup",
 					filepath.Join("/dev", "loop99"),
 					imgPath,
 				),
+				//nolint:gosec,G204
 				exec.Command("kpartx",
 					"-a",
 					filepath.Join("/dev", "loop99"),
 				),
 				// mount the rootfs partition in which to run update-grub
+				//nolint:gosec,G204
 				exec.Command("mount",
 					filepath.Join("/dev", "mapper", "loop99p3"), // with this example the rootfs is partition 3
 					mountDir,
@@ -2055,10 +2057,12 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 		// tear down the loopback
 		teardownCmds := []*exec.Cmd{
+			//nolint:gosec,G204
 			exec.Command("kpartx",
 				"-d",
 				filepath.Join("/dev", "loop99"),
 			),
+			//nolint:gosec,G204
 			exec.Command("losetup",
 				"--detach",
 				filepath.Join("/dev", "loop99"),

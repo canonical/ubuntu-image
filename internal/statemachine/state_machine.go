@@ -15,8 +15,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/internal/commands"
-	"github.com/canonical/ubuntu-image/internal/helper"
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -26,7 +24,8 @@ import (
 	"github.com/snapcore/snapd/seed"
 	"github.com/xeipuuv/gojsonschema"
 
-	"gopkg.in/yaml.v2"
+	"github.com/canonical/ubuntu-image/internal/commands"
+	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 const (
@@ -227,8 +226,8 @@ func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
 // postProcessGadgetYaml adds the rootfs to the partitions list if needed
 func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var rootfsSeen bool = false
-	var farthestOffset quantity.Offset = 0
-	var lastOffset quantity.Offset = 0
+	var farthestOffset quantity.Offset
+	var lastOffset quantity.Offset
 	var lastVolumeName string
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
