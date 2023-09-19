@@ -926,3 +926,103 @@ func TestStateMachine_readMetadataJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestStateMachine_writeMetadataJSON(t *testing.T) {
+	tests := []struct {
+		name          string
+		stateMachine  *StateMachine
+		shouldPass    bool
+		expectedError string
+	}{
+		{
+			name: "successful write",
+			stateMachine: &StateMachine{
+				stateMachineFlags: &commands.StateMachineOpts{
+					Resume:  true,
+					WorkDir: filepath.Join(testDataDir, "metadata"),
+				},
+				CurrentStep:  "",
+				StepsTaken:   2,
+				YamlFilePath: "/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
+				IsSeeded:     true,
+				SectorSize:   quantity.Size(512),
+				RootfsSize:   quantity.Size(775915520),
+				states:       allTestStates[2:],
+				GadgetInfo: &gadget.Info{
+					Volumes: map[string]*gadget.Volume{
+						"pc": {
+							Schema:     "gpt",
+							Bootloader: "grub",
+							Structure: []gadget.VolumeStructure{
+								{
+									Name:    "mbr",
+									Offset:  ptrToOffset(quantity.Offset(quantity.Size(0))),
+									MinSize: quantity.Size(440),
+									Size:    quantity.Size(440),
+									Role:    "mbr",
+									Type:    "mbr",
+									Content: []gadget.VolumeContent{
+										{
+											Image: "pc-boot.img",
+										},
+									},
+									Update: gadget.VolumeUpdate{
+										Edition: 1,
+									},
+								},
+							},
+						},
+					},
+				},
+				ImageSizes:  map[string]quantity.Size{"pc": 3155165184},
+				VolumeOrder: []string{"pc"},
+				VolumeNames: map[string]string{"pc": "pc.img"},
+				tempDirs: temporaryDirectories{
+					rootfs:  filepath.Join(testDataDir, "metadata", "root"),
+					unpack:  filepath.Join(testDataDir, "metadata", "unpack"),
+					volumes: filepath.Join(testDataDir, "metadata", "volumes"),
+				},
+			},
+			shouldPass: true,
+		},
+		{
+			name: "fail to write in inexistent directory",
+			stateMachine: &StateMachine{
+				stateMachineFlags: &commands.StateMachineOpts{
+					Resume:  true,
+					WorkDir: filepath.Join("non-existent", "metadata"),
+				},
+				CurrentStep:  "",
+				StepsTaken:   2,
+				YamlFilePath: "/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
+			},
+			shouldPass:    false,
+			expectedError: "error opening JSON metadata file for writing",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			tName := strings.ReplaceAll(tc.name, " ", "_")
+			err := tc.stateMachine.writeMetadataJSON(fmt.Sprintf("%s.json", tName))
+
+			if tc.shouldPass {
+				want, err := os.ReadFile(filepath.Join(testDataDir, "metadata", fmt.Sprintf("reference_%s.json", tName)))
+				if err != nil {
+					t.Fatal("Unable to load reference metadata file: %w", err)
+				}
+
+				got, err := os.ReadFile(filepath.Join(testDataDir, "metadata", fmt.Sprintf("%s.json", tName)))
+				if err != nil {
+					t.Fatal("Unable to load metadata file: %w", err)
+				}
+
+				asserter.AssertEqual(want, got)
+
+			} else {
+				asserter.AssertErrContains(err, tc.expectedError)
+			}
+
+		})
+	}
+}

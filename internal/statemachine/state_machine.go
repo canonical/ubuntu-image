@@ -434,8 +434,8 @@ func (stateMachine *StateMachine) writeMetadata() error {
 
 // writeMetadataJSON writes the state machine info to disk, encoded as JSON. This will be used when resuming a
 // partial state machine run
-func (stateMachine *StateMachine) writeMetadataJSON() error {
-	jsonfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.json")
+func (stateMachine *StateMachine) writeMetadataJSON(metadataFile string) error {
+	jsonfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, metadataFile)
 	jsonfile, err := os.OpenFile(jsonfilePath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("error opening JSON metadata file for writing: %s", jsonfilePath)
@@ -504,5 +504,5 @@ func (stateMachine *StateMachine) Teardown() error {
 	if stateMachine.cleanWorkDir {
 		return stateMachine.cleanup()
 	}
-	return stateMachine.writeMetadataJSON()
+	return stateMachine.writeMetadataJSON(metadataStateFile)
 }
