@@ -25,6 +25,9 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Call mount --make-rprivate and umount --recursive when undoing a bind
     mount from the host. (LP: #2033582)
 
+  [ Paul Mars ]
+  * Store state machine state as a JSON file to ease maintainability
+
  -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Fri, 14 Jul 2023 15:56:27 +0200
 
 ubuntu-image (2.2+22.10ubuntu1) kinetic; urgency=medium
