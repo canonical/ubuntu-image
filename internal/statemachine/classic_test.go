@@ -1180,10 +1180,10 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 
 			osCreate = func(name string) (*os.File, error) {
 				if strings.Contains(name, file) {
-					fileReadWrite, _ := os.Create(name)
+					fileReadWrite, err := os.Create(name)
+					asserter.AssertErrNil(err, true)
 					fileReadWrite.Close()
-					fileReadOnly, _ := os.Open(name)
-					return fileReadOnly, nil
+					return os.Open(name)
 				}
 				return os.Create(name)
 			}

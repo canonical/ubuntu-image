@@ -174,12 +174,12 @@ func mockGojsonschemaValidateError(gojsonschema.JSONLoader, gojsonschema.JSONLoa
 }
 
 func readOnlyDiskfsCreate(diskName string, size int64, format diskfs.Format, sectorSize diskfs.SectorSize) (*disk.Disk, error) {
-	diskFile, _ := os.OpenFile(diskName, os.O_RDONLY|os.O_CREATE, 0444)
+	diskFile, err := os.OpenFile(diskName, os.O_RDONLY|os.O_CREATE, 0444)
 	disk := disk.Disk{
 		File:             diskFile,
 		LogicalBlocksize: int64(sectorSize),
 	}
-	return &disk, nil
+	return &disk, err
 }
 
 // Fake exec command helper

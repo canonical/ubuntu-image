@@ -505,8 +505,11 @@ func (stateMachine *StateMachine) createChroot() error {
 	// debootstrap copies /etc/hostname from build environment; replace it
 	// with a fresh version
 	hostname := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
-	hostnameFile, _ := os.OpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
-	_, err := hostnameFile.WriteString("ubuntu\n")
+	hostnameFile, err := os.OpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open hostname file: %w", err)
+	}
+	_, err = hostnameFile.WriteString("ubuntu\n")
 	if err != nil {
 		return fmt.Errorf("unable to write hostname: %w", err)
 	}
@@ -523,7 +526,10 @@ func (stateMachine *StateMachine) createChroot() error {
 	aptSources := classicStateMachine.ImageDef.GeneratePocketList()
 
 	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
-	sourcesListFile, _ := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
+	sourcesListFile, err := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open sources.list file: %w", err)
+	}
 	for _, aptSource := range aptSources {
 		_, err = sourcesListFile.WriteString(aptSource)
 		if err != nil {
