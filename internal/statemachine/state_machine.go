@@ -4,7 +4,6 @@ package statemachine
 
 import (
 	"crypto/rand"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,6 +27,10 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 
 	"gopkg.in/yaml.v2"
+)
+
+const (
+	metadataStateFile = "ubuntu-image.json"
 )
 
 // define some functions that can be mocked by test cases
@@ -329,66 +332,76 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	return nil
 }
 
-// readMetadata reads info about a partial state machine from disk
-func (stateMachine *StateMachine) readMetadata() error {
-	// handle the resume case
-	if stateMachine.stateMachineFlags.Resume {
-		// open the ubuntu-image.gob file and determine the state
-		var partialStateMachine = new(StateMachine)
-		gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
-		gobfile, err := os.Open(gobfilePath)
-		if err != nil {
-			return fmt.Errorf("error reading metadata file: %s", err.Error())
-		}
-		defer gobfile.Close()
-		dec := gob.NewDecoder(gobfile)
-		err = dec.Decode(&partialStateMachine)
-		if err != nil {
-			return fmt.Errorf("failed to parse metadata file: %s", err.Error())
-		}
-		stateMachine.CurrentStep = partialStateMachine.CurrentStep
-		stateMachine.StepsTaken = partialStateMachine.StepsTaken
-		stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
-		stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
-		stateMachine.ImageSizes = partialStateMachine.ImageSizes
-		stateMachine.RootfsSize = partialStateMachine.RootfsSize
-		stateMachine.IsSeeded = partialStateMachine.IsSeeded
-		stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
-		stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
-		stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
-		stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
-
-		// delete all of the stateFuncs that have already run
-		stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
-
-		// due to https://github.com/golang/go/issues/10415 we need to set back the volume
-		// structs we reset before encoding (see writeMetadata())
-		if stateMachine.GadgetInfo != nil {
-			gadget.SetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
-		}
+// readMetadata reads info about a partial state machine encoded as JSON from disk
+func (stateMachine *StateMachine) readMetadata(metadataFile string) error {
+	if !stateMachine.stateMachineFlags.Resume {
+		return nil
 	}
+	// open the ubuntu-image.json file and load the state
+	var partialStateMachine = &StateMachine{}
+	jsonfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, metadataFile)
+	jsonfile, err := os.ReadFile(jsonfilePath)
+	if err != nil {
+		return fmt.Errorf("error reading metadata file: %s", err.Error())
+	}
+
+	err = json.Unmarshal(jsonfile, partialStateMachine)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata file: %s", err.Error())
+	}
+
+	return stateMachine.loadState(partialStateMachine)
+}
+
+func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) error {
+	stateMachine.StepsTaken = partialStateMachine.StepsTaken
+
+	if stateMachine.StepsTaken > len(stateMachine.states) {
+		return fmt.Errorf("invalid steps taken count (%d). The state machine only have %d steps", stateMachine.StepsTaken, len(stateMachine.states))
+	}
+
+	// delete all of the stateFuncs that have already run
+	stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
+
+	stateMachine.CurrentStep = partialStateMachine.CurrentStep
+	stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
+	stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
+	stateMachine.ImageSizes = partialStateMachine.ImageSizes
+	stateMachine.RootfsSize = partialStateMachine.RootfsSize
+	stateMachine.IsSeeded = partialStateMachine.IsSeeded
+	stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
+	stateMachine.SectorSize = partialStateMachine.SectorSize
+	stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
+	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
+	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
+
+	// due to https://github.com/golang/go/issues/10415 we need to set back the volume
+	// structs we reset before encoding (see writeMetadata())
+	if stateMachine.GadgetInfo != nil {
+		gadget.SetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
+	}
+
 	return nil
 }
 
-// writeMetadata writes the state machine info to disk. This will be used when resuming a
+// writeMetadata writes the state machine info to disk, encoded as JSON. This will be used when resuming a
 // partial state machine run
-func (stateMachine *StateMachine) writeMetadata() error {
-	gobfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "ubuntu-image.gob")
-	gobfile, err := os.OpenFile(gobfilePath, os.O_CREATE|os.O_WRONLY, 0644)
+func (stateMachine *StateMachine) writeMetadata(metadataFile string) error {
+	jsonfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, metadataFile)
+	jsonfile, err := os.OpenFile(jsonfilePath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("error opening metadata file for writing: %s", gobfilePath)
+		return fmt.Errorf("error opening JSON metadata file for writing: %s", jsonfilePath)
 	}
-	defer gobfile.Close()
-	enc := gob.NewEncoder(gobfile)
+	defer jsonfile.Close()
 
-	// due to https://github.com/golang/go/issues/10415 we need to reset potentially tricky
-	// fields in the gadget before encoding
-	if stateMachine.GadgetInfo != nil {
-		gadget.ResetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
+	b, err := json.Marshal(stateMachine)
+	if err != nil {
+		return fmt.Errorf("failed to JSON encode metadata: %w", err)
 	}
 
-	if err := enc.Encode(stateMachine); err != nil {
-		return fmt.Errorf("failed to encode metatdata: %s", err.Error())
+	_, err = jsonfile.Write(b)
+	if err != nil {
+		return fmt.Errorf("failed to write metadata to file: %w", err)
 	}
 	return nil
 }
@@ -440,12 +453,8 @@ func (stateMachine *StateMachine) Run() error {
 
 // Teardown handles anything else that needs to happen after the states have finished running
 func (stateMachine *StateMachine) Teardown() error {
-	if !stateMachine.cleanWorkDir {
-		if err := stateMachine.writeMetadata(); err != nil {
-			return err
-		}
-	} else {
-		stateMachine.cleanup()
+	if stateMachine.cleanWorkDir {
+		return stateMachine.cleanup()
 	}
-	return nil
+	return stateMachine.writeMetadata(metadataStateFile)
 }

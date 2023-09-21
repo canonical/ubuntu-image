@@ -48,7 +48,7 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 	}
 
 	// if --resume was passed, figure out where to start
-	if err := snapStateMachine.readMetadata(); err != nil {
+	if err := snapStateMachine.readMetadata(metadataStateFile); err != nil {
 		return err
 	}
 
