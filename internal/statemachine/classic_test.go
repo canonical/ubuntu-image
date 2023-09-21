@@ -2751,6 +2751,29 @@ func TestFailedCreateChroot(t *testing.T) {
 		asserter.AssertErrContains(err, "Error running debootstrap command")
 		execCommand = exec.Command
 
+		// Check if failure of open hostname file is detected
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		err = stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// Prepare a fallthrough debootstrap
+		testCaseName = "TestFailedCreateChrootNoHostname"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+
+		err = stateMachine.createChroot()
+		asserter.AssertErrContains(err, "unable to open hostname file")
+
+		osOpenFile = os.OpenFile
+		execCommand = exec.Command
+
 		// Check if failure of truncation is detected
 
 		// Clean the work directory
@@ -2760,10 +2783,6 @@ func TestFailedCreateChroot(t *testing.T) {
 
 		// Prepare a fallthrough debootstrap
 		testCaseName = "TestFailedCreateChrootSkip"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
 		osTruncate = mockTruncate
 		defer func() {
 			osTruncate = os.Truncate

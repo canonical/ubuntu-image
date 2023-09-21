@@ -248,6 +248,8 @@ func TestExecHelperProcess(t *testing.T) {
 		if args[0] != "losetup" {
 			os.Exit(1)
 		}
+	case "TestFailedCreateChrootNoHostname":
+		fallthrough
 	case "TestFailedCreateChrootSkip":
 		fallthrough
 	case "TestFailedRunLiveBuild":
