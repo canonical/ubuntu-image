@@ -992,6 +992,27 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 			shouldPass: true,
 		},
 		{
+			name: "fail to marshall an invalid stateMachine - use a GadgetInfo with a channel",
+			stateMachine: &StateMachine{
+				stateMachineFlags: &commands.StateMachineOpts{
+					Resume:  true,
+					WorkDir: filepath.Join(testDataDir, "metadata"),
+				},
+				GadgetInfo: &gadget.Info{
+					Defaults: map[string]map[string]interface{}{
+						"key": {
+							"key": make(chan int),
+						},
+					},
+				},
+				CurrentStep:  "",
+				StepsTaken:   2,
+				YamlFilePath: "/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
+			},
+			shouldPass:    false,
+			expectedError: "failed to JSON encode metadata",
+		},
+		{
 			name: "fail to write in inexistent directory",
 			stateMachine: &StateMachine{
 				stateMachineFlags: &commands.StateMachineOpts{
