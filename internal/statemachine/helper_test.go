@@ -1375,6 +1375,9 @@ func TestFailedUpdateGrub(t *testing.T) {
 		testCaseName = "TestFailedUpdateGrubOther"
 		err = stateMachine.updateGrub("", 0)
 		asserter.AssertErrContains(err, "Error running command")
+		// check defered function failed and wrapped the error
+		asserter.AssertErrContains(err, "Unable to execute teardown cmd")
+		asserter.AssertErrContains(err, "Unable to unmount")
 		execCommand = exec.Command
 	})
 }

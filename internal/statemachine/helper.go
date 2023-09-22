@@ -973,10 +973,10 @@ func runAll(cmds []*exec.Cmd) error {
 }
 
 // updateGrub mounts the resulting image and runs update-grub
-func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) error {
+func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) (err error) {
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
-	err := osMkdir(mountDir, 0755)
+	err = osMkdir(mountDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
 	}
@@ -996,12 +996,14 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		stateMachine.commonFlags.SectorSize,
 		imgPath,
 	)
-	losetupOutput, err := losetupCmd.Output()
+	var losetupOutput []byte
+	losetupOutput, err = losetupCmd.Output()
 	if err != nil {
-		return fmt.Errorf("Error running losetup command \"%s\". Error is %s",
+		err = fmt.Errorf("Error running losetup command \"%s\". Error is %s",
 			losetupCmd.String(),
 			err.Error(),
 		)
+		return err
 	}
 	loopUsed := strings.TrimSpace(string(losetupOutput))
 
@@ -1024,7 +1026,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		defer func(cmds []*exec.Cmd) {
 			if tmpErr := runAll(cmds); tmpErr != nil {
 				if err != nil {
-					err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
+					err = fmt.Errorf("Unable to unmount: %s after previous error: %w", tmpErr, err)
 				} else {
 					err = tmpErr
 				}
@@ -1082,7 +1084,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	defer func() {
 		if tmpErr := teardownCmd.Run(); tmpErr != nil {
 			if err != nil {
-				err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
+				err = fmt.Errorf("Unable to execute teardown cmd: %s after previous error: %w", tmpErr, err)
 			} else {
 				err = tmpErr
 			}
@@ -1093,10 +1095,11 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	// now run all the commands
 	for _, cmd := range updateGrubCmds {
 		cmdOutput := helper.SetCommandOutput(cmd, stateMachine.commonFlags.Debug)
-		err := cmd.Run()
+		err = cmd.Run()
 		if err != nil {
-			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+			err = fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
 				cmd.String(), err.Error(), cmdOutput.String())
+			return err
 		}
 	}
 

@@ -541,23 +541,26 @@ func (stateMachine *StateMachine) createChroot() error {
 }
 
 // add PPAs to the apt sources list
-func (stateMachine *StateMachine) addExtraPPAs() error {
+func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// create /etc/apt/sources.list.d in the chroot if it doesn't already exist
 	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
-	err := osMkdir(sourcesListD, 0755)
+	err = osMkdir(sourcesListD, 0755)
 	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
+		err = fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
+		return err
 	}
 
 	// now create the ppa sources.list files
 	tmpGPGDir, err := osMkdirTemp("/tmp", "ubuntu-image-gpg")
 	if err != nil {
-		return fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
+		err = fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
+		return err
 	}
 	defer func() {
-		if tmpErr := osRemoveAll(tmpGPGDir); tmpErr != nil {
+		tmpErr := osRemoveAll(tmpGPGDir)
+		if tmpErr != nil {
 			if err != nil {
 				err = fmt.Errorf("%s after previous error: %w", tmpErr.Error(), err)
 			} else {
@@ -569,14 +572,17 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 		ppaFileName, ppaFileContents := createPPAInfo(ppa,
 			classicStateMachine.ImageDef.Series)
 
+		var ppaIO *os.File
 		ppaFile := filepath.Join(sourcesListD, ppaFileName)
-		ppaIO, err := osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+		ppaIO, err = osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
+			err = fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
+			return err
 		}
 		_, err = ppaIO.Write([]byte(ppaFileContents))
 		if err != nil {
-			return fmt.Errorf("unable to write ppa file %s: %w", ppaFile, err)
+			err = fmt.Errorf("unable to write ppa file %s: %w", ppaFile, err)
+			return err
 		}
 		ppaIO.Close()
 
@@ -591,12 +597,14 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 			"etc", "apt", "trusted.gpg.d", keyFileName)
 		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, stateMachine.commonFlags.Debug)
 		if err != nil {
-			return fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
+			err = fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
 				ppa.PPAName, err.Error())
+			return err
 		}
 	}
-	if err := osRemoveAll(tmpGPGDir); err != nil {
-		return fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
+	if err = osRemoveAll(tmpGPGDir); err != nil {
+		err = fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
+		return err
 	}
 
 	return nil
@@ -983,10 +991,8 @@ func (stateMachine *StateMachine) customizeFstab() error {
 		fstabEntries = append(fstabEntries, fstabEntry)
 	}
 	_, err = fstabIO.Write([]byte(strings.Join(fstabEntries, "\n") + "\n"))
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return err
 }
 
 // Handle any manual customizations specified in the image definition

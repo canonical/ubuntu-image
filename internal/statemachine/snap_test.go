@@ -177,10 +177,11 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 	})
 }
 
-// TestFailedPrepareImage tests a failure in the call to image.Prepare. This is easy to achieve
-// by attempting to use --disable-console-conf with a core20 image
+// TestFailedPrepareImage tests prepareImage
 func TestFailedPrepareImage(t *testing.T) {
-	t.Run("test_failed_prepare_image", func(t *testing.T) {
+	// Test a failure in the call to image.Prepare. This is easy to achieve
+	// by attempting to use --disable-console-conf with a core20 image
+	t.Run("test_failed_prepare_image_imagePrepare", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -195,11 +196,37 @@ func TestFailedPrepareImage(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.Run()
+		fmt.Print(err)
 		asserter.AssertErrContains(err, "Error preparing image")
 
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
 	})
+
+	t.Run("test_failed_prepare_image_snap_revision", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine SnapStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
+		stateMachine.Opts.Revisions = map[string]int{
+			"test": 0,
+		}
+
+		err := stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		fmt.Print(err)
+		asserter.AssertErrContains(err, "error dealing with snap revision")
+
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
+	})
+
 }
 
 // TestPopulateSnapRootfsContents runs the state machine through populate_rootfs_contents and examines

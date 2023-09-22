@@ -2943,6 +2943,23 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		asserter.AssertErrContains(err, "Error removing temporary gpg directory")
 		osRemoveAll = os.RemoveAll
 
+		// Test failing osRemoveAll in defered function
+		// mock os.RemoveAll
+		osRemoveAll = mockRemoveAll
+		defer func() {
+			osRemoveAll = os.RemoveAll
+		}()
+		// mock os.OpenFile
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error creating")
+		asserter.AssertErrContains(err, "after previous error")
+		osRemoveAll = os.RemoveAll
+		osOpenFile = os.OpenFile
+
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
