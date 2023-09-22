@@ -562,7 +562,7 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 				}
 				// check if the ID was added to the list of existing IDs
 				found := false
-				for _, id := range tc.existing {
+				for _, id := range testCases[i].existing {
 					if bytes.Equal(id, randomBytes) {
 						found = true
 						break
