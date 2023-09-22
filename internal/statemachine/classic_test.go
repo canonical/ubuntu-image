@@ -2062,13 +2062,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			mountImageCmds = append(mountImageCmds, mountCmds...)
 			umountImageCmds = append(umountImageCmds, umountCmds...)
 			defer func(cmds []*exec.Cmd) {
-				if tmpErr := runAll(cmds); tmpErr != nil {
-					if err != nil {
-						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
-					} else {
-						err = tmpErr
-					}
-				}
+				_ = runAll(cmds)
 			}(umountCmds)
 		}
 		// make sure to unmount the disk too

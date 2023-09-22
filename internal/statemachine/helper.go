@@ -1024,13 +1024,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		updateGrubCmds = append(updateGrubCmds, mountCmds...)
 		umounts = append(umounts, umountCmds...)
 		defer func(cmds []*exec.Cmd) {
-			if tmpErr := runAll(cmds); tmpErr != nil {
-				if err != nil {
-					err = fmt.Errorf("Unable to unmount: %s after previous error: %w", tmpErr, err)
-				} else {
-					err = tmpErr
-				}
-			}
+			_ = runAll(cmds)
 		}(umountCmds)
 
 	}
@@ -1082,13 +1076,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		loopUsed,
 	)
 	defer func() {
-		if tmpErr := teardownCmd.Run(); tmpErr != nil {
-			if err != nil {
-				err = fmt.Errorf("Unable to execute teardown cmd: %s after previous error: %w", tmpErr, err)
-			} else {
-				err = tmpErr
-			}
-		}
+		_ = teardownCmd.Run()
 	}()
 	updateGrubCmds = append(updateGrubCmds, teardownCmd)
 

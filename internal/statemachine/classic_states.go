@@ -687,14 +687,9 @@ func (stateMachine *StateMachine) installPackages() error {
 			}
 		}
 		defer func(cmds []*exec.Cmd) {
-			if tmpErr := runAll(cmds); tmpErr != nil {
-				if err != nil {
-					err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
-				} else {
-					err = tmpErr
-				}
-			}
+			_ = runAll(cmds)
 		}(umountCmds)
+
 		installPackagesCmds = append(installPackagesCmds, mountCmds...)
 		umounts = append(umounts, umountCmds...)
 	}
@@ -1165,7 +1160,6 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 
 // preseedClassicImage preseeds the snaps that have already been staged in the chroot
 func (stateMachine *StateMachine) preseedClassicImage() error {
-	var err error
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// create some directories in the chroot that we will bind mount from the
@@ -1190,18 +1184,13 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	var umountCmds []*exec.Cmd
 	for _, mountPoint := range mountPoints {
 		thisMountCmds, thisUmountCmds := mountFromHost(stateMachine.tempDirs.chroot, mountPoint)
-		defer func(cmds []*exec.Cmd) {
-			if tmpErr := runAll(cmds); tmpErr != nil {
-				if err != nil {
-					err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
-				} else {
-					err = tmpErr
-				}
-			}
-		}(umountCmds)
 		mountCmds = append(mountCmds, thisMountCmds...)
 		umountCmds = append(umountCmds, thisUmountCmds...)
 	}
+
+	defer func(cmds []*exec.Cmd) {
+		_ = runAll(cmds)
+	}(umountCmds)
 
 	// assemble the commands in the correct order: mount, preseed, unmount
 	preseedCmds = append(preseedCmds, mountCmds...)
