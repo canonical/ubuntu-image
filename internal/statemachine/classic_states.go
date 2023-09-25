@@ -1017,9 +1017,25 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 func (stateMachine *StateMachine) customizeFstab() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
+	fstabPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab")
+
 	// open /etc/fstab for writing
-	fstabIO, err := osOpenFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
-		os.O_CREATE|os.O_WRONLY, 0644)
+	flags := os.O_CREATE | os.O_RDWR
+	if classicStateMachine.ImageDef.Customization.FstabTruncate {
+		flags = flags | os.O_TRUNC
+	} else {
+		flags = flags | os.O_APPEND
+	}
+
+	// check if fstab is empty
+	info, err := os.Stat(fstabPath) // an error means the file do not exist, which is fine
+	emptyFstab := true
+
+	if err == nil && info.Size() != 0 {
+		emptyFstab = false
+	}
+
+	fstabIO, err := osOpenFile(fstabPath, flags, 0644)
 	if err != nil {
 		return fmt.Errorf("Error opening fstab: %s", err.Error())
 	}
@@ -1043,6 +1059,14 @@ func (stateMachine *StateMachine) customizeFstab() error {
 		)
 		fstabEntries = append(fstabEntries, fstabEntry)
 	}
+
+	if !classicStateMachine.ImageDef.Customization.FstabTruncate && !emptyFstab {
+		_, err = fstabIO.Write([]byte("\n"))
+		if err != nil {
+			return err
+		}
+	}
+
 	_, err = fstabIO.Write([]byte(strings.Join(fstabEntries, "\n") + "\n"))
 
 	return err

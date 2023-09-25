@@ -256,6 +256,10 @@ The following specification defines what is supported in the YAML:
              dump: <bool> (optional)
              # the order to fsck the filesystem
              fsck-order: <int>
+         # Define what to do with the existing (if any) fstab file. 
+         # Default to "false", which will keep existing entries and append new
+         # ones (if any)
+         fstab_truncate: <bool> (optional)
        artifacts:
          # Used to specify that ubuntu-image should create a .img file.
          img: (optional)

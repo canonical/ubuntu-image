@@ -3631,7 +3631,8 @@ func TestCustomizeFstab(t *testing.T) {
 					FsckOrder:    1,
 				},
 			},
-			expectedFstab: `LABEL=writable	/	ext4	defaults	1	1
+			expectedFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1
+LABEL=writable	/	ext4	defaults	1	1
 `,
 			existingFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1`,
 		},

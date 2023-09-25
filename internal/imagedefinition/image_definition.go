@@ -76,6 +76,7 @@ type Customization struct {
 	ExtraPackages []*Package `yaml:"extra-packages" json:"ExtraPackages,omitempty" extra_step_prebuilt_rootfs:"install_extra_packages"`
 	ExtraSnaps    []*Snap    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"    extra_step_prebuilt_rootfs:"install_extra_snaps"`
 	Fstab         []*Fstab   `yaml:"fstab"          json:"Fstab,omitempty"`
+	FstabTruncate bool       `yaml:"fstab_truncate" json:"FstabTruncate,omitempty" default:"false"`
 	Manual        *Manual    `yaml:"manual"         json:"Manual,omitempty"`
 }
 
