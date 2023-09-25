@@ -3602,10 +3602,11 @@ func TestCustomizeFstab(t *testing.T) {
 		name          string
 		fstab         []*imagedefinition.Fstab
 		expectedFstab string
+		existingFstab string
 	}{
 		{
-			"one_entry",
-			[]*imagedefinition.Fstab{
+			name: "one_entry to an empty fstab",
+			fstab: []*imagedefinition.Fstab{
 				{
 					Label:        "writable",
 					Mountpoint:   "/",
@@ -3615,12 +3616,28 @@ func TestCustomizeFstab(t *testing.T) {
 					FsckOrder:    1,
 				},
 			},
-			`LABEL=writable	/	ext4	defaults	1	1
+			expectedFstab: `LABEL=writable	/	ext4	defaults	1	1
 `,
 		},
 		{
-			"two_entries",
-			[]*imagedefinition.Fstab{
+			name: "one_entry to a non-empty fstab",
+			fstab: []*imagedefinition.Fstab{
+				{
+					Label:        "writable",
+					Mountpoint:   "/",
+					FSType:       "ext4",
+					MountOptions: "defaults",
+					Dump:         true,
+					FsckOrder:    1,
+				},
+			},
+			expectedFstab: `LABEL=writable	/	ext4	defaults	1	1
+`,
+			existingFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1`,
+		},
+		{
+			name: "two_entries",
+			fstab: []*imagedefinition.Fstab{
 				{
 					Label:        "writable",
 					Mountpoint:   "/",
@@ -3638,13 +3655,13 @@ func TestCustomizeFstab(t *testing.T) {
 					FsckOrder:    1,
 				},
 			},
-			`LABEL=writable	/	ext4	defaults	0	1
+			expectedFstab: `LABEL=writable	/	ext4	defaults	0	1
 LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 `,
 		},
 		{
-			"defaults_assumed",
-			[]*imagedefinition.Fstab{
+			name: "defaults_assumed",
+			fstab: []*imagedefinition.Fstab{
 				{
 					Label:      "writable",
 					Mountpoint: "/",
@@ -3652,7 +3669,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 					FsckOrder:  1,
 				},
 			},
-			`LABEL=writable	/	ext4	defaults	0	1
+			expectedFstab: `LABEL=writable	/	ext4	defaults	0	1
 `,
 		},
 	}
@@ -3687,13 +3704,19 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0644)
 			asserter.AssertErrNil(err, true)
 
+			fstabPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab")
+
+			// simulate an already existing fstab file
+			if len(tc.existingFstab) != 0 {
+				err = osWriteFile(fstabPath, []byte(tc.existingFstab), 0644)
+				asserter.AssertErrNil(err, true)
+			}
+
 			// customize the fstab, ensure no errors, and check the contents
 			err = stateMachine.customizeFstab()
 			asserter.AssertErrNil(err, true)
 
-			fstabBytes, err := os.ReadFile(
-				filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
-			)
+			fstabBytes, err := os.ReadFile(fstabPath)
 			asserter.AssertErrNil(err, true)
 
 			if string(fstabBytes) != tc.expectedFstab {
