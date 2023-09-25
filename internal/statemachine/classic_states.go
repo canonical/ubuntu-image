@@ -27,8 +27,11 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
-var seedVersionRegex = regexp.MustCompile(`^[a-z0-9].*`)
-var localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
+var (
+	seedVersionRegex = regexp.MustCompile(`^[a-z0-9].*`)
+	fstabRegex       = regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
+	localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
+)
 
 // parseImageDefinition parses the provided yaml file and ensures it is valid
 func (stateMachine *StateMachine) parseImageDefinition() error {
@@ -1289,24 +1292,30 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 		}
 	}
 
-	if classicStateMachine.ImageDef.Customization != nil {
-		if len(classicStateMachine.ImageDef.Customization.Fstab) == 0 {
-			fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
-			fstabBytes, err := osReadFile(fstabPath)
-			if err == nil {
-				if !strings.Contains(string(fstabBytes), "LABEL=writable") {
-					re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
-					newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
-					if !strings.Contains(string(newContents), "LABEL=writable") {
-						newContents = []byte("LABEL=writable   /    ext4   defaults    0 0\n")
-					}
-					err := osWriteFile(fstabPath, newContents, 0644)
-					if err != nil {
-						return fmt.Errorf("Error writing to fstab: %s", err.Error())
-					}
-				}
-			}
-		}
+	if classicStateMachine.ImageDef.Customization == nil {
+		return nil
+	}
+
+	if len(classicStateMachine.ImageDef.Customization.Fstab) != 0 {
+		return nil
+	}
+
+	fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
+	fstabBytes, err := osReadFile(fstabPath)
+	if err != nil {
+		return fmt.Errorf("Error reading fstab: %s", err.Error())
+	}
+
+	if strings.Contains(string(fstabBytes), "LABEL=writable") {
+		return nil
+	}
+	newContents := fstabRegex.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
+	if !strings.Contains(string(newContents), "LABEL=writable") {
+		newContents = []byte("LABEL=writable   /    ext4   defaults    0 0\n")
+	}
+	err = osWriteFile(fstabPath, newContents, 0644)
+	if err != nil {
+		return fmt.Errorf("Error writing to fstab: %s", err.Error())
 	}
 	return nil
 }
