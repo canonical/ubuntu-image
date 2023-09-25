@@ -33,6 +33,7 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Add experimental ubuntu-image 'pack' support
   * Support the keep-enabled parameter in ubuntu-image extra-ppas
   * Clean image build leftovers
+  * Make sure the fstab file is cleanly overridden (LP: #2031889)
 
   [ Alfonso Sanchez-Beato ]
   * Update to latest snapd, adapting to changes in layouts code.
