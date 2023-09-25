@@ -9,8 +9,3 @@ type ClassicArgs struct {
 type ClassicOpts struct {
 	AptParams []string `long:"apt-params" description:"Any additional APT specific configuration needed for the image build."` // TODO: is this used?
 }
-
-type classicCommand struct {
-	ClassicArgsPassed ClassicArgs `positional-args:"true" required:"false"`
-	ClassicOptsPassed ClassicOpts
-}

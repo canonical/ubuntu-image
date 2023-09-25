@@ -14,8 +14,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/image/preseed"
@@ -24,14 +22,17 @@ import (
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
-
 	"gopkg.in/yaml.v2"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
+
+var seedVersionRegex = regexp.MustCompile(`^[a-z0-9].*`)
 
 // parseImageDefinition parses the provided yaml file and ensures it is valid
 func (stateMachine *StateMachine) parseImageDefinition() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// Open and decode the yaml file
 	var imageDefinition imagedefinition.ImageDefinition
@@ -205,8 +206,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 // If a new possible state is added to the classic build state machine, it
 // should be added here (usually basing on contents of the image definition)
 func (stateMachine *StateMachine) calculateStates() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	var rootfsCreationStates []stateFunc
 
@@ -222,7 +222,6 @@ func (stateMachine *StateMachine) calculateStates() error {
 		case "prebuilt":
 			rootfsCreationStates = append(rootfsCreationStates,
 				stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree})
-			break
 		}
 
 		// Load the gadget yaml after the gadget is built
@@ -382,8 +381,7 @@ func (stateMachine *StateMachine) calculateStates() error {
 
 // Build the gadget tree
 func (stateMachine *StateMachine) buildGadgetTree() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// make the gadget directory under scratch
 	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
@@ -401,7 +399,6 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 			return fmt.Errorf("Error cloning gadget repository: \"%s\"", err.Error())
 		}
 		sourceDir = gadgetDir
-		break
 	case "directory":
 		// no need to check error here as the validity of the URL
 		// has been confirmed by the schema validation
@@ -420,7 +417,6 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		}
 
 		sourceDir = filepath.Join(gadgetDir)
-		break
 	}
 
 	// now run "make" to build the gadget tree
@@ -453,8 +449,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 
 // Prepare the gadget tree
 func (stateMachine *StateMachine) prepareGadgetTree() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 	gadgetDir := filepath.Join(classicStateMachine.tempDirs.unpack, "gadget")
 	err := osMkdirAll(gadgetDir, 0755)
 	if err != nil && !os.IsExist(err) {
@@ -489,8 +484,7 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 // Bootstrap a chroot environment to install packages in. It will eventually
 // become the rootfs of the image
 func (stateMachine *StateMachine) createChroot() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	if err := osMkdir(stateMachine.tempDirs.chroot, 0755); err != nil {
 		return fmt.Errorf("Failed to create chroot directory: %s", err.Error())
@@ -511,14 +505,20 @@ func (stateMachine *StateMachine) createChroot() error {
 	// debootstrap copies /etc/hostname from build environment; replace it
 	// with a fresh version
 	hostname := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
-	hostnameFile, _ := os.OpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
-	hostnameFile.WriteString("ubuntu\n")
+	hostnameFile, err := osOpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open hostname file: %w", err)
+	}
+	_, err = hostnameFile.WriteString("ubuntu\n")
+	if err != nil {
+		return fmt.Errorf("unable to write hostname: %w", err)
+	}
 	hostnameFile.Close()
 
 	// debootstrap also copies /etc/resolv.conf from build environment; truncate it
 	// as to not leak the host files into the built image
 	resolvConf := filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf")
-	if err := osTruncate(resolvConf, 0); err != nil {
+	if err = osTruncate(resolvConf, 0); err != nil {
 		return fmt.Errorf("Error truncating resolv.conf: %s", err.Error())
 	}
 
@@ -526,42 +526,64 @@ func (stateMachine *StateMachine) createChroot() error {
 	aptSources := classicStateMachine.ImageDef.GeneratePocketList()
 
 	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
-	sourcesListFile, _ := os.OpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
+	sourcesListFile, err := osOpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open sources.list file: %w", err)
+	}
 	for _, aptSource := range aptSources {
-		sourcesListFile.WriteString(aptSource)
+		_, err = sourcesListFile.WriteString(aptSource)
+		if err != nil {
+			return fmt.Errorf("unable to write apt sources: %w", err)
+		}
 	}
 
 	return nil
 }
 
 // add PPAs to the apt sources list
-func (stateMachine *StateMachine) addExtraPPAs() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+func (stateMachine *StateMachine) addExtraPPAs() (err error) {
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// create /etc/apt/sources.list.d in the chroot if it doesn't already exist
 	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
-	err := osMkdir(sourcesListD, 0755)
+	err = osMkdir(sourcesListD, 0755)
 	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
+		err = fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
+		return err
 	}
 
 	// now create the ppa sources.list files
 	tmpGPGDir, err := osMkdirTemp("/tmp", "ubuntu-image-gpg")
 	if err != nil {
-		return fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
+		err = fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
+		return err
 	}
-	defer osRemoveAll(tmpGPGDir)
+	defer func() {
+		tmpErr := osRemoveAll(tmpGPGDir)
+		if tmpErr != nil {
+			if err != nil {
+				err = fmt.Errorf("%s after previous error: %w", tmpErr.Error(), err)
+			} else {
+				err = tmpErr
+			}
+		}
+	}()
 	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
 		ppaFileName, ppaFileContents := createPPAInfo(ppa,
 			classicStateMachine.ImageDef.Series)
 
+		var ppaIO *os.File
 		ppaFile := filepath.Join(sourcesListD, ppaFileName)
-		ppaIO, err := osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+		ppaIO, err = osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
+			err = fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
+			return err
 		}
-		ppaIO.Write([]byte(ppaFileContents))
+		_, err = ppaIO.Write([]byte(ppaFileContents))
+		if err != nil {
+			err = fmt.Errorf("unable to write ppa file %s: %w", ppaFile, err)
+			return err
+		}
 		ppaIO.Close()
 
 		// Import keys either from the specified fingerprint or via the Launchpad API
@@ -575,12 +597,14 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 			"etc", "apt", "trusted.gpg.d", keyFileName)
 		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, stateMachine.commonFlags.Debug)
 		if err != nil {
-			return fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
+			err = fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
 				ppa.PPAName, err.Error())
+			return err
 		}
 	}
-	if err := osRemoveAll(tmpGPGDir); err != nil {
-		return fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
+	if err = osRemoveAll(tmpGPGDir); err != nil {
+		err = fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
+		return err
 	}
 
 	return nil
@@ -593,8 +617,7 @@ func (stateMachine *StateMachine) addExtraPPAs() error {
 // 3. Run `apt install <package list>` in the chroot
 // 4. Unmount /proc /sys /dev and /run
 func (stateMachine *StateMachine) installPackages() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// copy /etc/resolv.conf from the host system into the chroot
 	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
@@ -663,7 +686,10 @@ func (stateMachine *StateMachine) installPackages() error {
 
 			}
 		}
-		defer runAll(umountCmds)
+		defer func(cmds []*exec.Cmd) {
+			_ = runAll(cmds)
+		}(umountCmds)
+
 		installPackagesCmds = append(installPackagesCmds, mountCmds...)
 		umounts = append(umounts, umountCmds...)
 	}
@@ -688,8 +714,7 @@ func (stateMachine *StateMachine) installPackages() error {
 // Verify artifact names have volumes listed for multi-volume gadgets and set
 // the volume names in the struct
 func (stateMachine *StateMachine) verifyArtifactNames() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	stateMachine.VolumeNames = make(map[string]string)
 
@@ -784,8 +809,7 @@ func (stateMachine *StateMachine) buildRootfsFromTasks() error {
 
 // Extract the rootfs from a tar archive
 func (stateMachine *StateMachine) extractRootfsTar() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// make the chroot directory to which we will extract the tar
 	if err := osMkdir(stateMachine.tempDirs.chroot, 0755); err != nil {
@@ -821,8 +845,7 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 // germinate runs the germinate binary and parses the output to create
 // a list of packages from the seed section of the image definition
 func (stateMachine *StateMachine) germinate() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// create a scratch directory to run germinate in
 	germinateDir := filepath.Join(classicStateMachine.stateMachineFlags.WorkDir, "germinate")
@@ -856,8 +879,7 @@ func (stateMachine *StateMachine) germinate() error {
 			seedScanner := bufio.NewScanner(seedFile)
 			for seedScanner.Scan() {
 				seedLine := seedScanner.Bytes()
-				matched, _ := regexp.Match(`^[a-z0-9].*`, seedLine)
-				if matched {
+				if seedVersionRegex.Match(seedLine) {
 					packageName := strings.Split(string(seedLine), " ")[0]
 					*packageList = append(*packageList, packageName)
 				}
@@ -935,8 +957,7 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 
 // Customize /etc/fstab based on values in the image definition
 func (stateMachine *StateMachine) customizeFstab() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// open /etc/fstab for writing
 	fstabIO, err := osOpenFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
@@ -964,14 +985,14 @@ func (stateMachine *StateMachine) customizeFstab() error {
 		)
 		fstabEntries = append(fstabEntries, fstabEntry)
 	}
-	fstabIO.Write([]byte(strings.Join(fstabEntries, "\n") + "\n"))
-	return nil
+	_, err = fstabIO.Write([]byte(strings.Join(fstabEntries, "\n") + "\n"))
+
+	return err
 }
 
 // Handle any manual customizations specified in the image definition
 func (stateMachine *StateMachine) manualCustomization() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// copy /etc/resolv.conf from the host system into the chroot if it hasn't already been done
 	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
@@ -1018,8 +1039,7 @@ func (stateMachine *StateMachine) manualCustomization() error {
 
 // prepareClassicImage calls image.Prepare to stage snaps in classic images
 func (stateMachine *StateMachine) prepareClassicImage() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	var imageOpts image.Options
 
@@ -1106,7 +1126,10 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 					extraSnap.SnapRevision,
 					extraSnap.SnapName,
 				)
-				imageOpts.SeedManifest.SetAllowedSnapRevision(extraSnap.SnapName, snap.R(extraSnap.SnapRevision))
+				err = imageOpts.SeedManifest.SetAllowedSnapRevision(extraSnap.SnapName, snap.R(extraSnap.SnapRevision))
+				if err != nil {
+					return fmt.Errorf("error dealing with the extra snap %s: %w", extraSnap.SnapName, err)
+				}
 			}
 		}
 	}
@@ -1137,8 +1160,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 
 // preseedClassicImage preseeds the snaps that have already been staged in the chroot
 func (stateMachine *StateMachine) preseedClassicImage() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// create some directories in the chroot that we will bind mount from the
 	// host system. This is required or else the call to snap-preseed will fail
@@ -1162,14 +1184,18 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 	var umountCmds []*exec.Cmd
 	for _, mountPoint := range mountPoints {
 		thisMountCmds, thisUmountCmds := mountFromHost(stateMachine.tempDirs.chroot, mountPoint)
-		defer runAll(umountCmds)
 		mountCmds = append(mountCmds, thisMountCmds...)
 		umountCmds = append(umountCmds, thisUmountCmds...)
 	}
 
+	defer func(cmds []*exec.Cmd) {
+		_ = runAll(cmds)
+	}(umountCmds)
+
 	// assemble the commands in the correct order: mount, preseed, unmount
 	preseedCmds = append(preseedCmds, mountCmds...)
 	preseedCmds = append(preseedCmds,
+		//nolint:gosec,G204
 		exec.Command("/usr/lib/snapd/snap-preseed", stateMachine.tempDirs.chroot),
 	)
 	preseedCmds = append(preseedCmds, umountCmds...)
@@ -1187,8 +1213,7 @@ func (stateMachine *StateMachine) preseedClassicImage() error {
 // populateClassicRootfsContents copies over the staged rootfs
 // to rootfs. It also changes fstab and handles the --cloud-init flag
 func (stateMachine *StateMachine) populateClassicRootfsContents() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// if we backed up resolv.conf then restore it here
 	err := helperRestoreResolvConf(classicStateMachine.tempDirs.chroot)
@@ -1232,8 +1257,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 
 // Generate the manifest
 func (stateMachine *StateMachine) generatePackageManifest() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// This is basically just a wrapper around dpkg-query
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
@@ -1253,14 +1277,16 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 		return fmt.Errorf("Error creating manifest file: %s", err.Error())
 	}
 	defer manifest.Close()
-	manifest.Write(cmdOutput.Bytes())
+	_, err = manifest.Write(cmdOutput.Bytes())
+	if err != nil {
+		return fmt.Errorf("error writing the manifest file: %w", err)
+	}
 	return nil
 }
 
 // Generate the manifest
 func (stateMachine *StateMachine) generateFilelist() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// This is basically just a wrapper around find (similar to what we do in livecd-rootfs)
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
@@ -1280,14 +1306,16 @@ func (stateMachine *StateMachine) generateFilelist() error {
 		return fmt.Errorf("Error creating filelist file: %s", err.Error())
 	}
 	defer filelist.Close()
-	filelist.Write(cmdOutput.Bytes())
+	_, err = filelist.Write(cmdOutput.Bytes())
+	if err != nil {
+		return fmt.Errorf("error writing the filelist file: %w", err)
+	}
 	return nil
 }
 
 // Generate the rootfs tarball
 func (stateMachine *StateMachine) generateRootfsTarball() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// first create a vanilla uncompressed tar archive
 	rootfsSrc := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
@@ -1300,8 +1328,7 @@ func (stateMachine *StateMachine) generateRootfsTarball() error {
 
 // makeQcow2Img converts raw .img artifacts into qcow2 artifacts
 func (stateMachine *StateMachine) makeQcow2Img() error {
-	var classicStateMachine *ClassicStateMachine
-	classicStateMachine = stateMachine.parent.(*ClassicStateMachine)
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	for _, qcow2 := range *classicStateMachine.ImageDef.Artifacts.Qcow2 {
 		backingFile := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[qcow2.Qcow2Volume])

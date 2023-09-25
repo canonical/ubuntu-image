@@ -18,20 +18,20 @@ import (
 	"strings"
 	"testing"
 
-	"gopkg.in/yaml.v2"
-
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/pkg/xattr"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
-
-	//"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
+	"gopkg.in/yaml.v2"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
+
+var yamlMarshal = yaml.Marshal
 
 // TestClassicSetup tests a successful run of the polymorphed Setup function
 func TestClassicSetup(t *testing.T) {
@@ -1035,7 +1035,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 		},
 	}
 
-	for _, cloudInitConfig := range cloudInitConfigs {
+	for i, cloudInitConfig := range cloudInitConfigs {
 		t.Run("test_customize_cloud_init", func(t *testing.T) {
 			// Test setup
 			asserter := helper.Asserter{T: t}
@@ -1046,17 +1046,24 @@ func TestCustomizeCloudInit(t *testing.T) {
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			tmpDir, err := os.MkdirTemp("", "")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer os.RemoveAll(tmpDir)
+			asserter.AssertErrNil(err, true)
+			defer func() {
+				if tmpErr := osRemoveAll(tmpDir); tmpErr != nil {
+					if err != nil {
+						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
+					} else {
+						err = tmpErr
+					}
+				}
+			}()
 			stateMachine.tempDirs.chroot = tmpDir
 
 			// this directory is expected to be present as it is installed by cloud-init
-			os.MkdirAll(path.Join(tmpDir, "etc/cloud/cloud.cfg.d"), 0777)
+			err = os.MkdirAll(path.Join(tmpDir, "etc/cloud/cloud.cfg.d"), 0777)
+			asserter.AssertErrNil(err, true)
 
 			stateMachine.ImageDef.Customization = &imagedefinition.Customization{
-				CloudInit: &cloudInitConfig,
+				CloudInit: &cloudInitConfigs[i],
 			}
 
 			// Running function to test
@@ -1122,9 +1129,7 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	tmpDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	asserter.AssertErrNil(err, true)
 	defer os.RemoveAll(tmpDir)
 	stateMachine.tempDirs.chroot = tmpDir
 
@@ -1148,7 +1153,8 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 		t.Run("test_failed_customize_cloud_init_"+file, func(t *testing.T) {
 			// this directory is expected to be present as it is installed by cloud-init
 			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
-			os.MkdirAll(cloudInitConfigDirPath, 0777)
+			err = os.MkdirAll(cloudInitConfigDirPath, 0777)
+			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(cloudInitConfigDirPath)
 
 			osCreate = func(name string) (*os.File, error) {
@@ -1168,15 +1174,16 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 		t.Run("test_failed_customize_cloud_init_"+file, func(t *testing.T) {
 			// this directory is expected to be present as it is installed by cloud-init
 			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
-			os.MkdirAll(cloudInitConfigDirPath, 0777)
+			err = os.MkdirAll(cloudInitConfigDirPath, 0777)
+			asserter.AssertErrNil(err, true)
 			defer os.RemoveAll(cloudInitConfigDirPath)
 
 			osCreate = func(name string) (*os.File, error) {
 				if strings.Contains(name, file) {
-					fileReadWrite, _ := os.Create(name)
+					fileReadWrite, err := os.Create(name)
+					asserter.AssertErrNil(err, true)
 					fileReadWrite.Close()
-					fileReadOnly, _ := os.Open(name)
-					return fileReadOnly, nil
+					return os.Open(name)
 				}
 				return os.Create(name)
 			}
@@ -1192,7 +1199,8 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 	t.Run("test_failed_customize_cloud_init_mkdir", func(t *testing.T) {
 		// this directory is expected to be present as it is installed by cloud-init
 		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
-		os.MkdirAll(cloudInitConfigDirPath, 0777)
+		err = os.MkdirAll(cloudInitConfigDirPath, 0777)
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(cloudInitConfigDirPath)
 
 		osMkdirAll = mockMkdirAll
@@ -1210,7 +1218,8 @@ func TestFailedCustomizeCloudInit(t *testing.T) {
 	t.Run("Test_failed_customize_cloud_init_yaml_marshal", func(t *testing.T) {
 		// this directory is expected to be present as it is installed by cloud-init
 		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
-		os.MkdirAll(cloudInitConfigDirPath, 0777)
+		err = os.MkdirAll(cloudInitConfigDirPath, 0777)
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(cloudInitConfigDirPath)
 
 		yamlMarshal = mockMarshal
@@ -1411,8 +1420,7 @@ func TestPrepareClassicImage(t *testing.T) {
 			snapInfo, err := snapStore.SnapInfo(context, snapSpec, nil)
 			asserter.AssertErrNil(err, true)
 
-			var storeRevision int
-			storeRevision = snapInfo.Channels["latest/"+snapChannel].Revision.N
+			storeRevision := snapInfo.Channels["latest/"+snapChannel].Revision.N
 			snapFileName := fmt.Sprintf("%s_%d.snap", snapName, storeRevision)
 
 			snapPath := filepath.Join(stateMachine.tempDirs.chroot,
@@ -1723,7 +1731,8 @@ func TestGeneratePackageManifest(t *testing.T) {
 				},
 			},
 		}
-		osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
 
 		err = stateMachine.generatePackageManifest()
@@ -1832,7 +1841,8 @@ func TestGenerateFilelist(t *testing.T) {
 				},
 			},
 		}
-		osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+		asserter.AssertErrNil(err, true)
 		defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
 
 		err = stateMachine.generateFilelist()
@@ -1965,8 +1975,8 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			"var", "lib", "snapd", "seed", "seed.yaml")
 
 		seedFile, err := os.Open(seedYaml)
-		defer seedFile.Close()
 		asserter.AssertErrNil(err, true)
+		defer seedFile.Close()
 
 		var seededSnaps snapList
 		err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
@@ -2026,15 +2036,18 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		mountImageCmds = append(mountImageCmds,
 			[]*exec.Cmd{
 				// set up the loopback
+				//nolint:gosec,G204
 				exec.Command("losetup",
 					filepath.Join("/dev", "loop99"),
 					imgPath,
 				),
+				//nolint:gosec,G204
 				exec.Command("kpartx",
 					"-a",
 					filepath.Join("/dev", "loop99"),
 				),
 				// mount the rootfs partition in which to run update-grub
+				//nolint:gosec,G204
 				exec.Command("mount",
 					filepath.Join("/dev", "mapper", "loop99p3"), // with this example the rootfs is partition 3
 					mountDir,
@@ -2048,17 +2061,21 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
 			mountImageCmds = append(mountImageCmds, mountCmds...)
 			umountImageCmds = append(umountImageCmds, umountCmds...)
-			defer runAll(umountCmds)
+			defer func(cmds []*exec.Cmd) {
+				_ = runAll(cmds)
+			}(umountCmds)
 		}
 		// make sure to unmount the disk too
 		umountImageCmds = append(umountImageCmds, exec.Command("umount", mountDir))
 
 		// tear down the loopback
 		teardownCmds := []*exec.Cmd{
+			//nolint:gosec,G204
 			exec.Command("kpartx",
 				"-d",
 				filepath.Join("/dev", "loop99"),
 			),
+			//nolint:gosec,G204
 			exec.Command("losetup",
 				"--detach",
 				filepath.Join("/dev", "loop99"),
@@ -2066,7 +2083,16 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		}
 
 		for _, teardownCmd := range teardownCmds {
-			defer teardownCmd.Run()
+			defer func(teardownCmd *exec.Cmd) {
+				if tmpErr := teardownCmd.Run(); tmpErr != nil {
+					if err != nil {
+						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
+					} else {
+						err = tmpErr
+					}
+				}
+
+			}(teardownCmd)
 		}
 		umountImageCmds = append(umountImageCmds, teardownCmds...)
 
@@ -2126,12 +2152,12 @@ func TestCheckEmptyFields(t *testing.T) {
 		{"missing_implicitly_required", testStruct{A: "foo", C: "baz"}, false},
 		{"missing_omitempty", testStruct{A: "foo", B: "bar"}, true},
 	}
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		t.Run("test_check_empty_fields_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 
 			result := new(gojsonschema.Result)
-			err := helper.CheckEmptyFields(&tc.structData, result, schema)
+			err := helper.CheckEmptyFields(&testCases[i].structData, result, schema)
 			asserter.AssertErrNil(err, false)
 			schema.Required = append(schema.Required, "fieldA")
 
@@ -2719,6 +2745,29 @@ func TestFailedCreateChroot(t *testing.T) {
 		asserter.AssertErrContains(err, "Error running debootstrap command")
 		execCommand = exec.Command
 
+		// Check if failure of open hostname file is detected
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		err = stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		// Prepare a fallthrough debootstrap
+		testCaseName = "TestFailedCreateChrootNoHostname"
+		execCommand = fakeExecCommand
+		defer func() {
+			execCommand = exec.Command
+		}()
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+
+		err = stateMachine.createChroot()
+		asserter.AssertErrContains(err, "unable to open hostname file")
+
+		osOpenFile = os.OpenFile
+		execCommand = exec.Command
+
 		// Check if failure of truncation is detected
 
 		// Clean the work directory
@@ -2728,10 +2777,6 @@ func TestFailedCreateChroot(t *testing.T) {
 
 		// Prepare a fallthrough debootstrap
 		testCaseName = "TestFailedCreateChrootSkip"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
 		osTruncate = mockTruncate
 		defer func() {
 			osTruncate = os.Truncate
@@ -2847,7 +2892,8 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// create the /etc/apt/ dir in workdir
-		os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d"), 0755)
+		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d"), 0755)
+		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
 		osMkdir = mockMkdir
@@ -2890,6 +2936,23 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 		err = stateMachine.addExtraPPAs()
 		asserter.AssertErrContains(err, "Error removing temporary gpg directory")
 		osRemoveAll = os.RemoveAll
+
+		// Test failing osRemoveAll in defered function
+		// mock os.RemoveAll
+		osRemoveAll = mockRemoveAll
+		defer func() {
+			osRemoveAll = os.RemoveAll
+		}()
+		// mock os.OpenFile
+		osOpenFile = mockOpenFile
+		defer func() {
+			osOpenFile = os.OpenFile
+		}()
+		err = stateMachine.addExtraPPAs()
+		asserter.AssertErrContains(err, "Error creating")
+		asserter.AssertErrContains(err, "after previous error")
+		osRemoveAll = os.RemoveAll
+		osOpenFile = os.OpenFile
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
@@ -3417,7 +3480,7 @@ func TestUnsupportedBootloader(t *testing.T) {
 			filepath.Join(gadgetDest, "gadget.yaml"),
 			osutil.CopyFlagDefault,
 		)
-
+		asserter.AssertErrNil(err, true)
 		// parse gadget.yaml
 		err = stateMachine.prepareGadgetTree()
 		asserter.AssertErrNil(err, true)
@@ -3438,6 +3501,7 @@ func TestUnsupportedBootloader(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.updateBootloader()
+		asserter.AssertErrNil(err, true)
 
 		// restore stdout and examine what was printed
 		restoreStdout()

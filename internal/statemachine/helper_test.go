@@ -14,14 +14,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 // TestMaxOffset tests the functionality of the maxOffset function
@@ -59,15 +60,17 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 		// make the u-boot directory and add a file
 		bootDir := filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "uboot")
-		os.MkdirAll(bootDir, 0755)
-		osutil.CopySpecialFile(filepath.Join("testdata", "grubenv"), bootDir)
+		err := os.MkdirAll(bootDir, 0755)
+		asserter.AssertErrNil(err, true)
+		err = osutil.CopySpecialFile(filepath.Join("testdata", "grubenv"), bootDir)
+		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
 		osMkdirAll = mockMkdirAll
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
+		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 
@@ -110,16 +113,18 @@ func TestFailedHandleSecureBootPiboot(t *testing.T) {
 		// make the piboot directory and add a file
 		bootDir := filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "piboot")
-		os.MkdirAll(bootDir, 0755)
-		osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree_piboot",
+		err := os.MkdirAll(bootDir, 0755)
+		asserter.AssertErrNil(err, true)
+		err = osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree_piboot",
 			"piboot.conf"), bootDir)
+		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
 		osMkdirAll = mockMkdirAll
 		defer func() {
 			osMkdirAll = os.MkdirAll
 		}()
-		err := stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
+		err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 		asserter.AssertErrContains(err, "Error creating ubuntu dir")
 		osMkdirAll = os.MkdirAll
 
@@ -336,7 +341,8 @@ func TestCleanup(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 		stateMachine.cleanWorkDir = true
-		stateMachine.Teardown()
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
 		if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err == nil {
 			t.Errorf("Error: temporary workdir %s was not cleaned up\n",
 				stateMachine.stateMachineFlags.WorkDir)
@@ -390,9 +396,10 @@ func TestFailedWriteOffsetValues(t *testing.T) {
 
 		// create an empty pc.img
 		imgPath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "pc.img")
-		os.Create(imgPath)
-		os.Truncate(imgPath, 0)
-
+		_, err = os.Create(imgPath)
+		asserter.AssertErrNil(err, true)
+		err = os.Truncate(imgPath, 0)
+		asserter.AssertErrNil(err, true)
 		volume, found := stateMachine.GadgetInfo.Volumes["pc"]
 		if !found {
 			t.Fatalf("Failed to find gadget volume")
@@ -432,11 +439,14 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// set up a "rootfs" that we can calculate the size of
-		os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
-		osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+		err = os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
+		asserter.AssertErrNil(err, true)
+		err = osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+		asserter.AssertErrNil(err, true)
 
 		// ensure volumes exists
-		os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+		asserter.AssertErrNil(err, true)
 
 		// calculate the size of the rootfs
 		err = stateMachine.calculateRootfsSize()
@@ -522,7 +532,7 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 		{"collision", [][]byte{{0, 1, 2, 3}}, [][]byte{{0, 1, 2, 3}, {4, 5, 6, 7}}, []byte{4, 5, 6, 7}, false},
 		{"broken", [][]byte{{0, 0, 0, 0}}, nil, []byte{0, 0, 0, 0}, true},
 	}
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		t.Run("test_generate_unique_diskid_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			// create a test rng reader, using data from our testcase
@@ -542,18 +552,18 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 				randRead = rand.Read
 			}()
 
-			randomBytes, err := generateUniqueDiskID(&tc.existing)
+			randomBytes, err := generateUniqueDiskID(&testCases[i].existing)
 			if tc.expectedErr {
 				asserter.AssertErrContains(err, "Failed to generate unique disk ID")
 			} else {
 				asserter.AssertErrNil(err, true)
-				if bytes.Compare(randomBytes, tc.expected) != 0 {
+				if !bytes.Equal(randomBytes, tc.expected) {
 					t.Errorf("Error, expected ID %v but got %v", tc.expected, randomBytes)
 				}
 				// check if the ID was added to the list of existing IDs
 				found := false
-				for _, id := range tc.existing {
-					if bytes.Compare(id, randomBytes) == 0 {
+				for _, id := range testCases[i].existing {
+					if bytes.Equal(id, randomBytes) {
 						found = true
 						break
 					}
@@ -576,40 +586,33 @@ func TestGetHostArch(t *testing.T) {
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", expected, hostArch)
 			}
-			break
 		case "arm":
 			expected := "armhf"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		case "arm64":
 			expected := "arm64"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		case "ppc64le":
 			expected := "ppc64el"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		case "s390x":
 			expected := "s390x"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		case "riscv64":
 			expected := "riscv64"
 			if hostArch != expected {
 				t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
 			}
-			break
 		default:
 			t.Skipf("Test not supported on architecture %s", runtime.GOARCH)
-			break
 		}
 	})
 }
@@ -1303,6 +1306,7 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 		// Doing the preseed at the time of the test allows it to
 		// run on each architecture and keeps the github repository
 		// free of large .snap files
+		//nolint:gosec,G204
 		snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
 			"--classic", "--snap=core20", "--snap=core22", "--snap=snapd", "--snap=lxd",
 			filepath.Join("testdata", "modelAssertionClassic"),
@@ -1327,7 +1331,7 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 		asserter.AssertErrContains(err, "seed must have a model assertion")
 		err = os.Rename(filepath.Join(stateMachine.tempDirs.rootfs, "model"),
 			filepath.Join(seedDir, "assertions", "model"))
-
+		asserter.AssertErrNil(err, true)
 		// move seed.yaml to cause an error in LoadMeta
 		err = os.Rename(filepath.Join(seedDir, "seed.yaml"),
 			filepath.Join(seedDir, "seed.yaml.bak"))

@@ -13,8 +13,7 @@ import (
 
 // Prepare the image
 func (stateMachine *StateMachine) prepareImage() error {
-	var snapStateMachine *SnapStateMachine
-	snapStateMachine = stateMachine.parent.(*SnapStateMachine)
+	snapStateMachine := stateMachine.parent.(*SnapStateMachine)
 
 	var imageOpts image.Options
 
@@ -36,7 +35,10 @@ func (stateMachine *StateMachine) prepareImage() error {
 		imageOpts.SeedManifest = seedwriter.NewManifest()
 		for snapName, snapRev := range snapStateMachine.Opts.Revisions {
 			fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n", snapRev, snapName)
-			imageOpts.SeedManifest.SetAllowedSnapRevision(snapName, snap.R(snapRev))
+			err = imageOpts.SeedManifest.SetAllowedSnapRevision(snapName, snap.R(snapRev))
+			if err != nil {
+				return fmt.Errorf("Error preparing image: error dealing with snap revision %s: %w", snapName, err)
+			}
 		}
 	}
 

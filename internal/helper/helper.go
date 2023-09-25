@@ -11,11 +11,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/canonical/ubuntu-image/internal/commands"
 )
 
 // define some functions that can be mocked by test cases
@@ -69,7 +70,7 @@ func RunScript(hookScript string) error {
 func SaveCWD() func() {
 	wd, _ := os.Getwd()
 	return func() {
-		os.Chdir(wd)
+		_ = os.Chdir(wd)
 	}
 }
 
@@ -116,12 +117,18 @@ func SetDefaults(needsDefaults interface{}) error {
 			field.Cap() > 0 &&
 			field.Index(0).Kind() == reflect.Pointer {
 			for i := 0; i < field.Cap(); i++ {
-				SetDefaults(field.Index(i).Interface())
+				err := SetDefaults(field.Index(i).Interface())
+				if err != nil {
+					return err
+				}
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
 			// otherwise if it's just a pointer, look for default types
 			if field.Elem().Kind() == reflect.Struct {
-				SetDefaults(field.Interface())
+				err := SetDefaults(field.Interface())
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			tags := elem.Type().Field(i).Tag
@@ -133,18 +140,15 @@ func SetDefaults(needsDefaults interface{}) error {
 					switch varType {
 					case reflect.String:
 						field.SetString(defaultValue)
-						break
 					case reflect.Slice:
 						defaultValues := strings.Split(defaultValue, ",")
 						field.Set(reflect.ValueOf(defaultValues))
-						break
 					case reflect.Bool:
 						if defaultValue == "true" {
 							field.SetBool(true)
 						} else {
 							field.SetBool(false)
 						}
-						break
 					default:
 						return fmt.Errorf("Setting default value of type %s not supported",
 							varType)
@@ -306,16 +310,12 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 		break
 	case "bzip2":
 		tarCommand.Args = append(tarCommand.Args, "--bzip2")
-		break
 	case "gzip":
 		tarCommand.Args = append(tarCommand.Args, "--gzip")
-		break
 	case "xz":
 		tarCommand.Args = append(tarCommand.Args, "--xz")
-		break
 	case "zstd":
 		tarCommand.Args = append(tarCommand.Args, "--zstd")
-		break
 	default:
 		return fmt.Errorf("Unknown compression type: \"%s\"", compression)
 	}

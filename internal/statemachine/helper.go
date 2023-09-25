@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/partition"
 	"github.com/diskfs/go-diskfs/partition/gpt"
@@ -24,6 +22,9 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 // validateInput ensures that command line flags for the state machine are valid. These
@@ -195,8 +196,14 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			blockSize = structure.Size
 		}
 		if structure.Role == gadget.SystemData {
-			os.Create(partImg)
-			os.Truncate(partImg, int64(stateMachine.RootfsSize))
+			_, err := os.Create(partImg)
+			if err != nil {
+				return fmt.Errorf("unable to create partImg file: %w", err)
+			}
+			err = os.Truncate(partImg, int64(stateMachine.RootfsSize))
+			if err != nil {
+				return fmt.Errorf("unable to truncate partImg file: %w", err)
+			}
 		} else {
 			// zero out the .img file
 			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
@@ -511,7 +518,7 @@ func generateUniqueDiskID(existing *[][]byte) ([]byte, error) {
 			continue
 		}
 		for _, id := range *existing {
-			if bytes.Compare(randomBytes, id) == 0 {
+			if bytes.Equal(randomBytes, id) {
 				retry = true
 				break
 			}
@@ -596,9 +603,12 @@ func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir strin
 		cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(imageDefinition.Gadget.GadgetBranch)
 	}
 
-	cloneOptions.Validate()
+	err := cloneOptions.Validate()
+	if err != nil {
+		return err
+	}
 
-	_, err := git.PlainClone(workDir, false, cloneOptions)
+	_, err = git.PlainClone(workDir, false, cloneOptions)
 	return err
 }
 
@@ -642,9 +652,7 @@ func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
 		"--option=Dpkg::Options::=--force-confold",
 	)
 
-	for _, aptPackage := range packageList {
-		installCmd.Args = append(installCmd.Args, aptPackage)
-	}
+	installCmd.Args = append(installCmd.Args, packageList...)
 
 	// Env is sometimes used for mocking command calls in tests,
 	// so only overwrite env if it is nil
@@ -853,7 +861,7 @@ func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool
 			debugStatement = fmt.Sprintf("%s with GID %s\n", strings.TrimSpace(debugStatement), addGroup.GroupID)
 		}
 		if debug {
-			fmt.Printf(debugStatement)
+			fmt.Print(debugStatement)
 		}
 		addGroupOutput := helper.SetCommandOutput(addGroupCmd, debug)
 		err := addGroupCmd.Run()
@@ -877,7 +885,7 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 			debugStatement = fmt.Sprintf("%s with UID %s\n", strings.TrimSpace(debugStatement), addUser.UserID)
 		}
 		if debug {
-			fmt.Printf(debugStatement)
+			fmt.Print(debugStatement)
 		}
 		addUserOutput := helper.SetCommandOutput(addUserCmd, debug)
 		err := addUserCmd.Run()
@@ -895,15 +903,15 @@ func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) 
 // uses struct tags to identify which state must be added
 func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates []stateFunc) {
 	possibleStateFunc := map[string][]stateFunc{
-		"add_extra_ppas": []stateFunc{
-			stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+		"add_extra_ppas": {
+			{"add_extra_ppas", (*StateMachine).addExtraPPAs},
 		},
-		"install_extra_packages": []stateFunc{
-			stateFunc{"install_extra_packages", (*StateMachine).installPackages},
+		"install_extra_packages": {
+			{"install_extra_packages", (*StateMachine).installPackages},
 		},
-		"install_extra_snaps": []stateFunc{
-			stateFunc{"install_extra_snaps", (*StateMachine).prepareClassicImage},
-			stateFunc{"preseed_extra_snaps", (*StateMachine).preseedClassicImage},
+		"install_extra_snaps": {
+			{"install_extra_snaps", (*StateMachine).prepareClassicImage},
+			{"preseed_extra_snaps", (*StateMachine).preseedClassicImage},
 		},
 	}
 	value := reflect.ValueOf(searchStruct)
@@ -943,25 +951,32 @@ func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error)
 	}
 
 	// iterate over the snaps in the seed and add them to the list
-	preseed.Iter(func(sn *seed.Snap) error {
+	err = preseed.Iter(func(sn *seed.Snap) error {
 		seededSnaps[sn.SnapName()] = sn.Channel
 		return nil
 	})
+	if err != nil {
+		return seededSnaps, err
+	}
 
 	return seededSnaps, nil
 }
 
-func runAll(cmds []*exec.Cmd) {
+func runAll(cmds []*exec.Cmd) error {
 	for _, cmd := range cmds {
-		cmd.Run()
+		err := cmd.Run()
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // updateGrub mounts the resulting image and runs update-grub
-func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) error {
+func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) (err error) {
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
-	err := osMkdir(mountDir, 0755)
+	err = osMkdir(mountDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
 	}
@@ -981,18 +996,21 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		stateMachine.commonFlags.SectorSize,
 		imgPath,
 	)
-	losetupOutput, err := losetupCmd.Output()
+	var losetupOutput []byte
+	losetupOutput, err = losetupCmd.Output()
 	if err != nil {
-		return fmt.Errorf("Error running losetup command \"%s\". Error is %s",
+		err = fmt.Errorf("Error running losetup command \"%s\". Error is %s",
 			losetupCmd.String(),
 			err.Error(),
 		)
+		return err
 	}
 	loopUsed := strings.TrimSpace(string(losetupOutput))
 
 	var umounts []*exec.Cmd
 	updateGrubCmds = append(updateGrubCmds,
 		// mount the rootfs partition in which to run update-grub
+		//nolint:gosec,G204
 		exec.Command("mount",
 			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
 			mountDir,
@@ -1005,7 +1023,10 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
 		updateGrubCmds = append(updateGrubCmds, mountCmds...)
 		umounts = append(umounts, umountCmds...)
-		defer runAll(umountCmds)
+		defer func(cmds []*exec.Cmd) {
+			_ = runAll(cmds)
+		}(umountCmds)
+
 	}
 	// make sure to unmount the disk too
 	umounts = append(umounts, exec.Command("umount", mountDir))
@@ -1054,16 +1075,19 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		"--detach",
 		loopUsed,
 	)
-	defer teardownCmd.Run()
+	defer func() {
+		_ = teardownCmd.Run()
+	}()
 	updateGrubCmds = append(updateGrubCmds, teardownCmd)
 
 	// now run all the commands
 	for _, cmd := range updateGrubCmds {
 		cmdOutput := helper.SetCommandOutput(cmd, stateMachine.commonFlags.Debug)
-		err := cmd.Run()
+		err = cmd.Run()
 		if err != nil {
-			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+			err = fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
 				cmd.String(), err.Error(), cmdOutput.String())
+			return err
 		}
 	}
 

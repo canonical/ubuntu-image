@@ -8,12 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 // generate work directory file structure
@@ -267,7 +268,7 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 				}
 			}
 			if laidOutStructure.HasFilesystem() {
-				mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(&laidOutStructure, nil)
+				mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(&laidOutVolume.LaidOutStructure[ii], nil)
 				if err != nil {
 					return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
 				}
@@ -376,11 +377,11 @@ func (stateMachine *StateMachine) makeDisk() error {
 					return fmt.Errorf("Error generating disk ID: %s", err.Error())
 				}
 				diskFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
-				defer diskFile.Close()
 				if err != nil {
 					return fmt.Errorf("Error opening disk to write MBR disk identifier: %s",
 						err.Error())
 				}
+				defer diskFile.Close()
 				_, err = diskFile.WriteAt(randomBytes, 440)
 				if err != nil {
 					return fmt.Errorf("Error writing MBR disk identifier: %s", err.Error())

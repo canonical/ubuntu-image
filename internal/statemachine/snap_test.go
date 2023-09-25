@@ -15,9 +15,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/store"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
@@ -176,10 +177,11 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 	})
 }
 
-// TestFailedPrepareImage tests a failure in the call to image.Prepare. This is easy to achieve
-// by attempting to use --disable-console-conf with a core20 image
+// TestFailedPrepareImage tests prepareImage
 func TestFailedPrepareImage(t *testing.T) {
-	t.Run("test_failed_prepare_image", func(t *testing.T) {
+	// Test a failure in the call to image.Prepare. This is easy to achieve
+	// by attempting to use --disable-console-conf with a core20 image
+	t.Run("test_failed_prepare_image_imagePrepare", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
 		defer saveCWD()
@@ -194,11 +196,37 @@ func TestFailedPrepareImage(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.Run()
+		fmt.Print(err)
 		asserter.AssertErrContains(err, "Error preparing image")
 
 		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
 	})
+
+	t.Run("test_failed_prepare_image_snap_revision", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine SnapStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
+		stateMachine.Opts.Revisions = map[string]int{
+			"test": 0,
+		}
+
+		err := stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		fmt.Print(err)
+		asserter.AssertErrContains(err, "error dealing with snap revision")
+
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
+	})
+
 }
 
 // TestPopulateSnapRootfsContents runs the state machine through populate_rootfs_contents and examines
@@ -274,15 +302,19 @@ func TestGenerateSnapManifest(t *testing.T) {
 			stateMachine.tempDirs.rootfs = filepath.Join(workDir, "rootfs")
 			stateMachine.IsSeeded = tc.seeded
 			stateMachine.commonFlags.OutputDir = filepath.Join(workDir, "output")
-			osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+			err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+			asserter.AssertErrNil(err, true)
 
 			// Prepare direcory structure for installed and seeded snaps
 			snapsDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "snaps")
 			seedDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "seed", "snaps")
 			uc20Dir := filepath.Join(stateMachine.tempDirs.rootfs, "snaps")
-			osMkdirAll(snapsDir, 0755)
-			osMkdirAll(seedDir, 0755)
-			osMkdirAll(uc20Dir, 0755)
+			err = osMkdirAll(snapsDir, 0755)
+			asserter.AssertErrNil(err, true)
+			err = osMkdirAll(seedDir, 0755)
+			asserter.AssertErrNil(err, true)
+			err = osMkdirAll(uc20Dir, 0755)
+			asserter.AssertErrNil(err, true)
 			var testEnvMap map[string][]string
 			if tc.seeded {
 				testEnvMap = map[string][]string{
