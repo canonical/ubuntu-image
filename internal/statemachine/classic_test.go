@@ -1855,9 +1855,9 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 	})
 }
 
-// TestPopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
+// TestStateMachine_PopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
 // the rootfs to ensure at least some of the correct file are in place
-func TestPopulateClassicRootfsContents(t *testing.T) {
+func TestStateMachine_PopulateClassicRootfsContents(t *testing.T) {
 	t.Run("test_populate_classic_rootfs_contents", func(t *testing.T) {
 		if runtime.GOARCH != "amd64" {
 			t.Skip("Test for amd64 only")
@@ -1875,6 +1875,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 			Rootfs: &imagedefinition.Rootfs{
 				Archive: "ubuntu",
 			},
+			Customization: &imagedefinition.Customization{},
 		}
 
 		// need workdir set up for this
@@ -1901,13 +1902,28 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 			}
 		}
 
+		// return when Customization.Fstab is not empty
+		stateMachine.ImageDef.Customization.Fstab = []*imagedefinition.Fstab{
+			{
+				Label:        "writable",
+				Mountpoint:   "/",
+				FSType:       "ext4",
+				MountOptions: "defaults",
+				Dump:         true,
+				FsckOrder:    1,
+			},
+		}
+
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
+
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
-// TestFailedPopulateClassicRootfsContents tests failed scenarios in populateClassicRootfsContents
+// TestStateMachine_FailedPopulateClassicRootfsContents tests failed scenarios in populateClassicRootfsContents
 // this is accomplished by mocking functions
-func TestFailedPopulateClassicRootfsContents(t *testing.T) {
+func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_classic_rootfs_contents", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine ClassicStateMachine
@@ -1958,6 +1974,24 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		err = stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrContains(err, "Error writing to fstab")
 		osWriteFile = os.WriteFile
+
+		// mock os.ReadFile
+		osReadFile = mockReadFile
+		defer func() {
+			osReadFile = os.ReadFile
+		}()
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrContains(err, "Error reading fstab")
+		osReadFile = os.ReadFile
+
+		// return when existing fstab contains LABEL=writable
+		//nolint:gosec,G306
+		err = os.WriteFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
+			[]byte("LABEL=writable\n"),
+			0644)
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
 
 		// create an /etc/resolv.conf.tmp in the chroot
 		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
@@ -3601,6 +3635,7 @@ func TestCustomizeFstab(t *testing.T) {
 	testCases := []struct {
 		name          string
 		fstab         []*imagedefinition.Fstab
+		fstabTruncate bool
 		expectedFstab string
 		existingFstab string
 	}{
@@ -3633,6 +3668,23 @@ func TestCustomizeFstab(t *testing.T) {
 			},
 			expectedFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1
 LABEL=writable	/	ext4	defaults	1	1
+`,
+			existingFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1`,
+		},
+		{
+			name: "one_entry to a non-empty fstab to be truncated",
+			fstab: []*imagedefinition.Fstab{
+				{
+					Label:        "writable",
+					Mountpoint:   "/",
+					FSType:       "ext4",
+					MountOptions: "defaults",
+					Dump:         true,
+					FsckOrder:    1,
+				},
+			},
+			fstabTruncate: true,
+			expectedFstab: `LABEL=writable	/	ext4	defaults	1	1
 `,
 			existingFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1`,
 		},
@@ -3689,7 +3741,8 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 				Series:       getHostSuite(),
 				Rootfs:       &imagedefinition.Rootfs{},
 				Customization: &imagedefinition.Customization{
-					Fstab: tc.fstab,
+					Fstab:         tc.fstab,
+					FstabTruncate: tc.fstabTruncate,
 				},
 			}
 
