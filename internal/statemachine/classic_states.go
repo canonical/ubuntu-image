@@ -821,7 +821,7 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	// has been confirmed by the schema validation
 	tarPath := strings.TrimPrefix(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL, "file://")
 	if !filepath.IsAbs(tarPath) {
-	tarPath = filepath.Join(stateMachine.ConfDefPath, tarPath)
+		tarPath = filepath.Join(stateMachine.ConfDefPath, tarPath)
 	}
 
 	// if the sha256 sum of the tarball is provided, make sure it matches
@@ -1086,7 +1086,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	// are also set to be installed. Note we only do this for snaps that are
 	// seeded. Users are expected to specify all base and content provider
 	// snaps in the image definition.
-		snapStore := store.New(nil, nil)
+	snapStore := store.New(nil, nil)
 	snapContext := context.Background()
 	for _, seededSnap := range imageOpts.Snaps {
 		snapSpec := store.SnapSpec{Name: seededSnap}
@@ -1124,8 +1124,10 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 		}
 	}
 
+	modelAssertionPath := strings.TrimPrefix(classicStateMachine.ImageDef.ModelAssertion, "file://")
+
 	imageOpts.Classic = true
-	imageOpts.ModelFile = strings.TrimPrefix(classicStateMachine.ImageDef.ModelAssertion, "file://")
+	imageOpts.ModelFile = filepath.Join(stateMachine.ConfDefPath, modelAssertionPath)
 	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
 	imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot
 	imageOpts.Customizations = *new(image.Customizations)

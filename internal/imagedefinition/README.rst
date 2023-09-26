@@ -58,6 +58,8 @@ The following specification defines what is supported in the YAML:
          target: <string> (optional)
        # A path to a model assertion to use when pre-seeding snaps
        # in the image. Must be a local file URI beginning with file://
+       # The given path will be interpreted as relative to the path of
+       # the image definition file if is not absolute.
        model-assertion: <string> (optional)
        # Defines parameters needed to build the rootfs for a classic
        # image. Currently only building from a seed is supported.
