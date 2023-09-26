@@ -999,7 +999,7 @@ func (stateMachine *StateMachine) manualCustomization() error {
 		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
 	}
 
-	err = manualCopyFile(classicStateMachine.ImageDef.Customization.Manual.CopyFile, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	err = manualCopyFile(classicStateMachine.ImageDef.Customization.Manual.CopyFile, classicStateMachine.ConfDefPath, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 	if err != nil {
 		return err
 	}
@@ -1010,9 +1010,9 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	}
 
 	err = manualTouchFile(classicStateMachine.ImageDef.Customization.Manual.TouchFile, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		return err
+	}
 
 	err = manualAddGroup(classicStateMachine.ImageDef.Customization.Manual.AddGroup, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 	if err != nil {

@@ -794,7 +794,7 @@ func TestFailedManualCopyFile(t *testing.T) {
 				Source: "/test/does/not/exist",
 			},
 		}
-		err := manualCopyFile(copyFiles, "/fakedir", true)
+		err := manualCopyFile(copyFiles, "/tmp", "/fakedir", true)
 		asserter.AssertErrContains(err, "Error copying file")
 	})
 }

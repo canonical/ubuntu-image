@@ -805,17 +805,16 @@ func mountTempFS(targetDir, scratchDir, mountpoint string) (mountCmds, umountCmd
 }
 
 // manualCopyFile copies a file into the chroot
-func manualCopyFile(customizations []*imagedefinition.CopyFile, targetDir string, debug bool) error {
+func manualCopyFile(customizations []*imagedefinition.CopyFile, confDefPath string, targetDir string, debug bool) error {
 	for _, c := range customizations {
-		// Copy the file into the specified location in the chroot
+		source := filepath.Join(confDefPath, c.Source)
 		dest := filepath.Join(targetDir, c.Dest)
-		// source := filepath.Join(s)
 		if debug {
-			fmt.Printf("Copying file \"%s\" to \"%s\"\n", c.Source, dest)
+			fmt.Printf("Copying file \"%s\" to \"%s\"\n", source, dest)
 		}
-		if err := osutilCopySpecialFile(c.Source, dest); err != nil {
+		if err := osutilCopySpecialFile(source, dest); err != nil {
 			return fmt.Errorf("Error copying file \"%s\" into chroot: %s",
-				c.Source, err.Error())
+				source, err.Error())
 		}
 	}
 	return nil

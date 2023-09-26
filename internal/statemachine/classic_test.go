@@ -1384,8 +1384,8 @@ chpasswd:
 func TestStateMachine_manualCustomization(t *testing.T) {
 	t.Run("test_manual_customization", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+		restoreCWD := helper.SaveCWD()
+		defer restoreCWD()
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -1432,8 +1432,13 @@ func TestStateMachine_manualCustomization(t *testing.T) {
 			},
 		}
 
+		d, _ := os.Getwd()
+		fmt.Printf("cwd: %s", d)
+		err := stateMachine.setConfDefDir(filepath.Join(d, "image_definition.yaml"))
+		asserter.AssertErrNil(err, true)
+
 		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		// also create chroot
