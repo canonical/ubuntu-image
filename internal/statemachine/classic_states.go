@@ -999,38 +999,29 @@ func (stateMachine *StateMachine) manualCustomization() error {
 		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
 	}
 
-	type customizationHandler struct {
-		inputData   interface{}
-		handlerFunc func(interface{}, string, bool) error
-	}
-	customizationHandlers := []customizationHandler{
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.CopyFile,
-			handlerFunc: manualCopyFile,
-		},
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.Execute,
-			handlerFunc: manualExecute,
-		},
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.TouchFile,
-			handlerFunc: manualTouchFile,
-		},
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.AddGroup,
-			handlerFunc: manualAddGroup,
-		},
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.AddUser,
-			handlerFunc: manualAddUser,
-		},
+	err = manualCopyFile(classicStateMachine.ImageDef.Customization.Manual.CopyFile, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
 
-	for _, customization := range customizationHandlers {
-		err := customization.handlerFunc(customization.inputData, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	err = manualExecute(classicStateMachine.ImageDef.Customization.Manual.Execute, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
+	}
+
+	err = manualTouchFile(classicStateMachine.ImageDef.Customization.Manual.TouchFile, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 		if err != nil {
 			return err
 		}
+
+	err = manualAddGroup(classicStateMachine.ImageDef.Customization.Manual.AddGroup, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
+	}
+
+	err = manualAddUser(classicStateMachine.ImageDef.Customization.Manual.AddUser, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
 
 	return nil

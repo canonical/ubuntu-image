@@ -1380,8 +1380,8 @@ chpasswd:
 	}
 }
 
-// TestManualCustomization unit tests the manualCustomization function
-func TestManualCustomization(t *testing.T) {
+// TestStateMachine_manualCustomization unit tests the manualCustomization function
+func TestStateMachine_manualCustomization(t *testing.T) {
 	t.Run("test_manual_customization", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		saveCWD := helper.SaveCWD()
@@ -1472,53 +1472,142 @@ func TestManualCustomization(t *testing.T) {
 	})
 }
 
-// TestFailedManualCustomization tests failures in the manualCustomization function
-func TestFailedManualCustomization(t *testing.T) {
+// TestStateMachine_manualCustomization_fail tests failures in the manualCustomization function
+func TestStateMachine_manualCustomization_fail(t *testing.T) {
 	t.Run("test_failed_manual_customization", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+		restoreCWD := helper.SaveCWD()
+		t.Cleanup(restoreCWD)
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Customization: &imagedefinition.Customization{
-				Manual: &imagedefinition.Manual{
-					TouchFile: []*imagedefinition.TouchFile{
-						{
-							TouchPath: filepath.Join("this", "path", "does", "not", "exist"),
-						},
-					},
-				},
-			},
-		}
-
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
-		// create an /etc/resolv.conf in the chroot
-		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
-		asserter.AssertErrNil(err, true)
-		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
-		asserter.AssertErrNil(err, true)
-
-		// now test the failed touch file customization
-		err = stateMachine.manualCustomization()
-		asserter.AssertErrContains(err, "no such file or directory")
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-
 		// mock helper.BackupAndCopyResolvConf
 		helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConf
-		defer func() {
+		t.Cleanup(func() {
 			helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
-		}()
+		})
 		err = stateMachine.manualCustomization()
 		asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
-		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 	})
+
+	tests := []struct {
+		name                 string
+		expectedErr          string
+		manualCustomizations *imagedefinition.Manual
+	}{
+		{
+			name:        "failing manualCopyFile",
+			expectedErr: "cp: cannot stat 'this/path/does/not/exist'",
+			manualCustomizations: &imagedefinition.Manual{
+				CopyFile: []*imagedefinition.CopyFile{
+					{
+						Source: filepath.Join("this", "path", "does", "not", "exist"),
+						Dest:   filepath.Join("this", "path", "does", "not", "exist"),
+					},
+				},
+			},
+		},
+		{
+			name:        "failing manualExecute",
+			expectedErr: "chroot: failed to run command",
+			manualCustomizations: &imagedefinition.Manual{
+				Execute: []*imagedefinition.Execute{
+					{
+						ExecutePath: filepath.Join("this", "path", "does", "not", "exist"),
+					},
+				},
+			},
+		},
+		{
+			name:        "failing manualTouchFile",
+			expectedErr: "no such file or directory",
+			manualCustomizations: &imagedefinition.Manual{
+				TouchFile: []*imagedefinition.TouchFile{
+					{
+						TouchPath: filepath.Join("this", "path", "does", "not", "exist"),
+					},
+				},
+			},
+		},
+		{
+			name:        "failing manualAddGroup",
+			expectedErr: "group 'root' already exists",
+			manualCustomizations: &imagedefinition.Manual{
+				AddGroup: []*imagedefinition.AddGroup{
+					{
+						GroupName: "root",
+						GroupID:   "0",
+					},
+				},
+			},
+		},
+		{
+			name:        "failing manualAddUser",
+			expectedErr: "user 'root' already exists",
+			manualCustomizations: &imagedefinition.Manual{
+				AddUser: []*imagedefinition.AddUser{
+					{
+						UserName: "root",
+						UserID:   "0",
+					},
+				},
+			},
+		},
+	}
+	asserter := helper.Asserter{T: t}
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+	}
+
+	// need workdir set up for this
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	// also create chroot
+	err = stateMachine.createChroot()
+	asserter.AssertErrNil(err, true)
+
+	// create an /etc/resolv.conf in the chroot
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
+	asserter.AssertErrNil(err, true)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			t.Cleanup(saveCWD)
+
+			stateMachine.ImageDef.Customization = &imagedefinition.Customization{
+				Manual: tc.manualCustomizations,
+			}
+
+			err = stateMachine.manualCustomization()
+
+			if len(tc.expectedErr) == 0 {
+				asserter.AssertErrNil(err, true)
+			} else {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+
+		})
+	}
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestPrepareClassicImage unit tests the prepareClassicImage function

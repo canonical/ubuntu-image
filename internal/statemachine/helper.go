@@ -805,30 +805,26 @@ func mountTempFS(targetDir, scratchDir, mountpoint string) (mountCmds, umountCmd
 }
 
 // manualCopyFile copies a file into the chroot
-func manualCopyFile(copyFileInterfaces interface{}, targetDir string, debug bool) error {
-	copyFileSlice := reflect.ValueOf(copyFileInterfaces)
-	for i := 0; i < copyFileSlice.Len(); i++ {
-		copyFile := copyFileSlice.Index(i).Interface().(*imagedefinition.CopyFile)
-
+func manualCopyFile(customizations []*imagedefinition.CopyFile, targetDir string, debug bool) error {
+	for _, c := range customizations {
 		// Copy the file into the specified location in the chroot
-		dest := filepath.Join(targetDir, copyFile.Dest)
+		dest := filepath.Join(targetDir, c.Dest)
+		// source := filepath.Join(s)
 		if debug {
-			fmt.Printf("Copying file \"%s\" to \"%s\"\n", copyFile.Source, dest)
+			fmt.Printf("Copying file \"%s\" to \"%s\"\n", c.Source, dest)
 		}
-		if err := osutilCopySpecialFile(copyFile.Source, dest); err != nil {
+		if err := osutilCopySpecialFile(c.Source, dest); err != nil {
 			return fmt.Errorf("Error copying file \"%s\" into chroot: %s",
-				copyFile.Source, err.Error())
+				c.Source, err.Error())
 		}
 	}
 	return nil
 }
 
-// manualExecute executes an executable file in the chroot
-func manualExecute(executeInterfaces interface{}, targetDir string, debug bool) error {
-	executeSlice := reflect.ValueOf(executeInterfaces)
-	for i := 0; i < executeSlice.Len(); i++ {
-		execute := executeSlice.Index(i).Interface().(*imagedefinition.Execute)
-		executeCmd := execCommand("chroot", targetDir, execute.ExecutePath)
+// manualExecute executes executable files in the chroot
+func manualExecute(customizations []*imagedefinition.Execute, targetDir string, debug bool) error {
+	for _, c := range customizations {
+		executeCmd := execCommand("chroot", targetDir, c.ExecutePath)
 		if debug {
 			fmt.Printf("Executing command \"%s\"\n", executeCmd.String())
 		}
@@ -842,12 +838,10 @@ func manualExecute(executeInterfaces interface{}, targetDir string, debug bool) 
 	return nil
 }
 
-// manualTouchFile touches a file in the chroot
-func manualTouchFile(touchFileInterfaces interface{}, targetDir string, debug bool) error {
-	touchFileSlice := reflect.ValueOf(touchFileInterfaces)
-	for i := 0; i < touchFileSlice.Len(); i++ {
-		touchFile := touchFileSlice.Index(i).Interface().(*imagedefinition.TouchFile)
-		fullPath := filepath.Join(targetDir, touchFile.TouchPath)
+// manualTouchFile touches files in the chroot
+func manualTouchFile(customizations []*imagedefinition.TouchFile, targetDir string, debug bool) error {
+	for _, c := range customizations {
+		fullPath := filepath.Join(targetDir, c.TouchPath)
 		if debug {
 			fmt.Printf("Creating empty file \"%s\"\n", fullPath)
 		}
@@ -859,16 +853,14 @@ func manualTouchFile(touchFileInterfaces interface{}, targetDir string, debug bo
 	return nil
 }
 
-// manualAddGroup adds a group in the chroot
-func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool) error {
-	addGroupSlice := reflect.ValueOf(addGroupInterfaces)
-	for i := 0; i < addGroupSlice.Len(); i++ {
-		addGroup := addGroupSlice.Index(i).Interface().(*imagedefinition.AddGroup)
-		addGroupCmd := execCommand("chroot", targetDir, "groupadd", addGroup.GroupName)
-		debugStatement := fmt.Sprintf("Adding group \"%s\"\n", addGroup.GroupName)
-		if addGroup.GroupID != "" {
-			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", addGroup.GroupID}...)
-			debugStatement = fmt.Sprintf("%s with GID %s\n", strings.TrimSpace(debugStatement), addGroup.GroupID)
+// manualAddGroup adds groups in the chroot
+func manualAddGroup(customizations []*imagedefinition.AddGroup, targetDir string, debug bool) error {
+	for _, c := range customizations {
+		addGroupCmd := execCommand("chroot", targetDir, "groupadd", c.GroupName)
+		debugStatement := fmt.Sprintf("Adding group \"%s\"\n", c.GroupName)
+		if c.GroupID != "" {
+			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", c.GroupID}...)
+			debugStatement = fmt.Sprintf("%s with GID %s\n", strings.TrimSpace(debugStatement), c.GroupID)
 		}
 		if debug {
 			fmt.Print(debugStatement)
@@ -883,16 +875,14 @@ func manualAddGroup(addGroupInterfaces interface{}, targetDir string, debug bool
 	return nil
 }
 
-// manualAddUser adds a group in the chroot
-func manualAddUser(addUserInterfaces interface{}, targetDir string, debug bool) error {
-	addUserSlice := reflect.ValueOf(addUserInterfaces)
-	for i := 0; i < addUserSlice.Len(); i++ {
-		addUser := addUserSlice.Index(i).Interface().(*imagedefinition.AddUser)
-		addUserCmd := execCommand("chroot", targetDir, "useradd", addUser.UserName)
-		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", addUser.UserName)
-		if addUser.UserID != "" {
-			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", addUser.UserID}...)
-			debugStatement = fmt.Sprintf("%s with UID %s\n", strings.TrimSpace(debugStatement), addUser.UserID)
+// manualAddUser adds users in the chroot
+func manualAddUser(customizations []*imagedefinition.AddUser, targetDir string, debug bool) error {
+	for _, c := range customizations {
+		addUserCmd := execCommand("chroot", targetDir, "useradd", c.UserName)
+		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", c.UserName)
+		if c.UserID != "" {
+			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", c.UserID}...)
+			debugStatement = fmt.Sprintf("%s with UID %s\n", strings.TrimSpace(debugStatement), c.UserID)
 		}
 		if debug {
 			fmt.Print(debugStatement)
