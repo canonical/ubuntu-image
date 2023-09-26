@@ -115,7 +115,8 @@ The following specification defines what is supported in the YAML:
          # following compression types: bzip2, gzip, xz, zstd.
          tarball: (exactly 1 of archive-tasks, seed or tarball must be specified)
              # The path to the tarball. Currently only local paths beginning with
-             # file:// are supported
+             # file:// are supported. The given path will be interpreted as relative
+             # to the path of the image definition file if is not absolute.
              url: <string> (required if tarball dict is specified)
              # URL to the gpg signature to verify the tarball against.
              gpg: <string> (optional)

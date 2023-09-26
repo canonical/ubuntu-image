@@ -821,7 +821,7 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	// has been confirmed by the schema validation
 	tarPath := strings.TrimPrefix(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL, "file://")
 	if !filepath.IsAbs(tarPath) {
-		tarPath, _ = filepath.Abs(tarPath)
+	tarPath = filepath.Join(stateMachine.ConfDefPath, tarPath)
 	}
 
 	// if the sha256 sum of the tarball is provided, make sure it matches

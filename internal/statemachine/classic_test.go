@@ -888,55 +888,64 @@ func TestExtractRootfsTar(t *testing.T) {
 		expectedFiles []string
 	}{
 		{
-			"vanilla_tar",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar"),
-			"ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
-			[]string{
+			name:      "vanilla_tar",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"),
+			SHA256sum: "ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
+			expectedFiles: []string{
 				"test_tar1",
 				"test_tar2",
 			},
 		},
 		{
-			"vanilla_tar_relative_path",
-			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"),
-			"ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
-			[]string{
+			name:      "vanilla_tar respecting absolute path",
+			rootfsTar: filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar"),
+			SHA256sum: "ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
+			expectedFiles: []string{
 				"test_tar1",
 				"test_tar2",
 			},
 		},
 		{
-			"gz",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.gz"),
-			"29152fd9cadbc92f174815ec642ab3aea98f08f902a4f317ec037f8fe60e40c3",
-			[]string{
+			name:      "vanilla_tar relative path even with dot dot",
+			rootfsTar: filepath.Join("testdata", "../..", filepath.Base(wd), "testdata", "rootfs_tarballs", "rootfs.tar"),
+			SHA256sum: "ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
+			expectedFiles: []string{
+				"test_tar1",
+				"test_tar2",
+			},
+		},
+		{
+			name:      "gz",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.gz"),
+			SHA256sum: "29152fd9cadbc92f174815ec642ab3aea98f08f902a4f317ec037f8fe60e40c3",
+			expectedFiles: []string{
 				"test_tar_gz1",
 				"test_tar_gz2",
 			},
 		},
 		{
-			"xz",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.xz"),
-			"e3708f1d98ccea0e0c36843d9576580505ee36d523bfcf78b0f73a035ae9a14e",
-			[]string{
+			name:      "xz",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.xz"),
+			SHA256sum: "e3708f1d98ccea0e0c36843d9576580505ee36d523bfcf78b0f73a035ae9a14e",
+			expectedFiles: []string{
 				"test_tar_xz1",
 				"test_tar_xz2",
 			},
 		},
 		{
-			"bz2",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.bz2"),
-			"a1180a73b652d85d7330ef21d433b095363664f2f808363e67f798fae15abf0c",
-			[]string{
+			name:      "bz2",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.bz2"),
+			SHA256sum: "a1180a73b652d85d7330ef21d433b095363664f2f808363e67f798fae15abf0c",
+			expectedFiles: []string{
 				"test_tar_bz1",
 				"test_tar_bz2",
 			},
 		},
 		{
-			"zst",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.zst"),
-			"5fb00513f84e28225a3155fd78c59a6a923b222e1c125aab35bbfd4091281829",
-			[]string{
+			name:      "zst",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.zst"),
+			SHA256sum: "5fb00513f84e28225a3155fd78c59a6a923b222e1c125aab35bbfd4091281829",
+			expectedFiles: []string{
 				"test_tar_zstd1",
 				"test_tar_zstd2",
 			},
@@ -945,8 +954,8 @@ func TestExtractRootfsTar(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test_extract_rootfs_tar_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -961,8 +970,11 @@ func TestExtractRootfsTar(t *testing.T) {
 				},
 			}
 
+			err := stateMachine.setConfDefDir(filepath.Join(wd, "image_definition.yaml"))
+			asserter.AssertErrNil(err, true)
+
 			// need workdir set up for this
-			err := stateMachine.makeTemporaryDirectories()
+			err = stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 
 			err = stateMachine.extractRootfsTar()
@@ -989,21 +1001,20 @@ func TestFailedExtractRootfsTar(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		absTarPath, err := filepath.Abs(filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"))
-		asserter.AssertErrNil(err, true)
+		tarPath := filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar")
 		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Rootfs: &imagedefinition.Rootfs{
 				Tarball: &imagedefinition.Tarball{
-					TarballURL: fmt.Sprintf("file://%s", absTarPath),
+					TarballURL: fmt.Sprintf("file://%s", tarPath),
 					SHA256sum:  "fail",
 				},
 			},
 		}
 
 		// need workdir set up for this
-		err = stateMachine.makeTemporaryDirectories()
+		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
@@ -1433,7 +1444,6 @@ func TestStateMachine_manualCustomization(t *testing.T) {
 		}
 
 		d, _ := os.Getwd()
-		fmt.Printf("cwd: %s", d)
 		err := stateMachine.setConfDefDir(filepath.Join(d, "image_definition.yaml"))
 		asserter.AssertErrNil(err, true)
 
