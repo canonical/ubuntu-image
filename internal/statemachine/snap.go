@@ -37,6 +37,10 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 	// set the states that will be used for this image type
 	snapStateMachine.states = snapStates
 
+	if err := snapStateMachine.setConfDefDir(snapStateMachine.parent.(*SnapStateMachine).Args.ModelAssertion); err != nil {
+		return err
+	}
+
 	// do the validation common to all image types
 	if err := snapStateMachine.validateInput(); err != nil {
 		return err

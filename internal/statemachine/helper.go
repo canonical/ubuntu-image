@@ -57,6 +57,16 @@ func (stateMachine *StateMachine) validateInput() error {
 	return nil
 }
 
+func (stateMachine *StateMachine) setConfDefDir(confFileArg string) error {
+	path, err := filepath.Abs(filepath.Dir(confFileArg))
+	if err != nil {
+		return fmt.Errorf("unable to determine the configuration definition directory: %w", err)
+	}
+	stateMachine.ConfDefPath = path
+
+	return nil
+}
+
 // validateUntilThru validates that the the state passed as --until
 // or --thru exists in the state machine's list of states
 func (stateMachine *StateMachine) validateUntilThru() error {

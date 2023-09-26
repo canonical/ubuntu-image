@@ -18,6 +18,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/invopop/jsonschema"
 	"github.com/pkg/xattr"
 	"github.com/snapcore/snapd/image"
@@ -26,9 +28,6 @@ import (
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
 	"gopkg.in/yaml.v2"
-
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 var yamlMarshal = yaml.Marshal
@@ -300,6 +299,34 @@ func TestPrintStates(t *testing.T) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
 				expectedStates, string(readStdout))
 		}
+	})
+}
+
+// TestClassicStateMachine_Setup_Fail_setConfDefDir tests a failure in the Setup() function when setting the configuration definition directory
+func TestClassicStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
+	t.Run("test_failed_set_conf_dir", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		tmpDirPath := filepath.Join("/tmp", "test_failed_set_conf_dir")
+		err := os.Mkdir(tmpDirPath, 0755)
+		t.Cleanup(func() {
+			os.RemoveAll(tmpDirPath)
+		})
+		asserter.AssertErrNil(err, true)
+
+		err = os.Chdir(tmpDirPath)
+		asserter.AssertErrNil(err, true)
+
+		_ = os.RemoveAll(tmpDirPath)
+
+		err = stateMachine.Setup()
+		asserter.AssertErrContains(err, "unable to determine the configuration definition directory")
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 

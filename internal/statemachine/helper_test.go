@@ -15,15 +15,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
-
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 // TestMaxOffset tests the functionality of the maxOffset function
@@ -1413,4 +1412,77 @@ func TestFailedUpdateGrub(t *testing.T) {
 		asserter.AssertErrContains(err, "Error running command")
 		execCommand = exec.Command
 	})
+}
+
+func TestStateMachine_setConfDefDir(t *testing.T) {
+	tests := []struct {
+		name          string
+		confFileArg   string
+		expectedError string
+		wantPath      string
+		absBroken     bool
+	}{
+		{
+			name:        "simple case",
+			confFileArg: "ubuntu-server.yaml",
+			wantPath:    "/tmp/simple_case",
+		},
+		{
+			name:        "conf in subdir",
+			confFileArg: "subdir/ubuntu-server.yaml",
+			wantPath:    "/tmp/conf_in_subdir/subdir",
+		},
+		{
+			name:        "conf in parent",
+			confFileArg: "../ubuntu-server.yaml",
+			wantPath:    "/tmp",
+		},
+		{
+			name:        "conf at root",
+			confFileArg: "../../../../../../../../../../..//ubuntu-server.yaml",
+			wantPath:    "/",
+		},
+		{
+			name:          "fail to get conf directory",
+			confFileArg:   "ubuntu-server.yaml",
+			wantPath:      "",
+			absBroken:     true,
+			expectedError: "unable to determine the configuration definition directory",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			tName := strings.ReplaceAll(tc.name, " ", "_")
+
+			tmpDirPath := filepath.Join("/tmp", tName)
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			err := os.Mkdir(tmpDirPath, 0755)
+			t.Cleanup(func() {
+				os.RemoveAll(tmpDirPath)
+			})
+			asserter.AssertErrNil(err, true)
+
+			err = os.Chdir(tmpDirPath)
+			asserter.AssertErrNil(err, true)
+
+			if tc.absBroken {
+				os.RemoveAll(tmpDirPath)
+			}
+
+			stateMachine := &StateMachine{}
+			err = stateMachine.setConfDefDir(tc.confFileArg)
+			if len(tc.expectedError) == 0 {
+				asserter.AssertErrNil(err, true)
+			} else {
+				asserter.AssertErrContains(err, tc.expectedError)
+			}
+
+			if tc.wantPath != stateMachine.ConfDefPath {
+				t.Errorf("Expected \"%s\" but got \"%s\"", tc.wantPath, stateMachine.ConfDefPath)
+			}
+		})
+	}
 }

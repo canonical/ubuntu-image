@@ -21,6 +21,35 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
+// TestSnapStateMachine_Setup_Fail_setConfDefDir tests a failure in the Setup() function when setting the configuration definition directory
+func TestSnapStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
+	t.Run("test_failed_set_conf_dir", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine SnapStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		tmpDirPath := filepath.Join("/tmp", "test_failed_set_conf_dir")
+		err := os.Mkdir(tmpDirPath, 0755)
+		t.Cleanup(func() {
+			os.RemoveAll(tmpDirPath)
+		})
+		asserter.AssertErrNil(err, true)
+
+		err = os.Chdir(tmpDirPath)
+		asserter.AssertErrNil(err, true)
+
+		_ = os.RemoveAll(tmpDirPath)
+
+		err = stateMachine.Setup()
+		asserter.AssertErrContains(err, "unable to determine the configuration definition directory")
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input
 func TestFailedSnapSetup(t *testing.T) {
 	testCases := []struct {
