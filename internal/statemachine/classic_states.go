@@ -1086,10 +1086,10 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	// are also set to be installed. Note we only do this for snaps that are
 	// seeded. Users are expected to specify all base and content provider
 	// snaps in the image definition.
-	for _, seededSnap := range imageOpts.Snaps {
 		snapStore := store.New(nil, nil)
+	snapContext := context.Background()
+	for _, seededSnap := range imageOpts.Snaps {
 		snapSpec := store.SnapSpec{Name: seededSnap}
-		snapContext := context.TODO() //context can be empty, just not nil
 		snapInfo, err := snapStore.SnapInfo(snapContext, snapSpec, nil)
 		if err != nil {
 			return fmt.Errorf("Error getting info for snap %s: \"%s\"",
