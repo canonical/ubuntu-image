@@ -1128,7 +1128,11 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	// if no explicit model assertion was given, keep empty ModelFile to let snapd fallback to default
 	// model assertion
 	if len(modelAssertionPath) != 0 {
+		if !filepath.IsAbs(modelAssertionPath) {
 		imageOpts.ModelFile = filepath.Join(stateMachine.ConfDefPath, modelAssertionPath)
+		} else {
+			imageOpts.ModelFile = modelAssertionPath
+		}
 	}
 
 	imageOpts.Classic = true
