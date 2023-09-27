@@ -1055,3 +1055,16 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 		})
 	}
 }
+
+func TestMinSize(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-gpt-minsize.yaml")
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, false)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, false)
+}

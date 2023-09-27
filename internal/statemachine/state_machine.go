@@ -227,6 +227,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var rootfsSeen bool = false
 	var farthestOffset quantity.Offset
 	var lastOffset quantity.Offset
+	farthestOffsetUnknown := false
 	var lastVolumeName string
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
@@ -284,10 +285,13 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			}
 
 			// update farthestOffset if needed
-			offset := *structure.Offset
-			lastOffset = offset + quantity.Offset(structure.Size)
-			farthestOffset = maxOffset(lastOffset, farthestOffset)
-			structure.Offset = &offset
+			if structure.Offset == nil {
+				farthestOffsetUnknown = true
+			} else {
+				offset := *structure.Offset
+				lastOffset = offset + quantity.Offset(structure.Size)
+				farthestOffset = maxOffset(lastOffset, farthestOffset)
+			}
 
 			// system-data and system-seed do not always have content defined.
 			// this makes Content be a nil slice and lead copyStructureContent() skip the rootfs copying later.
@@ -302,7 +306,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 		}
 	}
 
-	if !rootfsSeen && len(stateMachine.GadgetInfo.Volumes) == 1 {
+	if !farthestOffsetUnknown && !rootfsSeen && len(stateMachine.GadgetInfo.Volumes) == 1 {
 		// We still need to handle the case of unspecified system-data
 		// partition where we simply attach the rootfs at the end of the
 		// partition list.
