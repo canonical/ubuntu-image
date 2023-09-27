@@ -1125,9 +1125,13 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	}
 
 	modelAssertionPath := strings.TrimPrefix(classicStateMachine.ImageDef.ModelAssertion, "file://")
+	// if no explicit model assertion was given, keep empty ModelFile to let snapd fallback to default
+	// model assertion
+	if len(modelAssertionPath) != 0 {
+		imageOpts.ModelFile = filepath.Join(stateMachine.ConfDefPath, modelAssertionPath)
+	}
 
 	imageOpts.Classic = true
-	imageOpts.ModelFile = filepath.Join(stateMachine.ConfDefPath, modelAssertionPath)
 	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
 	imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot
 	imageOpts.Customizations = *new(image.Customizations)
