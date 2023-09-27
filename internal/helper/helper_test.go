@@ -117,3 +117,85 @@ func TestFailedRestoreResolvConf(t *testing.T) {
 		asserter.AssertErrContains(err, "Error removing file")
 	})
 }
+
+type s1 struct {
+	A string `default:"test"`
+	B string
+}
+
+type s2 struct {
+	A string `default:"test"`
+	B bool   `default:"true"`
+}
+
+func TestSetDefaults(t *testing.T) {
+	type args struct {
+		needsDefaults interface{}
+	}
+	tests := []struct {
+		name          string
+		args          args
+		want          interface{}
+		wantErr       bool
+		expectedError string
+	}{
+		{
+			name: "set default on empty valid struct",
+			args: args{
+				needsDefaults: &s1{},
+			},
+			want: &s1{
+				A: "test",
+				B: "",
+			},
+		},
+		{
+			name: "set default on non-empty valid struct",
+			args: args{
+				needsDefaults: &s1{
+					A: "non-empty",
+				},
+			},
+			want: &s1{
+				A: "non-empty",
+				B: "",
+			},
+		},
+		{
+			name: "set default on empty struct with bool",
+			args: args{
+				needsDefaults: &s2{},
+			},
+			want: &s2{
+				A: "test",
+				B: true,
+			},
+		},
+		{
+			name: "set default on non-empty struct with bool",
+			args: args{
+				needsDefaults: &s2{
+					B: false,
+				},
+			},
+			want: &s2{
+				A: "test",
+				B: false,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := Asserter{T: t}
+			err := SetDefaults(tc.args.needsDefaults)
+
+			if len(tc.expectedError) == 0 {
+				asserter.AssertErrNil(err, true)
+				asserter.AssertEqual(tc.want, tc.args.needsDefaults)
+			} else {
+				asserter.AssertErrContains(err, tc.expectedError)
+			}
+
+		})
+	}
+}
