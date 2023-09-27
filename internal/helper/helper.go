@@ -133,26 +133,27 @@ func SetDefaults(needsDefaults interface{}) error {
 		} else {
 			tags := elem.Type().Field(i).Tag
 			defaultValue, hasDefault := tags.Lookup("default")
-			if hasDefault {
-				indirectedField := reflect.Indirect(field)
-				if indirectedField.CanSet() && field.IsZero() {
-					varType := field.Type().Kind()
-					switch varType {
-					case reflect.String:
-						field.SetString(defaultValue)
-					case reflect.Slice:
-						defaultValues := strings.Split(defaultValue, ",")
-						field.Set(reflect.ValueOf(defaultValues))
-					case reflect.Bool:
-						if defaultValue == "true" {
-							field.SetBool(true)
-						} else {
-							field.SetBool(false)
-						}
-					default:
-						return fmt.Errorf("Setting default value of type %s not supported",
-							varType)
+			if !hasDefault {
+				continue
+			}
+			indirectedField := reflect.Indirect(field)
+			if indirectedField.CanSet() && field.IsZero() {
+				varType := field.Type().Kind()
+				switch varType {
+				case reflect.String:
+					field.SetString(defaultValue)
+				case reflect.Slice:
+					defaultValues := strings.Split(defaultValue, ",")
+					field.Set(reflect.ValueOf(defaultValues))
+				case reflect.Bool:
+					if defaultValue == "true" {
+						field.SetBool(true)
+					} else {
+						field.SetBool(false)
 					}
+				default:
+					return fmt.Errorf("Setting default value of type %s not supported",
+						varType)
 				}
 			}
 		}

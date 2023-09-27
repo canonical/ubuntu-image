@@ -118,14 +118,33 @@ func TestFailedRestoreResolvConf(t *testing.T) {
 	})
 }
 
-type s1 struct {
+type S1 struct {
 	A string `default:"test"`
 	B string
+	C []string `default:"1,2,3"`
+	D []*S3
+	E *S3
 }
 
-type s2 struct {
+type S2 struct {
 	A string `default:"test"`
 	B bool   `default:"true"`
+}
+
+type S3 struct {
+	A string `default:"defaults3value"`
+}
+
+type S4 struct {
+	A int `default:"1"`
+}
+
+type S5 struct {
+	A *S4
+}
+
+type S6 struct {
+	A []*S4
 }
 
 func TestSetDefaults(t *testing.T) {
@@ -140,33 +159,53 @@ func TestSetDefaults(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name: "set default on empty valid struct",
+			name: "set default on empty struct",
 			args: args{
-				needsDefaults: &s1{},
+				needsDefaults: &S1{},
 			},
-			want: &s1{
+			want: &S1{
 				A: "test",
 				B: "",
+				C: []string{"1", "2", "3"},
 			},
 		},
 		{
-			name: "set default on non-empty valid struct",
+			name: "set default on non-empty struct",
 			args: args{
-				needsDefaults: &s1{
-					A: "non-empty",
+				needsDefaults: &S1{
+					A: "non-empty-A-value",
+					B: "non-empty-B-value",
+					C: []string{"non-empty-C-value"},
+					D: []*S3{
+						{
+							A: "non-empty-A-value",
+						},
+					},
+					E: &S3{
+						A: "non-empty-A-value",
+					},
 				},
 			},
-			want: &s1{
-				A: "non-empty",
-				B: "",
+			want: &S1{
+				A: "non-empty-A-value",
+				B: "non-empty-B-value",
+				C: []string{"non-empty-C-value"},
+				D: []*S3{
+					{
+						A: "non-empty-A-value",
+					},
+				},
+				E: &S3{
+					A: "non-empty-A-value",
+				},
 			},
 		},
 		{
 			name: "set default on empty struct with bool",
 			args: args{
-				needsDefaults: &s2{},
+				needsDefaults: &S2{},
 			},
-			want: &s2{
+			want: &S2{
 				A: "test",
 				B: true,
 			},
@@ -174,14 +213,48 @@ func TestSetDefaults(t *testing.T) {
 		{
 			name: "set default on non-empty struct with bool",
 			args: args{
-				needsDefaults: &s2{
+				needsDefaults: &S2{
 					B: false,
 				},
 			},
-			want: &s2{
+			want: &S2{
 				A: "test",
 				B: false,
 			},
+		},
+		{
+			name: "fail to set default on struct with unsuported type",
+			args: args{
+				needsDefaults: &S4{},
+			},
+			expectedError: "not supported",
+		},
+		{
+			name: "fail to set default on struct containing a struct with unsuported type",
+			args: args{
+				needsDefaults: &S5{
+					A: &S4{},
+				},
+			},
+			expectedError: "not supported",
+		},
+		{
+			name: "fail to set default on struct containing an slice of struct with unsuported type",
+			args: args{
+				needsDefaults: &S6{
+					A: []*S4{
+						{},
+					},
+				},
+			},
+			expectedError: "not supported",
+		},
+		{
+			name: "fail to set default on a concrete object (not a pointer)",
+			args: args{
+				needsDefaults: S1{},
+			},
+			expectedError: "The argument to SetDefaults must be a pointer",
 		},
 	}
 	for _, tc := range tests {
