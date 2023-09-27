@@ -13,7 +13,7 @@ Generate a bootable disk image
     Paul Mars <paul.mars@canonical.com>
 :Date: 2021-10-21
 :Copyright: 2016-2021 Canonical Ltd.
-:Version: 2.0
+:Version: 3.0
 :Manual section: 1
 
 
