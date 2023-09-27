@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -400,17 +399,18 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		}
 		sourceDir = gadgetDir
 	case "directory":
-		// no need to check error here as the validity of the URL
-		// has been confirmed by the schema validation
-		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
+		gadgetTreePath := strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
+		if !filepath.IsAbs(gadgetTreePath) {
+			gadgetTreePath = filepath.Join(stateMachine.ConfDefPath, gadgetTreePath)
+		}
 
 		// copy the source tree to the workdir
-		files, err := osReadDir(sourceURL.Path)
+		files, err := osReadDir(gadgetTreePath)
 		if err != nil {
 			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 		}
 		for _, gadgetFile := range files {
-			srcFile := filepath.Join(sourceURL.Path, gadgetFile.Name())
+			srcFile := filepath.Join(gadgetTreePath, gadgetFile.Name())
 			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
 				return fmt.Errorf("Error copying gadget source: %s", err.Error())
 			}
@@ -1129,7 +1129,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	// model assertion
 	if len(modelAssertionPath) != 0 {
 		if !filepath.IsAbs(modelAssertionPath) {
-		imageOpts.ModelFile = filepath.Join(stateMachine.ConfDefPath, modelAssertionPath)
+			imageOpts.ModelFile = filepath.Join(stateMachine.ConfDefPath, modelAssertionPath)
 		} else {
 			imageOpts.ModelFile = modelAssertionPath
 		}

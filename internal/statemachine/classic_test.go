@@ -2630,6 +2630,8 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		gitCloneCommand := *exec.Command(
 			"git",
 			"clone",
+			"--depth",
+			"1",
 			"--branch",
 			"classic",
 			"https://github.com/snapcore/pc-gadget",
@@ -2663,6 +2665,123 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		os.RemoveAll(gadgetDir)
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}
+
+func TestStateMachine_buildGadgetTree_paths(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	// git clone the gadget into a /tmp dir
+	originGadgetDir, err := os.MkdirTemp("", "pc-gadget-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() {
+		err = os.RemoveAll(originGadgetDir)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+	gitCloneCommand := *exec.Command(
+		"git",
+		"clone",
+		"--depth",
+		"1",
+		"--branch",
+		"classic",
+		"https://github.com/snapcore/pc-gadget",
+		originGadgetDir,
+	)
+	err = gitCloneCommand.Run()
+	asserter.AssertErrNil(err, true)
+
+	tmpDir, err := os.MkdirTemp("", "")
+	t.Cleanup(func() {
+		err := osRemoveAll(tmpDir)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	testCases := []struct {
+		name      string
+		gadgetDir string
+	}{
+		{
+			name:      "gadget URL poiting to an absolute dir",
+			gadgetDir: originGadgetDir,
+		},
+		{
+			name:      "gadget URL pointing to an absolute sub dir",
+			gadgetDir: filepath.Join(tmpDir, "a", "b"),
+		},
+		{
+			name:      "gadget URL pointing to a relative sub dir",
+			gadgetDir: filepath.Join("a", "b"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run("test_build_gadget_tree_paths_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+			t.Cleanup(func() {
+				err := os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+				if err != nil {
+					t.Error(err)
+				}
+			})
+
+			// move the original gadget dir to the desire location to test it will be found
+			if originGadgetDir != tc.gadgetDir {
+				fullGadgetDir := tc.gadgetDir
+				if !filepath.IsAbs(tc.gadgetDir) {
+					fullGadgetDir = filepath.Join(tmpDir, tc.gadgetDir)
+				}
+
+				err = os.MkdirAll(filepath.Dir(fullGadgetDir), 0777)
+				asserter.AssertErrNil(err, true)
+
+				err = os.Rename(originGadgetDir, fullGadgetDir)
+				asserter.AssertErrNil(err, true)
+				// move it back once the test is done
+				t.Cleanup(func() {
+					err := os.Rename(fullGadgetDir, originGadgetDir)
+					if err != nil {
+						t.Error(err)
+					}
+				})
+			}
+
+			// now set up the image definition to build from this directory
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Gadget: &imagedefinition.Gadget{
+					GadgetURL:  fmt.Sprintf("file://%s", tc.gadgetDir),
+					GadgetType: "directory",
+				},
+			}
+
+			err = stateMachine.setConfDefDir(filepath.Join(tmpDir, "image_definition.yaml"))
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.buildGadgetTree()
+			asserter.AssertErrNil(err, true)
+
+			// now make sure the gadget.yaml is in the expected location
+			// this was a bug reported by the CPC team
+			err = stateMachine.prepareGadgetTree()
+			asserter.AssertErrNil(err, true)
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, true)
+		})
+	}
 }
 
 // TestGadgetGadgetTargets tests using alternate make targets with gadget builds
