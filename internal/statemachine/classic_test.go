@@ -18,9 +18,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
-	"github.com/canonical/ubuntu-image/internal/imagedefinition"
-	"github.com/invopop/jsonschema"
 	"github.com/pkg/xattr"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
@@ -28,6 +25,9 @@ import (
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
 	"gopkg.in/yaml.v2"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 var yamlMarshal = yaml.Marshal
@@ -2375,52 +2375,6 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
-}
-
-// TestCheckEmptyFields unit tests the helper.CheckEmptyFields function
-func TestCheckEmptyFields(t *testing.T) {
-	// define the struct we will use to test
-	type testStruct struct {
-		A string `yaml:"a" json:"fieldA,required"`
-		B string `yaml:"b" json:"fieldB"`
-		C string `yaml:"c" json:"fieldC,omitempty"`
-	}
-
-	// generate the schema for our testStruct
-	var jsonReflector jsonschema.Reflector
-	schema := jsonReflector.Reflect(&testStruct{})
-
-	// now run CheckEmptyFields with a variety of test data
-	// to ensure the correct return values
-	testCases := []struct {
-		name       string
-		structData testStruct
-		shouldPass bool
-	}{
-		{"success", testStruct{A: "foo", B: "bar", C: "baz"}, true},
-		{"missing_explicitly_required", testStruct{B: "bar", C: "baz"}, false},
-		{"missing_implicitly_required", testStruct{A: "foo", C: "baz"}, false},
-		{"missing_omitempty", testStruct{A: "foo", B: "bar"}, true},
-	}
-	for i, tc := range testCases {
-		t.Run("test_check_empty_fields_"+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-
-			result := new(gojsonschema.Result)
-			err := helper.CheckEmptyFields(&testCases[i].structData, result, schema)
-			asserter.AssertErrNil(err, false)
-			schema.Required = append(schema.Required, "fieldA")
-
-			// make sure validation will fail only when expected
-			if tc.shouldPass && !result.Valid() {
-				t.Error("CheckEmptyFields added errors when it should not have")
-			}
-			if !tc.shouldPass && result.Valid() {
-				t.Error("CheckEmptyFields did NOT add errors when it should have")
-			}
-
-		})
-	}
 }
 
 // TestGerminate tests the germinate state and ensures some necessary packages are included
