@@ -1019,51 +1019,41 @@ func TestStateMachine_customizeCloudInit(t *testing.T) {
 		{
 			name: "full cloudinit conf",
 			cloudInitCustomization: imagedefinition.CloudInit{
-				MetaData:      "foo: bar",
-				UserData:      "bar: baz",
-				NetworkConfig: "foobar: foobar",
-			},
-			wantMetaData: `#cloud-config
-
-foo: bar`,
-			wantUserData: `#cloud-config
-
-bar: baz`,
-			wantNetworkConfig: `#cloud-config
-
-foobar: foobar`,
-		},
-		{
-			name: "full cloudinit conf with already correct header",
-			cloudInitCustomization: imagedefinition.CloudInit{
 				MetaData: `#cloud-config
+
 foo: bar`,
 				UserData: `#cloud-config
 
-bar: baz`,
+foo: baz`,
 				NetworkConfig: `#cloud-config
+
 foobar: foobar`,
 			},
 			wantMetaData: `#cloud-config
+
 foo: bar`,
 			wantUserData: `#cloud-config
 
-bar: baz`,
+foo: baz`,
 			wantNetworkConfig: `#cloud-config
+
 foobar: foobar`,
 		},
-
 		{
 			name: "empty user data",
 			cloudInitCustomization: imagedefinition.CloudInit{
-				MetaData:      "foo: bar",
-				UserData:      "",
-				NetworkConfig: "foobar: foobar",
+				MetaData: `#cloud-config
+
+foo: bar`,
+				UserData: "",
+				NetworkConfig: `#cloud-config
+
+foobar: foobar`,
 			},
 			wantMetaData: `#cloud-config
 
 foo: bar`,
-			wantUserData: ``,
+			wantUserData: "",
 			wantNetworkConfig: `#cloud-config
 
 foobar: foobar`,
@@ -1071,11 +1061,13 @@ foobar: foobar`,
 		{
 			name: "empty metadata",
 			cloudInitCustomization: imagedefinition.CloudInit{
-				UserData:      "",
-				NetworkConfig: "foobar: foobar",
+				UserData: "",
+				NetworkConfig: `#cloud-config
+
+foobar: foobar`,
 			},
-			wantMetaData: ``,
-			wantUserData: ``,
+			wantMetaData: "",
+			wantUserData: "",
 			wantNetworkConfig: `#cloud-config
 
 foobar: foobar`,
@@ -1083,7 +1075,9 @@ foobar: foobar`,
 		{
 			name: "multiline user data",
 			cloudInitCustomization: imagedefinition.CloudInit{
-				UserData: `chpasswd:
+				UserData: `#cloud-config
+
+chpasswd:
 	expire: true
 	users:
 		- name: ubuntu
@@ -1091,7 +1085,7 @@ foobar: foobar`,
 		type: text
 `,
 			},
-			wantMetaData: ``,
+			wantMetaData: "",
 			wantUserData: `#cloud-config
 
 chpasswd:
@@ -1101,7 +1095,7 @@ chpasswd:
 		password: ubuntu
 		type: text
 `,
-			wantNetworkConfig: ``,
+			wantNetworkConfig: "",
 		},
 	}
 
@@ -1206,9 +1200,13 @@ func TestStatemachine_customizeCloudInit_failed(t *testing.T) {
 
 	stateMachine.ImageDef.Customization = &imagedefinition.Customization{
 		CloudInit: &imagedefinition.CloudInit{
-			MetaData:      "foo: bar",
-			NetworkConfig: "foobar: foobar",
-			UserData: `chpasswd:
+			MetaData: `#cloud-config
+foo: bar`,
+			NetworkConfig: `#cloud-config
+foobar: foobar`,
+			UserData: `#cloud-config
+
+chpasswd:
   expire: true
   users:
     - name: ubuntu
@@ -1226,7 +1224,9 @@ func TestStatemachine_customizeCloudInit_failed(t *testing.T) {
 			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
 			err = os.MkdirAll(cloudInitConfigDirPath, 0777)
 			asserter.AssertErrNil(err, true)
-			defer os.RemoveAll(cloudInitConfigDirPath)
+			t.Cleanup(func() {
+				os.RemoveAll(cloudInitConfigDirPath)
+			})
 
 			osCreate = func(name string) (*os.File, error) {
 				if strings.Contains(name, file) {
@@ -1247,7 +1247,9 @@ func TestStatemachine_customizeCloudInit_failed(t *testing.T) {
 			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
 			err = os.MkdirAll(cloudInitConfigDirPath, 0777)
 			asserter.AssertErrNil(err, true)
-			defer os.RemoveAll(cloudInitConfigDirPath)
+			t.Cleanup(func() {
+				os.RemoveAll(cloudInitConfigDirPath)
+			})
 
 			osCreate = func(name string) (*os.File, error) {
 				if strings.Contains(name, file) {
@@ -1272,12 +1274,14 @@ func TestStatemachine_customizeCloudInit_failed(t *testing.T) {
 		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
 		err = os.MkdirAll(cloudInitConfigDirPath, 0777)
 		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(cloudInitConfigDirPath)
+		t.Cleanup(func() {
+			os.RemoveAll(cloudInitConfigDirPath)
+		})
 
 		osMkdirAll = mockMkdirAll
-		defer func() {
+		t.Cleanup(func() {
 			osMkdirAll = os.MkdirAll
-		}()
+		})
 
 		err := stateMachine.customizeCloudInit()
 		if err == nil {
@@ -1286,12 +1290,14 @@ func TestStatemachine_customizeCloudInit_failed(t *testing.T) {
 	})
 
 	// Test if yaml.Marshal fails
-	t.Run("Test_failed_customize_cloud_init_yaml_marshal", func(t *testing.T) {
+	t.Run("test_failed_customize_cloud_init_yaml_marshal", func(t *testing.T) {
 		// this directory is expected to be present as it is installed by cloud-init
 		cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
 		err = os.MkdirAll(cloudInitConfigDirPath, 0777)
 		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(cloudInitConfigDirPath)
+		t.Cleanup(func() {
+			os.RemoveAll(cloudInitConfigDirPath)
+		})
 
 		yamlMarshal = mockMarshal
 		defer func() {
@@ -1303,6 +1309,48 @@ func TestStatemachine_customizeCloudInit_failed(t *testing.T) {
 			t.Error()
 		}
 	})
+
+	// Test cloud-init customization is invalid
+	testCases := []struct {
+		name                   string
+		cloudInitCustomization imagedefinition.CloudInit
+	}{
+		{
+			name: "invalid metadata",
+			cloudInitCustomization: imagedefinition.CloudInit{
+				MetaData: "foo: bar",
+			},
+		},
+		{
+			name: "invalid userdata",
+			cloudInitCustomization: imagedefinition.CloudInit{
+				UserData: "foo: bar",
+			},
+		},
+		{
+			name: "invalid network config",
+			cloudInitCustomization: imagedefinition.CloudInit{
+				NetworkConfig: "foo: bar",
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run("test_failed_customize_cloud_init_invalid_config_"+tc.name, func(t *testing.T) {
+			// this directory is expected to be present as it is installed by cloud-init
+			cloudInitConfigDirPath := path.Join(tmpDir, "etc/cloud/cloud.cfg.d")
+			err = os.MkdirAll(cloudInitConfigDirPath, 0777)
+			asserter.AssertErrNil(err, true)
+			t.Cleanup(func() {
+				os.RemoveAll(cloudInitConfigDirPath)
+			})
+
+			stateMachine.ImageDef.Customization.CloudInit = &testCases[i].cloudInitCustomization
+
+			err := stateMachine.customizeCloudInit()
+			asserter.AssertErrContains(err, "is missing proper header")
+		})
+	}
 }
 
 // TestManualCustomization unit tests the manualCustomization function

@@ -136,6 +136,8 @@ The following specification defines what is supported in the YAML:
              - <string>
              - <string>
          # Used to create a custom cloud-init configuration.
+         # Given configuration should be fully valid cloud-init configuration
+         # (including file header) 
          cloud-init: (optional)
            # cloud-init yaml metadata
            meta-data: <yaml as a string> (optional)

@@ -890,27 +890,24 @@ func (stateMachine *StateMachine) germinate() error {
 	return nil
 }
 
-const cloudInitHeader = "#cloud-config\n"
-
 // customizeCloudInitFile customizes a cloud-init data file with the given content
 func customizeCloudInitFile(customData string, seedPath string, fileName string) error {
-	if customData != "" {
-		f, err := osCreate(path.Join(seedPath, fileName))
-		if err != nil {
-			return err
-		}
-		defer f.Close()
+	if customData == "" {
+		return nil
+	}
+	f, err := osCreate(path.Join(seedPath, fileName))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
-		if !strings.HasPrefix(customData, cloudInitHeader) {
-			_, err := f.WriteString(cloudInitHeader + "\n")
-			if err != nil {
-				return err
-			}
-		}
-		_, err = f.WriteString(customData)
-		if err != nil {
-			return err
-		}
+	if !strings.HasPrefix(customData, "#cloud-config\n") {
+		return fmt.Errorf("provided cloud-init customization for %s is missing proper header", fileName)
+	}
+
+	_, err = f.WriteString(customData)
+	if err != nil {
+		return err
 	}
 
 	return nil
