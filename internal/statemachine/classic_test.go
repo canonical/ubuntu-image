@@ -1007,36 +1007,106 @@ func TestFailedExtractRootfsTar(t *testing.T) {
 	})
 }
 
-// TestCustomizeCloudInit unit tests the customizeCloudInit function
-func TestCustomizeCloudInit(t *testing.T) {
-	cloudInitConfigs := []imagedefinition.CloudInit{
+// TestStateMachine_customizeCloudInit unit tests the customizeCloudInit method
+func TestStateMachine_customizeCloudInit(t *testing.T) {
+	testCases := []struct {
+		name                   string
+		cloudInitCustomization imagedefinition.CloudInit
+		wantMetaData           string
+		wantUserData           string
+		wantNetworkConfig      string
+	}{
 		{
-			MetaData:      "foo: bar",
-			NetworkConfig: "foobar: foobar",
-			UserData:      "bar: baz",
+			name: "full cloudinit conf",
+			cloudInitCustomization: imagedefinition.CloudInit{
+				MetaData:      "foo: bar",
+				UserData:      "bar: baz",
+				NetworkConfig: "foobar: foobar",
+			},
+			wantMetaData: `#cloud-config
+
+foo: bar`,
+			wantUserData: `#cloud-config
+
+bar: baz`,
+			wantNetworkConfig: `#cloud-config
+
+foobar: foobar`,
 		},
 		{
-			MetaData:      "foo: bar",
-			NetworkConfig: "foobar: foobar",
-			UserData:      "",
+			name: "full cloudinit conf with already correct header",
+			cloudInitCustomization: imagedefinition.CloudInit{
+				MetaData: `#cloud-config
+foo: bar`,
+				UserData: `#cloud-config
+
+bar: baz`,
+				NetworkConfig: `#cloud-config
+foobar: foobar`,
+			},
+			wantMetaData: `#cloud-config
+foo: bar`,
+			wantUserData: `#cloud-config
+
+bar: baz`,
+			wantNetworkConfig: `#cloud-config
+foobar: foobar`,
+		},
+
+		{
+			name: "empty user data",
+			cloudInitCustomization: imagedefinition.CloudInit{
+				MetaData:      "foo: bar",
+				UserData:      "",
+				NetworkConfig: "foobar: foobar",
+			},
+			wantMetaData: `#cloud-config
+
+foo: bar`,
+			wantUserData: ``,
+			wantNetworkConfig: `#cloud-config
+
+foobar: foobar`,
 		},
 		{
-			NetworkConfig: "foobar: foobar",
-			UserData:      "",
+			name: "empty metadata",
+			cloudInitCustomization: imagedefinition.CloudInit{
+				UserData:      "",
+				NetworkConfig: "foobar: foobar",
+			},
+			wantMetaData: ``,
+			wantUserData: ``,
+			wantNetworkConfig: `#cloud-config
+
+foobar: foobar`,
 		},
 		{
-			UserData: `chpasswd:
-  expire: true
-  users:
-    - name: ubuntu
-      password: ubuntu
-      type: text
+			name: "multiline user data",
+			cloudInitCustomization: imagedefinition.CloudInit{
+				UserData: `chpasswd:
+	expire: true
+	users:
+		- name: ubuntu
+		password: ubuntu
+		type: text
 `,
+			},
+			wantMetaData: ``,
+			wantUserData: `#cloud-config
+
+chpasswd:
+	expire: true
+	users:
+		- name: ubuntu
+		password: ubuntu
+		type: text
+`,
+			wantNetworkConfig: ``,
 		},
 	}
 
-	for i, cloudInitConfig := range cloudInitConfigs {
-		t.Run("test_customize_cloud_init", func(t *testing.T) {
+	for i, tc := range testCases {
+		t.Run("test_customize_cloud_init_"+tc.name, func(t *testing.T) {
 			// Test setup
 			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
@@ -1047,7 +1117,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 			stateMachine.parent = &stateMachine
 			tmpDir, err := os.MkdirTemp("", "")
 			asserter.AssertErrNil(err, true)
-			defer func() {
+			t.Cleanup(func() {
 				if tmpErr := osRemoveAll(tmpDir); tmpErr != nil {
 					if err != nil {
 						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
@@ -1055,7 +1125,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 						err = tmpErr
 					}
 				}
-			}()
+			})
 			stateMachine.tempDirs.chroot = tmpDir
 
 			// this directory is expected to be present as it is installed by cloud-init
@@ -1063,7 +1133,7 @@ func TestCustomizeCloudInit(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			stateMachine.ImageDef.Customization = &imagedefinition.Customization{
-				CloudInit: &cloudInitConfigs[i],
+				CloudInit: &testCases[i].cloudInitCustomization,
 			}
 
 			// Running function to test
@@ -1074,41 +1144,41 @@ func TestCustomizeCloudInit(t *testing.T) {
 			seedPath := path.Join(tmpDir, "var/lib/cloud/seed/nocloud")
 
 			metaDataFile, err := os.Open(path.Join(seedPath, "meta-data"))
-			if cloudInitConfig.MetaData != "" {
+			if tc.cloudInitCustomization.MetaData != "" {
 				asserter.AssertErrNil(err, false)
 
 				metaDataFileContent, err := io.ReadAll(metaDataFile)
 				asserter.AssertErrNil(err, false)
 
-				if string(metaDataFileContent[:]) != cloudInitConfig.MetaData {
-					t.Errorf("un-expected meta-data content found: expected:\n%v\ngot:%v", cloudInitConfig.MetaData, string(metaDataFileContent[:]))
+				if string(metaDataFileContent) != tc.wantMetaData {
+					t.Errorf("un-expected meta-data content found: expected:\n%v\ngot:%v", tc.wantMetaData, string(metaDataFileContent))
 				}
 			} else {
 				asserter.AssertErrContains(err, "no such file or directory")
 			}
 
 			networkConfigFile, err := os.Open(path.Join(seedPath, "network-config"))
-			if cloudInitConfig.NetworkConfig != "" {
+			if tc.cloudInitCustomization.NetworkConfig != "" {
 				asserter.AssertErrNil(err, false)
 
 				networkConfigFileContent, err := io.ReadAll(networkConfigFile)
 				asserter.AssertErrNil(err, false)
-				if string(networkConfigFileContent[:]) != cloudInitConfig.NetworkConfig {
-					t.Errorf("un-expected network-config found: expected:\n%v\ngot:%v", cloudInitConfig.NetworkConfig, string(networkConfigFileContent[:]))
+				if string(networkConfigFileContent) != tc.wantNetworkConfig {
+					t.Errorf("un-expected network-config found: expected:\n%v\ngot:%v", tc.wantNetworkConfig, string(networkConfigFileContent))
 				}
 			} else {
 				asserter.AssertErrContains(err, "no such file or directory")
 			}
 
 			userDataFile, err := os.Open(path.Join(seedPath, "user-data"))
-			if cloudInitConfig.UserData != "" {
+			if tc.cloudInitCustomization.UserData != "" {
 				asserter.AssertErrNil(err, false)
 
 				userDataFileContent, err := io.ReadAll(userDataFile)
 				asserter.AssertErrNil(err, false)
 
-				if string(userDataFileContent[:]) != cloudInitConfig.UserData {
-					t.Errorf("un-expected user-data content found: expected:\n%v\ngot:%v", cloudInitConfig.UserData, string(userDataFileContent[:]))
+				if string(userDataFileContent) != tc.wantUserData {
+					t.Errorf("un-expected user-data content found: expected:\n%v\ngot:%v", tc.wantUserData, string(userDataFileContent))
 				}
 			} else {
 				asserter.AssertErrContains(err, "no such file or directory")
@@ -1119,7 +1189,8 @@ func TestCustomizeCloudInit(t *testing.T) {
 	}
 }
 
-func TestFailedCustomizeCloudInit(t *testing.T) {
+// TestStatemachine_customizeCloudInit_failed tests failure modes of customizeCloudInit method
+func TestStatemachine_customizeCloudInit_failed(t *testing.T) {
 	// Test setup
 	asserter := helper.Asserter{T: t}
 	saveCWD := helper.SaveCWD()
