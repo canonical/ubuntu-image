@@ -24,6 +24,7 @@ rootfs:
 customization:
   cloud-init:
     user-data: |
+      #cloud-config
       chpasswd:
         expire: true
         users:
