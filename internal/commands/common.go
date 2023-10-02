@@ -34,4 +34,7 @@ type UbuntuImageCommand struct {
 		ClassicArgsPassed ClassicArgs `positional-args:"true" required:"false"`
 		ClassicOptsPassed ClassicOpts
 	} `command:"classic"`
+	Pack struct {
+		PackOptsPassed PackOpts `required:"true"`
+	} `command:"pack" hidden:"true"`
 }

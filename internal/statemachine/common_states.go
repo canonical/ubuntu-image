@@ -39,7 +39,7 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	stateMachine.tempDirs.chroot = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "chroot")
 	stateMachine.tempDirs.scratch = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "scratch")
 
-	tempDirs := []string{stateMachine.tempDirs.scratch, stateMachine.tempDirs.rootfs}
+	tempDirs := []string{stateMachine.tempDirs.scratch, stateMachine.tempDirs.rootfs, stateMachine.tempDirs.unpack}
 	for _, tempDir := range tempDirs {
 		err := osMkdir(tempDir, 0755)
 		if err != nil && !os.IsExist(err) {

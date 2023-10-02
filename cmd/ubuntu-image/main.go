@@ -41,6 +41,11 @@ func executeStateMachine(commonOpts *commands.CommonOpts, stateMachineOpts *comm
 		stateMachine.Args = ubuntuImageCommand.Classic.ClassicArgsPassed
 		stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
 		stateMachineInterface = stateMachine
+	} else if imageType == "pack" {
+		stateMachine := new(statemachine.PackStateMachine)
+		stateMachine.Opts = ubuntuImageCommand.Pack.PackOptsPassed
+		stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
+		stateMachineInterface = stateMachine
 	}
 
 	// set up, run, and tear down the state machine
