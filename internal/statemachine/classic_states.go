@@ -890,6 +890,29 @@ func (stateMachine *StateMachine) germinate() error {
 	return nil
 }
 
+// customizeCloudInitFile customizes a cloud-init data file with the given content
+func customizeCloudInitFile(customData string, seedPath string, fileName string) error {
+	if customData == "" {
+		return nil
+	}
+	f, err := osCreate(path.Join(seedPath, fileName))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if !strings.HasPrefix(customData, "#cloud-config\n") {
+		return fmt.Errorf("provided cloud-init customization for %s is missing proper header", fileName)
+	}
+
+	_, err = f.WriteString(customData)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Customize Cloud init with the values in the image definition YAML
 func (stateMachine *StateMachine) customizeCloudInit() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -902,43 +925,19 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 		return err
 	}
 
-	if cloudInitCustomization.MetaData != "" {
-		metaDataFile, err := osCreate(path.Join(seedPath, "meta-data"))
-		if err != nil {
-			return err
-		}
-		defer metaDataFile.Close()
-
-		_, err = metaDataFile.WriteString(cloudInitCustomization.MetaData)
-		if err != nil {
-			return err
-		}
+	err = customizeCloudInitFile(cloudInitCustomization.MetaData, seedPath, "meta-data")
+	if err != nil {
+		return err
 	}
 
-	if cloudInitCustomization.UserData != "" {
-		userDataFile, err := osCreate(path.Join(seedPath, "user-data"))
-		if err != nil {
-			return err
-		}
-		defer userDataFile.Close()
-
-		_, err = userDataFile.WriteString(cloudInitCustomization.UserData)
-		if err != nil {
-			return err
-		}
+	err = customizeCloudInitFile(cloudInitCustomization.UserData, seedPath, "user-data")
+	if err != nil {
+		return err
 	}
 
-	if cloudInitCustomization.NetworkConfig != "" {
-		networkConfigFile, err := osCreate(path.Join(seedPath, "network-config"))
-		if err != nil {
-			return err
-		}
-		defer networkConfigFile.Close()
-
-		_, err = networkConfigFile.WriteString(cloudInitCustomization.NetworkConfig)
-		if err != nil {
-			return err
-		}
+	err = customizeCloudInitFile(cloudInitCustomization.NetworkConfig, seedPath, "network-config")
+	if err != nil {
+		return err
 	}
 
 	datasourceConfig := "# to update this file, run dpkg-reconfigure cloud-init\ndatasource_list: [ NoCloud ]\n"
