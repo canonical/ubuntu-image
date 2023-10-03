@@ -579,7 +579,7 @@ func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec
 		"--no-rdepends",
 	)
 
-	if imageDefinition.Rootfs.Seed.Vcs {
+	if *imageDefinition.Rootfs.Seed.Vcs {
 		germinateCmd.Args = append(germinateCmd.Args, "--vcs=auto")
 	}
 

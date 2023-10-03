@@ -2241,7 +2241,7 @@ func TestGerminate(t *testing.T) {
 						SeedURLs:   tc.seedURLs,
 						SeedBranch: hostSuite,
 						Names:      tc.seedNames,
-						Vcs:        tc.vcs,
+						Vcs:        helper.BoolPtr(tc.vcs),
 					},
 				},
 			}
@@ -2313,7 +2313,7 @@ func TestFailedGerminate(t *testing.T) {
 					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 					SeedBranch: hostSuite,
 					Names:      []string{"server", "minimal", "standard", "cloud-image"},
-					Vcs:        true,
+					Vcs:        helper.BoolPtr(true),
 				},
 			},
 		}

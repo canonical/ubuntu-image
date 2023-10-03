@@ -128,7 +128,12 @@ type S1 struct {
 
 type S2 struct {
 	A string `default:"test"`
-	B bool   `default:"true"`
+	B *bool  `default:"true"`
+	C bool   `default:"true"`
+	D bool   `default:"true"`
+	E *bool  `default:"false"`
+	F bool   `default:"false"`
+	G *bool
 }
 
 type S3 struct {
@@ -207,19 +212,33 @@ func TestSetDefaults(t *testing.T) {
 			},
 			want: &S2{
 				A: "test",
-				B: true,
+				B: BoolPtr(true),
+				C: true,
+				D: true,
+				E: BoolPtr(false),
+				F: false,
+				G: BoolPtr(false), // even default values we do not let nil pointer
 			},
 		},
 		{
 			name: "set default on non-empty struct with bool",
 			args: args{
 				needsDefaults: &S2{
-					B: false,
+					B: BoolPtr(false),
+					D: false,
+					F: true,
+					G: BoolPtr(true),
 				},
 			},
 			want: &S2{
 				A: "test",
-				B: false,
+				B: BoolPtr(true),
+				C: true,
+				D: true, //shows that default values on bools do not work
+				// properly without using a pointer to bool
+				E: BoolPtr(false),
+				F: true,
+				G: BoolPtr(true),
 			},
 		},
 		{

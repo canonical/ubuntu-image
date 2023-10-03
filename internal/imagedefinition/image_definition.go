@@ -55,7 +55,7 @@ type Seed struct {
 	SeedBranch string   `yaml:"branch" json:"SeedBranch,omitempty"`
 	SeedURLs   []string `yaml:"urls"   json:"SeedURLs"             jsonschema:"type=array,format=uri"`
 	Names      []string `yaml:"names"  json:"Names"`
-	Vcs        bool     `yaml:"vcs"    json:"Vcs"                  default:"true"`
+	Vcs        *bool    `yaml:"vcs"    json:"Vcs"                  default:"true"`
 }
 
 // Tarball defines the tarball section of rootfs, which is used
@@ -97,7 +97,7 @@ type PPA struct {
 	PPAName     string `yaml:"name"         json:"PPAName"               jsonschema:"pattern=^[a-zA-Z0-9_.+-]+/[a-zA-Z0-9_.+-]+$"`
 	Auth        string `yaml:"auth"         json:"Auth,omitempty"        jsonschema:"pattern=^[a-zA-Z0-9_.+-]+:[a-zA-Z0-9]+$"`
 	Fingerprint string `yaml:"fingerprint"  json:"Fingerprint,omitempty"`
-	KeepEnabled bool   `yaml:"keep-enabled" json:"KeepEnabled"           default:"true"`
+	KeepEnabled *bool  `yaml:"keep-enabled" json:"KeepEnabled"           default:"true"`
 }
 
 // Package contains information about packages

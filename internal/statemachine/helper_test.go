@@ -695,7 +695,7 @@ func TestGenerateGerminateCmd(t *testing.T) {
 					Seed: &imagedefinition.Seed{
 						SeedURLs:   tc.seedURLs,
 						SeedBranch: "testbranch",
-						Vcs:        tc.vcs,
+						Vcs:        helper.BoolPtr(tc.vcs),
 					},
 					Components: []string{"main", "universe"},
 				},

@@ -23,6 +23,10 @@ import (
 var osRename = os.Rename
 var osRemove = os.Remove
 
+func BoolPtr(b bool) *bool {
+	return &b
+}
+
 // CaptureStd returns an io.Reader to read what was printed, and teardown
 func CaptureStd(toCap **os.File) (io.Reader, func(), error) {
 	stdCap, stdCapW, err := os.Pipe()
@@ -123,11 +127,28 @@ func SetDefaults(needsDefaults interface{}) error {
 				}
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
-			// otherwise if it's just a pointer, look for default types
+			// if it's a pointer to a struct, look for default types
 			if field.Elem().Kind() == reflect.Struct {
 				err := SetDefaults(field.Interface())
 				if err != nil {
 					return err
+				}
+				// special case for pointer to bools
+			} else if field.Type().Elem() == reflect.TypeOf(true) {
+				// make sure the pointer is never nil in case no value
+				// was set
+				if field.IsNil() {
+					field.Set(reflect.ValueOf(BoolPtr(false)))
+				}
+				tags := elem.Type().Field(i).Tag
+				defaultValue, hasDefault := tags.Lookup("default")
+				if !hasDefault {
+					continue
+				}
+				if defaultValue == "true" {
+					field.Set(reflect.ValueOf(BoolPtr(true)))
+				} else {
+					field.Set(reflect.ValueOf(BoolPtr(false)))
 				}
 			}
 		} else {
