@@ -76,6 +76,7 @@ type SmInterface interface {
 	Setup() error
 	Run() error
 	Teardown() error
+	SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts)
 }
 
 // stateFunc allows us easy access to the function names, which will help with --resume and debug statements

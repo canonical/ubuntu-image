@@ -19,58 +19,56 @@ var Version string = ""
 // helper variables for unit testing
 var osExit = os.Exit
 var captureStd = helper.CaptureStd
-var stateMachineInterface statemachine.SmInterface
-var imageType string = ""
 
 var stateMachineLongDesc = `Options for controlling the internal state machine.
 Other than -w, these options are mutually exclusive. When -u or -t is given,
 the state machine can be resumed later with -r, but -w must be given in that
 case since the state is saved in a ubuntu-image.json file in the working directory.`
 
-func executeStateMachine(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts, ubuntuImageCommand *commands.UbuntuImageCommand) {
-	// Set up the state machine
-	if imageType == "snap" {
-		stateMachine := new(statemachine.SnapStateMachine)
-		stateMachine.Opts = ubuntuImageCommand.Snap.SnapOptsPassed
-		stateMachine.Args = ubuntuImageCommand.Snap.SnapArgsPassed
-		stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
-		stateMachineInterface = stateMachine
-	} else if imageType == "classic" {
-		stateMachine := new(statemachine.ClassicStateMachine)
-		stateMachine.Opts = ubuntuImageCommand.Classic.ClassicOptsPassed
-		stateMachine.Args = ubuntuImageCommand.Classic.ClassicArgsPassed
-		stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
-		stateMachineInterface = stateMachine
-	} else if imageType == "pack" {
-		stateMachine := new(statemachine.PackStateMachine)
-		stateMachine.Opts = ubuntuImageCommand.Pack.PackOptsPassed
-		stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
-		stateMachineInterface = stateMachine
+func initStateMachine(imageType string, commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts, ubuntuImageCommand *commands.UbuntuImageCommand) (statemachine.SmInterface, error) {
+	var stateMachine statemachine.SmInterface
+	switch imageType {
+	case "snap":
+		stateMachine = &statemachine.SnapStateMachine{
+			Opts: ubuntuImageCommand.Snap.SnapOptsPassed,
+			Args: ubuntuImageCommand.Snap.SnapArgsPassed,
+		}
+	case "classic":
+		stateMachine = &statemachine.ClassicStateMachine{
+			Opts: ubuntuImageCommand.Classic.ClassicOptsPassed,
+			Args: ubuntuImageCommand.Classic.ClassicArgsPassed,
+		}
+	case "pack":
+		stateMachine = &statemachine.PackStateMachine{
+			Opts: ubuntuImageCommand.Pack.PackOptsPassed,
+		}
+	default:
+		return nil, fmt.Errorf("unsupported command\n")
 	}
 
+	stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
+
+	return stateMachine, nil
+}
+
+func executeStateMachine(sm statemachine.SmInterface) error {
 	// set up, run, and tear down the state machine
-	if err := stateMachineInterface.Setup(); err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		osExit(1)
-		return
+	if err := sm.Setup(); err != nil {
+		return err
 	}
 
-	if err := stateMachineInterface.Run(); err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		osExit(1)
-		return
+	if err := sm.Run(); err != nil {
+		return err
 	}
 
-	if err := stateMachineInterface.Teardown(); err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		osExit(1)
-		return
+	if err := sm.Teardown(); err != nil {
+		return err
 	}
 
+	return nil
 }
 
 func main() {
-	// instantiate structs for
 	commonOpts := new(commands.CommonOpts)
 	stateMachineOpts := new(commands.StateMachineOpts)
 	ubuntuImageCommand := new(commands.UbuntuImageCommand)
@@ -164,10 +162,24 @@ func main() {
 		return
 	}
 
-	if parser.Command.Active != nil && imageType == "" {
+	var imageType string
+	if parser.Command.Active != nil {
 		imageType = parser.Command.Active.Name
 	}
 
+	// init the state machine
+	sm, err := initStateMachine(imageType, commonOpts, stateMachineOpts, ubuntuImageCommand)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		osExit(1)
+		return
+	}
+
 	// let the state machine handle the image build
-	executeStateMachine(commonOpts, stateMachineOpts, ubuntuImageCommand)
+	err = executeStateMachine(sm)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		osExit(1)
+		return
+	}
 }

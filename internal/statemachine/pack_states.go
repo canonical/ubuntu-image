@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 )
 
+// preparePack prepare the packStateMachine
+// This step must be run first
 func (stateMachine *StateMachine) preparePack() error {
 	packStateMachine := stateMachine.parent.(*PackStateMachine)
 
@@ -14,6 +16,7 @@ func (stateMachine *StateMachine) preparePack() error {
 	return nil
 }
 
+// populateTemporaryDirectories fills tempDirs with dirs given as Opts
 func (stateMachine *StateMachine) populateTemporaryDirectories() error {
 	packStateMachine := stateMachine.parent.(*PackStateMachine)
 

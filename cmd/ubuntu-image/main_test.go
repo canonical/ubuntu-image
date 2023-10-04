@@ -13,101 +13,123 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
+var (
+	ErrAtSetup    = errors.New("Fail at Setup")
+	ErrAtRun      = errors.New("Fail at Run")
+	ErrAtTeardown = errors.New("Fail at Teardown")
+)
+
 type MockedStateMachine struct {
 	whenToFail string
 }
 
 func (mockSM *MockedStateMachine) Setup() error {
 	if mockSM.whenToFail == "Setup" {
-		return errors.New("Testing Error")
+		return ErrAtSetup
 	}
 	return nil
 }
 
 func (mockSM *MockedStateMachine) Run() error {
 	if mockSM.whenToFail == "Run" {
-		return errors.New("Testing Error")
+		return ErrAtRun
 	}
 	return nil
 }
 
 func (mockSM *MockedStateMachine) Teardown() error {
 	if mockSM.whenToFail == "Teardown" {
-		return errors.New("Testing Error")
+		return ErrAtTeardown
 	}
 	return nil
 }
 
-var mockedStateMachine MockedStateMachine
+func (mockSM *MockedStateMachine) SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts) {
+}
 
 // TestValidCommands tests that certain valid commands are parsed correctly
 func TestValidCommands(t *testing.T) {
 	testCases := []struct {
-		name        string
-		command     string
-		gadgetModel string
-		isSnap      bool
+		name    string
+		command string
+		flags   []string
+		field   func(*commands.UbuntuImageCommand) string
+		want    string
 	}{
-		{"valid_snap_command", "snap", "model_assertion.yml", true},
-		{"valid_classic_command", "classic", "image_defintion.yml", false},
+		{
+			name:    "valid_snap_command",
+			command: "snap",
+			flags:   []string{"model_assertion.yml"},
+			field: func(u *commands.UbuntuImageCommand) string {
+				return u.Snap.SnapArgsPassed.ModelAssertion
+			},
+			want: "model_assertion.yml",
+		},
+		{
+			name:    "valid_classic_command",
+			command: "classic",
+			flags:   []string{"image_defintion.yml"},
+			field: func(u *commands.UbuntuImageCommand) string {
+				return u.Classic.ClassicArgsPassed.ImageDefinition
+			},
+			want: "image_defintion.yml",
+		},
+		{
+			name:    "valid_pack_command",
+			command: "pack",
+			flags:   []string{"--artifact-type", "img", "--gadget-dir", "./test-gadget-dir", "--rootfs-dir", "./test"},
+			field: func(u *commands.UbuntuImageCommand) string {
+				return u.Pack.PackOptsPassed.GadgetDir
+			},
+			want: "./test-gadget-dir",
+		},
 	}
 	for _, tc := range testCases {
-		tc := tc // capture range variable for parallel execution
-		t.Run("test "+tc.name, func(t *testing.T) {
-			// set up the command
+		t.Run(tc.name, func(t *testing.T) {
 			var args []string
 			if tc.command != "" {
 				args = append(args, tc.command)
 			}
-			if tc.gadgetModel != "" {
-				args = append(args, tc.gadgetModel)
+			if tc.flags != nil {
+				args = append(args, tc.flags...)
 			}
 
-			// finally, execute the command and check output
-			ubuntuImageCommand := new(commands.UbuntuImageCommand)
+			ubuntuImageCommand := &commands.UbuntuImageCommand{}
 			_, err := flags.ParseArgs(ubuntuImageCommand, args)
 			if err != nil {
 				t.Error("Did not expect an error but got", err)
 			}
 
-			// check that opts got the correct value
-			var comparison string
-			if tc.isSnap {
-				comparison = ubuntuImageCommand.Snap.SnapArgsPassed.ModelAssertion
-			} else {
-				comparison = ubuntuImageCommand.Classic.ClassicArgsPassed.ImageDefinition
-			}
-			if comparison != tc.gadgetModel {
-				t.Errorf("Unexpected input file value \"%s\". Expected \"%s\"",
-					comparison, tc.gadgetModel)
+			got := tc.field(ubuntuImageCommand)
+			if tc.want != got {
+				t.Errorf("Unexpected parsed value \"%s\". Expected \"%s\"",
+					got, tc.want)
 			}
 		})
 	}
 }
 
-// TestInvalidCommands tests a few invalid commands argument/flag combinations:
-// ubuntu-image is run with a command that is neither snap nor classic
-// ubuntu-image snap is run with no model assertion
-// ubuntu-image classic is run with no gadget tree
-// ubuntu-image is run with a nonexistent flag
+// TestInvalidCommands tests invalid commands argument/flag combinations
 func TestInvalidCommands(t *testing.T) {
 	testCases := []struct {
-		name     string
-		command  []string
-		flags    []string
-		expected string
+		name          string
+		command       []string
+		flags         []string
+		expectedError string
 	}{
-		{"invalid_command", []string{"test"}, nil, "invalid argument \"test\" for \"ubuntu-image\""},
-		{"no_model_assertion", []string{"snap"}, nil, "accepts 1 arg(s), received 0"},
-		{"no_gadget_tree", []string{"classic"}, nil, "accepts 1 arg(s), received 0"},
-		{"invalid_flag", []string{"classic"}, []string{"--nonexistent"}, "unknown flag: --nonexistent"},
-		{"invalid_validation", []string{"snap"}, []string{"--validation=test"}, "Invalid value"},
-		{"invalid_sector_size", []string{"snap"}, []string{"--sector_size=123"}, "Invalid value"},
+		{"invalid_command", []string{"test"}, nil, "Unknown command `test'. Please specify one command of: classic or snap"},
+		{"no_model_assertion", []string{"snap"}, nil, "the required argument `model_assertion` was not provided"},
+		{"no_gadget_tree", []string{"classic"}, nil, "the required argument `image_definition` was not provided"},
+		{"invalid_flag", []string{"classic"}, []string{"--nonexistent"}, "unknown flag `nonexistent'"},
+		{"invalid_validation", []string{"snap"}, []string{"--validation=test"}, "unknown flag `validation'"},
+		{"invalid_sector_size", []string{"snap"}, []string{"--sector_size=123"}, "unknown flag `sector_size'"},
+		{"missing_flag", []string{"pack"}, []string{"--artifact-type=img"}, "the required flags `--gadget-dir' and `--rootfs-dir' were not specified"},
 	}
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution
-		t.Run("test "+tc.name, func(t *testing.T) {
-			// set up the command
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+
 			var args []string
 			if tc.command != nil {
 				args = append(args, tc.command...)
@@ -117,11 +139,10 @@ func TestInvalidCommands(t *testing.T) {
 			}
 
 			// finally, execute the command and check output
-			ubuntuImageCommand := new(commands.UbuntuImageCommand)
-			_, err := flags.ParseArgs(ubuntuImageCommand, args)
-			if err == nil {
-				t.Error("Expected an error but none was found")
-			}
+			ubuntuImageCommand := &commands.UbuntuImageCommand{}
+			_, gotErr := flags.ParseArgs(ubuntuImageCommand, args)
+			asserter.AssertErrContains(gotErr, tc.expectedError)
+
 		})
 	}
 }
@@ -138,19 +159,20 @@ func TestExitCode(t *testing.T) {
 		{"invalid_flag_exit_1", []string{"--help-me"}, 1},
 		{"bad_state_machine_args_classic", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
 		{"bad_state_machine_args_snap", []string{"snap", "model_assertion.yaml", "-u", "5", "-t", "6"}, 1},
+		{"bad_state_machine_args_pack", []string{"pack", "--artifact-type", "img", "--gadget-dir", "./test-gadget-dir", "--rootfs-dir", "./test", "-u", "5", "-t", "6"}, 1},
 		{"no_command_given", []string{}, 1},
 		{"resume_without_workdir", []string{"--resume"}, 1},
 		{"invalid_sector_size", []string{"--sector-size", "128", "--help"}, 1}, // Cheap trick with the --help to make the test work
 	}
 	for _, tc := range testCases {
-		t.Run("test "+tc.name, func(t *testing.T) {
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+		t.Run(tc.name, func(t *testing.T) {
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 			// Override os.Exit temporarily
 			oldOsExit := osExit
-			defer func() {
+			t.Cleanup(func() {
 				osExit = oldOsExit
-			}()
+			})
 
 			var got int
 			tmpExit := func(code int) {
@@ -164,7 +186,7 @@ func TestExitCode(t *testing.T) {
 			os.Args = append([]string{tc.name}, tc.flags...)
 
 			// os.Exit will be captured. Run the command with no flags to trigger an error
-			imageType = ""
+			// imageType = ""
 			main()
 			if got != tc.expected {
 				t.Errorf("Expected exit code: %d, got: %d", tc.expected, got)
@@ -211,7 +233,6 @@ func TestVersion(t *testing.T) {
 			Version = tc.hardcoded
 			os.Setenv("SNAP_VERSION", tc.snapEnv)
 
-			imageType = ""
 			main()
 			if got != 0 {
 				t.Errorf("Expected exit code: 0, got: %d", got)
@@ -272,7 +293,6 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 			os.Args = append([]string{tc.name}, tc.flags...)
 
 			// run main and check the exit code
-			imageType = ""
 			main()
 			if got != 1 {
 				t.Errorf("Expected error code on exit, got: %d", got)
@@ -282,46 +302,43 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 	}
 }
 
-// TestFailedStateMachine tests fails for all implemented functions to ensure
+// TestExecuteStateMachine tests fails for all implemented functions to ensure
 // that main fails gracefully
-func TestFailedStateMachine(t *testing.T) {
+func TestExecuteStateMachine(t *testing.T) {
 	testCases := []struct {
-		name       string
-		whenToFail string
+		name          string
+		whenToFail    string
+		expectedError string
 	}{
-		{"error_statemachine_setup", "Setup"},
-		{"error_statemachine_run", "Run"},
-		{"error_statemachine_teardown", "Teardown"},
+		{
+			name:          "error_statemachine_setup",
+			whenToFail:    "Setup",
+			expectedError: ErrAtSetup.Error(),
+		},
+		{
+			name:          "error_statemachine_run",
+			whenToFail:    "Run",
+			expectedError: ErrAtRun.Error(),
+		},
+		{
+			name:          "error_statemachine_teardown",
+			whenToFail:    "Teardown",
+			expectedError: ErrAtTeardown.Error(),
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Override os.Exit temporarily
-			oldOsExit := osExit
-			defer func() {
-				osExit = oldOsExit
-			}()
-
-			var got int
-			tmpExit := func(code int) {
-				got = code
-			}
-
-			osExit = tmpExit
+			asserter := helper.Asserter{T: t}
 
 			flags := []string{"snap", "model_assertion"}
 			// set up the flags for the test cases
 			flag.CommandLine = flag.NewFlagSet("failed_state_machine", flag.ExitOnError)
-			os.Args = append([]string{"failed_state_machine"}, flags...)
+			os.Args = flags
 
-			// this stops main from using the snapSM or classicSm
-			imageType = "test"
-
-			mockedStateMachine.whenToFail = tc.whenToFail
-			stateMachineInterface = &mockedStateMachine
-			main()
-			if got != 1 {
-				t.Errorf("Expected error code on exit, got: %d", got)
-			}
+			gotErr := executeStateMachine(&MockedStateMachine{
+				whenToFail: tc.whenToFail,
+			})
+			asserter.AssertErrContains(gotErr, tc.expectedError)
 		})
 	}
 }
