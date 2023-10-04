@@ -10,3 +10,7 @@ type PackOpts struct {
 type PackCommand struct {
 	PackOptsPassed PackOpts `required:"true"`
 }
+
+type PackCommand struct {
+	PackOptsPassed PackOpts `required:"true"`
+}

@@ -26,15 +26,7 @@ type StateMachineOpts struct {
 
 // UbuntuImageCommand is needed for the parser to store positional arguments and flags
 type UbuntuImageCommand struct {
-	Snap struct {
-		SnapArgsPassed SnapArgs `positional-args:"true" required:"false"`
-		SnapOptsPassed SnapOpts
-	} `command:"snap"`
-	Classic struct {
-		ClassicArgsPassed ClassicArgs `positional-args:"true" required:"false"`
-		ClassicOptsPassed ClassicOpts
-	} `command:"classic"`
-	Pack struct {
-		PackOptsPassed PackOpts `required:"true"`
-	} `command:"pack" hidden:"true"`
+	Snap    SnapCommand    `command:"snap"`
+	Classic ClassicCommand `command:"classic"`
+	Pack    PackCommand    `command:"pack" hidden:"true"`
 }
