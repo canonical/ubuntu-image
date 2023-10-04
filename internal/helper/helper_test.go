@@ -117,3 +117,176 @@ func TestFailedRestoreResolvConf(t *testing.T) {
 		asserter.AssertErrContains(err, "Error removing file")
 	})
 }
+
+type S1 struct {
+	A string `default:"test"`
+	B string
+	C []string `default:"1,2,3"`
+	D []*S3
+	E *S3
+}
+
+type S2 struct {
+	A string `default:"test"`
+	B *bool  `default:"true"`
+	C *bool  `default:"false"`
+	D *bool
+}
+
+type S3 struct {
+	A string `default:"defaults3value"`
+}
+
+type S4 struct {
+	A int `default:"1"`
+}
+
+type S5 struct {
+	A *S4
+}
+
+type S6 struct {
+	A []*S4
+}
+
+type S7 struct {
+	A bool `default:"true"`
+}
+
+func TestSetDefaults(t *testing.T) {
+	type args struct {
+		needsDefaults interface{}
+	}
+	tests := []struct {
+		name          string
+		args          args
+		want          interface{}
+		wantErr       bool
+		expectedError string
+	}{
+		{
+			name: "set default on empty struct",
+			args: args{
+				needsDefaults: &S1{},
+			},
+			want: &S1{
+				A: "test",
+				B: "",
+				C: []string{"1", "2", "3"},
+			},
+		},
+		{
+			name: "set default on non-empty struct",
+			args: args{
+				needsDefaults: &S1{
+					A: "non-empty-A-value",
+					B: "non-empty-B-value",
+					C: []string{"non-empty-C-value"},
+					D: []*S3{
+						{
+							A: "non-empty-A-value",
+						},
+					},
+					E: &S3{
+						A: "non-empty-A-value",
+					},
+				},
+			},
+			want: &S1{
+				A: "non-empty-A-value",
+				B: "non-empty-B-value",
+				C: []string{"non-empty-C-value"},
+				D: []*S3{
+					{
+						A: "non-empty-A-value",
+					},
+				},
+				E: &S3{
+					A: "non-empty-A-value",
+				},
+			},
+		},
+		{
+			name: "set default on empty struct with bool",
+			args: args{
+				needsDefaults: &S2{},
+			},
+			want: &S2{
+				A: "test",
+				B: BoolPtr(true),
+				C: BoolPtr(false),
+				D: BoolPtr(false), // even default values we do not let nil pointer
+			},
+		},
+		{
+			name: "set default on non-empty struct with bool",
+			args: args{
+				needsDefaults: &S2{
+					B: BoolPtr(false),
+					D: BoolPtr(true),
+				},
+			},
+			want: &S2{
+				A: "test",
+				B: BoolPtr(true),
+				C: BoolPtr(false),
+				D: BoolPtr(true),
+			},
+		},
+		{
+			name: "fail to set default on struct with unsuported type",
+			args: args{
+				needsDefaults: &S4{},
+			},
+			expectedError: "not supported",
+		},
+		{
+			name: "fail to set default on struct containing a struct with unsuported type",
+			args: args{
+				needsDefaults: &S5{
+					A: &S4{},
+				},
+			},
+			expectedError: "not supported",
+		},
+		{
+			name: "fail to set default on struct containing an slice of struct with unsuported type",
+			args: args{
+				needsDefaults: &S6{
+					A: []*S4{
+						{},
+					},
+				},
+			},
+			expectedError: "not supported",
+		},
+		{
+			name: "fail to set default on a concrete object (not a pointer)",
+			args: args{
+				needsDefaults: S1{},
+			},
+			expectedError: "The argument to SetDefaults must be a pointer",
+		},
+		{
+			name: "fail to set default on a boolean",
+			args: args{
+				needsDefaults: &S7{},
+			},
+			expectedError: "Setting default value of a boolean not supported. Use a pointer to boolean instead",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := Asserter{T: t}
+			err := SetDefaults(tc.args.needsDefaults)
+
+			if len(tc.expectedError) == 0 {
+				asserter.AssertErrNil(err, true)
+				asserter.AssertEqual(tc.want, tc.args.needsDefaults)
+			} else {
+				asserter.AssertErrContains(err, tc.expectedError)
+			}
+
+		})
+	}
+}

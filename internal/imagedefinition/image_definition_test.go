@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 func TestGeneratePocketList(t *testing.T) {
@@ -144,5 +146,39 @@ func TestCustomErrors(t *testing.T) {
 			t.Errorf("dependentKeyError description format \"%s\" is invalid",
 				dependentKeyErr.DescriptionFormat())
 		}
+	})
+}
+
+// TestImageDefinition_SetDefaults make sure we do not add a boolean field
+// with a default value (because we cannot properly apply the default value)
+func TestImageDefinition_SetDefaults(t *testing.T) {
+	t.Run("test_image_definition_valid_defaults", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		err := helper.SetDefaults(&ImageDefinition{
+			Gadget: &Gadget{},
+			Rootfs: &Rootfs{
+				Seed:    &Seed{},
+				Tarball: &Tarball{},
+			},
+			Customization: &Customization{
+				Installer:     &Installer{},
+				CloudInit:     &CloudInit{},
+				ExtraPPAs:     []*PPA{{}},
+				ExtraPackages: []*Package{{}},
+				ExtraSnaps:    []*Snap{{}},
+				Fstab:         []*Fstab{{}},
+				Manual:        &Manual{},
+			},
+			Artifacts: &Artifact{
+				Img:       &[]Img{{}},
+				Iso:       &[]Iso{{}},
+				Qcow2:     &[]Qcow2{{}},
+				Manifest:  &Manifest{},
+				Filelist:  &Filelist{},
+				Changelog: &Changelog{},
+				RootfsTar: &RootfsTar{},
+			},
+		})
+		asserter.AssertErrNil(err, true)
 	})
 }

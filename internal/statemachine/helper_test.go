@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -655,12 +656,35 @@ func TestGetQemuStaticForArch(t *testing.T) {
 // TestGenerateGerminateCmd unit tests the generateGerminateCmd function
 func TestGenerateGerminateCmd(t *testing.T) {
 	testCases := []struct {
-		name   string
-		mirror string
+		name     string
+		mirror   string
+		seedURLs []string
+		vcs      bool
 	}{
-		{"amd64", "http://archive.ubuntu.com/ubuntu/"},
-		{"armhf", "http://ports.ubuntu.com/ubuntu/"},
-		{"arm64", "http://ports.ubuntu.com/ubuntu/"},
+		{
+			name:     "amd64",
+			mirror:   "http://archive.ubuntu.com/ubuntu/",
+			seedURLs: []string{"git://test.git"},
+			vcs:      true,
+		},
+		{
+			name:     "armhf",
+			mirror:   "http://ports.ubuntu.com/ubuntu/",
+			seedURLs: []string{"git://test.git"},
+			vcs:      true,
+		},
+		{
+			name:     "arm64",
+			mirror:   "http://ports.ubuntu.com/ubuntu/",
+			seedURLs: []string{"git://test.git"},
+			vcs:      true,
+		},
+		{
+			name:     "arm64",
+			mirror:   "http://ports.ubuntu.com/ubuntu/",
+			seedURLs: []string{"https://ubuntu-archive-team.ubuntu.com/seeds/"},
+			vcs:      false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_germinate_cmd_"+tc.name, func(t *testing.T) {
@@ -669,13 +693,15 @@ func TestGenerateGerminateCmd(t *testing.T) {
 				Rootfs: &imagedefinition.Rootfs{
 					Mirror: tc.mirror,
 					Seed: &imagedefinition.Seed{
-						SeedURLs:   []string{"git://test.git"},
+						SeedURLs:   tc.seedURLs,
 						SeedBranch: "testbranch",
+						Vcs:        helper.BoolPtr(tc.vcs),
 					},
 					Components: []string{"main", "universe"},
 				},
 			}
 			germinateCmd := generateGerminateCmd(imageDef)
+			fmt.Print(germinateCmd)
 
 			if !strings.Contains(germinateCmd.String(), tc.mirror) {
 				t.Errorf("germinate command \"%s\" has incorrect mirror. Expected \"%s\"",
@@ -685,6 +711,16 @@ func TestGenerateGerminateCmd(t *testing.T) {
 			if !strings.Contains(germinateCmd.String(), "--components=main,universe") {
 				t.Errorf("Expected germinate command \"%s\" to contain "+
 					"\"--components=main,universe\"", germinateCmd.String())
+			}
+
+			if strings.Contains(germinateCmd.String(), "--vcs=auto") && !tc.vcs {
+				t.Errorf("Germinate command \"%s\" should not contain "+
+					"\"--vcs=auto\"", germinateCmd.String())
+			}
+
+			if !strings.Contains(germinateCmd.String(), "--vcs=auto") && tc.vcs {
+				t.Errorf("Expected germinate command \"%s\" to contain "+
+					"\"--vcs=auto\"", germinateCmd.String())
 			}
 		})
 	}
