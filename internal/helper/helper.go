@@ -167,11 +167,7 @@ func SetDefaults(needsDefaults interface{}) error {
 					defaultValues := strings.Split(defaultValue, ",")
 					field.Set(reflect.ValueOf(defaultValues))
 				case reflect.Bool:
-					if defaultValue == "true" {
-						field.SetBool(true)
-					} else {
-						field.SetBool(false)
-					}
+					return fmt.Errorf("Setting default value of a boolean not supported. Use a pointer to boolean instead.")
 				default:
 					return fmt.Errorf("Setting default value of type %s not supported",
 						varType)

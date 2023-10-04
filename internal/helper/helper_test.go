@@ -129,11 +129,8 @@ type S1 struct {
 type S2 struct {
 	A string `default:"test"`
 	B *bool  `default:"true"`
-	C bool   `default:"true"`
-	D bool   `default:"true"`
-	E *bool  `default:"false"`
-	F bool   `default:"false"`
-	G *bool
+	C *bool  `default:"false"`
+	D *bool
 }
 
 type S3 struct {
@@ -150,6 +147,10 @@ type S5 struct {
 
 type S6 struct {
 	A []*S4
+}
+
+type S7 struct {
+	A bool `default:"true"`
 }
 
 func TestSetDefaults(t *testing.T) {
@@ -213,11 +214,8 @@ func TestSetDefaults(t *testing.T) {
 			want: &S2{
 				A: "test",
 				B: BoolPtr(true),
-				C: true,
-				D: true,
-				E: BoolPtr(false),
-				F: false,
-				G: BoolPtr(false), // even default values we do not let nil pointer
+				C: BoolPtr(false),
+				D: BoolPtr(false), // even default values we do not let nil pointer
 			},
 		},
 		{
@@ -225,20 +223,14 @@ func TestSetDefaults(t *testing.T) {
 			args: args{
 				needsDefaults: &S2{
 					B: BoolPtr(false),
-					D: false,
-					F: true,
-					G: BoolPtr(true),
+					D: BoolPtr(true),
 				},
 			},
 			want: &S2{
 				A: "test",
 				B: BoolPtr(true),
-				C: true,
-				D: true, //shows that default values on bools do not work
-				// properly without using a pointer to bool
-				E: BoolPtr(false),
-				F: true,
-				G: BoolPtr(true),
+				C: BoolPtr(false),
+				D: BoolPtr(true),
 			},
 		},
 		{
@@ -274,6 +266,13 @@ func TestSetDefaults(t *testing.T) {
 				needsDefaults: S1{},
 			},
 			expectedError: "The argument to SetDefaults must be a pointer",
+		},
+		{
+			name: "fail to set default on a boolean",
+			args: args{
+				needsDefaults: &S7{},
+			},
+			expectedError: "Setting default value of a boolean not supported. Use a pointer to boolean instead",
 		},
 	}
 	for _, tc := range tests {
