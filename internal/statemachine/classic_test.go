@@ -1200,10 +1200,8 @@ func TestStatemachine_customizeCloudInit_failed(t *testing.T) {
 
 	stateMachine.ImageDef.Customization = &imagedefinition.Customization{
 		CloudInit: &imagedefinition.CloudInit{
-			MetaData: `#cloud-config
-foo: bar`,
-			NetworkConfig: `#cloud-config
-foobar: foobar`,
+			MetaData:      `foo: bar`,
+			NetworkConfig: `foobar: foobar`,
 			UserData: `#cloud-config
 
 chpasswd:
@@ -1316,21 +1314,9 @@ chpasswd:
 		cloudInitCustomization imagedefinition.CloudInit
 	}{
 		{
-			name: "invalid metadata",
-			cloudInitCustomization: imagedefinition.CloudInit{
-				MetaData: "foo: bar",
-			},
-		},
-		{
 			name: "invalid userdata",
 			cloudInitCustomization: imagedefinition.CloudInit{
 				UserData: "foo: bar",
-			},
-		},
-		{
-			name: "invalid network config",
-			cloudInitCustomization: imagedefinition.CloudInit{
-				NetworkConfig: "foo: bar",
 			},
 		},
 	}
