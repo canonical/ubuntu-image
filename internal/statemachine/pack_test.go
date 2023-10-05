@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/snapcore/snapd/osutil"
@@ -252,4 +254,226 @@ func TestPack_populateTemporaryDirectories(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPackStateMachine_SuccessfulRun runs through a full pack state machine run and ensures
+// it is successful. It creates a .img file and ensures they are the
+// correct file types it also mounts the resulting .img and ensures grub was updated
+func TestPackStateMachine_SuccessfulRun(t *testing.T) {
+	t.Run("test_successful_pack_run", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		restoreCWD := helper.SaveCWD()
+		t.Cleanup(restoreCWD)
+
+		// We need the output directory set for this
+		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		t.Cleanup(func() { os.RemoveAll(outputDir) })
+
+		gadgetDir, err := os.MkdirTemp("/tmp", "ubuntu-image-gadget-")
+		asserter.AssertErrNil(err, true)
+		t.Cleanup(func() { os.RemoveAll(gadgetDir) })
+
+		var stateMachine PackStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.commonFlags.Debug = true
+		stateMachine.commonFlags.Size = "5G"
+		stateMachine.commonFlags.OutputDir = outputDir
+
+		stateMachine.Opts = commands.PackOpts{
+			RootfsDir: filepath.Join("testdata", "filesystem"),
+			GadgetDir: filepath.Join(gadgetDir, "gadget"),
+		}
+
+		gadgetSource := filepath.Join("testdata", "gadget_tree")
+		err = osutil.CopySpecialFile(gadgetSource, gadgetDir)
+		asserter.AssertErrNil(err, true)
+
+		err = os.Rename(filepath.Join(gadgetDir, "gadget_tree"), filepath.Join(gadgetDir, "gadget"))
+		asserter.AssertErrNil(err, true)
+
+		// also copy gadget.yaml to the root of the scratch/gadget dir
+		err = osutil.CopyFile(
+			filepath.Join("testdata", "gadget_dir", "gadget.yaml"),
+			filepath.Join(gadgetDir, "gadget", "gadget.yaml"),
+			osutil.CopyFlagDefault,
+		)
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
+
+		// // make sure packages were successfully installed from public and private ppas
+		// files := []string{
+		// 	filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-public"),
+		// 	filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-private"),
+		// }
+		// for _, file := range files {
+		// 	_, err = os.Stat(file)
+		// 	asserter.AssertErrNil(err, true)
+		// }
+
+		// // make sure snaps from the correct channel were installed
+		// type snapList struct {
+		// 	Snaps []struct {
+		// 		Name    string `yaml:"name"`
+		// 		Channel string `yaml:"channel"`
+		// 	} `yaml:"snaps"`
+		// }
+
+		// seedYaml := filepath.Join(stateMachine.tempDirs.chroot,
+		// 	"var", "lib", "snapd", "seed", "seed.yaml")
+
+		// seedFile, err := os.Open(seedYaml)
+		// asserter.AssertErrNil(err, true)
+		// defer seedFile.Close()
+
+		// var seededSnaps snapList
+		// err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
+		// asserter.AssertErrNil(err, true)
+
+		// expectedSnapChannels := map[string]string{
+		// 	"hello":  "candidate",
+		// 	"core20": "stable",
+		// }
+
+		// for _, seededSnap := range seededSnaps.Snaps {
+		// 	channel, found := expectedSnapChannels[seededSnap.Name]
+		// 	if found {
+		// 		if channel != seededSnap.Channel {
+		// 			t.Errorf("Expected snap %s to be pre-seeded with channel %s, but got %s",
+		// 				seededSnap.Name, channel, seededSnap.Channel)
+		// 		}
+		// 	}
+		// }
+
+		// make sure all the artifacts were created and are the correct file types
+		artifacts := map[string]string{
+			"pc.img": "DOS/MBR boot sector",
+		}
+		for artifact, fileType := range artifacts {
+			fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
+			_, err := os.Stat(fullPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("File \"%s\" should exist, but does not", fullPath)
+				}
+			}
+
+			// check it is the expected file type
+			fileCommand := *exec.Command("file", fullPath)
+			cmdOutput, err := fileCommand.CombinedOutput()
+			asserter.AssertErrNil(err, true)
+			if !strings.Contains(string(cmdOutput), fileType) {
+				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
+					fullPath, fileType, string(cmdOutput))
+			}
+		}
+
+		// create a directory in which to mount the rootfs
+		mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+		// Slice used to store all the commands that need to be run
+		// to properly update grub.cfg in the chroot
+		var mountImageCmds []*exec.Cmd
+		var umountImageCmds []*exec.Cmd
+
+		imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img")
+
+		// set up the loopback
+		mountImageCmds = append(mountImageCmds,
+			[]*exec.Cmd{
+				// set up the loopback
+				//nolint:gosec,G204
+				exec.Command("losetup",
+					filepath.Join("/dev", "loop99"),
+					imgPath,
+				),
+				//nolint:gosec,G204
+				exec.Command("kpartx",
+					"-a",
+					filepath.Join("/dev", "loop99"),
+				),
+				// mount the rootfs partition in which to run update-grub
+				//nolint:gosec,G204
+				exec.Command("mount",
+					filepath.Join("/dev", "mapper", "loop99p3"), // with this example the rootfs is partition 3
+					mountDir,
+				),
+			}...,
+		)
+
+		// set up the mountpoints
+		mountPoints := []string{"/dev", "/proc", "/sys"}
+		for _, mountPoint := range mountPoints {
+			mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
+			mountImageCmds = append(mountImageCmds, mountCmds...)
+			umountImageCmds = append(umountImageCmds, umountCmds...)
+			defer func(cmds []*exec.Cmd) {
+				_ = runAll(cmds)
+			}(umountCmds)
+		}
+		// make sure to unmount the disk too
+		umountImageCmds = append(umountImageCmds, exec.Command("umount", mountDir))
+
+		// tear down the loopback
+		teardownCmds := []*exec.Cmd{
+			//nolint:gosec,G204
+			exec.Command("kpartx",
+				"-d",
+				filepath.Join("/dev", "loop99"),
+			),
+			//nolint:gosec,G204
+			exec.Command("losetup",
+				"--detach",
+				filepath.Join("/dev", "loop99"),
+			),
+		}
+
+		for _, teardownCmd := range teardownCmds {
+			defer func(teardownCmd *exec.Cmd) {
+				if tmpErr := teardownCmd.Run(); tmpErr != nil {
+					if err != nil {
+						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
+					} else {
+						err = tmpErr
+					}
+				}
+
+			}(teardownCmd)
+		}
+		umountImageCmds = append(umountImageCmds, teardownCmds...)
+
+		// now run all the commands to mount the image
+		for _, cmd := range mountImageCmds {
+			err := cmd.Run()
+			if err != nil {
+				t.Errorf("Error running command %s", cmd.String())
+			}
+		}
+
+		grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
+		_, err = os.Stat(grubCfg)
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("File \"%s\" should exist, but does not", grubCfg)
+			}
+		}
+
+		// now run all the commands to unmount the image and clean up
+		for _, cmd := range umountImageCmds {
+			err := cmd.Run()
+			if err != nil {
+				t.Errorf("Error running command %s", cmd.String())
+			}
+		}
+
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
 }

@@ -77,7 +77,7 @@ func TestValidCommands(t *testing.T) {
 		{
 			name:    "valid_pack_command",
 			command: "pack",
-			flags:   []string{"--artifact-type", "img", "--gadget-dir", "./test-gadget-dir", "--rootfs-dir", "./test"},
+			flags:   []string{"--artifact-type", "raw", "--gadget-dir", "./test-gadget-dir", "--rootfs-dir", "./test"},
 			field: func(u *commands.UbuntuImageCommand) string {
 				return u.Pack.PackOptsPassed.GadgetDir
 			},
@@ -159,7 +159,7 @@ func TestExitCode(t *testing.T) {
 		{"invalid_flag_exit_1", []string{"--help-me"}, 1},
 		{"bad_state_machine_args_classic", []string{"classic", "gadget_tree.yaml", "-u", "5", "-t", "6"}, 1},
 		{"bad_state_machine_args_snap", []string{"snap", "model_assertion.yaml", "-u", "5", "-t", "6"}, 1},
-		{"bad_state_machine_args_pack", []string{"pack", "--artifact-type", "img", "--gadget-dir", "./test-gadget-dir", "--rootfs-dir", "./test", "-u", "5", "-t", "6"}, 1},
+		{"bad_state_machine_args_pack", []string{"pack", "--artifact-type", "raw", "--gadget-dir", "./test-gadget-dir", "--rootfs-dir", "./test", "-u", "5", "-t", "6"}, 1},
 		{"no_command_given", []string{}, 1},
 		{"resume_without_workdir", []string{"--resume"}, 1},
 		{"invalid_sector_size", []string{"--sector-size", "128", "--help"}, 1}, // Cheap trick with the --help to make the test work
