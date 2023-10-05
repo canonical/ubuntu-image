@@ -41,6 +41,11 @@ func (packStateMachine *PackStateMachine) Setup() error {
 		return err
 	}
 
+	// validate values of until and thru
+	if err := packStateMachine.validateUntilThru(); err != nil {
+		return err
+	}
+
 	// if --resume was passed, figure out where to start
 	if err := packStateMachine.readMetadata(metadataStateFile); err != nil {
 		return err
