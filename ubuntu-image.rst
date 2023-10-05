@@ -288,6 +288,7 @@ is as follows:
 #. germinate
 #. add_extra_ppas
 #. install_packages
+#. clean_extra_ppas
 #. verify_artifact_names
 #. customize_cloud_init
 #. customize_fstab

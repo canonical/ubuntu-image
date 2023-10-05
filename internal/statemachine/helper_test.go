@@ -1195,6 +1195,7 @@ func TestCheckCustomizationSteps(t *testing.T) {
 			},
 			[]string{
 				"add_extra_ppas",
+				"clean_extra_ppas",
 			},
 		},
 		{

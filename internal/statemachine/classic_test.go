@@ -152,26 +152,63 @@ func TestFailedParseImageDefinition(t *testing.T) {
 	})
 }
 
-// TestCalculateStates reads in a variety of yaml files and ensures
+// TestClassicStateMachine_calculateStates reads in a variety of yaml files and ensures
 // that the correct states are added to the state machine
 // TODO: manually assemble the image definitions instead of relying on the parseImageDefinition() function to make this more of a unit test
-func TestCalculateStates(t *testing.T) {
+func TestClassicStateMachine_calculateStates(t *testing.T) {
 	testCases := []struct {
 		name            string
 		imageDefinition string
 		expectedStates  []string
 	}{
-		{"state_build_gadget", "test_build_gadget.yaml", []string{"build_gadget_tree", "load_gadget_yaml"}},
-		{"state_prebuilt_gadget", "test_prebuilt_gadget.yaml", []string{"prepare_gadget_tree", "load_gadget_yaml"}},
-		{"state_prebuilt_rootfs_extras", "test_prebuilt_rootfs_extras.yaml", []string{"add_extra_ppas", "install_extra_packages", "install_extra_snaps"}},
-		{"extract_rootfs_tar", "test_extract_rootfs_tar.yaml", []string{"extract_rootfs_tar"}},
-		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"germinate"}},
-		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
-		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "perform_manual_customization"}},
-		{"qcow2", "test_qcow2.yaml", []string{"make_disk", "make_qcow2_image"}},
+		{
+			name:            "state_build_gadget",
+			imageDefinition: "test_build_gadget.yaml",
+			expectedStates:  []string{"build_gadget_tree", "load_gadget_yaml"},
+		},
+		{
+			name:            "state_prebuilt_gadget",
+			imageDefinition: "test_prebuilt_gadget.yaml",
+			expectedStates:  []string{"prepare_gadget_tree", "load_gadget_yaml"},
+		},
+		{
+			name:            "state_prebuilt_rootfs_extras",
+			imageDefinition: "test_prebuilt_rootfs_extras.yaml",
+			expectedStates:  []string{"add_extra_ppas", "install_extra_packages", "clean_extra_ppas", "install_extra_snaps"},
+		},
+		{
+			name:            "state_ppa",
+			imageDefinition: "test_amd64.yaml",
+			expectedStates:  []string{"add_extra_ppas", "install_packages", "clean_extra_ppas", "install_extra_snaps"},
+		},
+		{
+			name:            "extract_rootfs_tar",
+			imageDefinition: "test_extract_rootfs_tar.yaml",
+			expectedStates:  []string{"extract_rootfs_tar"},
+		},
+		{
+			name:            "build_rootfs_from_seed",
+			imageDefinition: "test_rootfs_seed.yaml",
+			expectedStates:  []string{"germinate"},
+		},
+		{
+			name:            "build_rootfs_from_tasks",
+			imageDefinition: "test_rootfs_tasks.yaml",
+			expectedStates:  []string{"build_rootfs_from_tasks"},
+		},
+		{
+			name:            "customization_states",
+			imageDefinition: "test_customization.yaml",
+			expectedStates:  []string{"customize_cloud_init", "perform_manual_customization"},
+		},
+		{
+			name:            "qcow2",
+			imageDefinition: "test_qcow2.yaml",
+			expectedStates:  []string{"make_disk", "make_qcow2_image"},
+		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_calcluate_states_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()

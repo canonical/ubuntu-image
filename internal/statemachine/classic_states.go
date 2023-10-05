@@ -262,12 +262,20 @@ func (stateMachine *StateMachine) calculateStates() error {
 		if classicStateMachine.ImageDef.Customization != nil {
 			if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
 				rootfsCreationStates = append(rootfsCreationStates,
-					stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
+					[]stateFunc{
+						{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+						{"install_packages", (*StateMachine).installPackages},
+						{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs},
+					}...)
 			}
+		} else {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"install_packages", (*StateMachine).installPackages},
+			)
 		}
+
 		rootfsCreationStates = append(rootfsCreationStates,
 			[]stateFunc{
-				{"install_packages", (*StateMachine).installPackages},
 				{"prepare_image", (*StateMachine).prepareClassicImage},
 				{"preseed_image", (*StateMachine).preseedClassicImage},
 			}...,
@@ -610,6 +618,38 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 	if err = osRemoveAll(tmpGPGDir); err != nil {
 		err = fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
 		return err
+	}
+
+	return nil
+}
+
+// cleanExtraPPAs cleans previously added PPA to the source list
+func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
+
+	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		if *ppa.KeepEnabled {
+			continue
+		}
+		ppaFileName, _ := createPPAInfo(ppa, classicStateMachine.ImageDef.Series)
+
+		ppaFile := filepath.Join(sourcesListD, ppaFileName)
+		err = osRemove(ppaFile)
+		if err != nil {
+			err = fmt.Errorf("Error removing %s: %s", ppaFile, err.Error())
+			return err
+		}
+
+		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
+		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
+			"etc", "apt", "trusted.gpg.d", keyFileName)
+		err = osRemove(keyFilePath)
+		if err != nil {
+			err = fmt.Errorf("Error removing %s: %s", ppaFile, err.Error())
+			return err
+		}
 	}
 
 	return nil
