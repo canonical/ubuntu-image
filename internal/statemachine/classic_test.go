@@ -18,7 +18,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/invopop/jsonschema"
 	"github.com/pkg/xattr"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
@@ -300,6 +299,34 @@ func TestPrintStates(t *testing.T) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
 				expectedStates, string(readStdout))
 		}
+	})
+}
+
+// TestClassicStateMachine_Setup_Fail_setConfDefDir tests a failure in the Setup() function when setting the configuration definition directory
+func TestClassicStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
+	t.Run("test_failed_set_conf_dir", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		saveCWD := helper.SaveCWD()
+		defer saveCWD()
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+		tmpDirPath := filepath.Join("/tmp", "test_failed_set_conf_dir")
+		err := os.Mkdir(tmpDirPath, 0755)
+		t.Cleanup(func() {
+			os.RemoveAll(tmpDirPath)
+		})
+		asserter.AssertErrNil(err, true)
+
+		err = os.Chdir(tmpDirPath)
+		asserter.AssertErrNil(err, true)
+
+		_ = os.RemoveAll(tmpDirPath)
+
+		err = stateMachine.Setup()
+		asserter.AssertErrContains(err, "unable to determine the configuration definition directory")
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -861,55 +888,64 @@ func TestExtractRootfsTar(t *testing.T) {
 		expectedFiles []string
 	}{
 		{
-			"vanilla_tar",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar"),
-			"ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
-			[]string{
+			name:      "vanilla_tar",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"),
+			SHA256sum: "ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
+			expectedFiles: []string{
 				"test_tar1",
 				"test_tar2",
 			},
 		},
 		{
-			"vanilla_tar_relative_path",
-			filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"),
-			"ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
-			[]string{
+			name:      "vanilla_tar respecting absolute path",
+			rootfsTar: filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar"),
+			SHA256sum: "ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
+			expectedFiles: []string{
 				"test_tar1",
 				"test_tar2",
 			},
 		},
 		{
-			"gz",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.gz"),
-			"29152fd9cadbc92f174815ec642ab3aea98f08f902a4f317ec037f8fe60e40c3",
-			[]string{
+			name:      "vanilla_tar relative path even with dot dot",
+			rootfsTar: filepath.Join("testdata", "../..", filepath.Base(wd), "testdata", "rootfs_tarballs", "rootfs.tar"),
+			SHA256sum: "ec01fd8488b0f35d2ca69e6f82edfaecef5725da70913bab61240419ce574918",
+			expectedFiles: []string{
+				"test_tar1",
+				"test_tar2",
+			},
+		},
+		{
+			name:      "gz",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.gz"),
+			SHA256sum: "29152fd9cadbc92f174815ec642ab3aea98f08f902a4f317ec037f8fe60e40c3",
+			expectedFiles: []string{
 				"test_tar_gz1",
 				"test_tar_gz2",
 			},
 		},
 		{
-			"xz",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.xz"),
-			"e3708f1d98ccea0e0c36843d9576580505ee36d523bfcf78b0f73a035ae9a14e",
-			[]string{
+			name:      "xz",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.xz"),
+			SHA256sum: "e3708f1d98ccea0e0c36843d9576580505ee36d523bfcf78b0f73a035ae9a14e",
+			expectedFiles: []string{
 				"test_tar_xz1",
 				"test_tar_xz2",
 			},
 		},
 		{
-			"bz2",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.bz2"),
-			"a1180a73b652d85d7330ef21d433b095363664f2f808363e67f798fae15abf0c",
-			[]string{
+			name:      "bz2",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.bz2"),
+			SHA256sum: "a1180a73b652d85d7330ef21d433b095363664f2f808363e67f798fae15abf0c",
+			expectedFiles: []string{
 				"test_tar_bz1",
 				"test_tar_bz2",
 			},
 		},
 		{
-			"zst",
-			filepath.Join(wd, "testdata", "rootfs_tarballs", "rootfs.tar.zst"),
-			"5fb00513f84e28225a3155fd78c59a6a923b222e1c125aab35bbfd4091281829",
-			[]string{
+			name:      "zst",
+			rootfsTar: filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar.zst"),
+			SHA256sum: "5fb00513f84e28225a3155fd78c59a6a923b222e1c125aab35bbfd4091281829",
+			expectedFiles: []string{
 				"test_tar_zstd1",
 				"test_tar_zstd2",
 			},
@@ -918,8 +954,8 @@ func TestExtractRootfsTar(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test_extract_rootfs_tar_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -934,8 +970,11 @@ func TestExtractRootfsTar(t *testing.T) {
 				},
 			}
 
+			err := stateMachine.setConfDefDir(filepath.Join(wd, "image_definition.yaml"))
+			asserter.AssertErrNil(err, true)
+
 			// need workdir set up for this
-			err := stateMachine.makeTemporaryDirectories()
+			err = stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 
 			err = stateMachine.extractRootfsTar()
@@ -962,21 +1001,20 @@ func TestFailedExtractRootfsTar(t *testing.T) {
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
-		absTarPath, err := filepath.Abs(filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar"))
-		asserter.AssertErrNil(err, true)
+		tarPath := filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar")
 		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Rootfs: &imagedefinition.Rootfs{
 				Tarball: &imagedefinition.Tarball{
-					TarballURL: fmt.Sprintf("file://%s", absTarPath),
+					TarballURL: fmt.Sprintf("file://%s", tarPath),
 					SHA256sum:  "fail",
 				},
 			},
 		}
 
 		// need workdir set up for this
-		err = stateMachine.makeTemporaryDirectories()
+		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
@@ -1339,12 +1377,12 @@ chpasswd:
 	}
 }
 
-// TestManualCustomization unit tests the manualCustomization function
-func TestManualCustomization(t *testing.T) {
+// TestStateMachine_manualCustomization unit tests the manualCustomization function
+func TestStateMachine_manualCustomization(t *testing.T) {
 	t.Run("test_manual_customization", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+		restoreCWD := helper.SaveCWD()
+		defer restoreCWD()
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -1391,8 +1429,12 @@ func TestManualCustomization(t *testing.T) {
 			},
 		}
 
+		d, _ := os.Getwd()
+		err := stateMachine.setConfDefDir(filepath.Join(d, "image_definition.yaml"))
+		asserter.AssertErrNil(err, true)
+
 		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		// also create chroot
@@ -1431,53 +1473,142 @@ func TestManualCustomization(t *testing.T) {
 	})
 }
 
-// TestFailedManualCustomization tests failures in the manualCustomization function
-func TestFailedManualCustomization(t *testing.T) {
+// TestStateMachine_manualCustomization_fail tests failures in the manualCustomization function
+func TestStateMachine_manualCustomization_fail(t *testing.T) {
 	t.Run("test_failed_manual_customization", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+		restoreCWD := helper.SaveCWD()
+		t.Cleanup(restoreCWD)
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Customization: &imagedefinition.Customization{
-				Manual: &imagedefinition.Manual{
-					TouchFile: []*imagedefinition.TouchFile{
-						{
-							TouchPath: filepath.Join("this", "path", "does", "not", "exist"),
-						},
-					},
-				},
-			},
-		}
-
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
-		// create an /etc/resolv.conf in the chroot
-		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
-		asserter.AssertErrNil(err, true)
-		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
-		asserter.AssertErrNil(err, true)
-
-		// now test the failed touch file customization
-		err = stateMachine.manualCustomization()
-		asserter.AssertErrContains(err, "no such file or directory")
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-
 		// mock helper.BackupAndCopyResolvConf
 		helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConf
-		defer func() {
+		t.Cleanup(func() {
 			helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
-		}()
+		})
 		err = stateMachine.manualCustomization()
 		asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
-		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 	})
+
+	tests := []struct {
+		name                 string
+		expectedErr          string
+		manualCustomizations *imagedefinition.Manual
+	}{
+		{
+			name:        "failing manualCopyFile",
+			expectedErr: "cp: cannot stat 'this/path/does/not/exist'",
+			manualCustomizations: &imagedefinition.Manual{
+				CopyFile: []*imagedefinition.CopyFile{
+					{
+						Source: filepath.Join("this", "path", "does", "not", "exist"),
+						Dest:   filepath.Join("this", "path", "does", "not", "exist"),
+					},
+				},
+			},
+		},
+		{
+			name:        "failing manualExecute",
+			expectedErr: "chroot: failed to run command",
+			manualCustomizations: &imagedefinition.Manual{
+				Execute: []*imagedefinition.Execute{
+					{
+						ExecutePath: filepath.Join("this", "path", "does", "not", "exist"),
+					},
+				},
+			},
+		},
+		{
+			name:        "failing manualTouchFile",
+			expectedErr: "no such file or directory",
+			manualCustomizations: &imagedefinition.Manual{
+				TouchFile: []*imagedefinition.TouchFile{
+					{
+						TouchPath: filepath.Join("this", "path", "does", "not", "exist"),
+					},
+				},
+			},
+		},
+		{
+			name:        "failing manualAddGroup",
+			expectedErr: "group 'root' already exists",
+			manualCustomizations: &imagedefinition.Manual{
+				AddGroup: []*imagedefinition.AddGroup{
+					{
+						GroupName: "root",
+						GroupID:   "0",
+					},
+				},
+			},
+		},
+		{
+			name:        "failing manualAddUser",
+			expectedErr: "user 'root' already exists",
+			manualCustomizations: &imagedefinition.Manual{
+				AddUser: []*imagedefinition.AddUser{
+					{
+						UserName: "root",
+						UserID:   "0",
+					},
+				},
+			},
+		},
+	}
+	asserter := helper.Asserter{T: t}
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+	}
+
+	// need workdir set up for this
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	// also create chroot
+	err = stateMachine.createChroot()
+	asserter.AssertErrNil(err, true)
+
+	// create an /etc/resolv.conf in the chroot
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
+	asserter.AssertErrNil(err, true)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			t.Cleanup(saveCWD)
+
+			stateMachine.ImageDef.Customization = &imagedefinition.Customization{
+				Manual: tc.manualCustomizations,
+			}
+
+			err = stateMachine.manualCustomization()
+
+			if len(tc.expectedErr) == 0 {
+				asserter.AssertErrNil(err, true)
+			} else {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+
+		})
+	}
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestPrepareClassicImage unit tests the prepareClassicImage function
@@ -2232,52 +2363,6 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	})
 }
 
-// TestCheckEmptyFields unit tests the helper.CheckEmptyFields function
-func TestCheckEmptyFields(t *testing.T) {
-	// define the struct we will use to test
-	type testStruct struct {
-		A string `yaml:"a" json:"fieldA,required"`
-		B string `yaml:"b" json:"fieldB"`
-		C string `yaml:"c" json:"fieldC,omitempty"`
-	}
-
-	// generate the schema for our testStruct
-	var jsonReflector jsonschema.Reflector
-	schema := jsonReflector.Reflect(&testStruct{})
-
-	// now run CheckEmptyFields with a variety of test data
-	// to ensure the correct return values
-	testCases := []struct {
-		name       string
-		structData testStruct
-		shouldPass bool
-	}{
-		{"success", testStruct{A: "foo", B: "bar", C: "baz"}, true},
-		{"missing_explicitly_required", testStruct{B: "bar", C: "baz"}, false},
-		{"missing_implicitly_required", testStruct{A: "foo", C: "baz"}, false},
-		{"missing_omitempty", testStruct{A: "foo", B: "bar"}, true},
-	}
-	for i, tc := range testCases {
-		t.Run("test_check_empty_fields_"+tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-
-			result := new(gojsonschema.Result)
-			err := helper.CheckEmptyFields(&testCases[i].structData, result, schema)
-			asserter.AssertErrNil(err, false)
-			schema.Required = append(schema.Required, "fieldA")
-
-			// make sure validation will fail only when expected
-			if tc.shouldPass && !result.Valid() {
-				t.Error("CheckEmptyFields added errors when it should not have")
-			}
-			if !tc.shouldPass && result.Valid() {
-				t.Error("CheckEmptyFields did NOT add errors when it should have")
-			}
-
-		})
-	}
-}
-
 // TestGerminate tests the germinate state and ensures some necessary packages are included
 func TestGerminate(t *testing.T) {
 	testCases := []struct {
@@ -2531,6 +2616,8 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		gitCloneCommand := *exec.Command(
 			"git",
 			"clone",
+			"--depth",
+			"1",
 			"--branch",
 			"classic",
 			"https://github.com/snapcore/pc-gadget",
@@ -2564,6 +2651,123 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		os.RemoveAll(gadgetDir)
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}
+
+func TestStateMachine_buildGadgetTree_paths(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	// git clone the gadget into a /tmp dir
+	originGadgetDir, err := os.MkdirTemp("", "pc-gadget-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() {
+		err = os.RemoveAll(originGadgetDir)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+	gitCloneCommand := *exec.Command(
+		"git",
+		"clone",
+		"--depth",
+		"1",
+		"--branch",
+		"classic",
+		"https://github.com/snapcore/pc-gadget",
+		originGadgetDir,
+	)
+	err = gitCloneCommand.Run()
+	asserter.AssertErrNil(err, true)
+
+	tmpDir, err := os.MkdirTemp("", "")
+	t.Cleanup(func() {
+		err := osRemoveAll(tmpDir)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	testCases := []struct {
+		name      string
+		gadgetDir string
+	}{
+		{
+			name:      "gadget URL poiting to an absolute dir",
+			gadgetDir: originGadgetDir,
+		},
+		{
+			name:      "gadget URL pointing to an absolute sub dir",
+			gadgetDir: filepath.Join(tmpDir, "a", "b"),
+		},
+		{
+			name:      "gadget URL pointing to a relative sub dir",
+			gadgetDir: filepath.Join("a", "b"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run("test_build_gadget_tree_paths_"+tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+			t.Cleanup(func() {
+				err := os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+				if err != nil {
+					t.Error(err)
+				}
+			})
+
+			// move the original gadget dir to the desire location to test it will be found
+			if originGadgetDir != tc.gadgetDir {
+				fullGadgetDir := tc.gadgetDir
+				if !filepath.IsAbs(tc.gadgetDir) {
+					fullGadgetDir = filepath.Join(tmpDir, tc.gadgetDir)
+				}
+
+				err = os.MkdirAll(filepath.Dir(fullGadgetDir), 0777)
+				asserter.AssertErrNil(err, true)
+
+				err = os.Rename(originGadgetDir, fullGadgetDir)
+				asserter.AssertErrNil(err, true)
+				// move it back once the test is done
+				t.Cleanup(func() {
+					err := os.Rename(fullGadgetDir, originGadgetDir)
+					if err != nil {
+						t.Error(err)
+					}
+				})
+			}
+
+			// now set up the image definition to build from this directory
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Gadget: &imagedefinition.Gadget{
+					GadgetURL:  fmt.Sprintf("file://%s", tc.gadgetDir),
+					GadgetType: "directory",
+				},
+			}
+
+			err = stateMachine.setConfDefDir(filepath.Join(tmpDir, "image_definition.yaml"))
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.buildGadgetTree()
+			asserter.AssertErrNil(err, true)
+
+			// now make sure the gadget.yaml is in the expected location
+			// this was a bug reported by the CPC team
+			err = stateMachine.prepareGadgetTree()
+			asserter.AssertErrNil(err, true)
+			err = stateMachine.loadGadgetYaml()
+			asserter.AssertErrNil(err, true)
+		})
+	}
 }
 
 // TestGadgetGadgetTargets tests using alternate make targets with gadget builds

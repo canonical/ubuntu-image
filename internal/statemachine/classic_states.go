@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -400,17 +399,18 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		}
 		sourceDir = gadgetDir
 	case "directory":
-		// no need to check error here as the validity of the URL
-		// has been confirmed by the schema validation
-		sourceURL, _ := url.Parse(classicStateMachine.ImageDef.Gadget.GadgetURL)
+		gadgetTreePath := strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
+		if !filepath.IsAbs(gadgetTreePath) {
+			gadgetTreePath = filepath.Join(stateMachine.ConfDefPath, gadgetTreePath)
+		}
 
 		// copy the source tree to the workdir
-		files, err := osReadDir(sourceURL.Path)
+		files, err := osReadDir(gadgetTreePath)
 		if err != nil {
 			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 		}
 		for _, gadgetFile := range files {
-			srcFile := filepath.Join(sourceURL.Path, gadgetFile.Name())
+			srcFile := filepath.Join(gadgetTreePath, gadgetFile.Name())
 			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
 				return fmt.Errorf("Error copying gadget source: %s", err.Error())
 			}
@@ -821,7 +821,7 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	// has been confirmed by the schema validation
 	tarPath := strings.TrimPrefix(classicStateMachine.ImageDef.Rootfs.Tarball.TarballURL, "file://")
 	if !filepath.IsAbs(tarPath) {
-		tarPath, _ = filepath.Abs(tarPath)
+		tarPath = filepath.Join(stateMachine.ConfDefPath, tarPath)
 	}
 
 	// if the sha256 sum of the tarball is provided, make sure it matches
@@ -999,38 +999,29 @@ func (stateMachine *StateMachine) manualCustomization() error {
 		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
 	}
 
-	type customizationHandler struct {
-		inputData   interface{}
-		handlerFunc func(interface{}, string, bool) error
-	}
-	customizationHandlers := []customizationHandler{
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.CopyFile,
-			handlerFunc: manualCopyFile,
-		},
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.Execute,
-			handlerFunc: manualExecute,
-		},
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.TouchFile,
-			handlerFunc: manualTouchFile,
-		},
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.AddGroup,
-			handlerFunc: manualAddGroup,
-		},
-		{
-			inputData:   classicStateMachine.ImageDef.Customization.Manual.AddUser,
-			handlerFunc: manualAddUser,
-		},
+	err = manualCopyFile(classicStateMachine.ImageDef.Customization.Manual.CopyFile, classicStateMachine.ConfDefPath, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
 
-	for _, customization := range customizationHandlers {
-		err := customization.handlerFunc(customization.inputData, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
-		if err != nil {
-			return err
-		}
+	err = manualExecute(classicStateMachine.ImageDef.Customization.Manual.Execute, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
+	}
+
+	err = manualTouchFile(classicStateMachine.ImageDef.Customization.Manual.TouchFile, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
+	}
+
+	err = manualAddGroup(classicStateMachine.ImageDef.Customization.Manual.AddGroup, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
+	}
+
+	err = manualAddUser(classicStateMachine.ImageDef.Customization.Manual.AddUser, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -1095,10 +1086,10 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	// are also set to be installed. Note we only do this for snaps that are
 	// seeded. Users are expected to specify all base and content provider
 	// snaps in the image definition.
+	snapStore := store.New(nil, nil)
+	snapContext := context.Background()
 	for _, seededSnap := range imageOpts.Snaps {
-		snapStore := store.New(nil, nil)
 		snapSpec := store.SnapSpec{Name: seededSnap}
-		snapContext := context.TODO() //context can be empty, just not nil
 		snapInfo, err := snapStore.SnapInfo(snapContext, snapSpec, nil)
 		if err != nil {
 			return fmt.Errorf("Error getting info for snap %s: \"%s\"",
@@ -1133,8 +1124,18 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 		}
 	}
 
+	modelAssertionPath := strings.TrimPrefix(classicStateMachine.ImageDef.ModelAssertion, "file://")
+	// if no explicit model assertion was given, keep empty ModelFile to let snapd fallback to default
+	// model assertion
+	if len(modelAssertionPath) != 0 {
+		if !filepath.IsAbs(modelAssertionPath) {
+			imageOpts.ModelFile = filepath.Join(stateMachine.ConfDefPath, modelAssertionPath)
+		} else {
+			imageOpts.ModelFile = modelAssertionPath
+		}
+	}
+
 	imageOpts.Classic = true
-	imageOpts.ModelFile = strings.TrimPrefix(classicStateMachine.ImageDef.ModelAssertion, "file://")
 	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
 	imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot
 	imageOpts.Customizations = *new(image.Customizations)

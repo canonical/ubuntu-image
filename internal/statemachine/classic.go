@@ -42,6 +42,10 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 	// set the beginning states that will be used by all classic image builds
 	classicStateMachine.states = startingClassicStates
 
+	if err := classicStateMachine.setConfDefDir(classicStateMachine.parent.(*ClassicStateMachine).Args.ImageDefinition); err != nil {
+		return err
+	}
+
 	// do the validation common to all image types
 	if err := classicStateMachine.validateInput(); err != nil {
 		return err

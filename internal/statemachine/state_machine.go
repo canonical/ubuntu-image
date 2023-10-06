@@ -97,7 +97,8 @@ type StateMachine struct {
 	cleanWorkDir  bool          // whether or not to clean up the workDir
 	CurrentStep   string        // tracks the current progress of the state machine
 	StepsTaken    int           // counts the number of steps taken
-	YamlFilePath  string        // the location for the yaml file
+	ConfDefPath   string        // directory holding the model assertion / image definition file
+	YamlFilePath  string        // the location for the gadget yaml file
 	IsSeeded      bool          // core 20 images are seeded
 	rootfsVolName string        // volume on which the rootfs is located
 	rootfsPartNum int           // rootfs partition number

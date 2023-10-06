@@ -58,6 +58,8 @@ The following specification defines what is supported in the YAML:
          target: <string> (optional)
        # A path to a model assertion to use when pre-seeding snaps
        # in the image. Must be a local file URI beginning with file://
+       # The given path will be interpreted as relative to the path of
+       # the image definition file if is not absolute.
        model-assertion: <string> (optional)
        # Defines parameters needed to build the rootfs for a classic
        # image. Currently only building from a seed is supported.
@@ -115,7 +117,8 @@ The following specification defines what is supported in the YAML:
          # following compression types: bzip2, gzip, xz, zstd.
          tarball: (exactly 1 of archive-tasks, seed or tarball must be specified)
              # The path to the tarball. Currently only local paths beginning with
-             # file:// are supported
+             # file:// are supported. The given path will be interpreted as relative
+             # to the path of the image definition file if is not absolute.
              url: <string> (required if tarball dict is specified)
              # URL to the gpg signature to verify the tarball against.
              gpg: <string> (optional)
@@ -202,6 +205,8 @@ The following specification defines what is supported in the YAML:
            copy-file: (optional)
              -
                # The path to the file to copy.
+               # The given path will be interpreted as relative to the
+               # path of the image definition file if is not absolute.
                source: <string>
                # The path to use as a destination for the copied
                # file. The location of the rootfs will be prepended
