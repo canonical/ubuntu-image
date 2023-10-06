@@ -123,7 +123,7 @@ func TestInvalidCommands(t *testing.T) {
 		{"invalid_flag", []string{"classic"}, []string{"--nonexistent"}, "unknown flag `nonexistent'"},
 		{"invalid_validation", []string{"snap"}, []string{"--validation=test"}, "unknown flag `validation'"},
 		{"invalid_sector_size", []string{"snap"}, []string{"--sector_size=123"}, "unknown flag `sector_size'"},
-		{"missing_flag", []string{"pack"}, []string{"--artifact-type=img"}, "the required flags `--gadget-dir' and `--rootfs-dir' were not specified"},
+		{"missing_flag", []string{"pack"}, []string{"--artifact-type=raw"}, "the required flags `--gadget-dir' and `--rootfs-dir' were not specified"},
 	}
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution
