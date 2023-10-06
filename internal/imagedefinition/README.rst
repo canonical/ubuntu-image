@@ -205,6 +205,8 @@ The following specification defines what is supported in the YAML:
            copy-file: (optional)
              -
                # The path to the file to copy.
+               # The given path will be interpreted as relative to the
+               # path of the image definition file if is not absolute.
                source: <string>
                # The path to use as a destination for the copied
                # file. The location of the rootfs will be prepended
