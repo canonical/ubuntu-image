@@ -891,7 +891,7 @@ func (stateMachine *StateMachine) germinate() error {
 }
 
 // customizeCloudInitFile customizes a cloud-init data file with the given content
-func customizeCloudInitFile(customData string, seedPath string, fileName string) error {
+func customizeCloudInitFile(customData string, seedPath string, fileName string, requireHeader bool) error {
 	if customData == "" {
 		return nil
 	}
@@ -901,7 +901,7 @@ func customizeCloudInitFile(customData string, seedPath string, fileName string)
 	}
 	defer f.Close()
 
-	if !strings.HasPrefix(customData, "#cloud-config\n") {
+	if requireHeader && !strings.HasPrefix(customData, "#cloud-config\n") {
 		return fmt.Errorf("provided cloud-init customization for %s is missing proper header", fileName)
 	}
 
@@ -925,17 +925,17 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 		return err
 	}
 
-	err = customizeCloudInitFile(cloudInitCustomization.MetaData, seedPath, "meta-data")
+	err = customizeCloudInitFile(cloudInitCustomization.MetaData, seedPath, "meta-data", false)
 	if err != nil {
 		return err
 	}
 
-	err = customizeCloudInitFile(cloudInitCustomization.UserData, seedPath, "user-data")
+	err = customizeCloudInitFile(cloudInitCustomization.UserData, seedPath, "user-data", true)
 	if err != nil {
 		return err
 	}
 
-	err = customizeCloudInitFile(cloudInitCustomization.NetworkConfig, seedPath, "network-config")
+	err = customizeCloudInitFile(cloudInitCustomization.NetworkConfig, seedPath, "network-config", false)
 	if err != nil {
 		return err
 	}
