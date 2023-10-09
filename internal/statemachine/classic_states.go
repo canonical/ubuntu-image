@@ -259,15 +259,14 @@ func (stateMachine *StateMachine) calculateStates() error {
 		}
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
-		if classicStateMachine.ImageDef.Customization != nil {
-			if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
-				rootfsCreationStates = append(rootfsCreationStates,
-					[]stateFunc{
-						{"add_extra_ppas", (*StateMachine).addExtraPPAs},
-						{"install_packages", (*StateMachine).installPackages},
-						{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs},
-					}...)
-			}
+		if classicStateMachine.ImageDef.Customization != nil && len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				[]stateFunc{
+					{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+					{"install_packages", (*StateMachine).installPackages},
+					{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs},
+				}...)
+
 		} else {
 			rootfsCreationStates = append(rootfsCreationStates,
 				stateFunc{"install_packages", (*StateMachine).installPackages},
