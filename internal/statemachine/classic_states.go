@@ -630,7 +630,7 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
 
 	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
-		if *ppa.KeepEnabled {
+		if helper.PtrBool(ppa.KeepEnabled) {
 			continue
 		}
 		ppaFileName, _ := createPPAInfo(ppa, classicStateMachine.ImageDef.Series)
@@ -647,7 +647,7 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 			"etc", "apt", "trusted.gpg.d", keyFileName)
 		err = osRemove(keyFilePath)
 		if err != nil {
-			err = fmt.Errorf("Error removing %s: %s", ppaFile, err.Error())
+			err = fmt.Errorf("Error removing %s: %s", keyFilePath, err.Error())
 			return err
 		}
 	}
