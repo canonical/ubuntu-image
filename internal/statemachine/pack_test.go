@@ -334,6 +334,11 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		err = stateMachine.Run()
 		asserter.AssertErrNil(err, true)
 
+		t.Cleanup(func() {
+			err = stateMachine.Teardown()
+			asserter.AssertErrNil(err, true)
+		})
+
 		// make sure all the artifacts were created and are the correct file types
 		artifacts := map[string]string{"pc.img": "DOS/MBR boot sector"}
 		for artifact, fileType := range artifacts {
@@ -360,7 +365,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		var mountImageCmds []*exec.Cmd
 		var umountImageCmds []*exec.Cmd
 
-		defer func() {
+		t.Cleanup(func() {
 			for _, teardownCmd := range umountImageCmds {
 				if tmpErr := teardownCmd.Run(); tmpErr != nil {
 					if err != nil {
@@ -370,7 +375,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 					}
 				}
 			}
-		}()
+		})
 
 		// set up the loopback
 		mountImageCmds = append(mountImageCmds,
@@ -382,7 +387,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		)
 
 		// unset the loopback
-		umountImageCmds = append(mountImageCmds,
+		umountImageCmds = append(umountImageCmds,
 			//nolint:gosec,G204
 			exec.Command("losetup", "--detach", filepath.Join("/dev", "loop99")),
 		)
@@ -395,12 +400,12 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		umountImageCmds = append([]*exec.Cmd{
 			//nolint:gosec,G204
 			exec.Command("kpartx", "-d", filepath.Join("/dev", "loop99")),
-		}, mountImageCmds...,
+		}, umountImageCmds...,
 		)
 
 		mountImageCmds = append(mountImageCmds,
 			//nolint:gosec,G204
-			exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3")), // with this example the rootfs is partition 3 mountDir
+			exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3"), mountDir), // with this example the rootfs is partition 3 mountDir
 		)
 
 		umountImageCmds = append([]*exec.Cmd{
@@ -408,7 +413,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 			exec.Command("mount", "--make-rprivate", filepath.Join("/dev", "mapper", "loop99p3")),
 			//nolint:gosec,G204
 			exec.Command("umount", "--recursive", filepath.Join("/dev", "mapper", "loop99p3")),
-		}, mountImageCmds...,
+		}, umountImageCmds...,
 		)
 
 		// set up the mountpoints
@@ -419,7 +424,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 			umountImageCmds = append(umountCmds, umountImageCmds...)
 		}
 		// make sure to unmount the disk too
-		umountImageCmds = append([]*exec.Cmd{exec.Command("umount", mountDir)}, umountImageCmds...)
+		umountImageCmds = append([]*exec.Cmd{exec.Command("umount", "--recursive", mountDir)}, umountImageCmds...)
 
 		// now run all the commands to mount the image
 		for _, cmd := range mountImageCmds {
@@ -438,8 +443,5 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 				t.Errorf("File \"%s\" should exist, but does not", grubCfg)
 			}
 		}
-
-		err = stateMachine.Teardown()
-		asserter.AssertErrNil(err, true)
 	})
 }
