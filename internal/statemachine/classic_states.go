@@ -28,6 +28,7 @@ import (
 )
 
 var seedVersionRegex = regexp.MustCompile(`^[a-z0-9].*`)
+var localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
 
 // parseImageDefinition parses the provided yaml file and ensures it is valid
 func (stateMachine *StateMachine) parseImageDefinition() error {
@@ -1266,7 +1267,7 @@ func (stateMachine *StateMachine) setDefaultLocale() error {
 	defaultPath := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "default")
 	localePath := filepath.Join(defaultPath, "locale")
 	localeBytes, err := osReadFile(localePath)
-	if err == nil && strings.Contains(string(localeBytes), "LANG=") {
+	if err == nil && localePresentRegex.Find(localeBytes) != nil {
 		return nil
 	}
 

@@ -3956,6 +3956,11 @@ func TestStateMachine_defaultLocale(t *testing.T) {
 			"LANG=en_US.UTF-8\n",
 		},
 		{
+			"locale_set_non_lang",
+			"LC_ALL=en_US.UTF-8\n",
+			"LC_ALL=en_US.UTF-8\n",
+		},
+		{
 			"locale_set_with_comment",
 			"# some comment\nLANG=en_US.UTF-8\n",
 			"# some comment\nLANG=en_US.UTF-8\n",
@@ -3963,6 +3968,11 @@ func TestStateMachine_defaultLocale(t *testing.T) {
 		{
 			"no_locale_with_comment",
 			"# some comment\n",
+			"# Default Ubuntu locale\nLANG=C.UTF-8\n",
+		},
+		{
+			"no_locale_with_comment_locale",
+			"# LANG=en_US.UTF-8",
 			"# Default Ubuntu locale\nLANG=C.UTF-8\n",
 		},
 	}
