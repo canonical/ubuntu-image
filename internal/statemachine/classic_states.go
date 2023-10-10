@@ -1263,8 +1263,6 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 func (stateMachine *StateMachine) setDefaultLocale() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	fmt.Print("Running the setDefaultLocale hbahaha\n")
-
 	defaultPath := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "default")
 	localePath := filepath.Join(defaultPath, "locale")
 	localeBytes, err := osReadFile(localePath)
@@ -1281,9 +1279,6 @@ func (stateMachine *StateMachine) setDefaultLocale() error {
 	if err != nil {
 		return fmt.Errorf("Error writing to locale file: %s", err.Error())
 	}
-
-	fmt.Print("YEEEEEEEEEEEESSSSSSSS\n")
-
 	return nil
 }
 

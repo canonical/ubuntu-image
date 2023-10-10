@@ -3987,7 +3987,7 @@ func TestStateMachine_defaultLocale(t *testing.T) {
 
 			// create the <chroot>/etc/default/locale file
 			localePath := filepath.Join(defaultPath, "locale")
-			err = os.WriteFile(localePath, []byte(tc.localeContents), 0644)
+			err = os.WriteFile(localePath, []byte(tc.localeContents), 0600)
 			if err != nil {
 				t.Fatalf("Error creating locale file: %v", err)
 			}
