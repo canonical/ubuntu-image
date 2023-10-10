@@ -285,15 +285,16 @@ func TestPrintStates(t *testing.T) {
 [8] preseed_image
 [9] customize_fstab
 [10] perform_manual_customization
-[11] populate_rootfs_contents
-[12] generate_disk_info
-[13] calculate_rootfs_size
-[14] populate_bootfs_contents
-[15] populate_prepare_partitions
-[16] make_disk
-[17] update_bootloader
-[18] generate_manifest
-[19] finish
+[11] set_default_locale
+[12] populate_rootfs_contents
+[13] generate_disk_info
+[14] calculate_rootfs_size
+[15] populate_bootfs_contents
+[16] populate_prepare_partitions
+[17] make_disk
+[18] update_bootloader
+[19] generate_manifest
+[20] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -2348,6 +2349,14 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			}
 		}
 
+		// check if the locale is set to a sane default
+		localeFile := filepath.Join(mountDir, "etc", "default", "locale")
+		localeBytes, err := os.ReadFile(localeFile)
+		asserter.AssertErrNil(err, true)
+		if !strings.Contains(string(localeBytes), "LANG=C.UTF-8") {
+			t.Errorf("Expected LANG=C.UTF-8 in %s, but got %s", localeFile, string(localeBytes))
+		}
+
 		// now run all the commands to unmount the image and clean up
 		for _, cmd := range umountImageCmds {
 			err := cmd.Run()
@@ -3924,6 +3933,128 @@ func TestFailedPreseedClassicImage(t *testing.T) {
 		err = stateMachine.preseedClassicImage()
 		asserter.AssertErrContains(err, "Error running command")
 		execCommand = exec.Command
+
+		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	})
+}
+
+// TestStateMachine_defaultLocale tests that the default locale is set
+func TestStateMachine_defaultLocale(t *testing.T) {
+	testCases := []struct {
+		name           string
+		localeContents string
+		localeExpected string
+	}{
+		{
+			"no_locale",
+			"",
+			"# Default Ubuntu locale\nLANG=C.UTF-8\n",
+		},
+		{
+			"locale_set",
+			"LANG=en_US.UTF-8\n",
+			"LANG=en_US.UTF-8\n",
+		},
+		{
+			"locale_set_non_lang",
+			"LC_ALL=en_US.UTF-8\n",
+			"LC_ALL=en_US.UTF-8\n",
+		},
+		{
+			"locale_set_with_comment",
+			"# some comment\nLANG=en_US.UTF-8\n",
+			"# some comment\nLANG=en_US.UTF-8\n",
+		},
+		{
+			"no_locale_with_comment",
+			"# some comment\n",
+			"# Default Ubuntu locale\nLANG=C.UTF-8\n",
+		},
+		{
+			"no_locale_with_comment_locale",
+			"# LANG=en_US.UTF-8",
+			"# Default Ubuntu locale\nLANG=C.UTF-8\n",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_default_locale_"+tc.name, func(t *testing.T) {
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+
+			// need workdir set up for this
+			err := stateMachine.makeTemporaryDirectories()
+			if err != nil {
+				t.Fatalf("Error making temporary directories: %v", err)
+			}
+
+			// create the <chroot>/etc/default directory
+			defaultPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "default")
+			err = os.MkdirAll(defaultPath, 0744)
+			if err != nil {
+				t.Fatalf("Error creating etc directory: %v", err)
+			}
+
+			// create the <chroot>/etc/default/locale file
+			localePath := filepath.Join(defaultPath, "locale")
+			err = os.WriteFile(localePath, []byte(tc.localeContents), 0600)
+			if err != nil {
+				t.Fatalf("Error creating locale file: %v", err)
+			}
+
+			// call the function under test
+			err = stateMachine.setDefaultLocale()
+			if err != nil {
+				t.Fatalf("Error setting default locale: %v", err)
+			}
+
+			// read the locale file and make sure it matches the expected contents
+			localeBytes, err := os.ReadFile(localePath)
+			if err != nil {
+				t.Fatalf("Error reading locale file: %v", err)
+			}
+			if string(localeBytes) != tc.localeExpected {
+				t.Errorf("Expected locale contents \"%s\", but got \"%s\"",
+					tc.localeExpected, string(localeBytes))
+			}
+
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		})
+	}
+}
+
+// TestStateMachine_defaultLocaleFailures tests failures in the setDefaultLocale function
+func TestStateMachine_defaultLocaleFailures(t *testing.T) {
+	t.Run("test_default_locale_failures", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+
+		// need workdir set up for this
+		err := stateMachine.makeTemporaryDirectories()
+		if err != nil {
+			t.Fatalf("Error making temporary directories: %v", err)
+		}
+
+		// check failure in MkDirAll
+		osMkdirAll = mockMkdirAll
+		defer func() {
+			osMkdirAll = os.MkdirAll
+		}()
+		err = stateMachine.setDefaultLocale()
+		asserter.AssertErrContains(err, "Error creating default directory")
+		osMkdirAll = os.MkdirAll
+
+		// check failure in WriteFile
+		osWriteFile = mockWriteFile
+		defer func() {
+			osWriteFile = os.WriteFile
+		}()
+		err = stateMachine.setDefaultLocale()
+		asserter.AssertErrContains(err, "Error writing to locale file")
+		osWriteFile = os.WriteFile
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})

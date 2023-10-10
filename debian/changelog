@@ -20,6 +20,7 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Fix handling of resolv.conf in chroot, making sure we don't leak the build
     environment by accident.
   * Use snap-preseed --reset for preseed resetting
+  * Set a default locale during build
 
   [ Michael Hudson-Doyle ]
   * Call mount --make-rprivate and umount --recursive when undoing a bind
