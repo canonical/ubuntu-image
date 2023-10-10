@@ -293,6 +293,10 @@ func (stateMachine *StateMachine) calculateStates() error {
 		}
 	}
 
+	// After customization, let's make sure that the rootfs has the correct locale set
+	rootfsCreationStates = append(rootfsCreationStates,
+		stateFunc{"set_default_locale", (*StateMachine).setDefaultLocale})
+
 	// The rootfs is laid out in a staging area, now populate it in the correct location
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents})
@@ -1252,6 +1256,34 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 			}
 		}
 	}
+	return nil
+}
+
+// Set a default locale if one is not configured beforehand by other customizations
+func (stateMachine *StateMachine) setDefaultLocale() error {
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	fmt.Print("Running the setDefaultLocale hbahaha\n")
+
+	defaultPath := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "default")
+	localePath := filepath.Join(defaultPath, "locale")
+	localeBytes, err := osReadFile(localePath)
+	if err == nil && strings.Contains(string(localeBytes), "LANG=") {
+		return nil
+	}
+
+	err = osMkdirAll(defaultPath, 0755)
+	if err != nil {
+		return fmt.Errorf("Error creating default directory: %s", err.Error())
+	}
+
+	err = osWriteFile(localePath, []byte("# Default Ubuntu locale\nLANG=C.UTF-8\n"), 0644)
+	if err != nil {
+		return fmt.Errorf("Error writing to locale file: %s", err.Error())
+	}
+
+	fmt.Print("YEEEEEEEEEEEESSSSSSSS\n")
+
 	return nil
 }
 
