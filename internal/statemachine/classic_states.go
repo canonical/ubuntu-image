@@ -580,6 +580,9 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 			}
 		}
 	}()
+
+	trustedGPGD := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d")
+
 	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
 		ppaFileName, ppaFileContents := createPPAInfo(ppa,
 			classicStateMachine.ImageDef.Series)
@@ -605,8 +608,7 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
 		*/
 		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
-		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
-			"etc", "apt", "trusted.gpg.d", keyFileName)
+		keyFilePath := filepath.Join(trustedGPGD, keyFileName)
 		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, stateMachine.commonFlags.Debug)
 		if err != nil {
 			err = fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
