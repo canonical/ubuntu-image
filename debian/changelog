@@ -31,7 +31,10 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Replace linter and handle previously ignored errors
   * handle unknown Offset in gadget Volumes
 
- -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Fri, 14 Jul 2023 15:56:27 +0200
+  [ Alfonso Sanchez-Beato ]
+  * Update to latest snapd, adapting to changes in layouts code.
+
+ -- Alfonso Sanchez-Beato <alfonso.sanchez-beato@canonical.com>  Fri, 13 Oct 2023 11:26:23 +0100
 
 ubuntu-image (2.2+22.10ubuntu1) kinetic; urgency=medium
 
