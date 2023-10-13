@@ -241,7 +241,8 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 			GadgetRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
 			KernelRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
 		}
-		laidOutVolume, err := gadgetLayoutVolume(volume, nil, layoutOptions)
+		laidOutVolume, err := gadgetLayoutVolume(volume,
+			gadget.OnDiskStructsFromGadget(volume), layoutOptions)
 		if err != nil {
 			return fmt.Errorf("Error laying out bootfs contents: %s", err.Error())
 		}
