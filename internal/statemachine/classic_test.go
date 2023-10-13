@@ -1887,6 +1887,8 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
 		// also create chroot
 		err = stateMachine.createChroot()
 		asserter.AssertErrNil(err, true)
@@ -3649,6 +3651,8 @@ func TestPreseedResetChroot(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
 		// create chroot to preseed
 		err = stateMachine.createChroot()
 		asserter.AssertErrNil(err, true)
@@ -3777,6 +3781,8 @@ func TestUnsupportedBootloader(t *testing.T) {
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
+
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 		// place a test gadget tree in the scratch directory so we don't
 		// have to build one
