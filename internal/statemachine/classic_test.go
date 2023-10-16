@@ -2355,6 +2355,17 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			}
 		}
 
+		// Check cleaned files were removed
+		cleaned := []string{filepath.Join("etc", "machine-id"),
+			filepath.Join("var", "lib", "dbus", "machine-id"),
+		}
+		for _, file := range cleaned {
+			_, err := os.Stat(filepath.Join(mountDir, file))
+			if !os.IsNotExist(err) {
+				t.Errorf("File %s should not exist, but does", file)
+			}
+		}
+
 		// check if the locale is set to a sane default
 		localeFile := filepath.Join(mountDir, "etc", "default", "locale")
 		localeBytes, err := os.ReadFile(localeFile)

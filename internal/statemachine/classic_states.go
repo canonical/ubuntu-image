@@ -277,6 +277,11 @@ func (stateMachine *StateMachine) calculateStates() error {
 			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
 	}
 
+	// Before customization, make sure we clean unwanted secrets/values that
+	// are supposed to be unique per machine
+	rootfsCreationStates = append(rootfsCreationStates,
+		stateFunc{"clean_rootfs", (*StateMachine).cleanRootfs})
+
 	// Determine any customization that needs to run before the image is created
 	//TODO: installer image customization... eventually.
 	if classicStateMachine.ImageDef.Customization != nil {

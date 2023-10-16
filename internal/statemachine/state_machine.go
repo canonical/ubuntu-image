@@ -52,6 +52,7 @@ var osMkdirTemp = os.MkdirTemp
 var osOpen = os.Open
 var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
+var osRemove = os.Remove
 var osRename = os.Rename
 var osCreate = os.Create
 var osTruncate = os.Truncate
