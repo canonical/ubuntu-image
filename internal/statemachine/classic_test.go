@@ -2356,11 +2356,12 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		}
 
 		// Check cleaned files were removed
-		cleaned := []string{filepath.Join("etc", "machine-id"),
-			filepath.Join("var", "lib", "dbus", "machine-id"),
+		cleaned := []string{
+			filepath.Join(mountDir, "etc", "machine-id"),
+			filepath.Join(mountDir, "var", "lib", "dbus", "machine-id"),
 		}
 		for _, file := range cleaned {
-			_, err := os.Stat(filepath.Join(mountDir, file))
+			_, err := os.Stat(file)
 			if !os.IsNotExist(err) {
 				t.Errorf("File %s should not exist, but does", file)
 			}

@@ -330,19 +330,19 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 func (stateMachine *StateMachine) cleanRootfs() error {
 	toClean := []string{
 		// machine-id
-		filepath.Join("etc", "machine-id"),
-		filepath.Join("var", "lib", "dbus", "machine-id"),
+		filepath.Join(stateMachine.tempDirs.rootfs, "etc", "machine-id"),
+		filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "dbus", "machine-id"),
 	}
 
 	// openssh default keys
-	sshPubKeys, err := filepath.Glob(filepath.Join("etc", "ssh", "ssh_host_*_key.pub"))
+	sshPubKeys, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.rootfs, "etc", "ssh", "ssh_host_*_key.pub"))
 	if err != nil {
 		return fmt.Errorf("unable to list sshd pub keys: %s", err.Error())
 	}
 
 	toClean = append(toClean, sshPubKeys...)
 
-	sshPrivKeys, err := filepath.Glob(filepath.Join("etc", "ssh", "ssh_host_*_key"))
+	sshPrivKeys, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.rootfs, "etc", "ssh", "ssh_host_*_key"))
 	if err != nil {
 		return fmt.Errorf("unable to list sshd pub keys: %s", err.Error())
 	}
@@ -350,14 +350,13 @@ func (stateMachine *StateMachine) cleanRootfs() error {
 	toClean = append(toClean, sshPrivKeys...)
 
 	for _, f := range toClean {
-		path := filepath.Join(stateMachine.tempDirs.rootfs, f)
-		err = osRemove(path)
+		err = osRemove(f)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error removing %s: %s", f, err.Error())
 		}
 	}
 
-	udevRules, err := filepath.Glob(filepath.Join("etc", "udev", "rules.d", "*persistent-net.rules"))
+	udevRules, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.rootfs, "etc", "udev", "rules.d", "*persistent-net.rules"))
 	if err != nil {
 		return fmt.Errorf("unable to list udev persistent rules: %s", err.Error())
 	}
