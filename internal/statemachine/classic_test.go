@@ -2366,6 +2366,64 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	})
 }
 
+func TestSuccessfulRootfsGeneration(t *testing.T) {
+	t.Run("test_successful_classic_rootfs_generation", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		restoreCWD := helper.SaveCWD()
+		t.Cleanup(restoreCWD)
+
+		// We need the output directory set for this
+		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		t.Cleanup(func() { os.RemoveAll(outputDir) })
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.commonFlags.Debug = true
+		stateMachine.commonFlags.Size = "5G"
+		stateMachine.commonFlags.OutputDir = outputDir
+		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+			"test_rootfs_tarball.yaml")
+
+		err = stateMachine.Setup()
+		asserter.AssertErrNil(err, true)
+
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
+
+		t.Cleanup(func() {
+			err = stateMachine.Teardown()
+			asserter.AssertErrNil(err, true)
+		})
+
+		// make sure all the artifacts were created and are the correct file types
+		artifacts := map[string]string{
+			"rootfs.tar": "tar archive",
+		}
+		for artifact, fileType := range artifacts {
+			fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
+			_, err := os.Stat(fullPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("File \"%s\" should exist, but does not", fullPath)
+				}
+			}
+
+			// check it is the expected file type
+			fileCommand := *exec.Command("file", fullPath)
+			cmdOutput, err := fileCommand.CombinedOutput()
+			asserter.AssertErrNil(err, true)
+			if !strings.Contains(string(cmdOutput), fileType) {
+				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
+					fullPath, fileType, string(cmdOutput))
+			}
+		}
+	})
+}
+
 // TestGerminate tests the germinate state and ensures some necessary packages are included
 func TestGerminate(t *testing.T) {
 	testCases := []struct {
