@@ -39,6 +39,7 @@ parts:
       - gdisk
       - fakeroot
       - debootstrap
+      - eatmydata
       - gpg
       - germinate
       - mtools
