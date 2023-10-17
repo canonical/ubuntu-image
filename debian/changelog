@@ -33,6 +33,7 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
 
   [ Alfonso Sanchez-Beato ]
   * Update to latest snapd, adapting to changes in layouts code.
+  * Fix calculation of volume sizes after latest snapd changes
 
  -- Alfonso Sanchez-Beato <alfonso.sanchez-beato@canonical.com>  Fri, 13 Oct 2023 11:26:23 +0100
 

@@ -295,8 +295,6 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 		if err := stateMachine.handleLkBootloader(volume); err != nil {
 			return err
 		}
-		var farthestOffset quantity.Offset = 0
-		//for structureNumber, structure := range volume.Structure {
 		for structureNumber, structure := range volume.Structure {
 			var contentRoot string
 			if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
@@ -305,8 +303,6 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
 					"part"+strconv.Itoa(structureNumber))
 			}
-			farthestOffset = maxOffset(farthestOffset,
-				quantity.Offset(structure.Size)+getStructureOffset(structure))
 			if shouldSkipStructure(structure, stateMachine.IsSeeded) {
 				continue
 			}
@@ -319,8 +315,9 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 				return err
 			}
 		}
-		// set the image size values to be used by make_disk
-		stateMachine.handleContentSizes(farthestOffset, volumeName)
+		// Set the image size values to be used by make_disk, by using
+		// the minimum size that would be valid according to gadget.yaml.
+		stateMachine.handleContentSizes(quantity.Offset(volume.MinSize()), volumeName)
 	}
 	return nil
 }
@@ -336,7 +333,9 @@ func (stateMachine *StateMachine) makeDisk() error {
 			// Create the disk image
 			imgSize, found := stateMachine.ImageSizes[volumeName]
 			if !found {
-				imgSize, _ = stateMachine.calculateImageSize()
+				// Calculate the minimum size that would be
+				// valid according to gadget.yaml.
+				imgSize = volume.MinSize()
 			}
 
 			if err := osRemoveAll(imgName); err != nil {
