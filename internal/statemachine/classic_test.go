@@ -1887,6 +1887,8 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
 		// also create chroot
 		err = stateMachine.createChroot()
 		asserter.AssertErrNil(err, true)
@@ -2167,13 +2169,13 @@ func TestFailedGenerateFilelist(t *testing.T) {
 func TestSuccessfulClassicRun(t *testing.T) {
 	t.Run("test_successful_classic_run", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+		restoreCWD := helper.SaveCWD()
+		t.Cleanup(restoreCWD)
 
 		// We need the output directory set for this
 		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(outputDir)
+		t.Cleanup(func() { os.RemoveAll(outputDir) })
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -2187,8 +2189,15 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
 
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
 		err = stateMachine.Run()
 		asserter.AssertErrNil(err, true)
+
+		t.Cleanup(func() {
+			err = stateMachine.Teardown()
+			asserter.AssertErrNil(err, true)
+		})
 
 		// make sure packages were successfully installed from public and private ppas
 		files := []string{
@@ -2262,65 +2271,11 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 		// create a directory in which to mount the rootfs
 		mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
-		// Slice used to store all the commands that need to be run
-		// to properly update grub.cfg in the chroot
 		var mountImageCmds []*exec.Cmd
 		var umountImageCmds []*exec.Cmd
 
-		imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, "pc-amd64.img")
-
-		// set up the loopback
-		mountImageCmds = append(mountImageCmds,
-			[]*exec.Cmd{
-				// set up the loopback
-				//nolint:gosec,G204
-				exec.Command("losetup",
-					filepath.Join("/dev", "loop99"),
-					imgPath,
-				),
-				//nolint:gosec,G204
-				exec.Command("kpartx",
-					"-a",
-					filepath.Join("/dev", "loop99"),
-				),
-				// mount the rootfs partition in which to run update-grub
-				//nolint:gosec,G204
-				exec.Command("mount",
-					filepath.Join("/dev", "mapper", "loop99p3"), // with this example the rootfs is partition 3
-					mountDir,
-				),
-			}...,
-		)
-
-		// set up the mountpoints
-		mountPoints := []string{"/dev", "/proc", "/sys"}
-		for _, mountPoint := range mountPoints {
-			mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
-			mountImageCmds = append(mountImageCmds, mountCmds...)
-			umountImageCmds = append(umountImageCmds, umountCmds...)
-			defer func(cmds []*exec.Cmd) {
-				_ = runAll(cmds)
-			}(umountCmds)
-		}
-		// make sure to unmount the disk too
-		umountImageCmds = append(umountImageCmds, exec.Command("umount", mountDir))
-
-		// tear down the loopback
-		teardownCmds := []*exec.Cmd{
-			//nolint:gosec,G204
-			exec.Command("kpartx",
-				"-d",
-				filepath.Join("/dev", "loop99"),
-			),
-			//nolint:gosec,G204
-			exec.Command("losetup",
-				"--detach",
-				filepath.Join("/dev", "loop99"),
-			),
-		}
-
-		for _, teardownCmd := range teardownCmds {
-			defer func(teardownCmd *exec.Cmd) {
+		t.Cleanup(func() {
+			for _, teardownCmd := range umountImageCmds {
 				if tmpErr := teardownCmd.Run(); tmpErr != nil {
 					if err != nil {
 						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
@@ -2328,16 +2283,67 @@ func TestSuccessfulClassicRun(t *testing.T) {
 						err = tmpErr
 					}
 				}
+			}
+		})
 
-			}(teardownCmd)
+		imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, "pc-amd64.img")
+
+		// set up the loopback
+		mountImageCmds = append(mountImageCmds,
+			//nolint:gosec,G204
+			exec.Command("losetup",
+				filepath.Join("/dev", "loop99"),
+				imgPath,
+			),
+		)
+
+		// unset the loopback
+		umountImageCmds = append(umountImageCmds,
+			//nolint:gosec,G204
+			exec.Command("losetup", "--detach", filepath.Join("/dev", "loop99")),
+		)
+
+		mountImageCmds = append(mountImageCmds,
+			//nolint:gosec,G204
+			exec.Command("kpartx", "-a", filepath.Join("/dev", "loop99")),
+		)
+
+		umountImageCmds = append([]*exec.Cmd{
+			//nolint:gosec,G204
+			exec.Command("kpartx", "-d", filepath.Join("/dev", "loop99")),
+		}, umountImageCmds...,
+		)
+
+		mountImageCmds = append(mountImageCmds,
+			//nolint:gosec,G204
+			exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3"), mountDir), // with this example the rootfs is partition 3 mountDir
+		)
+
+		umountImageCmds = append([]*exec.Cmd{
+			//nolint:gosec,G204
+			exec.Command("mount", "--make-rprivate", filepath.Join("/dev", "mapper", "loop99p3")),
+			//nolint:gosec,G204
+			exec.Command("umount", "--recursive", filepath.Join("/dev", "mapper", "loop99p3")),
+		}, umountImageCmds...,
+		)
+
+		// set up the mountpoints
+		mountPoints := []string{"/dev", "/proc", "/sys"}
+		for _, mountPoint := range mountPoints {
+			mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
+			mountImageCmds = append(mountImageCmds, mountCmds...)
+			umountImageCmds = append(umountCmds, umountImageCmds...)
 		}
-		umountImageCmds = append(umountImageCmds, teardownCmds...)
+		// make sure to unmount the disk too
+		umountImageCmds = append([]*exec.Cmd{exec.Command("umount", "--recursive", mountDir)}, umountImageCmds...)
 
 		// now run all the commands to mount the image
 		for _, cmd := range mountImageCmds {
+			outPut := helper.SetCommandOutput(cmd, true)
 			err := cmd.Run()
 			if err != nil {
-				t.Errorf("Error running command %s", cmd.String())
+				t.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+					cmd.String(), err.Error(), outPut.String())
 			}
 		}
 
@@ -2357,18 +2363,64 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			t.Errorf("Expected LANG=C.UTF-8 in %s, but got %s", localeFile, string(localeBytes))
 		}
 
-		// now run all the commands to unmount the image and clean up
-		for _, cmd := range umountImageCmds {
-			err := cmd.Run()
-			if err != nil {
-				t.Errorf("Error running command %s", cmd.String())
-			}
-		}
+	})
+}
 
-		err = stateMachine.Teardown()
+func TestSuccessfulRootfsGeneration(t *testing.T) {
+	t.Run("test_successful_classic_rootfs_generation", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		restoreCWD := helper.SaveCWD()
+		t.Cleanup(restoreCWD)
+
+		// We need the output directory set for this
+		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+		asserter.AssertErrNil(err, true)
+		t.Cleanup(func() { os.RemoveAll(outputDir) })
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.commonFlags.Debug = true
+		stateMachine.commonFlags.Size = "5G"
+		stateMachine.commonFlags.OutputDir = outputDir
+		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+			"test_rootfs_tarball.yaml")
+
+		err = stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+		err = stateMachine.Run()
+		asserter.AssertErrNil(err, true)
+
+		t.Cleanup(func() {
+			err = stateMachine.Teardown()
+			asserter.AssertErrNil(err, true)
+		})
+
+		// make sure all the artifacts were created and are the correct file types
+		artifacts := map[string]string{
+			"rootfs.tar": "tar archive",
+		}
+		for artifact, fileType := range artifacts {
+			fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
+			_, err := os.Stat(fullPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					t.Errorf("File \"%s\" should exist, but does not", fullPath)
+				}
+			}
+
+			// check it is the expected file type
+			fileCommand := *exec.Command("file", fullPath)
+			cmdOutput, err := fileCommand.CombinedOutput()
+			asserter.AssertErrNil(err, true)
+			if !strings.Contains(string(cmdOutput), fileType) {
+				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
+					fullPath, fileType, string(cmdOutput))
+			}
+		}
 	})
 }
 
@@ -3657,6 +3709,8 @@ func TestPreseedResetChroot(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
 		// create chroot to preseed
 		err = stateMachine.createChroot()
 		asserter.AssertErrNil(err, true)
@@ -3785,6 +3839,8 @@ func TestUnsupportedBootloader(t *testing.T) {
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
+
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 		// place a test gadget tree in the scratch directory so we don't
 		// have to build one

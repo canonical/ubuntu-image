@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/snapcore/snapd/gadget"
@@ -441,7 +442,12 @@ func (stateMachine *StateMachine) Run() error {
 		if !stateMachine.commonFlags.Quiet {
 			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
 		}
-		if err := stateFunc.function(stateMachine); err != nil {
+		start := time.Now()
+		err := stateFunc.function(stateMachine)
+		if stateMachine.commonFlags.Debug {
+			fmt.Printf("duration: %v\n", time.Since(start))
+		}
+		if err != nil {
 			// clean up work dir on error
 			cleanupErr := stateMachine.cleanup()
 			if cleanupErr != nil {

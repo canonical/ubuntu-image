@@ -608,6 +608,7 @@ func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir strin
 	cloneOptions := &git.CloneOptions{
 		URL:          imageDefinition.Gadget.GadgetURL,
 		SingleBranch: true,
+		Depth:        1,
 	}
 	if imageDefinition.Gadget.GadgetBranch != "" {
 		cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(imageDefinition.Gadget.GadgetBranch)
