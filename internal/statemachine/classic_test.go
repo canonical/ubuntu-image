@@ -1917,6 +1917,12 @@ func TestStateMachine_PopulateClassicRootfsContents(t *testing.T) {
 		err = stateMachine.populateClassicRootfsContents()
 		asserter.AssertErrNil(err, true)
 
+		// return when no Customization
+		stateMachine.ImageDef.Customization = nil
+
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
+
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
