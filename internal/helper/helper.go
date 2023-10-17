@@ -27,13 +27,6 @@ func BoolPtr(b bool) *bool {
 	return &b
 }
 
-func PtrBool(b *bool) bool {
-	if b != nil {
-		return *b
-	}
-	return false
-}
-
 // CaptureStd returns an io.Reader to read what was printed, and teardown
 func CaptureStd(toCap **os.File) (io.Reader, func(), error) {
 	stdCap, stdCapW, err := os.Pipe()

@@ -631,9 +631,14 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
 
 	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
-		if helper.PtrBool(ppa.KeepEnabled) {
+		if ppa.KeepEnabled == nil {
+			return imagedefinition.ErrKeepEnabledNil
+		}
+
+		if *ppa.KeepEnabled {
 			continue
 		}
+
 		ppaFileName, _ := createPPAInfo(ppa, classicStateMachine.ImageDef.Series)
 
 		ppaFile := filepath.Join(sourcesListD, ppaFileName)

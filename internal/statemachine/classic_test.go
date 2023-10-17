@@ -3465,6 +3465,22 @@ func TestStatemachine_cleanExtraPPAs(t *testing.T) {
 				return func() { osRemove = os.Remove }
 			},
 		},
+		{
+			name: "fail to handle invalid image definition",
+			ppas: []*imagedefinition.PPA{
+				{
+					PPAName:     "canonical-foundations/ubuntu-image",
+					KeepEnabled: nil,
+				},
+			},
+			remainingPPAs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.list", series),
+			},
+			remainingGPGs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.gpg", series),
+			},
+			expectedErr: imagedefinition.ErrKeepEnabledNil.Error(),
+		},
 	}
 
 	for _, tc := range testCases {
