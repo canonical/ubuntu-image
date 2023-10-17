@@ -293,6 +293,7 @@ is as follows:
 #. customize_fstab
 #. manual_customization
 #. preseed_image
+#. clean_rootfs
 #. populate_rootfs_contents
 #. generate_disk_info
 #. calculate_rootfs_size
