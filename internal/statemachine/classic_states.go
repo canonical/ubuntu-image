@@ -28,8 +28,8 @@ import (
 )
 
 var (
-	seedVersionRegex = regexp.MustCompile(`^[a-z0-9].*`)
-	fstabRegex       = regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
+	seedVersionRegex   = regexp.MustCompile(`^[a-z0-9].*`)
+	fstabRegex         = regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
 	localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
 )
 
