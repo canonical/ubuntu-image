@@ -611,7 +611,7 @@ func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir strin
 // environment that will eventually become the rootfs of the resulting image
 func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, targetDir string, includeList []string) *exec.Cmd {
 	debootstrapCmd := execCommand("eatmydata",
-	"debootstrap",
+		"debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
 	)
