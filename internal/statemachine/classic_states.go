@@ -1406,3 +1406,50 @@ func (stateMachine *StateMachine) updateBootloader() error {
 	}
 	return nil
 }
+
+// cleanRootfs cleans the created chroot from secrets/values generated
+// during the various preceding install steps
+func (stateMachine *StateMachine) cleanRootfs() error {
+	toClean := []string{
+		// machine-id
+		filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
+		filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
+	}
+
+	// openssh default keys
+	sshPubKeys, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_*_key.pub"))
+	if err != nil {
+		return fmt.Errorf("unable to list ssh pub keys: %s", err.Error())
+	}
+
+	toClean = append(toClean, sshPubKeys...)
+
+	sshPrivKeys, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_*_key"))
+	if err != nil {
+		return fmt.Errorf("unable to list ssh pub keys: %s", err.Error())
+	}
+
+	toClean = append(toClean, sshPrivKeys...)
+
+	for _, f := range toClean {
+		err = osRemove(f)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("Error removing %s: %s", f, err.Error())
+		}
+	}
+
+	// udev persistent rules
+	udevRules, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "etc", "udev", "rules.d", "*persistent-net.rules"))
+	if err != nil {
+		return fmt.Errorf("unable to list udev persistent rules: %s", err.Error())
+	}
+
+	for _, f := range udevRules {
+		err = osTruncate(f, 0)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("Error truncating %s: %s", f, err.Error())
+		}
+	}
+
+	return nil
+}
