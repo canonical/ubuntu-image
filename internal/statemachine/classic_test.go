@@ -4249,8 +4249,8 @@ func NewOSMock(conf *osMockConf) *osMock {
 }
 
 func TestClassicStateMachine_cleanRootfs(t *testing.T) {
-	dummyContent := "test"
-	dummySize := int64(len(dummyContent))
+	sampleContent := "test"
+	sampleSize := int64(len(sampleContent))
 
 	testCases := []struct {
 		name                 string
@@ -4289,9 +4289,9 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
 			},
 			wantRootfsContent: map[string]int64{
-				filepath.Join("etc", "machine-id"):                                   dummySize,
-				filepath.Join("var", "lib", "dbus", "machine-id"):                    dummySize,
-				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): dummySize,
+				filepath.Join("etc", "machine-id"):                                   sampleSize,
+				filepath.Join("var", "lib", "dbus", "machine-id"):                    sampleSize,
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
 			},
 		},
 		{
@@ -4311,7 +4311,7 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
 			},
 			wantRootfsContent: map[string]int64{
-				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): dummySize,
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
 			},
 		},
 	}
@@ -4339,7 +4339,7 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				err = os.MkdirAll(filepath.Dir(fullPath), 0777)
 				asserter.AssertErrNil(err, true)
 
-				err := os.WriteFile(fullPath, []byte(dummyContent), 0600)
+				err := os.WriteFile(fullPath, []byte(sampleContent), 0600)
 				asserter.AssertErrNil(err, true)
 			}
 
