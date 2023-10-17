@@ -1431,6 +1431,20 @@ func (stateMachine *StateMachine) cleanRootfs() error {
 
 	toClean = append(toClean, sshPrivKeys...)
 
+	oldDebconf, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "var", "cache", "debconf", "*-old"))
+	if err != nil {
+		return fmt.Errorf("unable to list old debconf conf: %s", err.Error())
+	}
+
+	toClean = append(toClean, oldDebconf...)
+
+	oldDpkg, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dpkg", "*-old"))
+	if err != nil {
+		return fmt.Errorf("unable to list old dpkg conf: %s", err.Error())
+	}
+
+	toClean = append(toClean, oldDpkg...)
+
 	for _, f := range toClean {
 		err = osRemove(f)
 		if err != nil && !os.IsNotExist(err) {

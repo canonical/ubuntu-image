@@ -4134,8 +4134,8 @@ func TestStateMachine_defaultLocaleFailures(t *testing.T) {
 	})
 }
 
-func TestStateMachine_cleanRootfs(t *testing.T) {
-	t.Run("test_clean_rootfs", func(t *testing.T) {
+func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
+	t.Run("test_clean_rootfs_real_rootfs", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		restoreCWD := helper.SaveCWD()
 		t.Cleanup(restoreCWD)
@@ -4175,6 +4175,9 @@ func TestStateMachine_cleanRootfs(t *testing.T) {
 
 		// install the packages that snap-preseed needs
 		err = stateMachine.installPackages()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.cleanRootfs()
 		asserter.AssertErrNil(err, true)
 
 		// Check cleaned files were removed
@@ -4266,6 +4269,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("var", "lib", "dbus", "machine-id"),
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
 				filepath.Join("etc", "udev", "rules.d", "test2-persistent-net.rules"),
+				filepath.Join("var", "cache", "debconf", "test-old"),
+				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"):  0,
@@ -4287,11 +4292,15 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "machine-id"),
 				filepath.Join("var", "lib", "dbus", "machine-id"),
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
+				filepath.Join("var", "cache", "debconf", "test-old"),
+				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                   sampleSize,
 				filepath.Join("var", "lib", "dbus", "machine-id"):                    sampleSize,
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
+				filepath.Join("var", "cache", "debconf", "test-old"):                 sampleSize,
+				filepath.Join("var", "lib", "dpkg", "testdpkg-old"):                  sampleSize,
 			},
 		},
 		{
