@@ -2016,6 +2016,106 @@ func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 	})
 }
 
+// TestSateMachine_fixFstab tests functionality of the fixFstab function
+func TestSateMachine_fixFstab(t *testing.T) {
+	testCases := []struct {
+		name          string
+		existingFstab string
+		expectedFstab string
+	}{
+		{
+			name:          "add entry to an existing but empty fstab",
+			existingFstab: "# UNCONFIGURED FSTAB",
+			expectedFstab: `LABEL=writable	/	ext4	discard,errors=remount-ro	0	1
+`,
+		},
+		{
+			name: "fix existing entry amongst several others",
+			existingFstab: `# /etc/fstab: static file system information.
+UUID=1565-1398	/	ext4	defaults	0	0
+#Here is another comment that should be left in place
+/dev/mapper/vgubuntu-swap_1	none	swap	sw	0	0
+`,
+			expectedFstab: `# /etc/fstab: static file system information.
+LABEL=writable	/	ext4	discard,errors=remount-ro	0	1
+#Here is another comment that should be left in place
+/dev/mapper/vgubuntu-swap_1	none	swap	sw	0	0
+`,
+		},
+		{
+			name: "fix existing entry amongst several others (with spaces)",
+			existingFstab: `# /etc/fstab: static file system information.
+UUID=1565-1398	/	ext4	defaults	0	0
+/dev/mapper/vgubuntu-swap_1	none  swap sw      0   0
+`,
+			expectedFstab: `# /etc/fstab: static file system information.
+LABEL=writable	/	ext4	discard,errors=remount-ro	0	1
+/dev/mapper/vgubuntu-swap_1	none	swap	sw	0	0
+`,
+		},
+		{
+			name: "fix only one root mount point",
+			existingFstab: `# /etc/fstab: static file system information.
+UUID=1565-1398	/	ext4	defaults	0	0
+UUID=1234-5678	/	ext4	defaults	0	0
+`,
+			expectedFstab: `# /etc/fstab: static file system information.
+LABEL=writable	/	ext4	discard,errors=remount-ro	0	1
+UUID=1234-5678	/	ext4	defaults	0	0
+`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture:  getHostArch(),
+				Series:        getHostSuite(),
+				Rootfs:        &imagedefinition.Rootfs{},
+				Customization: &imagedefinition.Customization{},
+			}
+
+			// set the defaults for the imageDef
+			err := helper.SetDefaults(&stateMachine.ImageDef)
+			asserter.AssertErrNil(err, true)
+
+			// need workdir set up for this
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			// create the <chroot>/etc directory
+			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.rootfs, "etc"), 0644)
+			asserter.AssertErrNil(err, true)
+
+			fstabPath := filepath.Join(stateMachine.tempDirs.rootfs, "etc", "fstab")
+
+			// simulate an already existing fstab file
+			if len(tc.existingFstab) != 0 {
+				err = osWriteFile(fstabPath, []byte(tc.existingFstab), 0644)
+				asserter.AssertErrNil(err, true)
+			}
+
+			err = stateMachine.fixFstab()
+			asserter.AssertErrNil(err, true)
+
+			fstabBytes, err := os.ReadFile(fstabPath)
+			asserter.AssertErrNil(err, true)
+
+			if string(fstabBytes) != tc.expectedFstab {
+				t.Errorf("Expected fstab content \"%s\", but got \"%s\"",
+					tc.expectedFstab, string(fstabBytes))
+			}
+		})
+	}
+}
+
 // TestGeneratePackageManifest tests if classic image manifest generation works
 func TestGeneratePackageManifest(t *testing.T) {
 	t.Run("test_generate_package_manifest", func(t *testing.T) {

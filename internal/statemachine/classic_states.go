@@ -29,7 +29,6 @@ import (
 
 var (
 	seedVersionRegex   = regexp.MustCompile(`^[a-z0-9].*`)
-	fstabRegex         = regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
 	localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
 )
 
@@ -1320,6 +1319,13 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 		return nil
 	}
 
+	return classicStateMachine.fixFstab()
+}
+
+// fixFstab makes sure the fstab contains a valid entry for the root mount point
+func (stateMachine *StateMachine) fixFstab() error {
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
 	if len(classicStateMachine.ImageDef.Customization.Fstab) != 0 {
 		return nil
 	}
@@ -1330,14 +1336,45 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 		return fmt.Errorf("Error reading fstab: %s", err.Error())
 	}
 
-	if strings.Contains(string(fstabBytes), "LABEL=writable") {
-		return nil
+	rootMountFound := false
+	newLines := make([]string, 0)
+	rootFSLabel := "writable"
+	rootFSOptions := "discard,errors=remount-ro"
+	fsckOrder := "1"
+
+	lines := strings.Split(string(fstabBytes), "\n")
+	for _, l := range lines {
+		if l == "# UNCONFIGURED FSTAB" {
+			// omit this line if still present
+			continue
+		}
+
+		if strings.HasPrefix(l, "#") {
+			newLines = append(newLines, l)
+			continue
+		}
+
+		entry := strings.Fields(l)
+		if len(entry) < 6 {
+			// ignore invalid fstab entry
+			continue
+		}
+
+		if entry[1] == "/" && !rootMountFound {
+			entry[0] = "LABEL=" + rootFSLabel
+			entry[3] = rootFSOptions
+			entry[5] = fsckOrder
+
+			rootMountFound = true
+		}
+		newLines = append(newLines, strings.Join(entry, "\t"))
 	}
-	newContents := fstabRegex.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
-	if !strings.Contains(string(newContents), "LABEL=writable") {
-		newContents = []byte("LABEL=writable   /    ext4   defaults    0 0\n")
+
+	if !rootMountFound {
+		newLines = append(newLines, fmt.Sprintf("LABEL=%s	/	ext4	%s	0	%s", rootFSLabel, rootFSOptions, fsckOrder))
 	}
-	err = osWriteFile(fstabPath, newContents, 0644)
+
+	err = osWriteFile(fstabPath, []byte(strings.Join(newLines, "\n")+"\n"), 0644)
 	if err != nil {
 		return fmt.Errorf("Error writing to fstab: %s", err.Error())
 	}
