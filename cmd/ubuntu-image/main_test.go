@@ -186,7 +186,6 @@ func TestExitCode(t *testing.T) {
 			os.Args = append([]string{tc.name}, tc.flags...)
 
 			// os.Exit will be captured. Run the command with no flags to trigger an error
-			// imageType = ""
 			main()
 			if got != tc.expected {
 				t.Errorf("Expected exit code: %d, got: %d", tc.expected, got)
