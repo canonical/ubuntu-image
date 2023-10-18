@@ -68,6 +68,20 @@ func executeStateMachine(sm statemachine.SmInterface) error {
 	return nil
 }
 
+// unhidePackOpts make pack options visible in help if the pack command is used
+// This should be removed when the pack command is made visible to everyone
+func unhidePackOpts(parser *flags.Parser) {
+	// parse once to determine the active command
+	// we do not care about error here since we will reparse again
+	_, _ = parser.Parse()
+
+	if parser.Active != nil {
+		if parser.Active.Name == "pack" {
+			parser.Active.Hidden = false
+		}
+	}
+}
+
 func main() {
 	commonOpts := new(commands.CommonOpts)
 	stateMachineOpts := new(commands.StateMachineOpts)
@@ -81,7 +95,7 @@ func main() {
 		osExit(1)
 		return
 	}
-	_, err = parser.AddGroup("Common Options", "Options common to both commands", commonOpts)
+	_, err = parser.AddGroup("Common Options", "Options common to every command", commonOpts)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
@@ -105,6 +119,8 @@ func main() {
 		return
 	}
 	defer restoreStderr()
+
+	unhidePackOpts(parser)
 
 	// Parse the options provided and handle specific errors
 	if _, err := parser.Parse(); err != nil {
