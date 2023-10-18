@@ -82,16 +82,6 @@ func (stateMachine *StateMachine) prepareImage() error {
 	return nil
 }
 
-// for snap/core image builds, the image name is always <volume-name>.img for
-// each volume in the gadget. This function stores that info in the struct
-func (stateMachine *StateMachine) setArtifactNames() error {
-	stateMachine.VolumeNames = make(map[string]string)
-	for volumeName := range stateMachine.GadgetInfo.Volumes {
-		stateMachine.VolumeNames[volumeName] = volumeName + ".img"
-	}
-	return nil
-}
-
 // populateSnapRootfsContents uses a NewMountedFileSystemWriter to populate the rootfs
 func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 	var src, dst string

@@ -68,6 +68,16 @@ func (stateMachine *StateMachine) determineOutputDirectory() error {
 	return nil
 }
 
+// for snap/core image builds, the image name is always <volume-name>.img for
+// each volume in the gadget. This function stores that info in the struct
+func (stateMachine *StateMachine) setArtifactNames() error {
+	stateMachine.VolumeNames = make(map[string]string)
+	for volumeName := range stateMachine.GadgetInfo.Volumes {
+		stateMachine.VolumeNames[volumeName] = volumeName + ".img"
+	}
+	return nil
+}
+
 // Load gadget.yaml, do some validation, and store the relevant info in the StateMachine struct
 func (stateMachine *StateMachine) loadGadgetYaml() error {
 	gadgetYamlDst := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "gadget.yaml")
