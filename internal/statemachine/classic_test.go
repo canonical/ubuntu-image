@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -320,18 +321,19 @@ func TestPrintStates(t *testing.T) {
 [6] install_packages
 [7] prepare_image
 [8] preseed_image
-[9] customize_fstab
-[10] perform_manual_customization
-[11] set_default_locale
-[12] populate_rootfs_contents
-[13] generate_disk_info
-[14] calculate_rootfs_size
-[15] populate_bootfs_contents
-[16] populate_prepare_partitions
-[17] make_disk
-[18] update_bootloader
-[19] generate_manifest
-[20] finish
+[9] clean_rootfs
+[10] customize_fstab
+[11] perform_manual_customization
+[12] set_default_locale
+[13] populate_rootfs_contents
+[14] generate_disk_info
+[15] calculate_rootfs_size
+[16] populate_bootfs_contents
+[17] populate_prepare_partitions
+[18] make_disk
+[19] update_bootloader
+[20] generate_manifest
+[21] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -2392,6 +2394,22 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			}
 		}
 
+		// Check cleaned files were removed
+		cleaned := []string{
+			filepath.Join(mountDir, "etc", "machine-id"),
+			filepath.Join(mountDir, "var", "lib", "dbus", "machine-id"),
+			filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key"),
+			filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key.pub"),
+			filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key"),
+			filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
+		}
+		for _, file := range cleaned {
+			_, err := os.Stat(file)
+			if !os.IsNotExist(err) {
+				t.Errorf("File %s should not exist, but does", file)
+			}
+		}
+
 		// check if the locale is set to a sane default
 		localeFile := filepath.Join(mountDir, "etc", "default", "locale")
 		localeBytes, err := os.ReadFile(localeFile)
@@ -4364,4 +4382,242 @@ func TestStateMachine_defaultLocaleFailures(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}
+
+func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
+	t.Run("test_clean_rootfs_real_rootfs", func(t *testing.T) {
+		asserter := helper.Asserter{T: t}
+		restoreCWD := helper.SaveCWD()
+		t.Cleanup(restoreCWD)
+
+		var stateMachine ClassicStateMachine
+		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+		stateMachine.parent = &stateMachine
+		stateMachine.Snaps = []string{"lxd"}
+		stateMachine.commonFlags.Channel = "stable"
+		stateMachine.commonFlags.Debug = true
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
+			Architecture: getHostArch(),
+			Series:       getHostSuite(),
+			Rootfs: &imagedefinition.Rootfs{
+				Archive: "ubuntu",
+			},
+			Customization: &imagedefinition.Customization{
+				ExtraPackages: []*imagedefinition.Package{
+					{
+						PackageName: "squashfs-tools",
+					},
+					{
+						PackageName: "snapd",
+					},
+				},
+			},
+		}
+
+		err := stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrNil(err, true)
+
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+		// also create chroot
+		err = stateMachine.createChroot()
+		asserter.AssertErrNil(err, true)
+
+		// install the packages that snap-preseed needs
+		err = stateMachine.installPackages()
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.cleanRootfs()
+		asserter.AssertErrNil(err, true)
+
+		// Check cleaned files were removed
+		cleaned := []string{
+			filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
+			filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
+			filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key"),
+			filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key.pub"),
+			filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key"),
+			filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
+		}
+		for _, file := range cleaned {
+			_, err := os.Stat(file)
+			if !os.IsNotExist(err) {
+				t.Errorf("File %s should not exist, but does", file)
+			}
+		}
+	})
+}
+
+type osMockConf struct {
+	osutilCopySpecialFileThreshold uint
+	ReadDirThreshold               uint
+	RemoveThreshold                uint
+	TruncateThreshold              uint
+}
+
+type osMock struct {
+	conf                            *osMockConf
+	beforeOsutilCopySpecialFileFail uint
+	beforeReadDirFail               uint
+	beforeRemoveFail                uint
+	beforeTruncateFail              uint
+}
+
+func (o *osMock) CopySpecialFile(path, dest string) error {
+	if o.beforeOsutilCopySpecialFileFail >= o.conf.osutilCopySpecialFileThreshold {
+		return fmt.Errorf("CopySpecialFile fail")
+	}
+	o.beforeOsutilCopySpecialFileFail++
+	return nil
+}
+
+func (o *osMock) ReadDir(name string) ([]fs.DirEntry, error) {
+	if o.beforeReadDirFail >= o.conf.ReadDirThreshold {
+		return nil, fmt.Errorf("ReadDir fail")
+	}
+	o.beforeReadDirFail++
+	return []fs.DirEntry{}, nil
+}
+
+func (o *osMock) Remove(name string) error {
+	if o.beforeRemoveFail >= o.conf.RemoveThreshold {
+		return fmt.Errorf("Remove fail")
+	}
+	o.beforeRemoveFail++
+
+	return nil
+}
+
+func (o *osMock) Truncate(name string, size int64) error {
+	if o.beforeTruncateFail >= o.conf.TruncateThreshold {
+		return fmt.Errorf("Truncate fail")
+	}
+	o.beforeTruncateFail++
+
+	return nil
+}
+
+func NewOSMock(conf *osMockConf) *osMock {
+	return &osMock{conf: conf}
+}
+
+func TestClassicStateMachine_cleanRootfs(t *testing.T) {
+	sampleContent := "test"
+	sampleSize := int64(len(sampleContent))
+
+	testCases := []struct {
+		name                 string
+		mockFuncs            func() func()
+		expectedErr          string
+		initialRootfsContent []string
+		wantRootfsContent    map[string]int64 // name: size
+	}{
+		{
+			name: "success",
+			initialRootfsContent: []string{
+				filepath.Join("etc", "machine-id"),
+				filepath.Join("var", "lib", "dbus", "machine-id"),
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
+				filepath.Join("etc", "udev", "rules.d", "test2-persistent-net.rules"),
+				filepath.Join("var", "cache", "debconf", "test-old"),
+				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
+			},
+			wantRootfsContent: map[string]int64{
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"):  0,
+				filepath.Join("etc", "udev", "rules.d", "test2-persistent-net.rules"): 0,
+			},
+		},
+		{
+			name: "fail to clean files",
+			mockFuncs: func() func() {
+				mock := NewOSMock(
+					&osMockConf{},
+				)
+
+				osRemove = mock.Remove
+				return func() { osRemove = os.Remove }
+			},
+			expectedErr: "Error removing",
+			initialRootfsContent: []string{
+				filepath.Join("etc", "machine-id"),
+				filepath.Join("var", "lib", "dbus", "machine-id"),
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
+				filepath.Join("var", "cache", "debconf", "test-old"),
+				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
+			},
+			wantRootfsContent: map[string]int64{
+				filepath.Join("etc", "machine-id"):                                   sampleSize,
+				filepath.Join("var", "lib", "dbus", "machine-id"):                    sampleSize,
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
+				filepath.Join("var", "cache", "debconf", "test-old"):                 sampleSize,
+				filepath.Join("var", "lib", "dpkg", "testdpkg-old"):                  sampleSize,
+			},
+		},
+		{
+			name: "fail to truncate files",
+			mockFuncs: func() func() {
+				mock := NewOSMock(
+					&osMockConf{},
+				)
+
+				osTruncate = mock.Truncate
+				return func() { osTruncate = os.Truncate }
+			},
+			expectedErr: "Error truncating",
+			initialRootfsContent: []string{
+				filepath.Join("etc", "machine-id"),
+				filepath.Join("var", "lib", "dbus", "machine-id"),
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
+			},
+			wantRootfsContent: map[string]int64{
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			stateMachine := &ClassicStateMachine{}
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = stateMachine
+
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+			if tc.mockFuncs != nil {
+				restoreMock := tc.mockFuncs()
+				t.Cleanup(restoreMock)
+			}
+
+			for _, path := range tc.initialRootfsContent {
+				// create dir if necessary
+				fullPath := filepath.Join(stateMachine.tempDirs.chroot, path)
+				err = os.MkdirAll(filepath.Dir(fullPath), 0777)
+				asserter.AssertErrNil(err, true)
+
+				err := os.WriteFile(fullPath, []byte(sampleContent), 0600)
+				asserter.AssertErrNil(err, true)
+			}
+
+			err = stateMachine.cleanRootfs()
+			if err != nil || len(tc.expectedErr) != 0 {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+
+			for path, size := range tc.wantRootfsContent {
+				fullPath := filepath.Join(stateMachine.tempDirs.chroot, path)
+				s, err := os.Stat(fullPath)
+				if os.IsNotExist(err) {
+					t.Errorf("File %s should exist, but does not", path)
+				}
+
+				if s.Size() != size {
+					t.Errorf("File size of %s is not matching: want %d, got %d", path, size, s.Size())
+				}
+			}
+		})
+	}
 }
