@@ -1018,9 +1018,13 @@ func (stateMachine *StateMachine) customizeFstab() error {
 
 	fstabPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab")
 
+	if classicStateMachine.ImageDef.Customization.FstabTruncate == nil {
+		return imagedefinition.ErrFstabTruncateNil
+	}
+
 	// open /etc/fstab for writing
 	flags := os.O_CREATE | os.O_RDWR
-	if classicStateMachine.ImageDef.Customization.FstabTruncate {
+	if *classicStateMachine.ImageDef.Customization.FstabTruncate {
 		flags = flags | os.O_TRUNC
 	} else {
 		flags = flags | os.O_APPEND
@@ -1059,7 +1063,7 @@ func (stateMachine *StateMachine) customizeFstab() error {
 		fstabEntries = append(fstabEntries, fstabEntry)
 	}
 
-	if !classicStateMachine.ImageDef.Customization.FstabTruncate && !emptyFstab {
+	if !*classicStateMachine.ImageDef.Customization.FstabTruncate && !emptyFstab {
 		_, err = fstabIO.Write([]byte("\n"))
 		if err != nil {
 			return err

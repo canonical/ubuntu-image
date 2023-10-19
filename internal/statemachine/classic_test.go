@@ -3792,7 +3792,7 @@ LABEL=writable	/	ext4	defaults	1	1
 			fstabTruncate: true,
 			expectedFstab: `LABEL=writable	/	ext4	defaults	1	1
 `,
-			existingFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1`,
+			existingFstab: `LABEL=xxx /test ext4 discard,errors=remount-ro 0 1`,
 		},
 		{
 			name: "two_entries",
@@ -3848,7 +3848,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 				Rootfs:       &imagedefinition.Rootfs{},
 				Customization: &imagedefinition.Customization{
 					Fstab:         tc.fstab,
-					FstabTruncate: tc.fstabTruncate,
+					FstabTruncate: helper.BoolPtr(tc.fstabTruncate),
 				},
 			}
 
@@ -3887,12 +3887,12 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 	}
 }
 
-// TestFailedCustomizeFstab tests failures in the customizeFstab function
-func TestFailedCustomizeFstab(t *testing.T) {
+// TestStateMachine_customizeFstab_fail tests failures in the customizeFstab function
+func TestStateMachine_customizeFstab_fail(t *testing.T) {
 	t.Run("test_failed_customize_fstab", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+		restoreCWD := helper.SaveCWD()
+		defer restoreCWD()
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -3912,10 +3912,10 @@ func TestFailedCustomizeFstab(t *testing.T) {
 						FsckOrder:    1,
 					},
 				},
+				FstabTruncate: helper.BoolPtr(true),
 			},
 		}
 
-		// mock os.OpenFile
 		osOpenFile = mockOpenFile
 		defer func() {
 			osOpenFile = os.OpenFile
@@ -3923,6 +3923,10 @@ func TestFailedCustomizeFstab(t *testing.T) {
 		err := stateMachine.customizeFstab()
 		asserter.AssertErrContains(err, "Error opening fstab")
 		osOpenFile = os.OpenFile
+
+		stateMachine.ImageDef.Customization.FstabTruncate = nil
+		err = stateMachine.customizeFstab()
+		asserter.AssertErrContains(err, imagedefinition.ErrFstabTruncateNil.Error())
 	})
 }
 
