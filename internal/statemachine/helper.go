@@ -953,6 +953,29 @@ func runAll(cmds []*exec.Cmd) error {
 	return nil
 }
 
+// associateLoopDevice associates a file to a loop device and returns the loop device number
+func (stateMachine *StateMachine) associateLoopDevice(path string) (string, error) {
+	// run the losetup command and read the output to determine which loopback was used
+	losetupCmd := execCommand("losetup",
+		"--find",
+		"--show",
+		"--partscan",
+		"--sector-size",
+		stateMachine.commonFlags.SectorSize,
+		path,
+	)
+	var losetupOutput []byte
+	losetupOutput, err := losetupCmd.Output()
+	if err != nil {
+		err = fmt.Errorf("Error running losetup command \"%s\". Error is %s",
+			losetupCmd.String(),
+			err.Error(),
+		)
+		return "", err
+	}
+	return strings.TrimSpace(string(losetupOutput)), nil
+}
+
 // updateGrub mounts the resulting image and runs update-grub
 func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) (err error) {
 	// create a directory in which to mount the rootfs
@@ -968,25 +991,10 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 
 	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
 
-	// run the losetup command and read the output to determine which loopback was used
-	losetupCmd := execCommand("losetup",
-		"--find",
-		"--show",
-		"--partscan",
-		"--sector-size",
-		stateMachine.commonFlags.SectorSize,
-		imgPath,
-	)
-	var losetupOutput []byte
-	losetupOutput, err = losetupCmd.Output()
+	loopUsed, err := stateMachine.associateLoopDevice(imgPath)
 	if err != nil {
-		err = fmt.Errorf("Error running losetup command \"%s\". Error is %s",
-			losetupCmd.String(),
-			err.Error(),
-		)
 		return err
 	}
-	loopUsed := strings.TrimSpace(string(losetupOutput))
 
 	var umounts []*exec.Cmd
 	updateGrubCmds = append(updateGrubCmds,
