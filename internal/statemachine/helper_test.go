@@ -368,18 +368,6 @@ func TestFailedCleanup(t *testing.T) {
 	})
 }
 
-// TestFailedCalculateImageSize tests a scenario when calculateImageSize() is called
-// with a nil pointer to stateMachine.GadgetInfo
-func TestFailedCalculateImageSize(t *testing.T) {
-	t.Run("test_failed_calculate_image_size", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		_, err := stateMachine.calculateImageSize()
-		asserter.AssertErrContains(err, "Cannot calculate image size before initializing GadgetInfo")
-	})
-}
-
 // TestFailedWriteOffsetValues tests various error scenarios for writeOffsetValues
 func TestFailedWriteOffsetValues(t *testing.T) {
 	t.Run("test_failed_write_offset_values", func(t *testing.T) {
@@ -497,27 +485,6 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 			}
 		}
 	})
-}
-
-// TestGetStructureOffset ensures structure offset safely dereferences structure.Offset
-func TestGetStructureOffset(t *testing.T) {
-	var testOffset quantity.Offset = 1
-	testCases := []struct {
-		name      string
-		structure gadget.VolumeStructure
-		expected  quantity.Offset
-	}{
-		{"nil", gadget.VolumeStructure{Offset: nil}, 0},
-		{"with_value", gadget.VolumeStructure{Offset: &testOffset}, 1},
-	}
-	for _, tc := range testCases {
-		t.Run("test_get_structure_offset_"+tc.name, func(t *testing.T) {
-			offset := getStructureOffset(tc.structure)
-			if offset != tc.expected {
-				t.Errorf("Error, expected offset %d but got %d", tc.expected, offset)
-			}
-		})
-	}
 }
 
 // TestGenerateUniqueDiskID ensures that we generate unique disk IDs
@@ -1228,6 +1195,7 @@ func TestCheckCustomizationSteps(t *testing.T) {
 			},
 			[]string{
 				"add_extra_ppas",
+				"clean_extra_ppas",
 			},
 		},
 		{

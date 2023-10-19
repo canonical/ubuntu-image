@@ -77,6 +77,7 @@ type SmInterface interface {
 	Setup() error
 	Run() error
 	Teardown() error
+	SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts)
 }
 
 // stateFunc allows us easy access to the function names, which will help with --resume and debug statements
@@ -231,10 +232,9 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var farthestOffset quantity.Offset
 	var lastOffset quantity.Offset
 	farthestOffsetUnknown := false
-	var lastVolumeName string
+	var volume *gadget.Volume
 	for _, volumeName := range stateMachine.VolumeOrder {
-		volume := stateMachine.GadgetInfo.Volumes[volumeName]
-		lastVolumeName = volumeName
+		volume = stateMachine.GadgetInfo.Volumes[volumeName]
 		volumeBaseDir := filepath.Join(stateMachine.tempDirs.volumes, volumeName)
 		if err := osMkdirAll(volumeBaseDir, 0755); err != nil {
 			return fmt.Errorf("Error creating volume dir: %s", err.Error())
@@ -316,6 +316,8 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 		//
 		// Since so far we have no knowledge of the rootfs contents, the
 		// size is set to 0, and will be calculated later
+
+		// Note that there is only one volume, so "volume" points to it
 		rootfsStructure := gadget.VolumeStructure{
 			Name:       "",
 			Label:      "writable",
@@ -327,12 +329,13 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			Filesystem: "ext4",
 			Content:    []gadget.VolumeContent{},
 			Update:     gadget.VolumeUpdate{},
+			// "virtual" yaml index for the new structure (it would
+			// be the last one in gadget.yaml)
+			YamlIndex: len(volume.Structure),
 		}
 
-		// There is only one volume, so lastVolumeName is its name
 		// we now add the rootfs structure to the volume
-		stateMachine.GadgetInfo.Volumes[lastVolumeName].Structure =
-			append(stateMachine.GadgetInfo.Volumes[lastVolumeName].Structure, rootfsStructure)
+		volume.Structure = append(volume.Structure, rootfsStructure)
 	}
 	return nil
 }

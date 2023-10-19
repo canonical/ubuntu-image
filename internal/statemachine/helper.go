@@ -439,22 +439,10 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 	return &partitionTable, rootfsPartitionNumber
 }
 
-// calculateImageSize calculates the total sum of all partition sizes in an image
-func (stateMachine *StateMachine) calculateImageSize() (quantity.Size, error) {
-	if stateMachine.GadgetInfo == nil {
-		return 0, fmt.Errorf("Cannot calculate image size before initializing GadgetInfo")
-	}
-	var imgSize quantity.Size = 0
-	for _, volume := range stateMachine.GadgetInfo.Volumes {
-		for _, structure := range volume.Structure {
-			imgSize += structure.Size
-		}
-	}
-	return imgSize, nil
-}
-
 // copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
 func (stateMachine *StateMachine) copyDataToImage(volumeName string, volume *gadget.Volume, diskImg *disk.Disk) error {
+	// Resolve gadget information to on disk volume
+	onDisk := gadget.OnDiskStructsFromGadget(volume)
 	for structureNumber, structure := range volume.Structure {
 		if shouldSkipStructure(structure, stateMachine.IsSeeded) {
 			continue
@@ -463,8 +451,9 @@ func (stateMachine *StateMachine) copyDataToImage(volumeName string, volume *gad
 		// set up the arguments to dd the structures into an image
 		partImg := filepath.Join(stateMachine.tempDirs.volumes, volumeName,
 			"part"+strconv.Itoa(structureNumber)+".img")
-		seek := strconv.FormatInt(int64(getStructureOffset(structure))/sectorSize, 10)
-		count := strconv.FormatFloat(math.Ceil(float64(structure.Size)/float64(sectorSize)), 'f', 0, 64)
+		onDiskStruct := onDisk[structure.YamlIndex]
+		seek := strconv.FormatInt(int64(onDiskStruct.StartOffset)/sectorSize, 10)
+		count := strconv.FormatFloat(math.Ceil(float64(onDiskStruct.Size)/float64(sectorSize)), 'f', 0, 64)
 		ddArgs := []string{
 			"if=" + partImg,
 			"of=" + diskImg.File.Name(),
@@ -505,14 +494,6 @@ func writeOffsetValues(volume *gadget.Volume, imgName string, sectorSize, imgSiz
 		}
 	}
 	return nil
-}
-
-// getStructureOffset returns 0 if structure.Offset is nil, otherwise the value stored there
-func getStructureOffset(structure gadget.VolumeStructure) quantity.Offset {
-	if structure.Offset == nil {
-		return 0
-	}
-	return *structure.Offset
 }
 
 // generateUniqueDiskID returns a random 4-byte long disk ID, unique per the list of existing IDs
@@ -905,6 +886,7 @@ func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates 
 	possibleStateFunc := map[string][]stateFunc{
 		"add_extra_ppas": {
 			{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+			{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs},
 		},
 		"install_extra_packages": {
 			{"install_extra_packages", (*StateMachine).installPackages},
@@ -972,6 +954,29 @@ func runAll(cmds []*exec.Cmd) error {
 	return nil
 }
 
+// associateLoopDevice associates a file to a loop device and returns the loop device number
+func (stateMachine *StateMachine) associateLoopDevice(path string) (string, error) {
+	// run the losetup command and read the output to determine which loopback was used
+	losetupCmd := execCommand("losetup",
+		"--find",
+		"--show",
+		"--partscan",
+		"--sector-size",
+		stateMachine.commonFlags.SectorSize,
+		path,
+	)
+	var losetupOutput []byte
+	losetupOutput, err := losetupCmd.Output()
+	if err != nil {
+		err = fmt.Errorf("Error running losetup command \"%s\". Error is %s",
+			losetupCmd.String(),
+			err.Error(),
+		)
+		return "", err
+	}
+	return strings.TrimSpace(string(losetupOutput)), nil
+}
+
 // updateGrub mounts the resulting image and runs update-grub
 func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) (err error) {
 	// create a directory in which to mount the rootfs
@@ -987,25 +992,10 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 
 	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
 
-	// run the losetup command and read the output to determine which loopback was used
-	losetupCmd := execCommand("losetup",
-		"--find",
-		"--show",
-		"--partscan",
-		"--sector-size",
-		stateMachine.commonFlags.SectorSize,
-		imgPath,
-	)
-	var losetupOutput []byte
-	losetupOutput, err = losetupCmd.Output()
+	loopUsed, err := stateMachine.associateLoopDevice(imgPath)
 	if err != nil {
-		err = fmt.Errorf("Error running losetup command \"%s\". Error is %s",
-			losetupCmd.String(),
-			err.Error(),
-		)
 		return err
 	}
-	loopUsed := strings.TrimSpace(string(losetupOutput))
 
 	var umounts []*exec.Cmd
 	updateGrubCmds = append(updateGrubCmds,

@@ -153,29 +153,66 @@ func TestFailedParseImageDefinition(t *testing.T) {
 	})
 }
 
-// TestCalculateStates reads in a variety of yaml files and ensures
+// TestClassicStateMachine_calculateStates reads in a variety of yaml files and ensures
 // that the correct states are added to the state machine
 // TODO: manually assemble the image definitions instead of relying on the parseImageDefinition() function to make this more of a unit test
-func TestCalculateStates(t *testing.T) {
+func TestClassicStateMachine_calculateStates(t *testing.T) {
 	testCases := []struct {
 		name            string
 		imageDefinition string
 		expectedStates  []string
 	}{
-		{"state_build_gadget", "test_build_gadget.yaml", []string{"build_gadget_tree", "load_gadget_yaml"}},
-		{"state_prebuilt_gadget", "test_prebuilt_gadget.yaml", []string{"prepare_gadget_tree", "load_gadget_yaml"}},
-		{"state_prebuilt_rootfs_extras", "test_prebuilt_rootfs_extras.yaml", []string{"add_extra_ppas", "install_extra_packages", "install_extra_snaps"}},
-		{"extract_rootfs_tar", "test_extract_rootfs_tar.yaml", []string{"extract_rootfs_tar"}},
-		{"build_rootfs_from_seed", "test_rootfs_seed.yaml", []string{"germinate"}},
-		{"build_rootfs_from_tasks", "test_rootfs_tasks.yaml", []string{"build_rootfs_from_tasks"}},
-		{"customization_states", "test_customization.yaml", []string{"customize_cloud_init", "perform_manual_customization"}},
-		{"qcow2", "test_qcow2.yaml", []string{"make_disk", "make_qcow2_image"}},
+		{
+			name:            "state_build_gadget",
+			imageDefinition: "test_build_gadget.yaml",
+			expectedStates:  []string{"build_gadget_tree", "load_gadget_yaml"},
+		},
+		{
+			name:            "state_prebuilt_gadget",
+			imageDefinition: "test_prebuilt_gadget.yaml",
+			expectedStates:  []string{"prepare_gadget_tree", "load_gadget_yaml"},
+		},
+		{
+			name:            "state_prebuilt_rootfs_extras",
+			imageDefinition: "test_prebuilt_rootfs_extras.yaml",
+			expectedStates:  []string{"add_extra_ppas", "install_extra_packages", "clean_extra_ppas", "install_extra_snaps"},
+		},
+		{
+			name:            "state_ppa",
+			imageDefinition: "test_amd64.yaml",
+			expectedStates:  []string{"add_extra_ppas", "install_packages", "clean_extra_ppas"},
+		},
+		{
+			name:            "extract_rootfs_tar",
+			imageDefinition: "test_extract_rootfs_tar.yaml",
+			expectedStates:  []string{"extract_rootfs_tar"},
+		},
+		{
+			name:            "build_rootfs_from_seed",
+			imageDefinition: "test_rootfs_seed.yaml",
+			expectedStates:  []string{"germinate"},
+		},
+		{
+			name:            "build_rootfs_from_tasks",
+			imageDefinition: "test_rootfs_tasks.yaml",
+			expectedStates:  []string{"build_rootfs_from_tasks"},
+		},
+		{
+			name:            "customization_states",
+			imageDefinition: "test_customization.yaml",
+			expectedStates:  []string{"customize_cloud_init", "perform_manual_customization"},
+		},
+		{
+			name:            "qcow2",
+			imageDefinition: "test_qcow2.yaml",
+			expectedStates:  []string{"make_disk", "make_qcow2_image"},
+		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_calcluate_states_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -3344,6 +3381,219 @@ func TestFailedAddExtraPPAs(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}
+
+func TestStatemachine_cleanExtraPPAs(t *testing.T) {
+	series := getHostSuite()
+
+	testCases := []struct {
+		name          string
+		mockFuncs     func() func()
+		expectedErr   string
+		ppas          []*imagedefinition.PPA
+		remainingPPAs []string
+		remainingGPGs []string
+	}{
+		{
+			name: "keep one PPA, remove one PPA",
+			ppas: []*imagedefinition.PPA{
+				{
+					PPAName:     "canonical-foundations/ubuntu-image",
+					KeepEnabled: helper.BoolPtr(true),
+				},
+				{
+					PPAName:     "canonical-foundations/ubuntu-image-private-test",
+					Auth:        "sil2100:vVg74j6SM8WVltwpxDRJ",
+					Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
+					KeepEnabled: helper.BoolPtr(false),
+				},
+			},
+			remainingPPAs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.list", series),
+			},
+			remainingGPGs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.gpg", series),
+			},
+		},
+		{
+			name: "fail to remove PPA file",
+			ppas: []*imagedefinition.PPA{
+				{
+					PPAName:     "canonical-foundations/ubuntu-image",
+					KeepEnabled: helper.BoolPtr(true),
+				},
+				{
+					PPAName:     "canonical-foundations/ubuntu-image-private-test",
+					Auth:        "sil2100:vVg74j6SM8WVltwpxDRJ",
+					Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
+					KeepEnabled: helper.BoolPtr(false),
+				},
+			},
+			remainingPPAs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.list", series),
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-private-test-%s.list", series),
+			},
+			remainingGPGs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.gpg", series),
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-private-test-%s.gpg", series),
+			},
+			expectedErr: "Error removing",
+			mockFuncs: func() func() {
+				mock := NewOSMock(
+					&osMockConf{
+						RemoveThreshold: 0,
+					},
+				)
+
+				osRemove = mock.Remove
+				return func() { osRemove = os.Remove }
+			},
+		},
+		{
+			name: "fail to remove GPG file",
+			ppas: []*imagedefinition.PPA{
+				{
+					PPAName:     "canonical-foundations/ubuntu-image",
+					KeepEnabled: helper.BoolPtr(true),
+				},
+				{
+					PPAName:     "canonical-foundations/ubuntu-image-private-test",
+					Auth:        "sil2100:vVg74j6SM8WVltwpxDRJ",
+					Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
+					KeepEnabled: helper.BoolPtr(false),
+				},
+			},
+			remainingPPAs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.list", series),
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-private-test-%s.list", series),
+			},
+			remainingGPGs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.gpg", series),
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-private-test-%s.gpg", series),
+			},
+			expectedErr: "Error removing",
+			mockFuncs: func() func() {
+				mock := NewOSMock(
+					&osMockConf{
+						RemoveThreshold: 1,
+					},
+				)
+
+				osRemove = mock.Remove
+				return func() { osRemove = os.Remove }
+			},
+		},
+		{
+			name: "fail to handle invalid image definition",
+			ppas: []*imagedefinition.PPA{
+				{
+					PPAName:     "canonical-foundations/ubuntu-image",
+					KeepEnabled: nil,
+				},
+			},
+			remainingPPAs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.list", series),
+			},
+			remainingGPGs: []string{
+				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.gpg", series),
+			},
+			expectedErr: imagedefinition.ErrKeepEnabledNil.Error(),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture: getHostArch(),
+				Series:       series,
+				Rootfs:       &imagedefinition.Rootfs{},
+				Customization: &imagedefinition.Customization{
+					ExtraPPAs: tc.ppas,
+				},
+			}
+
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+			// create the /etc/apt/ dir in workdir
+			gpgDir := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d")
+			err = os.MkdirAll(gpgDir, 0755)
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.addExtraPPAs()
+			asserter.AssertErrNil(err, true)
+
+			if tc.mockFuncs != nil {
+				restoreMock := tc.mockFuncs()
+				t.Cleanup(restoreMock)
+			}
+
+			err = stateMachine.cleanExtraPPAs()
+			if err != nil || len(tc.expectedErr) != 0 {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+
+			// check ppa files
+			sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
+			ppaFiles, err := osReadDir(sourcesListD)
+			asserter.AssertErrNil(err, true)
+			foundRemainingPPAs := map[string]bool{}
+
+			for _, f := range ppaFiles {
+				found := false
+				for _, p := range tc.remainingPPAs {
+					if f.Name() == p {
+						found = true
+						foundRemainingPPAs[p] = true
+					}
+				}
+
+				if !found {
+					t.Errorf("the ppa %s was left in place but should have been removed", f)
+				}
+			}
+
+			for _, p := range tc.remainingPPAs {
+				if !foundRemainingPPAs[p] {
+					t.Errorf("the ppa %s was removed but should have been kept", p)
+				}
+			}
+
+			// Check gpg dir
+			gpgFiles, err := osReadDir(gpgDir)
+			asserter.AssertErrNil(err, true)
+			foundRemainingGPGs := map[string]bool{}
+
+			for _, f := range gpgFiles {
+				found := false
+				for _, p := range tc.remainingGPGs {
+					if f.Name() == p {
+						found = true
+						foundRemainingGPGs[p] = true
+					}
+				}
+
+				if !found {
+					t.Errorf("the keyfile %s was left in place but should have been removed", f)
+				}
+			}
+
+			for _, p := range tc.remainingGPGs {
+				if !foundRemainingGPGs[p] {
+					t.Errorf("the keyfile %s was removed but should have been kept", p)
+				}
+			}
+		})
+	}
 }
 
 // TestCustomizeFstab tests functionality of the customizeFstab function

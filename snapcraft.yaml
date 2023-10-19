@@ -3,7 +3,7 @@ summary: Create Ubuntu images
 description: |
   Official tool for building Ubuntu images, currently supporing Ubuntu Core
   snap-based images and preinstalled Ubuntu classic images.
-version: 3.0+snap13
+version: 3.0+snap16
 grade: stable
 confinement: classic
 base: core22
@@ -14,7 +14,7 @@ issues: https://bugs.launchpad.net/ubuntu-image/+filebug
 environment:
   FAKEROOT_FLAGS: "--lib $SNAP/usr/lib/lib-arch/libfakeroot/libfakeroot-tcp.so --faked $SNAP/usr/bin/faked-tcp"
   PATH: $SNAP/usr/bin:$SNAP/bin:$SNAP/usr/sbin:$SNAP/sbin:$PATH
-  GCONV_PATH: /snap/core20/current/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/gconv
+  GCONV_PATH: /snap/core22/current/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/gconv
   PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$PYTHONPATH
   DEBOOTSTRAP_DIR: $SNAP/usr/share/debootstrap
   PERL5LIB: $SNAP/usr/share/perl5:$SNAP/usr/share/perl:$PERL5LIB

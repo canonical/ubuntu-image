@@ -30,9 +30,12 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Store state machine state as a JSON file to ease maintainability
   * Replace linter and handle previously ignored errors
   * handle unknown Offset in gadget Volumes
+  * Add experimental ubuntu-image 'pack' support
+  * Support the keep-enabled parameter in ubuntu-image extra-ppas
 
   [ Alfonso Sanchez-Beato ]
   * Update to latest snapd, adapting to changes in layouts code.
+  * Fix calculation of volume sizes after latest snapd changes
 
  -- Alfonso Sanchez-Beato <alfonso.sanchez-beato@canonical.com>  Fri, 13 Oct 2023 11:26:23 +0100
 

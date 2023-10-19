@@ -17,7 +17,7 @@ type SnapOpts struct {
 	Revisions                 map[string]int `long:"revision" description:"The revision of a specific snap to install in the image." value-name:"REVISION"`
 }
 
-type snapCommand struct {
+type SnapCommand struct {
 	SnapArgsPassed SnapArgs `positional-args:"true" required:"false"`
 	SnapOptsPassed SnapOpts
 }
