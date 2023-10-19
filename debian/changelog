@@ -31,6 +31,7 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Replace linter and handle previously ignored errors
   * handle unknown Offset in gadget Volumes
   * Add experimental ubuntu-image 'pack' support
+  * Support the keep-enabled parameter in ubuntu-image extra-ppas
 
   [ Alfonso Sanchez-Beato ]
   * Update to latest snapd, adapting to changes in layouts code.
