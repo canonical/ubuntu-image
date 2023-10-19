@@ -18,12 +18,14 @@ import (
 type osMockConf struct {
 	osutilCopySpecialFileThreshold uint
 	ReadDirThreshold               uint
+	RemoveThreshold                uint
 }
 
 type osMock struct {
 	conf                            *osMockConf
 	beforeOsutilCopySpecialFileFail uint
 	beforeReadDirFail               uint
+	beforeRemoveFail                uint
 }
 
 func (o *osMock) CopySpecialFile(path, dest string) error {
@@ -42,6 +44,15 @@ func (o *osMock) ReadDir(name string) ([]fs.DirEntry, error) {
 	o.beforeReadDirFail++
 
 	return []fs.DirEntry{}, nil
+}
+
+func (o *osMock) Remove(name string) error {
+	if o.beforeRemoveFail >= o.conf.RemoveThreshold {
+		return fmt.Errorf("Remove fail")
+	}
+	o.beforeRemoveFail++
+
+	return nil
 }
 
 func NewOSMock(conf *osMockConf) *osMock {

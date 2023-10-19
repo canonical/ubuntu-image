@@ -259,15 +259,22 @@ func (stateMachine *StateMachine) calculateStates() error {
 		}
 	} else if classicStateMachine.ImageDef.Rootfs.Seed != nil {
 		rootfsCreationStates = append(rootfsCreationStates, rootfsSeedStates...)
-		if classicStateMachine.ImageDef.Customization != nil {
-			if len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
-				rootfsCreationStates = append(rootfsCreationStates,
-					stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs})
-			}
+		if classicStateMachine.ImageDef.Customization != nil && len(classicStateMachine.ImageDef.Customization.ExtraPPAs) > 0 {
+			rootfsCreationStates = append(rootfsCreationStates,
+				[]stateFunc{
+					{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+					{"install_packages", (*StateMachine).installPackages},
+					{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs},
+				}...)
+
+		} else {
+			rootfsCreationStates = append(rootfsCreationStates,
+				stateFunc{"install_packages", (*StateMachine).installPackages},
+			)
 		}
+
 		rootfsCreationStates = append(rootfsCreationStates,
 			[]stateFunc{
-				{"install_packages", (*StateMachine).installPackages},
 				{"prepare_image", (*StateMachine).prepareClassicImage},
 				{"preseed_image", (*StateMachine).preseedClassicImage},
 			}...,
@@ -573,6 +580,9 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 			}
 		}
 	}()
+
+	trustedGPGD := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d")
+
 	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
 		ppaFileName, ppaFileContents := createPPAInfo(ppa,
 			classicStateMachine.ImageDef.Series)
@@ -598,8 +608,7 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
 		*/
 		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
-		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
-			"etc", "apt", "trusted.gpg.d", keyFileName)
+		keyFilePath := filepath.Join(trustedGPGD, keyFileName)
 		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, stateMachine.commonFlags.Debug)
 		if err != nil {
 			err = fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
@@ -610,6 +619,43 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 	if err = osRemoveAll(tmpGPGDir); err != nil {
 		err = fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
 		return err
+	}
+
+	return nil
+}
+
+// cleanExtraPPAs cleans previously added PPA to the source list
+func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
+
+	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		if ppa.KeepEnabled == nil {
+			return imagedefinition.ErrKeepEnabledNil
+		}
+
+		if *ppa.KeepEnabled {
+			continue
+		}
+
+		ppaFileName, _ := createPPAInfo(ppa, classicStateMachine.ImageDef.Series)
+
+		ppaFile := filepath.Join(sourcesListD, ppaFileName)
+		err = osRemove(ppaFile)
+		if err != nil {
+			err = fmt.Errorf("Error removing %s: %s", ppaFile, err.Error())
+			return err
+		}
+
+		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
+		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
+			"etc", "apt", "trusted.gpg.d", keyFileName)
+		err = osRemove(keyFilePath)
+		if err != nil {
+			err = fmt.Errorf("Error removing %s: %s", keyFilePath, err.Error())
+			return err
+		}
 	}
 
 	return nil

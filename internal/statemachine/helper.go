@@ -886,6 +886,7 @@ func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates 
 	possibleStateFunc := map[string][]stateFunc{
 		"add_extra_ppas": {
 			{"add_extra_ppas", (*StateMachine).addExtraPPAs},
+			{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs},
 		},
 		"install_extra_packages": {
 			{"install_extra_packages", (*StateMachine).installPackages},
