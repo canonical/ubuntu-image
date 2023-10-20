@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -4446,59 +4445,6 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 			}
 		}
 	})
-}
-
-type osMockConf struct {
-	osutilCopySpecialFileThreshold uint
-	ReadDirThreshold               uint
-	RemoveThreshold                uint
-	TruncateThreshold              uint
-}
-
-type osMock struct {
-	conf                            *osMockConf
-	beforeOsutilCopySpecialFileFail uint
-	beforeReadDirFail               uint
-	beforeRemoveFail                uint
-	beforeTruncateFail              uint
-}
-
-func (o *osMock) CopySpecialFile(path, dest string) error {
-	if o.beforeOsutilCopySpecialFileFail >= o.conf.osutilCopySpecialFileThreshold {
-		return fmt.Errorf("CopySpecialFile fail")
-	}
-	o.beforeOsutilCopySpecialFileFail++
-	return nil
-}
-
-func (o *osMock) ReadDir(name string) ([]fs.DirEntry, error) {
-	if o.beforeReadDirFail >= o.conf.ReadDirThreshold {
-		return nil, fmt.Errorf("ReadDir fail")
-	}
-	o.beforeReadDirFail++
-	return []fs.DirEntry{}, nil
-}
-
-func (o *osMock) Remove(name string) error {
-	if o.beforeRemoveFail >= o.conf.RemoveThreshold {
-		return fmt.Errorf("Remove fail")
-	}
-	o.beforeRemoveFail++
-
-	return nil
-}
-
-func (o *osMock) Truncate(name string, size int64) error {
-	if o.beforeTruncateFail >= o.conf.TruncateThreshold {
-		return fmt.Errorf("Truncate fail")
-	}
-	o.beforeTruncateFail++
-
-	return nil
-}
-
-func NewOSMock(conf *osMockConf) *osMock {
-	return &osMock{conf: conf}
 }
 
 func TestClassicStateMachine_cleanRootfs(t *testing.T) {

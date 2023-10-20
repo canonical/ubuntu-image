@@ -19,6 +19,7 @@ type osMockConf struct {
 	osutilCopySpecialFileThreshold uint
 	ReadDirThreshold               uint
 	RemoveThreshold                uint
+	TruncateThreshold              uint
 }
 
 type osMock struct {
@@ -26,6 +27,7 @@ type osMock struct {
 	beforeOsutilCopySpecialFileFail uint
 	beforeReadDirFail               uint
 	beforeRemoveFail                uint
+	beforeTruncateFail              uint
 }
 
 func (o *osMock) CopySpecialFile(path, dest string) error {
@@ -51,6 +53,15 @@ func (o *osMock) Remove(name string) error {
 		return fmt.Errorf("Remove fail")
 	}
 	o.beforeRemoveFail++
+
+	return nil
+}
+
+func (o *osMock) Truncate(name string, size int64) error {
+	if o.beforeTruncateFail >= o.conf.TruncateThreshold {
+		return fmt.Errorf("Truncate fail")
+	}
+	o.beforeTruncateFail++
 
 	return nil
 }
