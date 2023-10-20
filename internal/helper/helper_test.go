@@ -230,7 +230,7 @@ func TestSetDefaults(t *testing.T) {
 			},
 			want: &S2{
 				A: "test",
-				B: BoolPtr(true),
+				B: BoolPtr(false),
 				C: BoolPtr(false),
 				D: BoolPtr(true),
 			},
