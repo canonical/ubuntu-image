@@ -11,7 +11,7 @@ import (
 func (stateMachine *StateMachine) preparePack() error {
 	packStateMachine := stateMachine.parent.(*PackStateMachine)
 
-	packStateMachine.YamlFilePath = filepath.Join(packStateMachine.Opts.GadgetDir, "gadget.yaml")
+	packStateMachine.YamlFilePath = filepath.Join(packStateMachine.Opts.GadgetDir, gadgetYamlPathInTree)
 
 	return nil
 }

@@ -482,7 +482,7 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 			gadgetTree, _ = filepath.Abs(gadgetTree)
 		}
 	} else {
-		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget", "install")
 	}
 	files, err := osReadDir(gadgetTree)
 	if err != nil {
@@ -495,7 +495,7 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 		}
 	}
 
-	classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "gadget.yaml")
+	classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, gadgetYamlPathInTree)
 
 	return nil
 }
