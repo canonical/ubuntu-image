@@ -3,6 +3,7 @@ package statemachine
 import (
 	"fmt"
 	"io/fs"
+	"os"
 	"os/exec"
 )
 
@@ -11,6 +12,7 @@ type osMockConf struct {
 	ReadDirThreshold               uint
 	RemoveThreshold                uint
 	TruncateThreshold              uint
+	OpenFileThreshold              uint
 }
 
 // osMock holds methods to easily mock functions from os and snapd/osutil packages
@@ -23,6 +25,7 @@ type osMock struct {
 	beforeReadDirFail               uint
 	beforeRemoveFail                uint
 	beforeTruncateFail              uint
+	beforeOpenFileFail              uint
 }
 
 func (o *osMock) CopySpecialFile(path, dest string) error {
@@ -59,6 +62,15 @@ func (o *osMock) Truncate(name string, size int64) error {
 	o.beforeTruncateFail++
 
 	return nil
+}
+
+func (o *osMock) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	if o.beforeOpenFileFail >= o.conf.OpenFileThreshold {
+		return nil, fmt.Errorf("OpenFile fail")
+	}
+	o.beforeOpenFileFail++
+
+	return &os.File{}, nil
 }
 
 func NewOSMock(conf *osMockConf) *osMock {

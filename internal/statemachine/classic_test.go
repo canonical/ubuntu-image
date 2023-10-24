@@ -2055,6 +2055,118 @@ func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 	})
 }
 
+// TestSateMachine_customizeSourcesList tests functionality of the customizeSourcesList state function
+func TestSateMachine_customizeSourcesList(t *testing.T) {
+	testCases := []struct {
+		name                string
+		existingSourcesList string
+		customization       *imagedefinition.Customization
+		mockFuncs           func() func()
+		expectedErr         string
+		expectedSourcesList string
+	}{
+		{
+			name:                "set default",
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			customization:       &imagedefinition.Customization{},
+			expectedSourcesList: `deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
+`,
+		},
+		{
+			name:                "set less components",
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			customization: &imagedefinition.Customization{
+				Components: []string{"main"},
+			},
+			expectedSourcesList: `deb http://archive.ubuntu.com/ubuntu/ jammy main
+`,
+		},
+		{
+			name:                "set components and pocket",
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			customization: &imagedefinition.Customization{
+				Components: []string{"main"},
+				Pocket:     "security",
+			},
+			expectedSourcesList: `deb http://archive.ubuntu.com/ubuntu/ jammy main
+deb http://security.ubuntu.com/ubuntu/ jammy-security main
+`,
+		},
+		{
+			name:                "fail to write sources.list",
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			customization: &imagedefinition.Customization{
+				Components: []string{"main"},
+				Pocket:     "security",
+			},
+			expectedSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			expectedErr:         "unable to open sources.list file",
+			mockFuncs: func() func() {
+				mock := NewOSMock(
+					&osMockConf{
+						OpenFileThreshold: 0,
+					},
+				)
+
+				osOpenFile = mock.OpenFile
+				return func() { osOpenFile = os.OpenFile }
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture:  getHostArch(),
+				Series:        getHostSuite(),
+				Rootfs:        &imagedefinition.Rootfs{},
+				Customization: tc.customization,
+			}
+
+			err := helper.SetDefaults(&stateMachine.ImageDef)
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt"), 0644)
+			asserter.AssertErrNil(err, true)
+
+			sourcesListPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+
+			err = osWriteFile(sourcesListPath, []byte(tc.existingSourcesList), 0644)
+			asserter.AssertErrNil(err, true)
+
+			if tc.mockFuncs != nil {
+				restoreMock := tc.mockFuncs()
+				t.Cleanup(restoreMock)
+			}
+
+			err = stateMachine.customizeSourcesList()
+			if err != nil || len(tc.expectedErr) != 0 {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+
+			sourcesListBytes, err := os.ReadFile(sourcesListPath)
+			asserter.AssertErrNil(err, true)
+
+			if string(sourcesListBytes) != tc.expectedSourcesList {
+				t.Errorf("Expected sources.list content \"%s\", but got \"%s\"",
+					tc.expectedSourcesList, string(sourcesListBytes))
+			}
+		})
+	}
+}
+
 // TestSateMachine_fixFstab tests functionality of the fixFstab function
 func TestSateMachine_fixFstab(t *testing.T) {
 	testCases := []struct {
@@ -2606,6 +2718,15 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			t.Errorf("Expected LANG=C.UTF-8 in %s, but got %s", localeFile, string(localeBytes))
 		}
 
+		// check if components and pocket correctly setup in /etc/apt/sources.list
+		aptSourcesListBytes, err := os.ReadFile(filepath.Join(mountDir, "etc", "apt", "sources.list"))
+		asserter.AssertErrNil(err, true)
+		wantAptSourcesList := `deb http://archive.ubuntu.com/ubuntu/ jammy main universe restricted multiverse
+deb http://security.ubuntu.com/ubuntu/ jammy-security main universe restricted multiverse
+deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe restricted multiverse
+deb http://archive.ubuntu.com/ubuntu/ jammy-proposed main universe restricted multiverse
+`
+		asserter.AssertEqual(wantAptSourcesList, string(aptSourcesListBytes))
 	})
 }
 

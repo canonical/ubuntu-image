@@ -1333,6 +1333,7 @@ func (stateMachine *StateMachine) overwriteSourcesList(aptSources []string) erro
 	if err != nil {
 		return fmt.Errorf("unable to open sources.list file: %w", err)
 	}
+	defer sourcesListFile.Close()
 	for _, aptSource := range aptSources {
 		_, err = sourcesListFile.WriteString(aptSource)
 		if err != nil {
