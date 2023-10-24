@@ -920,6 +920,10 @@ func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates 
 	for i := 0; i < elem.NumField(); i++ {
 		field := elem.Field(i)
 
+		if field.Kind() == reflect.String {
+			continue
+		}
+
 		if !field.IsNil() {
 			tags := elem.Type().Field(i).Tag
 			tagValue, hasTag := tags.Lookup(tag)
