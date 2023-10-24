@@ -323,18 +323,19 @@ func TestPrintStates(t *testing.T) {
 [7] prepare_image
 [8] preseed_image
 [9] clean_rootfs
-[10] customize_fstab
-[11] perform_manual_customization
-[12] set_default_locale
-[13] populate_rootfs_contents
-[14] generate_disk_info
-[15] calculate_rootfs_size
-[16] populate_bootfs_contents
-[17] populate_prepare_partitions
-[18] make_disk
-[19] update_bootloader
-[20] generate_manifest
-[21] finish
+[10] customize_sources_list
+[11] customize_fstab
+[12] perform_manual_customization
+[13] set_default_locale
+[14] populate_rootfs_contents
+[15] generate_disk_info
+[16] calculate_rootfs_size
+[17] populate_bootfs_contents
+[18] populate_prepare_partitions
+[19] make_disk
+[20] update_bootloader
+[21] generate_manifest
+[22] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
