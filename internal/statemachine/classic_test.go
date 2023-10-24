@@ -3424,8 +3424,8 @@ func TestCreateChroot(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		pockets := []string{
-			fmt.Sprintf("%s-updates", stateMachine.ImageDef.Series),
 			fmt.Sprintf("%s-security", stateMachine.ImageDef.Series),
+			fmt.Sprintf("%s-updates", stateMachine.ImageDef.Series),
 			fmt.Sprintf("%s-proposed", stateMachine.ImageDef.Series),
 		}
 

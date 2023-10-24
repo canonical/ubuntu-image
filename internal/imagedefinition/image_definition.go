@@ -315,10 +315,7 @@ func (imageDef ImageDefinition) securityMirror() string {
 }
 
 func generatePocketList(series string, components []string, mirror string, securityMirror string, pocket string) []string {
-	baseList := fmt.Sprintf("deb %%s %s%%s %s\n",
-		series,
-		strings.Join(components, " "),
-	)
+	baseList := fmt.Sprintf("deb %%s %s%%s %s\n", series, strings.Join(components, " "))
 
 	releaseList := fmt.Sprintf(baseList, mirror, "")
 	securityList := fmt.Sprintf(baseList, securityMirror, "-security")
@@ -333,9 +330,9 @@ func generatePocketList(series string, components []string, mirror string, secur
 	case "security":
 		pocketList = append(pocketList, releaseList, securityList)
 	case "updates":
-		pocketList = append(pocketList, releaseList, updatesList, securityList)
+		pocketList = append(pocketList, releaseList, securityList, updatesList)
 	case "proposed":
-		pocketList = append(pocketList, releaseList, updatesList, securityList, proposedList)
+		pocketList = append(pocketList, releaseList, securityList, updatesList, proposedList)
 	}
 
 	return pocketList

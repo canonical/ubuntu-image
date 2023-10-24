@@ -67,7 +67,7 @@ The following specification defines what is supported in the YAML:
        # archive-tasks, or tarball.
        rootfs:
          # Components are a list of apt sources, such as main,
-         # universe, and restricted. Defaults to "main".
+         # universe, and restricted. Defaults to "main,restricted".
          components: (optional)
            - <string>
            - <string>
@@ -131,7 +131,7 @@ The following specification defines what is supported in the YAML:
        # This is only supported for classic image building 
        customization: (optional)
          # Components are a list of apt sources, such as main,
-         # universe, and restricted. Defaults to "main".
+         # universe, and restricted. Defaults to "main, restricted, universe".
          # These are used in the resulting img, not to build it.
          components: (optional)
            - <string>
