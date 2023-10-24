@@ -341,40 +341,38 @@ func TestUntilThru(t *testing.T) {
 
 // TestDebug ensures that the name of the states is printed when the --debug flag is used
 func TestDebug(t *testing.T) {
-	t.Run("test_debug", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		workDir := "ubuntu-image-test-debug"
-		if err := os.Mkdir("ubuntu-image-test-debug", 0755); err != nil {
-			t.Errorf("Failed to create temporary directory %s\n", workDir)
-		}
+	asserter := helper.Asserter{T: t}
+	workDir := "ubuntu-image-test-debug"
+	if err := os.Mkdir("ubuntu-image-test-debug", 0755); err != nil {
+		t.Errorf("Failed to create temporary directory %s\n", workDir)
+	}
 
-		var stateMachine testStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.stateMachineFlags.WorkDir = workDir
-		stateMachine.commonFlags.Debug = true
+	var stateMachine testStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.commonFlags.Debug = true
 
-		err := stateMachine.Setup()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
 
-		// just use the one state
-		stateMachine.states = testStates
-		stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
-		asserter.AssertErrNil(err, true)
+	// just use the one state
+	stateMachine.states = testStates
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	asserter.AssertErrNil(err, true)
 
-		err = stateMachine.Run()
-		asserter.AssertErrNil(err, true)
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
 
-		// restore stdout and check that the debug info was printed
-		restoreStdout()
-		readStdout, err := io.ReadAll(stdout)
-		asserter.AssertErrNil(err, true)
+	// restore stdout and check that the debug info was printed
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
 
-		if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
-			t.Errorf("Expected state name \"%s\" to appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
-		}
-		// clean up
-		os.RemoveAll(workDir)
-	})
+	if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
+		t.Errorf("Expected state name \"%s\" to appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
+	}
+	// clean up
+	os.RemoveAll(workDir)
 }
 
 // TestFunction replaces some of the stateFuncs to test various error scenarios
@@ -423,19 +421,17 @@ func TestFunctionErrors(t *testing.T) {
 
 // TestSetCommonOpts ensures that the function actually sets the correct values in the struct
 func TestSetCommonOpts(t *testing.T) {
-	t.Run("test_set_common_opts", func(t *testing.T) {
-		commonOpts := new(commands.CommonOpts)
-		stateMachineOpts := new(commands.StateMachineOpts)
-		commonOpts.Debug = true
-		stateMachineOpts.WorkDir = testDir
+	commonOpts := new(commands.CommonOpts)
+	stateMachineOpts := new(commands.StateMachineOpts)
+	commonOpts.Debug = true
+	stateMachineOpts.WorkDir = testDir
 
-		var stateMachine testStateMachine
-		stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
+	var stateMachine testStateMachine
+	stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
 
-		if !stateMachine.commonFlags.Debug || stateMachine.stateMachineFlags.WorkDir != testDir {
-			t.Error("SetCommonOpts failed to set the correct options")
-		}
-	})
+	if !stateMachine.commonFlags.Debug || stateMachine.stateMachineFlags.WorkDir != testDir {
+		t.Error("SetCommonOpts failed to set the correct options")
+	}
 }
 
 // TestParseImageSizes tests a successful image size parse with all of the different allowed syntaxes
@@ -747,47 +743,44 @@ func TestPostProcessGadgetYaml(t *testing.T) {
 // the gadget.yaml file after loading it in. This is accomplished by mocking
 // os.MkdirAll
 func TestFailedPostProcessGadgetYaml(t *testing.T) {
-	t.Run("test_failed_post_process_gadget_yaml", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine StateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, false)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, false)
 
-		// set a valid yaml file and load it in
-		stateMachine.YamlFilePath = filepath.Join("testdata",
-			"gadget_tree", "meta", "gadget.yaml")
-		// ensure unpack exists
-		err = os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
-		asserter.AssertErrNil(err, true)
-		err = stateMachine.loadGadgetYaml()
-		asserter.AssertErrNil(err, false)
+	// set a valid yaml file and load it in
+	stateMachine.YamlFilePath = filepath.Join("testdata",
+		"gadget_tree", "meta", "gadget.yaml")
+	// ensure unpack exists
+	err = os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, false)
 
-		// mock filepath.Rel
-		filepathRel = mockRel
-		defer func() {
-			filepathRel = filepath.Rel
-		}()
-		err = stateMachine.postProcessGadgetYaml()
-		asserter.AssertErrContains(err, "Error creating relative path")
+	// mock filepath.Rel
+	filepathRel = mockRel
+	defer func() {
 		filepathRel = filepath.Rel
+	}()
+	err = stateMachine.postProcessGadgetYaml()
+	asserter.AssertErrContains(err, "Error creating relative path")
+	filepathRel = filepath.Rel
 
-		// mock os.MkdirAll
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		err = stateMachine.postProcessGadgetYaml()
-		asserter.AssertErrContains(err, "Error creating volume dir")
+	// mock os.MkdirAll
+	osMkdirAll = mockMkdirAll
+	defer func() {
 		osMkdirAll = os.MkdirAll
+	}()
+	err = stateMachine.postProcessGadgetYaml()
+	asserter.AssertErrContains(err, "Error creating volume dir")
+	osMkdirAll = os.MkdirAll
 
-		// use a gadget with a disallowed string in the content field
-		stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_invalid_content.yaml")
-		err = stateMachine.loadGadgetYaml()
-		asserter.AssertErrContains(err, "disallowed for security purposes")
-	})
+	// use a gadget with a disallowed string in the content field
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_invalid_content.yaml")
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrContains(err, "disallowed for security purposes")
 }
 
 func TestStateMachine_readMetadata(t *testing.T) {

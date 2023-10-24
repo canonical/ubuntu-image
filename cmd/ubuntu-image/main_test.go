@@ -210,7 +210,7 @@ func TestVersion(t *testing.T) {
 		{"both_hardcoded_and_snap", "2.0ubuntu1", "2.0+snap1", "2.0ubuntu1"},
 	}
 	for _, tc := range testCases {
-		t.Run("test "+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
 			// Override os.Exit temporarily
@@ -263,7 +263,7 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 		{"error_read_stderr", os.Stderr, nil, []string{}},
 	}
 	for _, tc := range testCases {
-		t.Run("test "+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			// Override os.Exit temporarily
 			oldOsExit := osExit
 			defer func() {
