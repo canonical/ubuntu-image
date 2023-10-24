@@ -1269,6 +1269,9 @@ func TestFailedMountTempFS(t *testing.T) {
 
 // TestFailedGetPreseededSnaps tests various failure scenarios in the getPreseededSnaps function
 func TestFailedGetPreseededSnaps(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	asserter := helper.Asserter{T: t}
 	var stateMachine StateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
