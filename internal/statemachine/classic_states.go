@@ -614,12 +614,12 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 			err = fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
 			return err
 		}
+		defer ppaIO.Close()
 		_, err = ppaIO.Write([]byte(ppaFileContents))
 		if err != nil {
 			err = fmt.Errorf("unable to write ppa file %s: %w", ppaFile, err)
 			return err
 		}
-		ppaIO.Close()
 
 		// Import keys either from the specified fingerprint or via the Launchpad API
 		/* TODO: this is the logic for deb822 sources. When other projects
