@@ -4,9 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/google/go-cmp/cmp"
 	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 func TestGeneratePocketList(t *testing.T) {
@@ -167,7 +168,7 @@ func TestCustomErrors(t *testing.T) {
 func TestImageDefinition_SetDefaults(t *testing.T) {
 	t.Run("test_image_definition_valid_defaults", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		err := helper.SetDefaults(&ImageDefinition{
+		imageDef := &ImageDefinition{
 			Gadget: &Gadget{},
 			Rootfs: &Rootfs{
 				Seed:    &Seed{},
@@ -191,8 +192,59 @@ func TestImageDefinition_SetDefaults(t *testing.T) {
 				Changelog: &Changelog{},
 				RootfsTar: &RootfsTar{},
 			},
-		})
+		}
+
+		want := &ImageDefinition{
+			Gadget: &Gadget{},
+			Rootfs: &Rootfs{
+				Seed: &Seed{
+					Vcs: helper.BoolPtr(true),
+				},
+				Tarball:    &Tarball{},
+				Components: []string{"main", "restricted"},
+				Archive:    "ubuntu",
+				Flavor:     "ubuntu",
+				Mirror:     "http://archive.ubuntu.com/ubuntu/",
+				Pocket:     "release",
+			},
+			Customization: &Customization{
+				Components: []string{"main", "restricted", "universe"},
+				Pocket:     "release",
+				Installer:  &Installer{},
+				CloudInit:  &CloudInit{},
+				ExtraPPAs: []*PPA{{
+					KeepEnabled: helper.BoolPtr(true),
+				}},
+				ExtraPackages: []*Package{{}},
+				ExtraSnaps: []*Snap{{
+					Store:   "canonical",
+					Channel: "stable",
+				}},
+				Fstab: []*Fstab{{
+					MountOptions: "defaults",
+				}},
+				Manual: &Manual{},
+			},
+			Artifacts: &Artifact{
+				Img:       &[]Img{{}},
+				Iso:       &[]Iso{{}},
+				Qcow2:     &[]Qcow2{{}},
+				Manifest:  &Manifest{},
+				Filelist:  &Filelist{},
+				Changelog: &Changelog{},
+				RootfsTar: &RootfsTar{
+					Compression: "uncompressed",
+				},
+			},
+		}
+
+		err := helper.SetDefaults(imageDef)
 		asserter.AssertErrNil(err, true)
+
+		asserter.AssertEqual(want, imageDef, cmp.AllowUnexported(ImageDefinition{}))
+	})
+}
+
 func TestImageDefinition_securityMirror(t *testing.T) {
 	type fields struct {
 		Architecture string
