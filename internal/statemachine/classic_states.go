@@ -312,6 +312,9 @@ func (stateMachine *StateMachine) calculateStates() error {
 	rootfsCreationStates = append(rootfsCreationStates,
 		stateFunc{"clean_rootfs", (*StateMachine).cleanRootfs})
 
+	rootfsCreationStates = append(rootfsCreationStates,
+		stateFunc{"customize_sources_list", (*StateMachine).customizeSourcesList})
+
 	// Determine any customization that needs to run before the image is created
 	//TODO: installer image customization... eventually.
 	if classicStateMachine.ImageDef.Customization != nil {
@@ -517,6 +520,21 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	return nil
 }
 
+// fixHostname set fresh hostname since debootstrap copies /etc/hostname from build environment
+func (stateMachine *StateMachine) fixHostname() error {
+	hostname := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
+	hostnameFile, err := osOpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open hostname file: %w", err)
+	}
+	defer hostnameFile.Close()
+	_, err = hostnameFile.WriteString("ubuntu\n")
+	if err != nil {
+		return fmt.Errorf("unable to write hostname: %w", err)
+	}
+	return nil
+}
+
 // Bootstrap a chroot environment to install packages in. It will eventually
 // become the rootfs of the image
 func (stateMachine *StateMachine) createChroot() error {
@@ -538,18 +556,10 @@ func (stateMachine *StateMachine) createChroot() error {
 			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
 	}
 
-	// debootstrap copies /etc/hostname from build environment; replace it
-	// with a fresh version
-	hostname := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
-	hostnameFile, err := osOpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
+	err := stateMachine.fixHostname()
 	if err != nil {
-		return fmt.Errorf("unable to open hostname file: %w", err)
+		return err
 	}
-	_, err = hostnameFile.WriteString("ubuntu\n")
-	if err != nil {
-		return fmt.Errorf("unable to write hostname: %w", err)
-	}
-	hostnameFile.Close()
 
 	// debootstrap also copies /etc/resolv.conf from build environment; truncate it
 	// as to not leak the host files into the built image
@@ -559,21 +569,7 @@ func (stateMachine *StateMachine) createChroot() error {
 	}
 
 	// add any extra apt sources to /etc/apt/sources.list
-	aptSources := classicStateMachine.ImageDef.GeneratePocketList()
-
-	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
-	sourcesListFile, err := osOpenFile(sourcesList, os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("unable to open sources.list file: %w", err)
-	}
-	for _, aptSource := range aptSources {
-		_, err = sourcesListFile.WriteString(aptSource)
-		if err != nil {
-			return fmt.Errorf("unable to write apt sources: %w", err)
-		}
-	}
-
-	return nil
+	return stateMachine.overwriteSourcesList(classicStateMachine.ImageDef.BuildPocketList())
 }
 
 // add PPAs to the apt sources list
@@ -1319,6 +1315,31 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	}
 
 	return classicStateMachine.fixFstab()
+}
+
+// customizeSourcesList customize the /etc/apt/sources.list file for the
+// resulting image. This state must be executed once packages installation
+// is done, and before other manual customization to let users modify it.
+func (stateMachine *StateMachine) customizeSourcesList() error {
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+	return stateMachine.overwriteSourcesList(classicStateMachine.ImageDef.TargetPocketList())
+}
+
+// overwriteSourcesList replaces /etc/apt/sources.list with the given list of entries
+// This function will truncate the existing file.
+func (stateMachine *StateMachine) overwriteSourcesList(aptSources []string) error {
+	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+	sourcesListFile, err := osOpenFile(sourcesList, os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open sources.list file: %w", err)
+	}
+	for _, aptSource := range aptSources {
+		_, err = sourcesListFile.WriteString(aptSource)
+		if err != nil {
+			return fmt.Errorf("unable to write apt sources: %w", err)
+		}
+	}
+	return nil
 }
 
 // fixFstab makes sure the fstab contains a valid entry for the root mount point

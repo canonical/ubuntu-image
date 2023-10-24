@@ -39,7 +39,7 @@ type Gadget struct {
 
 // Rootfs defines the rootfs section of the image definition file
 type Rootfs struct {
-	Components   []string `yaml:"components"    json:"Components,omitempty"`
+	Components   []string `yaml:"components"    json:"Components,omitempty"   default:"main,restricted"`
 	Archive      string   `yaml:"archive"       json:"Archive"                default:"ubuntu"`
 	Flavor       string   `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
 	Mirror       string   `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
@@ -70,6 +70,8 @@ type Tarball struct {
 // The extra_step_prebuilt_rootfs struct tag denotes that an extra state will
 // need to be added for image builds with prebuilt root filesystems.
 type Customization struct {
+	Components    []string   `yaml:"components"     json:"Components,omitempty"   default:"main,restricted,universe"`
+	Pocket        string     `yaml:"pocket"         json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
 	Installer     *Installer `yaml:"installer"      json:"Installer,omitempty"`
 	CloudInit     *CloudInit `yaml:"cloud-init"     json:"CloudInit,omitempty"`
 	ExtraPPAs     []*PPA     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"     extra_step_prebuilt_rootfs:"add_extra_ppas"`
@@ -312,50 +314,53 @@ func (imageDef ImageDefinition) securityMirror() string {
 	return imageDef.Rootfs.Mirror
 }
 
-// GeneratePocketList returns a slice of strings that need to be added to
-// /etc/apt/sources.list in the chroot based on the value of "pocket"
-// in the rootfs section of the image definition
-func (imageDef ImageDefinition) GeneratePocketList() []string {
-	pocketMap := map[string][]string{
-		"release": {},
-		"security": {
-			fmt.Sprintf("deb %s %s-security %s\n",
-				imageDef.securityMirror(),
-				imageDef.Series,
-				strings.Join(imageDef.Rootfs.Components, " "),
-			),
-		},
-		"updates": {
-			fmt.Sprintf("deb %s %s-updates %s\n",
-				imageDef.Rootfs.Mirror,
-				imageDef.Series,
-				strings.Join(imageDef.Rootfs.Components, " "),
-			),
-			fmt.Sprintf("deb %s %s-security %s\n",
-				imageDef.securityMirror(),
-				imageDef.Series,
-				strings.Join(imageDef.Rootfs.Components, " "),
-			),
-		},
-		"proposed": {
-			fmt.Sprintf("deb %s %s-updates %s\n",
-				imageDef.Rootfs.Mirror,
-				imageDef.Series,
-				strings.Join(imageDef.Rootfs.Components, " "),
-			),
-			fmt.Sprintf("deb %s %s-security %s\n",
-				imageDef.securityMirror(),
-				imageDef.Series,
-				strings.Join(imageDef.Rootfs.Components, " "),
-			),
-			fmt.Sprintf("deb %s %s-proposed %s\n",
-				imageDef.Rootfs.Mirror,
-				imageDef.Series,
-				strings.Join(imageDef.Rootfs.Components, " "),
-			),
-		},
+func generatePocketList(series string, components []string, mirror string, securityMirror string, pocket string) []string {
+	baseList := fmt.Sprintf("deb %%s %s%%s %s\n",
+		series,
+		strings.Join(components, " "),
+	)
+
+	releaseList := fmt.Sprintf(baseList, mirror, "")
+	securityList := fmt.Sprintf(baseList, securityMirror, "-security")
+	updatesList := fmt.Sprintf(baseList, mirror, "-updates")
+	proposedList := fmt.Sprintf(baseList, mirror, "-proposed")
+
+	pocketList := make([]string, 0)
+
+	switch pocket {
+	case "release":
+		pocketList = append(pocketList, releaseList)
+	case "security":
+		pocketList = append(pocketList, releaseList, securityList)
+	case "updates":
+		pocketList = append(pocketList, releaseList, updatesList, securityList)
+	case "proposed":
+		pocketList = append(pocketList, releaseList, updatesList, securityList, proposedList)
 	}
 
-	// Schema validation has already confirmed the Pocket is a valid value
-	return pocketMap[strings.ToLower(imageDef.Rootfs.Pocket)]
+	return pocketList
+}
+
+// BuildPocketList returns a slice of strings that need to be added to
+// /etc/apt/sources.list in the chroot to build the image, based on the value of "pocket"
+// in the rootfs section of the image definition
+func (imageDef ImageDefinition) BuildPocketList() []string {
+	return generatePocketList(
+		imageDef.Series,
+		imageDef.Rootfs.Components,
+		imageDef.Rootfs.Mirror,
+		imageDef.securityMirror(),
+		strings.ToLower(imageDef.Rootfs.Pocket))
+}
+
+// TargetPocketList returns a slice of strings that need to be added to
+// /etc/apt/sources.list in the chroot for the target image, based on the value of "pocket"
+// in the customization section of the image definition
+func (imageDef ImageDefinition) TargetPocketList() []string {
+	return generatePocketList(
+		imageDef.Series,
+		imageDef.Customization.Components,
+		imageDef.Rootfs.Mirror,
+		imageDef.securityMirror(),
+		strings.ToLower(imageDef.Customization.Pocket))
 }
