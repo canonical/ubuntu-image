@@ -29,6 +29,12 @@ customization:
     make-dirs:
       - path: /etc/foo/bar
         permissions: 0755
+  components:
+    - main
+    - universe
+    - restricted
+    - multiverse
+  pocket: proposed
   cloud-init:
     user-data: |
       #cloud-config
