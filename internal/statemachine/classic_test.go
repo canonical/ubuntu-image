@@ -34,18 +34,16 @@ var yamlMarshal = yaml.Marshal
 
 // TestClassicSetup tests a successful run of the polymorphed Setup function
 func TestClassicSetup(t *testing.T) {
-	t.Run("test_classic_setup", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
 
-		err := stateMachine.Setup()
-		asserter.AssertErrNil(err, true)
-	})
+	err := stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
 }
 
 // TestYAMLSchemaParsing attempts to parse a variety of image definition files, both
@@ -78,7 +76,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"img_specified_without_gadget", "test_image_without_gadget.yaml", false, "Key img cannot be used without key gadget:"},
 	}
 	for _, tc := range testCases {
-		t.Run("test_yaml_schema_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
@@ -102,56 +100,54 @@ func TestYAMLSchemaParsing(t *testing.T) {
 // TestFailedParseImageDefinition mocks function calls to test
 // failure cases in the parseImageDefinition state
 func TestFailedParseImageDefinition(t *testing.T) {
-	t.Run("test_failed_parse_image_definition", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
-			"test_raspi.yaml")
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_raspi.yaml")
 
-		// mock helper.SetDefaults
-		helperSetDefaults = mockSetDefaults
-		defer func() {
-			helperSetDefaults = helper.SetDefaults
-		}()
-		err := stateMachine.parseImageDefinition()
-		asserter.AssertErrContains(err, "Test Error")
+	// mock helper.SetDefaults
+	helperSetDefaults = mockSetDefaults
+	defer func() {
 		helperSetDefaults = helper.SetDefaults
+	}()
+	err := stateMachine.parseImageDefinition()
+	asserter.AssertErrContains(err, "Test Error")
+	helperSetDefaults = helper.SetDefaults
 
-		// mock helper.CheckEmptyFields
-		helperCheckEmptyFields = mockCheckEmptyFields
-		defer func() {
-			helperCheckEmptyFields = helper.CheckEmptyFields
-		}()
-		err = stateMachine.parseImageDefinition()
-		asserter.AssertErrContains(err, "Test Error")
+	// mock helper.CheckEmptyFields
+	helperCheckEmptyFields = mockCheckEmptyFields
+	defer func() {
 		helperCheckEmptyFields = helper.CheckEmptyFields
+	}()
+	err = stateMachine.parseImageDefinition()
+	asserter.AssertErrContains(err, "Test Error")
+	helperCheckEmptyFields = helper.CheckEmptyFields
 
-		// mock gojsonschema.Validate
-		gojsonschemaValidate = mockGojsonschemaValidateError
-		defer func() {
-			gojsonschemaValidate = gojsonschema.Validate
-		}()
-		err = stateMachine.parseImageDefinition()
-		asserter.AssertErrContains(err, "Schema validation returned an error")
+	// mock gojsonschema.Validate
+	gojsonschemaValidate = mockGojsonschemaValidateError
+	defer func() {
 		gojsonschemaValidate = gojsonschema.Validate
+	}()
+	err = stateMachine.parseImageDefinition()
+	asserter.AssertErrContains(err, "Schema validation returned an error")
+	gojsonschemaValidate = gojsonschema.Validate
 
-		// mock helper.CheckTags
-		// the gadget must be set to nil for this test to work
-		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
-			"test_image_without_gadget.yaml")
-		helperCheckTags = mockCheckTags
-		defer func() {
-			helperCheckTags = helper.CheckTags
-		}()
-		err = stateMachine.parseImageDefinition()
-		asserter.AssertErrContains(err, "Test Error")
+	// mock helper.CheckTags
+	// the gadget must be set to nil for this test to work
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_image_without_gadget.yaml")
+	helperCheckTags = mockCheckTags
+	defer func() {
 		helperCheckTags = helper.CheckTags
-	})
+	}()
+	err = stateMachine.parseImageDefinition()
+	asserter.AssertErrContains(err, "Test Error")
+	helperCheckTags = helper.CheckTags
 }
 
 // TestClassicStateMachine_calculateStates reads in a variety of yaml files and ensures
@@ -245,74 +241,71 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 // TestFailedCalculateStates tests failure scenarios in the
 // calculateStates function
 func TestFailedCalculateStates(t *testing.T) {
-	t.Run("test_failed_calcluate_states", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Gadget: &imagedefinition.Gadget{
-				GadgetType: "git",
-			},
-			Rootfs: &imagedefinition.Rootfs{
-				ArchiveTasks: []string{"test"},
-			},
-			Customization: &imagedefinition.Customization{},
-			Artifacts:     &imagedefinition.Artifact{},
-		}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Gadget: &imagedefinition.Gadget{
+			GadgetType: "git",
+		},
+		Rootfs: &imagedefinition.Rootfs{
+			ArchiveTasks: []string{"test"},
+		},
+		Customization: &imagedefinition.Customization{},
+		Artifacts:     &imagedefinition.Artifact{},
+	}
 
-		// mock helper.CheckTags
-		// the gadget must be set to nil for this test to work
-		helperCheckTags = mockCheckTags
-		defer func() {
-			helperCheckTags = helper.CheckTags
-		}()
-		err := stateMachine.calculateStates()
-		asserter.AssertErrContains(err, "Test Error")
+	// mock helper.CheckTags
+	// the gadget must be set to nil for this test to work
+	helperCheckTags = mockCheckTags
+	defer func() {
 		helperCheckTags = helper.CheckTags
+	}()
+	err := stateMachine.calculateStates()
+	asserter.AssertErrContains(err, "Test Error")
+	helperCheckTags = helper.CheckTags
 
-		// now set a --thru flag for a state that doesn't exist
-		stateMachine.stateMachineFlags.Thru = "fake_state"
+	// now set a --thru flag for a state that doesn't exist
+	stateMachine.stateMachineFlags.Thru = "fake_state"
 
-		// now calculate the states and ensure that the expected states are in the slice
-		err = stateMachine.calculateStates()
-		asserter.AssertErrContains(err, "not a valid state name")
-	})
+	// now calculate the states and ensure that the expected states are in the slice
+	err = stateMachine.calculateStates()
+	asserter.AssertErrContains(err, "not a valid state name")
 }
 
 // TestPrintStates ensures the states are printed to stdout when the --debug flag is set
 func TestPrintStates(t *testing.T) {
-	t.Run("test_print_states", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.commonFlags.Debug = true
-		stateMachine.commonFlags.DiskInfo = "test" // for coverage!
-		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions", "test_raspi.yaml")
-		err := stateMachine.parseImageDefinition()
-		asserter.AssertErrNil(err, true)
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.commonFlags.Debug = true
+	stateMachine.commonFlags.DiskInfo = "test" // for coverage!
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions", "test_raspi.yaml")
+	err := stateMachine.parseImageDefinition()
+	asserter.AssertErrNil(err, true)
 
-		// capture stdout, calculate the states, and ensure they were printed
-		stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
-		defer restoreStdout()
-		asserter.AssertErrNil(err, true)
+	// capture stdout, calculate the states, and ensure they were printed
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	defer restoreStdout()
+	asserter.AssertErrNil(err, true)
 
-		err = stateMachine.calculateStates()
-		asserter.AssertErrNil(err, true)
+	err = stateMachine.calculateStates()
+	asserter.AssertErrNil(err, true)
 
-		// restore stdout and examine what was printed
-		restoreStdout()
-		readStdout, err := io.ReadAll(stdout)
-		asserter.AssertErrNil(err, true)
+	// restore stdout and examine what was printed
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
 
-		expectedStates := `The calculated states are as follows:
+	expectedStates := `The calculated states are as follows:
 [0] build_gadget_tree
 [1] prepare_gadget_tree
 [2] load_gadget_yaml
@@ -337,215 +330,199 @@ func TestPrintStates(t *testing.T) {
 [21] generate_manifest
 [22] finish
 `
-		if !strings.Contains(string(readStdout), expectedStates) {
-			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
-				expectedStates, string(readStdout))
-		}
-	})
+	if !strings.Contains(string(readStdout), expectedStates) {
+		t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
+			expectedStates, string(readStdout))
+	}
 }
 
 // TestClassicStateMachine_Setup_Fail_setConfDefDir tests a failure in the Setup() function when setting the configuration definition directory
 func TestClassicStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
-	t.Run("test_failed_set_conf_dir", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-		tmpDirPath := filepath.Join("/tmp", "test_failed_set_conf_dir")
-		err := os.Mkdir(tmpDirPath, 0755)
-		t.Cleanup(func() {
-			os.RemoveAll(tmpDirPath)
-		})
-		asserter.AssertErrNil(err, true)
-
-		err = os.Chdir(tmpDirPath)
-		asserter.AssertErrNil(err, true)
-
-		_ = os.RemoveAll(tmpDirPath)
-
-		err = stateMachine.Setup()
-		asserter.AssertErrContains(err, "unable to determine the configuration definition directory")
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	tmpDirPath := filepath.Join("/tmp", "test_failed_set_conf_dir")
+	err := os.Mkdir(tmpDirPath, 0755)
+	t.Cleanup(func() {
+		os.RemoveAll(tmpDirPath)
 	})
+	asserter.AssertErrNil(err, true)
+
+	err = os.Chdir(tmpDirPath)
+	asserter.AssertErrNil(err, true)
+
+	_ = os.RemoveAll(tmpDirPath)
+
+	err = stateMachine.Setup()
+	asserter.AssertErrContains(err, "unable to determine the configuration definition directory")
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestFailedValidateInputClassic tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputClassic(t *testing.T) {
-	t.Run("test_failed_validate_input", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		// use both --until and --thru to trigger this failure
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.stateMachineFlags.Until = "until-test"
-		stateMachine.stateMachineFlags.Thru = "thru-test"
+	// use both --until and --thru to trigger this failure
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.stateMachineFlags.Until = "until-test"
+	stateMachine.stateMachineFlags.Thru = "thru-test"
 
-		err := stateMachine.Setup()
-		asserter.AssertErrContains(err, "cannot specify both --until and --thru")
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	err := stateMachine.Setup()
+	asserter.AssertErrContains(err, "cannot specify both --until and --thru")
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestFailedReadMetadataClassic tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestFailedReadMetadataClassic(t *testing.T) {
-	t.Run("test_failed_read_metadata", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		// start a --resume with no previous SM run
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.stateMachineFlags.Resume = true
-		stateMachine.stateMachineFlags.WorkDir = testDir
+	// start a --resume with no previous SM run
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.stateMachineFlags.Resume = true
+	stateMachine.stateMachineFlags.WorkDir = testDir
 
-		err := stateMachine.Setup()
-		asserter.AssertErrContains(err, "error reading metadata file")
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	err := stateMachine.Setup()
+	asserter.AssertErrContains(err, "error reading metadata file")
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestPrepareGadgetTree runs prepareGadgetTree() and ensures the gadget_tree files
 // are placed in the correct locations
 func TestPrepareGadgetTree(t *testing.T) {
-	t.Run("test_prepare_gadget_tree", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget:       &imagedefinition.Gadget{},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget:       &imagedefinition.Gadget{},
+	}
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	// place a test gadget tree in the  scratch directory so we don't have to build one
+	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+	err = os.MkdirAll(gadgetDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	gadgetSource := filepath.Join("testdata", "gadget_tree")
+	err = osutil.CopySpecialFile(gadgetSource, filepath.Join(gadgetDir, "install"))
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrNil(err, true)
+
+	gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
+	for _, file := range gadgetTreeFiles {
+		_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
+		if err != nil {
+			t.Errorf("File %s should be in unpack, but is missing", file)
 		}
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// place a test gadget tree in the scratch directory so we don't have to build one
-		gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
-		err = os.MkdirAll(gadgetDir, 0755)
-		asserter.AssertErrNil(err, true)
-
-		gadgetSource := filepath.Join("testdata", "gadget_tree")
-		err = osutil.CopySpecialFile(gadgetSource, filepath.Join(gadgetDir, "install"))
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrNil(err, true)
-
-		gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
-		for _, file := range gadgetTreeFiles {
-			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
-			if err != nil {
-				t.Errorf("File %s should be in unpack, but is missing", file)
-			}
-		}
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	}
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestPrepareGadgetTreePrebuilt tests the prepareGadgetTree function with prebuilt gadgets
 func TestPrepareGadgetTreePrebuilt(t *testing.T) {
-	t.Run("test_prepare_gadget_tree_prebuilt", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetType: "prebuilt",
-				GadgetURL:  "testdata/gadget_tree/",
-			},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget: &imagedefinition.Gadget{
+			GadgetType: "prebuilt",
+			GadgetURL:  "testdata/gadget_tree/",
+		},
+	}
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrNil(err, true)
+
+	gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
+	for _, file := range gadgetTreeFiles {
+		_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
+		if err != nil {
+			t.Errorf("File %s should be in unpack, but is missing", file)
 		}
-
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrNil(err, true)
-
-		gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
-		for _, file := range gadgetTreeFiles {
-			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
-			if err != nil {
-				t.Errorf("File %s should be in unpack, but is missing", file)
-			}
-		}
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	}
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestFailedPrepareGadgetTree tests failures in the prepareGadgetTree function
 func TestFailedPrepareGadgetTree(t *testing.T) {
-	t.Run("test_failed_prepare_gadget_tree", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget:       &imagedefinition.Gadget{},
-		}
+	asserter := helper.Asserter{T: t}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget:       &imagedefinition.Gadget{},
+	}
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// place a test gadget tree in the  scratch directory so we don't have to build one
-		gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
-		err = os.MkdirAll(gadgetDir, 0755)
-		asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		gadgetSource := filepath.Join("testdata", "gadget_tree")
-		err = osutil.CopySpecialFile(gadgetSource, filepath.Join(gadgetDir, "install"))
-		asserter.AssertErrNil(err, true)
+	// place a test gadget tree in the  scratch directory so we don't have to build one
+	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+	err = os.MkdirAll(gadgetDir, 0755)
+	asserter.AssertErrNil(err, true)
 
-		// mock os.Mkdir
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrContains(err, "Error creating unpack directory")
+	gadgetSource := filepath.Join("testdata", "gadget_tree")
+	err = osutil.CopySpecialFile(gadgetSource, filepath.Join(gadgetDir, "install"))
+	asserter.AssertErrNil(err, true)
+
+	// mock os.Mkdir
+	osMkdirAll = mockMkdirAll
+	defer func() {
 		osMkdirAll = os.MkdirAll
+	}()
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrContains(err, "Error creating unpack directory")
+	osMkdirAll = os.MkdirAll
 
-		// mock os.ReadDir
-		osReadDir = mockReadDir
-		defer func() {
-			osReadDir = os.ReadDir
-		}()
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrContains(err, "Error reading gadget tree")
+	// mock os.ReadDir
+	osReadDir = mockReadDir
+	defer func() {
 		osReadDir = os.ReadDir
+	}()
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrContains(err, "Error reading gadget tree")
+	osReadDir = os.ReadDir
 
-		// mock osutil.CopySpecialFile
-		osutilCopySpecialFile = mockCopySpecialFile
-		defer func() {
-			osutilCopySpecialFile = osutil.CopySpecialFile
-		}()
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrContains(err, "Error copying gadget tree")
+	// mock osutil.CopySpecialFile
+	osutilCopySpecialFile = mockCopySpecialFile
+	defer func() {
 		osutilCopySpecialFile = osutil.CopySpecialFile
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	}()
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrContains(err, "Error copying gadget tree")
+	osutilCopySpecialFile = osutil.CopySpecialFile
 }
 
 // TestVerifyArtifactNames unit tests the verifyArtifactNames function
@@ -861,7 +838,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_verify_artifact_names_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
@@ -884,7 +861,6 @@ func TestVerifyArtifactNames(t *testing.T) {
 				},
 			}
 
-			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 
@@ -911,19 +887,17 @@ func TestVerifyArtifactNames(t *testing.T) {
 
 // TestBuildRootfsFromTasks unit tests the buildRootfsFromTasks function
 func TestBuildRootfsFromTasks(t *testing.T) {
-	t.Run("test_build_rootfs_from_tasks", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-		err := stateMachine.buildRootfsFromTasks()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.buildRootfsFromTasks()
+	asserter.AssertErrNil(err, true)
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestExtractRootfsTar unit tests the extractRootfsTar function
@@ -1000,7 +974,7 @@ func TestExtractRootfsTar(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_extract_rootfs_tar_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			restoreCWD := helper.SaveCWD()
 			defer restoreCWD()
@@ -1021,9 +995,10 @@ func TestExtractRootfsTar(t *testing.T) {
 			err := stateMachine.setConfDefDir(filepath.Join(wd, "image_definition.yaml"))
 			asserter.AssertErrNil(err, true)
 
-			// need workdir set up for this
 			err = stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
+
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			err = stateMachine.extractRootfsTar()
 			asserter.AssertErrNil(err, true)
@@ -1034,63 +1009,59 @@ func TestExtractRootfsTar(t *testing.T) {
 					t.Errorf("File %s should be in chroot, but is missing", testFile)
 				}
 			}
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
 }
 
 // TestFailedExtractRootfsTar tests failures in the extractRootfsTar function
 func TestFailedExtractRootfsTar(t *testing.T) {
-	t.Run("test_failed_extract_rootfs_tar", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		tarPath := filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar")
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Tarball: &imagedefinition.Tarball{
-					TarballURL: fmt.Sprintf("file://%s", tarPath),
-					SHA256sum:  "fail",
-				},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	tarPath := filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar")
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Tarball: &imagedefinition.Tarball{
+				TarballURL: fmt.Sprintf("file://%s", tarPath),
+				SHA256sum:  "fail",
 			},
-		}
+		},
+	}
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// mock os.Mkdir
-		osMkdir = mockMkdir
-		defer func() {
-			osMkdir = os.Mkdir
-		}()
-		err = stateMachine.extractRootfsTar()
-		asserter.AssertErrContains(err, "Failed to create chroot directory")
+	// mock os.Mkdir
+	osMkdir = mockMkdir
+	defer func() {
 		osMkdir = os.Mkdir
+	}()
+	err = stateMachine.extractRootfsTar()
+	asserter.AssertErrContains(err, "Failed to create chroot directory")
+	osMkdir = os.Mkdir
 
-		// clean up chroot directory
-		os.RemoveAll(stateMachine.tempDirs.chroot)
+	// clean up chroot directory
+	os.RemoveAll(stateMachine.tempDirs.chroot)
 
-		// now test with the incorrect SHA256sum
-		err = stateMachine.extractRootfsTar()
-		asserter.AssertErrContains(err, "Calculated SHA256 sum of rootfs tarball")
+	// now test with the incorrect SHA256sum
+	err = stateMachine.extractRootfsTar()
+	asserter.AssertErrContains(err, "Calculated SHA256 sum of rootfs tarball")
 
-		// clean up chroot directory
-		os.RemoveAll(stateMachine.tempDirs.chroot)
+	// clean up chroot directory
+	os.RemoveAll(stateMachine.tempDirs.chroot)
 
-		// use a tarball that doesn't exist to trigger a failure in computing
-		// the SHA256 sum
-		stateMachine.ImageDef.Rootfs.Tarball.TarballURL = "file:///fakefile"
-		err = stateMachine.extractRootfsTar()
-		asserter.AssertErrContains(err, "Error opening file \"/fakefile\" to calculate SHA256 sum")
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	// use a tarball that doesn't exist to trigger a failure in computing
+	// the SHA256 sum
+	stateMachine.ImageDef.Rootfs.Tarball.TarballURL = "file:///fakefile"
+	err = stateMachine.extractRootfsTar()
+	asserter.AssertErrContains(err, "Error opening file \"/fakefile\" to calculate SHA256 sum")
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestStateMachine_customizeCloudInit unit tests the customizeCloudInit method
@@ -1427,121 +1398,126 @@ chpasswd:
 
 // TestStateMachine_manualCustomization unit tests the manualCustomization function
 func TestStateMachine_manualCustomization(t *testing.T) {
-	t.Run("test_manual_customization", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		restoreCWD := helper.SaveCWD()
-		defer restoreCWD()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
-			},
-			Customization: &imagedefinition.Customization{
-				Manual: &imagedefinition.Manual{
-					MakeDirs: []*imagedefinition.MakeDirs{
-						{
-							Path:        "/etc/foo/bar",
-							Permissions: 0755,
-						},
-						{
-							Path:        "/etc/baz/test",
-							Permissions: 0644,
-						},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{
+			Manual: &imagedefinition.Manual{
+				MakeDirs: []*imagedefinition.MakeDirs{
+					{
+						Path:        "/etc/foo/bar",
+						Permissions: 0755,
 					},
-					CopyFile: []*imagedefinition.CopyFile{
-						{
-							Source: filepath.Join("testdata", "test_script"),
-							Dest:   "/test_copy_file",
-						},
+					{
+						Path:        "/etc/baz/test",
+						Permissions: 0644,
 					},
-					TouchFile: []*imagedefinition.TouchFile{
-						{
-							TouchPath: "/test_touch_file",
-						},
+				},
+				CopyFile: []*imagedefinition.CopyFile{
+					{
+						Source: filepath.Join("testdata", "test_script"),
+						Dest:   "/test_copy_file",
 					},
-					Execute: []*imagedefinition.Execute{
-						{
-							// the file we already copied creates a file /test_execute
-							ExecutePath: "/test_copy_file",
-						},
+				},
+				TouchFile: []*imagedefinition.TouchFile{
+					{
+						TouchPath: "/test_touch_file",
 					},
-					AddUser: []*imagedefinition.AddUser{
-						{
-							UserName: "testuser",
-							UserID:   "123456",
-						},
+				},
+				Execute: []*imagedefinition.Execute{
+					{
+						// the file we already copied creates a file /test_execute
+						ExecutePath: "/test_copy_file",
 					},
-					AddGroup: []*imagedefinition.AddGroup{
-						{
-							GroupName: "testgroup",
-							GroupID:   "456789",
-						},
+				},
+				AddUser: []*imagedefinition.AddUser{
+					{
+						UserName: "testuser",
+						UserID:   "123456",
+					},
+				},
+				AddGroup: []*imagedefinition.AddGroup{
+					{
+						GroupName: "testgroup",
+						GroupID:   "456789",
 					},
 				},
 			},
+		},
+	}
+
+	d, _ := os.Getwd()
+	err := stateMachine.setConfDefDir(filepath.Join(d, "image_definition.yaml"))
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	// also create chroot
+	err = stateMachine.createChroot()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.manualCustomization()
+	asserter.AssertErrNil(err, true)
+
+	// Check that the correct directories exist
+	testDirectories := []string{"/etc/foo/bar", "/etc/baz/test"}
+	for _, dirName := range testDirectories {
+		_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, dirName))
+		if err != nil {
+			t.Errorf("directory %s should exist, but it does not", dirName)
 		}
+	}
 
-		d, _ := os.Getwd()
-		err := stateMachine.setConfDefDir(filepath.Join(d, "image_definition.yaml"))
-		asserter.AssertErrNil(err, true)
-
-		// need workdir set up for this
-		err = stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// also create chroot
-		err = stateMachine.createChroot()
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.manualCustomization()
-		asserter.AssertErrNil(err, true)
-
-		// Check that the correct directories exist
-		testDirectories := []string{"/etc/foo/bar", "/etc/baz/test"}
-		for _, dirName := range testDirectories {
-			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, dirName))
-			if err != nil {
-				t.Errorf("directory %s should exist, but it does not", dirName)
-			}
+	// Check that the correct files exist
+	testFiles := []string{"test_copy_file", "test_touch_file", "test_execute"}
+	for _, fileName := range testFiles {
+		_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, fileName))
+		if err != nil {
+			t.Errorf("file %s should exist, but it does not", fileName)
 		}
+	}
 
-		// Check that the correct files exist
-		testFiles := []string{"test_copy_file", "test_touch_file", "test_execute"}
-		for _, fileName := range testFiles {
-			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, fileName))
-			if err != nil {
-				t.Errorf("file %s should exist, but it does not", fileName)
-			}
-		}
+	// Check that the test user exists with the correct uid
+	passwdFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "passwd")
+	passwdContents, err := os.ReadFile(passwdFile)
+	asserter.AssertErrNil(err, true)
+	if !strings.Contains(string(passwdContents), "testuser:x:123456") {
+		t.Errorf("Test user was not created in the chroot")
+	}
 
-		// Check that the test user exists with the correct uid
-		passwdFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "passwd")
-		passwdContents, err := os.ReadFile(passwdFile)
-		asserter.AssertErrNil(err, true)
-		if !strings.Contains(string(passwdContents), "testuser:x:123456") {
-			t.Errorf("Test user was not created in the chroot")
-		}
+	// Check that the test group exists with the correct gid
+	groupFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "group")
+	groupContents, err := os.ReadFile(groupFile)
+	asserter.AssertErrNil(err, true)
+	if !strings.Contains(string(groupContents), "testgroup:x:456789") {
+		t.Errorf("Test group was not created in the chroot")
+	}
 
-		// Check that the test group exists with the correct gid
-		groupFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "group")
-		groupContents, err := os.ReadFile(groupFile)
-		asserter.AssertErrNil(err, true)
-		if !strings.Contains(string(groupContents), "testgroup:x:456789") {
-			t.Errorf("Test group was not created in the chroot")
-		}
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestStateMachine_manualCustomization_fail tests failures in the manualCustomization function
 func TestStateMachine_manualCustomization_fail(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	t.Run("test_failed_manual_customization", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		restoreCWD := helper.SaveCWD()
@@ -1551,7 +1527,6 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 		stateMachine.parent = &stateMachine
 
-		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
@@ -1653,9 +1628,10 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 		},
 	}
 
-	// need workdir set up for this
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// also create chroot
 	err = stateMachine.createChroot()
@@ -1687,372 +1663,373 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 
 		})
 	}
-	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestPrepareClassicImage unit tests the prepareClassicImage function
 func TestPrepareClassicImage(t *testing.T) {
-	t.Run("test_prepare_classic_image", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Snaps = []string{"lxd"}
-		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Customization: &imagedefinition.Customization{
-				ExtraSnaps: []*imagedefinition.Snap{
-					{
-						SnapName: "hello",
-						Channel:  "candidate",
-					},
-					{
-						SnapName: "core20",
-					},
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Snaps = []string{"lxd"}
+	stateMachine.commonFlags.Channel = "stable"
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Customization: &imagedefinition.Customization{
+			ExtraSnaps: []*imagedefinition.Snap{
+				{
+					SnapName: "hello",
+					Channel:  "candidate",
+				},
+				{
+					SnapName: "core20",
 				},
 			},
-		}
+		},
+	}
 
-		err := stateMachine.makeTemporaryDirectories()
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrNil(err, true)
+
+	// check that the lxd and hello snaps, as well as lxd's base, core20
+	// were prepareed in the correct location
+	snaps := map[string]string{"lxd": "stable", "hello": "candidate", "core20": "stable"}
+	for snapName, snapChannel := range snaps {
+		// reach out to the snap store to find the revision
+		// of the snap for the specified channel
+		snapStore := store.New(nil, nil)
+		snapSpec := store.SnapSpec{Name: snapName}
+		context := context.TODO() //context can be empty, just not nil
+		snapInfo, err := snapStore.SnapInfo(context, snapSpec, nil)
 		asserter.AssertErrNil(err, true)
 
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrNil(err, true)
+		storeRevision := snapInfo.Channels["latest/"+snapChannel].Revision.N
+		snapFileName := fmt.Sprintf("%s_%d.snap", snapName, storeRevision)
 
-		// check that the lxd and hello snaps, as well as lxd's base, core20
-		// were prepareed in the correct location
-		snaps := map[string]string{"lxd": "stable", "hello": "candidate", "core20": "stable"}
-		for snapName, snapChannel := range snaps {
-			// reach out to the snap store to find the revision
-			// of the snap for the specified channel
-			snapStore := store.New(nil, nil)
-			snapSpec := store.SnapSpec{Name: snapName}
-			context := context.TODO() //context can be empty, just not nil
-			snapInfo, err := snapStore.SnapInfo(context, snapSpec, nil)
-			asserter.AssertErrNil(err, true)
-
-			storeRevision := snapInfo.Channels["latest/"+snapChannel].Revision.N
-			snapFileName := fmt.Sprintf("%s_%d.snap", snapName, storeRevision)
-
-			snapPath := filepath.Join(stateMachine.tempDirs.chroot,
-				"var", "lib", "snapd", "seed", "snaps", snapFileName)
-			_, err = os.Stat(snapPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					t.Errorf("File %s should exist, but does not", snapPath)
-				}
+		snapPath := filepath.Join(stateMachine.tempDirs.chroot,
+			"var", "lib", "snapd", "seed", "snaps", snapFileName)
+		_, err = os.Stat(snapPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("File %s should exist, but does not", snapPath)
 			}
 		}
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	}
 }
 
 // TestClassicSnapRevisions tests that if revisions are specified in the image definition
 // that the corresponding revisions are staged in the chroot
 func TestClassicSnapRevisions(t *testing.T) {
-	t.Run("test_classic_snap_revisions", func(t *testing.T) {
-		if runtime.GOARCH != "amd64" {
-			t.Skip("Test for amd64 only")
-		}
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	if runtime.GOARCH != "amd64" {
+		t.Skip("Test for amd64 only")
+	}
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Snaps = []string{"lxd"}
-		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Customization: &imagedefinition.Customization{
-				ExtraSnaps: []*imagedefinition.Snap{
-					{
-						SnapName:     "hello",
-						SnapRevision: 38,
-					},
-					{
-						SnapName:     "ubuntu-image",
-						SnapRevision: 330,
-					},
-					{
-						SnapName:     "core20",
-						SnapRevision: 1852,
-					},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Snaps = []string{"lxd"}
+	stateMachine.commonFlags.Channel = "stable"
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Customization: &imagedefinition.Customization{
+			ExtraSnaps: []*imagedefinition.Snap{
+				{
+					SnapName:     "hello",
+					SnapRevision: 38,
+				},
+				{
+					SnapName:     "ubuntu-image",
+					SnapRevision: 330,
+				},
+				{
+					SnapName:     "core20",
+					SnapRevision: 1852,
 				},
 			},
-		}
+		},
+	}
 
-		err := stateMachine.makeTemporaryDirectories()
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrNil(err, true)
+
+	for _, snapInfo := range stateMachine.ImageDef.Customization.ExtraSnaps {
+		// compile a regex used to get revision numbers from seed.manifest
+		revRegex, err := regexp.Compile(fmt.Sprintf("%s_(.*?).snap\n", snapInfo.SnapName))
+		asserter.AssertErrNil(err, true)
+		seedData, err := os.ReadFile(filepath.Join(
+			stateMachine.tempDirs.chroot,
+			"var",
+			"lib",
+			"snapd",
+			"seed",
+			"seed.yaml",
+		))
+		asserter.AssertErrNil(err, true)
+		revString := revRegex.FindStringSubmatch(string(seedData))
+		if len(revString) != 2 {
+			t.Fatal("Error finding snap revision via regex")
+		}
+		seededRevision, err := strconv.Atoi(revString[1])
 		asserter.AssertErrNil(err, true)
 
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrNil(err, true)
-
-		for _, snapInfo := range stateMachine.ImageDef.Customization.ExtraSnaps {
-			// compile a regex used to get revision numbers from seed.manifest
-			revRegex, err := regexp.Compile(fmt.Sprintf("%s_(.*?).snap\n", snapInfo.SnapName))
-			asserter.AssertErrNil(err, true)
-			seedData, err := os.ReadFile(filepath.Join(
-				stateMachine.tempDirs.chroot,
-				"var",
-				"lib",
-				"snapd",
-				"seed",
-				"seed.yaml",
-			))
-			asserter.AssertErrNil(err, true)
-			revString := revRegex.FindStringSubmatch(string(seedData))
-			if len(revString) != 2 {
-				t.Fatal("Error finding snap revision via regex")
-			}
-			seededRevision, err := strconv.Atoi(revString[1])
-			asserter.AssertErrNil(err, true)
-
-			if seededRevision != snapInfo.SnapRevision {
-				t.Errorf("Error, expected snap %s to "+
-					"be revision %d, but it was %d",
-					snapInfo.SnapName, snapInfo.SnapRevision, seededRevision)
-			}
+		if seededRevision != snapInfo.SnapRevision {
+			t.Errorf("Error, expected snap %s to "+
+				"be revision %d, but it was %d",
+				snapInfo.SnapName, snapInfo.SnapRevision, seededRevision)
 		}
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	}
 }
 
 // TestFailedPrepareClassicImage tests failures in the prepareClassicImage function
 func TestFailedPrepareClassicImage(t *testing.T) {
-	t.Run("test_failed_prepare_classic_image", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Customization: &imagedefinition.Customization{
-				ExtraSnaps: []*imagedefinition.Snap{},
-			},
-		}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Customization: &imagedefinition.Customization{
+			ExtraSnaps: []*imagedefinition.Snap{},
+		},
+	}
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// include an invalid snap snap name to trigger a failure in
-		// parseSnapsAndChannels
-		stateMachine.Snaps = []string{"lxd=test=invalid=name"}
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrContains(err, "Invalid syntax")
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		// try to include a nonexistent snap to trigger a failure
-		// in snapStore.SnapInfo
-		stateMachine.Snaps = []string{"test-this-snap-name-should-never-exist"}
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrContains(err, "Error getting info for snap")
+	// include an invalid snap snap name to trigger a failure in
+	// parseSnapsAndChannels
+	stateMachine.Snaps = []string{"lxd=test=invalid=name"}
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrContains(err, "Invalid syntax")
 
-		// mock image.Prepare
-		stateMachine.Snaps = []string{"hello", "core"}
-		imagePrepare = mockImagePrepare
-		defer func() {
-			imagePrepare = image.Prepare
-		}()
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrContains(err, "Error preparing image")
+	// try to include a nonexistent snap to trigger a failure
+	// in snapStore.SnapInfo
+	stateMachine.Snaps = []string{"test-this-snap-name-should-never-exist"}
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrContains(err, "Error getting info for snap")
+
+	// mock image.Prepare
+	stateMachine.Snaps = []string{"hello", "core"}
+	imagePrepare = mockImagePrepare
+	t.Cleanup(func() {
 		imagePrepare = image.Prepare
-
-		// preseed the chroot, create a state.json file to trigger a reset, and mock some related functions
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrNil(err, true)
-		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "snapd", "state.json"))
-		asserter.AssertErrNil(err, true)
-
-		seedOpen = mockSeedOpen
-		defer func() {
-			seedOpen = seed.Open
-		}()
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrContains(err, "Error getting list of preseeded snaps")
-		seedOpen = seed.Open
-
-		// Setup the exec.Command mock
-		testCaseName = "TestFailedPrepareClassicImage"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrContains(err, "Error resetting preseeding")
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrContains(err, "Error preparing image")
+	imagePrepare = image.Prepare
+
+	// preseed the chroot, create a state.json file to trigger a reset, and mock some related functions
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "snapd", "state.json"))
+	asserter.AssertErrNil(err, true)
+
+	seedOpen = mockSeedOpen
+	t.Cleanup(func() {
+		seedOpen = seed.Open
+	})
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrContains(err, "Error getting list of preseeded snaps")
+	seedOpen = seed.Open
+
+	// Setup the exec.Command mock
+	testCaseName = "TestFailedPrepareClassicImage"
+	execCommand = fakeExecCommand
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrContains(err, "Error resetting preseeding")
 }
 
 // TestStateMachine_PopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
 // the rootfs to ensure at least some of the correct file are in place
 func TestStateMachine_PopulateClassicRootfsContents(t *testing.T) {
-	t.Run("test_populate_classic_rootfs_contents", func(t *testing.T) {
-		if runtime.GOARCH != "amd64" {
-			t.Skip("Test for amd64 only")
-		}
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
-			},
-			Customization: &imagedefinition.Customization{},
-		}
+	if runtime.GOARCH != "amd64" {
+		t.Skip("Test for amd64 only")
+	}
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{},
+	}
 
-		// also create chroot
-		err = stateMachine.createChroot()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		// check the files before Teardown
-		fileList := []string{filepath.Join("etc", "shadow"),
-			filepath.Join("etc", "systemd"),
-			filepath.Join("usr", "lib")}
-		for _, file := range fileList {
-			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
-			if err != nil {
-				if os.IsNotExist(err) {
-					t.Errorf("File %s should exist, but does not", file)
-				}
+	// also create chroot
+	err = stateMachine.createChroot()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.populateClassicRootfsContents()
+	asserter.AssertErrNil(err, true)
+
+	// check the files before Teardown
+	fileList := []string{filepath.Join("etc", "shadow"),
+		filepath.Join("etc", "systemd"),
+		filepath.Join("usr", "lib")}
+	for _, file := range fileList {
+		_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("File %s should exist, but does not", file)
 			}
 		}
+	}
 
-		// return when Customization.Fstab is not empty
-		stateMachine.ImageDef.Customization.Fstab = []*imagedefinition.Fstab{
-			{
-				Label:        "writable",
-				Mountpoint:   "/",
-				FSType:       "ext4",
-				MountOptions: "defaults",
-				Dump:         true,
-				FsckOrder:    1,
-			},
-		}
+	// return when Customization.Fstab is not empty
+	stateMachine.ImageDef.Customization.Fstab = []*imagedefinition.Fstab{
+		{
+			Label:        "writable",
+			Mountpoint:   "/",
+			FSType:       "ext4",
+			MountOptions: "defaults",
+			Dump:         true,
+			FsckOrder:    1,
+		},
+	}
 
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrNil(err, true)
+	err = stateMachine.populateClassicRootfsContents()
+	asserter.AssertErrNil(err, true)
 
-		// return when no Customization
-		stateMachine.ImageDef.Customization = nil
+	// return when no Customization
+	stateMachine.ImageDef.Customization = nil
 
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrNil(err, true)
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	err = stateMachine.populateClassicRootfsContents()
+	asserter.AssertErrNil(err, true)
 }
 
 // TestStateMachine_FailedPopulateClassicRootfsContents tests failed scenarios in populateClassicRootfsContents
 // this is accomplished by mocking functions
 func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
-	t.Run("test_failed_populate_classic_rootfs_contents", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
-			},
-			Customization: &imagedefinition.Customization{},
-		}
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	asserter := helper.Asserter{T: t}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{},
+	}
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		// also create chroot
-		err = stateMachine.createChroot()
-		asserter.AssertErrNil(err, true)
+	// also create chroot
+	err = stateMachine.createChroot()
+	asserter.AssertErrNil(err, true)
 
-		// mock os.ReadDir
-		osReadDir = mockReadDir
-		defer func() {
-			osReadDir = os.ReadDir
-		}()
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error reading unpack/chroot dir")
+	// mock os.ReadDir
+	osReadDir = mockReadDir
+	t.Cleanup(func() {
 		osReadDir = os.ReadDir
+	})
+	err = stateMachine.populateClassicRootfsContents()
+	asserter.AssertErrContains(err, "Error reading unpack/chroot dir")
+	osReadDir = os.ReadDir
 
-		// mock osutil.CopySpecialFile
-		osutilCopySpecialFile = mockCopySpecialFile
-		defer func() {
-			osutilCopySpecialFile = osutil.CopySpecialFile
-		}()
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error copying rootfs")
+	// mock osutil.CopySpecialFile
+	osutilCopySpecialFile = mockCopySpecialFile
+	t.Cleanup(func() {
 		osutilCopySpecialFile = osutil.CopySpecialFile
+	})
+	err = stateMachine.populateClassicRootfsContents()
+	asserter.AssertErrContains(err, "Error copying rootfs")
+	osutilCopySpecialFile = osutil.CopySpecialFile
 
-		// mock os.WriteFile
-		osWriteFile = mockWriteFile
-		defer func() {
-			osWriteFile = os.WriteFile
-		}()
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error writing to fstab")
+	// mock os.WriteFile
+	osWriteFile = mockWriteFile
+	t.Cleanup(func() {
 		osWriteFile = os.WriteFile
+	})
+	err = stateMachine.populateClassicRootfsContents()
+	asserter.AssertErrContains(err, "Error writing to fstab")
+	osWriteFile = os.WriteFile
 
-		// mock os.ReadFile
-		osReadFile = mockReadFile
-		defer func() {
-			osReadFile = os.ReadFile
-		}()
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error reading fstab")
+	// mock os.ReadFile
+	osReadFile = mockReadFile
+	t.Cleanup(func() {
 		osReadFile = os.ReadFile
+	})
+	err = stateMachine.populateClassicRootfsContents()
+	asserter.AssertErrContains(err, "Error reading fstab")
+	osReadFile = os.ReadFile
 
-		// return when existing fstab contains LABEL=writable
-		//nolint:gosec,G306
-		err = os.WriteFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
-			[]byte("LABEL=writable\n"),
-			0644)
-		asserter.AssertErrNil(err, true)
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrNil(err, true)
+	// return when existing fstab contains LABEL=writable
+	//nolint:gosec,G306
+	err = os.WriteFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
+		[]byte("LABEL=writable\n"),
+		0644)
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.populateClassicRootfsContents()
+	asserter.AssertErrNil(err, true)
 
-		// create an /etc/resolv.conf.tmp in the chroot
-		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
-		asserter.AssertErrNil(err, true)
-		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
-		asserter.AssertErrNil(err, true)
+	// create an /etc/resolv.conf.tmp in the chroot
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
+	asserter.AssertErrNil(err, true)
 
-		// mock helper.RestoreResolvConf
-		helperRestoreResolvConf = mockRestoreResolvConf
-		defer func() {
-			helperRestoreResolvConf = helper.RestoreResolvConf
-		}()
-		err = stateMachine.populateClassicRootfsContents()
-		asserter.AssertErrContains(err, "Error restoring /etc/resolv.conf")
+	// mock helper.RestoreResolvConf
+	helperRestoreResolvConf = mockRestoreResolvConf
+	t.Cleanup(func() {
 		helperRestoreResolvConf = helper.RestoreResolvConf
 	})
+	err = stateMachine.populateClassicRootfsContents()
+	asserter.AssertErrContains(err, "Error restoring /etc/resolv.conf")
+	helperRestoreResolvConf = helper.RestoreResolvConf
 }
 
 // TestSateMachine_customizeSourcesList tests functionality of the customizeSourcesList state function
@@ -2237,7 +2214,6 @@ UUID=1234-5678	/	ext4	defaults	0	0
 			err := helper.SetDefaults(&stateMachine.ImageDef)
 			asserter.AssertErrNil(err, true)
 
-			// need workdir set up for this
 			err = stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 
@@ -2269,527 +2245,526 @@ UUID=1234-5678	/	ext4	defaults	0	0
 
 // TestGeneratePackageManifest tests if classic image manifest generation works
 func TestGeneratePackageManifest(t *testing.T) {
-	t.Run("test_generate_package_manifest", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
+	asserter := helper.Asserter{T: t}
 
-		// Setup the exec.Command mock
-		testCaseName = "TestGeneratePackageManifest"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		// We need the output directory set for this
-		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
-		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(outputDir)
+	// Setup the exec.Command mock
+	testCaseName = "TestGeneratePackageManifest"
+	execCommand = fakeExecCommand
+	defer func() {
+		execCommand = exec.Command
+	}()
+	// We need the output directory set for this
+	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	defer os.RemoveAll(outputDir)
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.commonFlags.OutputDir = outputDir
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.commonFlags.OutputDir = outputDir
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{},
+		Artifacts: &imagedefinition.Artifact{
+			Manifest: &imagedefinition.Manifest{
+				ManifestName: "filesystem.manifest",
 			},
-			Customization: &imagedefinition.Customization{},
-			Artifacts: &imagedefinition.Artifact{
-				Manifest: &imagedefinition.Manifest{
-					ManifestName: "filesystem.manifest",
-				},
-			},
-		}
-		err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
-		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
+		},
+	}
+	err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+	asserter.AssertErrNil(err, true)
+	defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
 
-		err = stateMachine.generatePackageManifest()
-		asserter.AssertErrNil(err, true)
+	err = stateMachine.generatePackageManifest()
+	asserter.AssertErrNil(err, true)
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		// Check if manifest file got generated and if it has expected contents
-		manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
-		manifestBytes, err := os.ReadFile(manifestPath)
-		asserter.AssertErrNil(err, true)
-		// The order of packages shouldn't matter
-		examplePackages := []string{"foo 1.2", "bar 1.4-1ubuntu4.1", "libbaz 0.1.3ubuntu2"}
-		for _, pkg := range examplePackages {
-			if !strings.Contains(string(manifestBytes), pkg) {
-				t.Errorf("filesystem.manifest does not contain expected package: %s", pkg)
-			}
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	// Check if manifest file got generated and if it has expected contents
+	manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
+	manifestBytes, err := os.ReadFile(manifestPath)
+	asserter.AssertErrNil(err, true)
+	// The order of packages shouldn't matter
+	examplePackages := []string{"foo 1.2", "bar 1.4-1ubuntu4.1", "libbaz 0.1.3ubuntu2"}
+	for _, pkg := range examplePackages {
+		if !strings.Contains(string(manifestBytes), pkg) {
+			t.Errorf("filesystem.manifest does not contain expected package: %s", pkg)
 		}
-	})
+	}
 }
 
 // TestFailedGeneratePackageManifest tests if classic manifest generation failures are reported
 func TestFailedGeneratePackageManifest(t *testing.T) {
-	t.Run("test_failed_generate_package_manifest", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
+	asserter := helper.Asserter{T: t}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{},
+		Artifacts: &imagedefinition.Artifact{
+			Manifest: &imagedefinition.Manifest{
+				ManifestName: "filesystem.manifest",
 			},
-			Customization: &imagedefinition.Customization{},
-			Artifacts: &imagedefinition.Artifact{
-				Manifest: &imagedefinition.Manifest{
-					ManifestName: "filesystem.manifest",
-				},
-			},
-		}
+		},
+	}
 
-		// We need the output directory set for this
-		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
-		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(outputDir)
-		stateMachine.commonFlags.OutputDir = outputDir
+	// We need the output directory set for this
+	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	defer os.RemoveAll(outputDir)
+	stateMachine.commonFlags.OutputDir = outputDir
 
-		// Setup the exec.Command mock - version from the success test
-		testCaseName = "TestGeneratePackageManifest"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
+	// Setup the exec.Command mock - version from the success test
+	testCaseName = "TestGeneratePackageManifest"
+	execCommand = fakeExecCommand
+	defer func() {
+		execCommand = exec.Command
+	}()
 
-		// Setup the mock for os.Create, making those fail
-		osCreate = mockCreate
-		defer func() {
-			osCreate = os.Create
-		}()
-
-		err = stateMachine.generatePackageManifest()
-		asserter.AssertErrContains(err, "Error creating manifest file")
+	// Setup the mock for os.Create, making those fail
+	osCreate = mockCreate
+	defer func() {
 		osCreate = os.Create
+	}()
 
-		// Setup the exec.Command mock - version from the fail test
-		testCaseName = "TestFailedGeneratePackageManifest"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		err = stateMachine.generatePackageManifest()
-		asserter.AssertErrContains(err, "Error generating package manifest with command")
-	})
+	err = stateMachine.generatePackageManifest()
+	asserter.AssertErrContains(err, "Error creating manifest file")
+	osCreate = os.Create
+
+	// Setup the exec.Command mock - version from the fail test
+	testCaseName = "TestFailedGeneratePackageManifest"
+	execCommand = fakeExecCommand
+	defer func() {
+		execCommand = exec.Command
+	}()
+	err = stateMachine.generatePackageManifest()
+	asserter.AssertErrContains(err, "Error generating package manifest with command")
 }
 
 // TestGenerateFilelist tests if classic image filelist generation works
 func TestGenerateFilelist(t *testing.T) {
-	t.Run("test_generate_filelist", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
+	asserter := helper.Asserter{T: t}
 
-		// Setup the exec.Command mock
-		testCaseName = "TestGenerateFilelist"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		// We need the output directory set for this
-		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
-		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(outputDir)
+	// Setup the exec.Command mock
+	testCaseName = "TestGenerateFilelist"
+	execCommand = fakeExecCommand
+	defer func() {
+		execCommand = exec.Command
+	}()
+	// We need the output directory set for this
+	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	defer os.RemoveAll(outputDir)
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.commonFlags.OutputDir = outputDir
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.commonFlags.OutputDir = outputDir
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{},
+		Artifacts: &imagedefinition.Artifact{
+			Filelist: &imagedefinition.Filelist{
+				FilelistName: "filesystem.filelist",
 			},
-			Customization: &imagedefinition.Customization{},
-			Artifacts: &imagedefinition.Artifact{
-				Filelist: &imagedefinition.Filelist{
-					FilelistName: "filesystem.filelist",
-				},
-			},
-		}
-		err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
-		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
+		},
+	}
+	err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+	asserter.AssertErrNil(err, true)
+	defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
 
-		err = stateMachine.generateFilelist()
-		asserter.AssertErrNil(err, true)
+	err = stateMachine.generateFilelist()
+	asserter.AssertErrNil(err, true)
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		// Check if filelist file got generated
-		filelistPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.filelist")
-		_, err = os.Stat(filelistPath)
-		asserter.AssertErrNil(err, true)
-	})
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	// Check if filelist file got generated
+	filelistPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.filelist")
+	_, err = os.Stat(filelistPath)
+	asserter.AssertErrNil(err, true)
 }
 
 // TestFailedGenerateFilelist tests if classic filelist generation failures are reported
 func TestFailedGenerateFilelist(t *testing.T) {
-	t.Run("test_failed_generate_filelist", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
+	asserter := helper.Asserter{T: t}
 
-		// Setup the exec.Command mock - version from the success test
-		testCaseName = "TestGenerateFilelist"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		// Setup the mock for os.Create, making those fail
-		osCreate = mockCreate
-		defer func() {
-			osCreate = os.Create
-		}()
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
-			},
-			Customization: &imagedefinition.Customization{},
-			Artifacts: &imagedefinition.Artifact{
-				Filelist: &imagedefinition.Filelist{
-					FilelistName: "filesystem.filelist",
-				},
-			},
-		}
-
-		// We need the output directory set for this
-		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
-		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(outputDir)
-		stateMachine.commonFlags.OutputDir = outputDir
-
-		// Setup the exec.Command mock - version from the success test
-		testCaseName = "TestGenerateFilelist"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-
-		// Setup the mock for os.Create, making those fail
-		osCreate = mockCreate
-		defer func() {
-			osCreate = os.Create
-		}()
-
-		err = stateMachine.generateFilelist()
-		asserter.AssertErrContains(err, "Error creating filelist")
+	// Setup the exec.Command mock - version from the success test
+	testCaseName = "TestGenerateFilelist"
+	execCommand = fakeExecCommand
+	defer func() {
+		execCommand = exec.Command
+	}()
+	// Setup the mock for os.Create, making those fail
+	osCreate = mockCreate
+	defer func() {
 		osCreate = os.Create
+	}()
 
-		// Setup the exec.Command mock - version from the fail test
-		testCaseName = "TestFailedGenerateFilelist"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		err = stateMachine.generateFilelist()
-		asserter.AssertErrContains(err, "Error generating file list with command")
-	})
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{},
+		Artifacts: &imagedefinition.Artifact{
+			Filelist: &imagedefinition.Filelist{
+				FilelistName: "filesystem.filelist",
+			},
+		},
+	}
+
+	// We need the output directory set for this
+	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	defer os.RemoveAll(outputDir)
+	stateMachine.commonFlags.OutputDir = outputDir
+
+	// Setup the exec.Command mock - version from the success test
+	testCaseName = "TestGenerateFilelist"
+	execCommand = fakeExecCommand
+	defer func() {
+		execCommand = exec.Command
+	}()
+
+	// Setup the mock for os.Create, making those fail
+	osCreate = mockCreate
+	defer func() {
+		osCreate = os.Create
+	}()
+
+	err = stateMachine.generateFilelist()
+	asserter.AssertErrContains(err, "Error creating filelist")
+	osCreate = os.Create
+
+	// Setup the exec.Command mock - version from the fail test
+	testCaseName = "TestFailedGenerateFilelist"
+	execCommand = fakeExecCommand
+	defer func() {
+		execCommand = exec.Command
+	}()
+	err = stateMachine.generateFilelist()
+	asserter.AssertErrContains(err, "Error generating file list with command")
 }
 
 // TestSuccessfulClassicRun runs through a full classic state machine run and ensures
 // it is successful. It creates a .img and a .qcow2 file and ensures they are the
 // correct file types it also mounts the resulting .img and ensures grub was updated
 func TestSuccessfulClassicRun(t *testing.T) {
-	t.Run("test_successful_classic_run", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		restoreCWD := helper.SaveCWD()
-		t.Cleanup(restoreCWD)
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 
-		// We need the output directory set for this
-		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	t.Cleanup(restoreCWD)
+
+	// We need the output directory set for this
+	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(outputDir) })
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.commonFlags.Debug = true
+	stateMachine.commonFlags.Size = "5G"
+	stateMachine.commonFlags.OutputDir = outputDir
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_amd64.yaml")
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() {
+		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
-		t.Cleanup(func() { os.RemoveAll(outputDir) })
+	})
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.commonFlags.Debug = true
-		stateMachine.commonFlags.Size = "5G"
-		stateMachine.commonFlags.OutputDir = outputDir
-		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
-			"test_amd64.yaml")
-
-		err = stateMachine.Setup()
+	// make sure packages were successfully installed from public and private ppas
+	files := []string{
+		filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-public"),
+		filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-private"),
+	}
+	for _, file := range files {
+		_, err = os.Stat(file)
 		asserter.AssertErrNil(err, true)
+	}
 
-		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+	// make sure snaps from the correct channel were installed
+	type snapList struct {
+		Snaps []struct {
+			Name    string `yaml:"name"`
+			Channel string `yaml:"channel"`
+		} `yaml:"snaps"`
+	}
 
-		err = stateMachine.Run()
-		asserter.AssertErrNil(err, true)
+	seedYaml := filepath.Join(stateMachine.tempDirs.chroot,
+		"var", "lib", "snapd", "seed", "seed.yaml")
 
-		t.Cleanup(func() {
-			err = stateMachine.Teardown()
-			asserter.AssertErrNil(err, true)
-		})
+	seedFile, err := os.Open(seedYaml)
+	asserter.AssertErrNil(err, true)
+	defer seedFile.Close()
 
-		// make sure packages were successfully installed from public and private ppas
-		files := []string{
-			filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-public"),
-			filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-private"),
-		}
-		for _, file := range files {
-			_, err = os.Stat(file)
-			asserter.AssertErrNil(err, true)
-		}
+	var seededSnaps snapList
+	err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
+	asserter.AssertErrNil(err, true)
 
-		// make sure snaps from the correct channel were installed
-		type snapList struct {
-			Snaps []struct {
-				Name    string `yaml:"name"`
-				Channel string `yaml:"channel"`
-			} `yaml:"snaps"`
-		}
+	expectedSnapChannels := map[string]string{
+		"hello":  "candidate",
+		"core20": "stable",
+	}
 
-		seedYaml := filepath.Join(stateMachine.tempDirs.chroot,
-			"var", "lib", "snapd", "seed", "seed.yaml")
-
-		seedFile, err := os.Open(seedYaml)
-		asserter.AssertErrNil(err, true)
-		defer seedFile.Close()
-
-		var seededSnaps snapList
-		err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
-		asserter.AssertErrNil(err, true)
-
-		expectedSnapChannels := map[string]string{
-			"hello":  "candidate",
-			"core20": "stable",
-		}
-
-		for _, seededSnap := range seededSnaps.Snaps {
-			channel, found := expectedSnapChannels[seededSnap.Name]
-			if found {
-				if channel != seededSnap.Channel {
-					t.Errorf("Expected snap %s to be pre-seeded with channel %s, but got %s",
-						seededSnap.Name, channel, seededSnap.Channel)
-				}
+	for _, seededSnap := range seededSnaps.Snaps {
+		channel, found := expectedSnapChannels[seededSnap.Name]
+		if found {
+			if channel != seededSnap.Channel {
+				t.Errorf("Expected snap %s to be pre-seeded with channel %s, but got %s",
+					seededSnap.Name, channel, seededSnap.Channel)
 			}
 		}
+	}
 
-		// make sure all the artifacts were created and are the correct file types
-		artifacts := map[string]string{
-			"pc-amd64.img":            "DOS/MBR boot sector",
-			"pc-amd64.qcow2":          "QEMU QCOW",
-			"filesystem-manifest.txt": "text",
-			"filesystem-filelist.txt": "text",
-		}
-		for artifact, fileType := range artifacts {
-			fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
-			_, err := os.Stat(fullPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					t.Errorf("File \"%s\" should exist, but does not", fullPath)
-				}
-			}
-
-			// check it is the expected file type
-			fileCommand := *exec.Command("file", fullPath)
-			cmdOutput, err := fileCommand.CombinedOutput()
-			asserter.AssertErrNil(err, true)
-			if !strings.Contains(string(cmdOutput), fileType) {
-				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
-					fullPath, fileType, string(cmdOutput))
-			}
-		}
-
-		// create a directory in which to mount the rootfs
-		mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
-		var mountImageCmds []*exec.Cmd
-		var umountImageCmds []*exec.Cmd
-
-		t.Cleanup(func() {
-			for _, teardownCmd := range umountImageCmds {
-				if tmpErr := teardownCmd.Run(); tmpErr != nil {
-					if err != nil {
-						err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
-					} else {
-						err = tmpErr
-					}
-				}
-			}
-		})
-
-		imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, "pc-amd64.img")
-
-		// set up the loopback
-		mountImageCmds = append(mountImageCmds,
-			//nolint:gosec,G204
-			exec.Command("losetup",
-				filepath.Join("/dev", "loop99"),
-				imgPath,
-			),
-		)
-
-		// unset the loopback
-		umountImageCmds = append(umountImageCmds,
-			//nolint:gosec,G204
-			exec.Command("losetup", "--detach", filepath.Join("/dev", "loop99")),
-		)
-
-		mountImageCmds = append(mountImageCmds,
-			//nolint:gosec,G204
-			exec.Command("kpartx", "-a", filepath.Join("/dev", "loop99")),
-		)
-
-		umountImageCmds = append([]*exec.Cmd{
-			//nolint:gosec,G204
-			exec.Command("kpartx", "-d", filepath.Join("/dev", "loop99")),
-		}, umountImageCmds...,
-		)
-
-		mountImageCmds = append(mountImageCmds,
-			//nolint:gosec,G204
-			exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3"), mountDir), // with this example the rootfs is partition 3 mountDir
-		)
-
-		umountImageCmds = append([]*exec.Cmd{
-			//nolint:gosec,G204
-			exec.Command("mount", "--make-rprivate", filepath.Join("/dev", "mapper", "loop99p3")),
-			//nolint:gosec,G204
-			exec.Command("umount", "--recursive", filepath.Join("/dev", "mapper", "loop99p3")),
-		}, umountImageCmds...,
-		)
-
-		// set up the mountpoints
-		mountPoints := []string{"/dev", "/proc", "/sys"}
-		for _, mountPoint := range mountPoints {
-			mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
-			mountImageCmds = append(mountImageCmds, mountCmds...)
-			umountImageCmds = append(umountCmds, umountImageCmds...)
-		}
-		// make sure to unmount the disk too
-		umountImageCmds = append([]*exec.Cmd{exec.Command("umount", "--recursive", mountDir)}, umountImageCmds...)
-
-		// now run all the commands to mount the image
-		for _, cmd := range mountImageCmds {
-			outPut := helper.SetCommandOutput(cmd, true)
-			err := cmd.Run()
-			if err != nil {
-				t.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-					cmd.String(), err.Error(), outPut.String())
-			}
-		}
-
-		// test make-dirs customization
-		addedDir := filepath.Join(mountDir, "etc", "foo", "bar")
-		_, err = os.Stat(addedDir)
+	// make sure all the artifacts were created and are the correct file types
+	artifacts := map[string]string{
+		"pc-amd64.img":            "DOS/MBR boot sector",
+		"pc-amd64.qcow2":          "QEMU QCOW",
+		"filesystem-manifest.txt": "text",
+		"filesystem-filelist.txt": "text",
+	}
+	for artifact, fileType := range artifacts {
+		fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
+		_, err := os.Stat(fullPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				t.Errorf("Directory \"%s\" should exist, but does not", addedDir)
+				t.Errorf("File \"%s\" should exist, but does not", fullPath)
 			}
 		}
 
-		grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
-		_, err = os.Stat(grubCfg)
+		// check it is the expected file type
+		fileCommand := *exec.Command("file", fullPath)
+		cmdOutput, err := fileCommand.CombinedOutput()
+		asserter.AssertErrNil(err, true)
+		if !strings.Contains(string(cmdOutput), fileType) {
+			t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
+				fullPath, fileType, string(cmdOutput))
+		}
+	}
+
+	// create a directory in which to mount the rootfs
+	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+	var mountImageCmds []*exec.Cmd
+	var umountImageCmds []*exec.Cmd
+
+	t.Cleanup(func() {
+		for _, teardownCmd := range umountImageCmds {
+			if tmpErr := teardownCmd.Run(); tmpErr != nil {
+				if err != nil {
+					err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
+				} else {
+					err = tmpErr
+				}
+			}
+		}
+	})
+
+	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, "pc-amd64.img")
+
+	// set up the loopback
+	mountImageCmds = append(mountImageCmds,
+		//nolint:gosec,G204
+		exec.Command("losetup",
+			filepath.Join("/dev", "loop99"),
+			imgPath,
+		),
+	)
+
+	// unset the loopback
+	umountImageCmds = append(umountImageCmds,
+		//nolint:gosec,G204
+		exec.Command("losetup", "--detach", filepath.Join("/dev", "loop99")),
+	)
+
+	mountImageCmds = append(mountImageCmds,
+		//nolint:gosec,G204
+		exec.Command("kpartx", "-a", filepath.Join("/dev", "loop99")),
+	)
+
+	umountImageCmds = append([]*exec.Cmd{
+		//nolint:gosec,G204
+		exec.Command("kpartx", "-d", filepath.Join("/dev", "loop99")),
+	}, umountImageCmds...,
+	)
+
+	mountImageCmds = append(mountImageCmds,
+		//nolint:gosec,G204
+		exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3"), mountDir), // with this example the rootfs is partition 3 mountDir
+	)
+
+	umountImageCmds = append([]*exec.Cmd{
+		//nolint:gosec,G204
+		exec.Command("mount", "--make-rprivate", filepath.Join("/dev", "mapper", "loop99p3")),
+		//nolint:gosec,G204
+		exec.Command("umount", "--recursive", filepath.Join("/dev", "mapper", "loop99p3")),
+	}, umountImageCmds...,
+	)
+
+	// set up the mountpoints
+	mountPoints := []string{"/dev", "/proc", "/sys"}
+	for _, mountPoint := range mountPoints {
+		mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
+		mountImageCmds = append(mountImageCmds, mountCmds...)
+		umountImageCmds = append(umountCmds, umountImageCmds...)
+	}
+	// make sure to unmount the disk too
+	umountImageCmds = append([]*exec.Cmd{exec.Command("umount", "--recursive", mountDir)}, umountImageCmds...)
+
+	// now run all the commands to mount the image
+	for _, cmd := range mountImageCmds {
+		outPut := helper.SetCommandOutput(cmd, true)
+		err := cmd.Run()
 		if err != nil {
-			if os.IsNotExist(err) {
-				t.Errorf("File \"%s\" should exist, but does not", grubCfg)
-			}
+			t.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+				cmd.String(), err.Error(), outPut.String())
 		}
+	}
 
-		// Check cleaned files were removed
-		cleaned := []string{
-			filepath.Join(mountDir, "etc", "machine-id"),
-			filepath.Join(mountDir, "var", "lib", "dbus", "machine-id"),
-			filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key"),
-			filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key.pub"),
-			filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key"),
-			filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
+	// test make-dirs customization
+	addedDir := filepath.Join(mountDir, "etc", "foo", "bar")
+	_, err = os.Stat(addedDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("Directory \"%s\" should exist, but does not", addedDir)
 		}
-		for _, file := range cleaned {
-			_, err := os.Stat(file)
-			if !os.IsNotExist(err) {
-				t.Errorf("File %s should not exist, but does", file)
-			}
-		}
+	}
 
-		// check if the locale is set to a sane default
-		localeFile := filepath.Join(mountDir, "etc", "default", "locale")
-		localeBytes, err := os.ReadFile(localeFile)
-		asserter.AssertErrNil(err, true)
-		if !strings.Contains(string(localeBytes), "LANG=C.UTF-8") {
-			t.Errorf("Expected LANG=C.UTF-8 in %s, but got %s", localeFile, string(localeBytes))
+	grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
+	_, err = os.Stat(grubCfg)
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("File \"%s\" should exist, but does not", grubCfg)
 		}
+	}
 
-		// check if components and pocket correctly setup in /etc/apt/sources.list
-		aptSourcesListBytes, err := os.ReadFile(filepath.Join(mountDir, "etc", "apt", "sources.list"))
-		asserter.AssertErrNil(err, true)
-		wantAptSourcesList := `deb http://archive.ubuntu.com/ubuntu/ jammy main universe restricted multiverse
+	// Check cleaned files were removed
+	cleaned := []string{
+		filepath.Join(mountDir, "etc", "machine-id"),
+		filepath.Join(mountDir, "var", "lib", "dbus", "machine-id"),
+		filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key"),
+		filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key.pub"),
+		filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key"),
+		filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
+	}
+	for _, file := range cleaned {
+		_, err := os.Stat(file)
+		if !os.IsNotExist(err) {
+			t.Errorf("File %s should not exist, but does", file)
+		}
+	}
+
+	// check if the locale is set to a sane default
+	localeFile := filepath.Join(mountDir, "etc", "default", "locale")
+	localeBytes, err := os.ReadFile(localeFile)
+	asserter.AssertErrNil(err, true)
+	if !strings.Contains(string(localeBytes), "LANG=C.UTF-8") {
+		t.Errorf("Expected LANG=C.UTF-8 in %s, but got %s", localeFile, string(localeBytes))
+	}
+
+	// check if components and pocket correctly setup in /etc/apt/sources.list
+	aptSourcesListBytes, err := os.ReadFile(filepath.Join(mountDir, "etc", "apt", "sources.list"))
+	asserter.AssertErrNil(err, true)
+	wantAptSourcesList := `deb http://archive.ubuntu.com/ubuntu/ jammy main universe restricted multiverse
 deb http://security.ubuntu.com/ubuntu/ jammy-security main universe restricted multiverse
 deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe restricted multiverse
 deb http://archive.ubuntu.com/ubuntu/ jammy-proposed main universe restricted multiverse
 `
-		asserter.AssertEqual(wantAptSourcesList, string(aptSourcesListBytes))
-	})
+	asserter.AssertEqual(wantAptSourcesList, string(aptSourcesListBytes))
+
 }
 
 func TestSuccessfulRootfsGeneration(t *testing.T) {
-	t.Run("test_successful_classic_rootfs_generation", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		restoreCWD := helper.SaveCWD()
-		t.Cleanup(restoreCWD)
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	t.Cleanup(restoreCWD)
 
-		// We need the output directory set for this
-		outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	// We need the output directory set for this
+	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(outputDir) })
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.commonFlags.Debug = true
+	stateMachine.commonFlags.Size = "5G"
+	stateMachine.commonFlags.OutputDir = outputDir
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_rootfs_tarball.yaml")
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() {
+		err = stateMachine.Teardown()
 		asserter.AssertErrNil(err, true)
-		t.Cleanup(func() { os.RemoveAll(outputDir) })
-
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.commonFlags.Debug = true
-		stateMachine.commonFlags.Size = "5G"
-		stateMachine.commonFlags.OutputDir = outputDir
-		stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
-			"test_rootfs_tarball.yaml")
-
-		err = stateMachine.Setup()
-		asserter.AssertErrNil(err, true)
-
-		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
-
-		err = stateMachine.Run()
-		asserter.AssertErrNil(err, true)
-
-		t.Cleanup(func() {
-			err = stateMachine.Teardown()
-			asserter.AssertErrNil(err, true)
-		})
-
-		// make sure all the artifacts were created and are the correct file types
-		artifacts := map[string]string{
-			"rootfs.tar": "tar archive",
-		}
-		for artifact, fileType := range artifacts {
-			fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
-			_, err := os.Stat(fullPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					t.Errorf("File \"%s\" should exist, but does not", fullPath)
-				}
-			}
-
-			// check it is the expected file type
-			fileCommand := *exec.Command("file", fullPath)
-			cmdOutput, err := fileCommand.CombinedOutput()
-			asserter.AssertErrNil(err, true)
-			if !strings.Contains(string(cmdOutput), fileType) {
-				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
-					fullPath, fileType, string(cmdOutput))
-			}
-		}
 	})
+
+	// make sure all the artifacts were created and are the correct file types
+	artifacts := map[string]string{
+		"rootfs.tar": "tar archive",
+	}
+	for artifact, fileType := range artifacts {
+		fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
+		_, err := os.Stat(fullPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("File \"%s\" should exist, but does not", fullPath)
+			}
+		}
+
+		// check it is the expected file type
+		fileCommand := *exec.Command("file", fullPath)
+		cmdOutput, err := fileCommand.CombinedOutput()
+		asserter.AssertErrNil(err, true)
+		if !strings.Contains(string(cmdOutput), fileType) {
+			t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
+				fullPath, fileType, string(cmdOutput))
+		}
+	}
 }
 
 // TestGerminate tests the germinate state and ensures some necessary packages are included
 func TestGerminate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	testCases := []struct {
 		name             string
 		flavor           string
@@ -2840,9 +2815,10 @@ func TestGerminate(t *testing.T) {
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 
-			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
+
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			hostArch := getHostArch()
 			hostSuite := getHostSuite()
@@ -2894,7 +2870,6 @@ func TestGerminate(t *testing.T) {
 				}
 			}
 
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
 }
@@ -2902,179 +2877,177 @@ func TestGerminate(t *testing.T) {
 // TestFailedGerminate mocks function calls to test
 // failure cases in the germinate state
 func TestFailedGerminate(t *testing.T) {
-	t.Run("test_failed_germinate", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// create a valid imageDefinition
-		hostArch := getHostArch()
-		hostSuite := getHostSuite()
-		imageDef := imagedefinition.ImageDefinition{
-			Architecture: hostArch,
-			Series:       hostSuite,
-			Rootfs: &imagedefinition.Rootfs{
-				Flavor: "ubuntu",
-				Mirror: "http://archive.ubuntu.com/ubuntu/",
-				Seed: &imagedefinition.Seed{
-					SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
-					SeedBranch: hostSuite,
-					Names:      []string{"server", "minimal", "standard", "cloud-image"},
-					Vcs:        helper.BoolPtr(true),
-				},
+	// create a valid imageDefinition
+	hostArch := getHostArch()
+	hostSuite := getHostSuite()
+	imageDef := imagedefinition.ImageDefinition{
+		Architecture: hostArch,
+		Series:       hostSuite,
+		Rootfs: &imagedefinition.Rootfs{
+			Flavor: "ubuntu",
+			Mirror: "http://archive.ubuntu.com/ubuntu/",
+			Seed: &imagedefinition.Seed{
+				SeedURLs:   []string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
+				SeedBranch: hostSuite,
+				Names:      []string{"server", "minimal", "standard", "cloud-image"},
+				Vcs:        helper.BoolPtr(true),
 			},
-		}
-		stateMachine.ImageDef = imageDef
+		},
+	}
+	stateMachine.ImageDef = imageDef
 
-		// mock os.Mkdir
-		osMkdir = mockMkdir
-		defer func() {
-			osMkdir = os.Mkdir
-		}()
-		err = stateMachine.germinate()
-		asserter.AssertErrContains(err, "Error creating germinate directory")
+	// mock os.Mkdir
+	osMkdir = mockMkdir
+	t.Cleanup(func() {
 		osMkdir = os.Mkdir
-
-		// Setup the exec.Command mock
-		testCaseName = "TestFailedGerminate"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		err = stateMachine.germinate()
-		asserter.AssertErrContains(err, "Error running germinate command")
-		execCommand = exec.Command
-
-		// mock os.Open
-		osOpen = mockOpen
-		defer func() {
-			osOpen = os.Open
-		}()
-		err = stateMachine.germinate()
-		asserter.AssertErrContains(err, "Error opening seed file")
-		osOpen = os.Open
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+	err = stateMachine.germinate()
+	asserter.AssertErrContains(err, "Error creating germinate directory")
+	osMkdir = os.Mkdir
+
+	// Setup the exec.Command mock
+	testCaseName = "TestFailedGerminate"
+	execCommand = fakeExecCommand
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+	err = stateMachine.germinate()
+	asserter.AssertErrContains(err, "Error running germinate command")
+	execCommand = exec.Command
+
+	// mock os.Open
+	osOpen = mockOpen
+	t.Cleanup(func() {
+		osOpen = os.Open
+	})
+	err = stateMachine.germinate()
+	asserter.AssertErrContains(err, "Error opening seed file")
+	osOpen = os.Open
+
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestBuildGadgetTreeGit tests the successful build of a gadget tree
 func TestBuildGadgetTreeGit(t *testing.T) {
-	t.Run("test_build_gadget_tree_git", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// test the directory method
-		wd, _ := os.Getwd()
-		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
-		sourcePath = "file://" + sourcePath
-		imageDef := imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:  sourcePath,
-				GadgetType: "directory",
-			},
-		}
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		stateMachine.ImageDef = imageDef
+	// test the directory method
+	wd, _ := os.Getwd()
+	sourcePath := filepath.Join(wd, "testdata", "gadget_source")
+	sourcePath = "file://" + sourcePath
+	imageDef := imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget: &imagedefinition.Gadget{
+			GadgetURL:  sourcePath,
+			GadgetType: "directory",
+		},
+	}
 
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrNil(err, true)
+	stateMachine.ImageDef = imageDef
 
-		// test the git method
-		imageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:    "https://github.com/snapcore/pc-gadget",
-				GadgetType:   "git",
-				GadgetBranch: "classic",
-			},
-		}
+	err = stateMachine.buildGadgetTree()
+	asserter.AssertErrNil(err, true)
 
-		stateMachine.ImageDef = imageDef
+	// test the git method
+	imageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget: &imagedefinition.Gadget{
+			GadgetURL:    "https://github.com/snapcore/pc-gadget",
+			GadgetType:   "git",
+			GadgetBranch: "classic",
+		},
+	}
 
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrNil(err, true)
+	stateMachine.ImageDef = imageDef
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	err = stateMachine.buildGadgetTree()
+	asserter.AssertErrNil(err, true)
 }
 
 // TestBuildGadgetTreeDirectory tests the successful build of a gadget tree
 func TestBuildGadgetTreeDirectory(t *testing.T) {
-	t.Run("test_build_gadget_tree_directory", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		restoreCWD := helper.SaveCWD()
-		defer restoreCWD()
+	asserter := helper.Asserter{T: t}
+	saveCWD := helper.SaveCWD()
+	defer saveCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+	// need workdir set up for this
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		// git clone the gadget into a /tmp dir
-		gadgetDir, err := os.MkdirTemp("", "pc-gadget-")
-		asserter.AssertErrNil(err, true)
-		t.Cleanup(func() { os.RemoveAll(gadgetDir) })
-		gitCloneCommand := *exec.Command(
-			"git",
-			"clone",
-			"--depth",
-			"1",
-			"--branch",
-			"classic",
-			"https://github.com/snapcore/pc-gadget",
-			gadgetDir,
-		)
-		err = gitCloneCommand.Run()
-		asserter.AssertErrNil(err, true)
+	// git clone the gadget into a /tmp dir
+	gadgetDir, err := os.MkdirTemp("", "pc-gadget-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(gadgetDir) })
+	gitCloneCommand := *exec.Command(
+		"git",
+		"clone",
+		"--depth",
+		"1",
+		"--branch",
+		"classic",
+		"https://github.com/snapcore/pc-gadget",
+		gadgetDir,
+	)
+	err = gitCloneCommand.Run()
+	asserter.AssertErrNil(err, true)
 
-		// now set up the image definition to build from this directory
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:  fmt.Sprintf("file://%s", gadgetDir),
-				GadgetType: "directory",
-			},
-		}
+	// now set up the image definition to build from this directory
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget: &imagedefinition.Gadget{
+			GadgetURL:  fmt.Sprintf("file://%s", gadgetDir),
+			GadgetType: "directory",
+		},
+	}
 
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrNil(err, true)
+	err = stateMachine.buildGadgetTree()
+	asserter.AssertErrNil(err, true)
 
-		// now make sure the gadget.yaml is in the expected location
-		// this was a bug reported by the CPC team
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrNil(err, true)
-		err = stateMachine.loadGadgetYaml()
-		asserter.AssertErrNil(err, true)
-	})
+	// now make sure the gadget.yaml is in the expected location
+	// this was a bug reported by the CPC team
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
 }
 
 func TestStateMachine_buildGadgetTree_paths(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	asserter := helper.Asserter{T: t}
 	// git clone the gadget into a /tmp dir
 	originGadgetDir, err := os.MkdirTemp("", "pc-gadget-")
@@ -3134,7 +3107,6 @@ func TestStateMachine_buildGadgetTree_paths(t *testing.T) {
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 
-			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() {
@@ -3220,7 +3192,6 @@ func TestGadgetGadgetTargets(t *testing.T) {
 			stateMachine.parent = &stateMachine
 			stateMachine.commonFlags.Debug = true
 
-			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 
@@ -3262,431 +3233,421 @@ func TestGadgetGadgetTargets(t *testing.T) {
 
 // TestFailedBuildGadgetTree tests failures in the  buildGadgetTree function
 func TestFailedBuildGadgetTree(t *testing.T) {
-	t.Run("test_failed_build_gadget_tree", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// mock os.MkdirAll
-		osMkdir = mockMkdir
-		defer func() {
-			osMkdir = os.Mkdir
-		}()
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrContains(err, "Error creating scratch/gadget")
+	// mock os.MkdirAll
+	osMkdir = mockMkdir
+	t.Cleanup(func() {
 		osMkdir = os.Mkdir
-
-		// try to clone a repo that doesn't exist
-		imageDef := imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:  "http://fakerepo.git",
-				GadgetType: "git",
-			},
-		}
-		stateMachine.ImageDef = imageDef
-
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrContains(err, "Error cloning gadget repository")
-
-		// try to copy a file that doesn't exist
-		imageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:  "file:///fake/file/that/does/not/exist",
-				GadgetType: "directory",
-			},
-		}
-		stateMachine.ImageDef = imageDef
-
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrContains(err, "Error reading gadget tree")
-
-		// mock osutil.CopySpecialFile and run with /tmp as the gadget source
-		imageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:  "file:///tmp",
-				GadgetType: "directory",
-			},
-		}
-		stateMachine.ImageDef = imageDef
-
-		// mock osutil.CopySpecialFile
-		osutilCopySpecialFile = mockCopySpecialFile
-		defer func() {
-			osutilCopySpecialFile = osutil.CopySpecialFile
-		}()
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrContains(err, "Error copying gadget source")
-		osutilCopySpecialFile = osutil.CopySpecialFile
-
-		// run a "make" command that will fail by mocking exec.Command
-		testCaseName = "TestFailedBuildGadgetTree"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		wd, _ := os.Getwd()
-		sourcePath := filepath.Join(wd, "testdata", "gadget_source")
-		sourcePath = "file://" + sourcePath
-		imageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget: &imagedefinition.Gadget{
-				GadgetURL:  sourcePath,
-				GadgetType: "directory",
-			},
-		}
-		stateMachine.ImageDef = imageDef
-
-		err = stateMachine.buildGadgetTree()
-		asserter.AssertErrContains(err, "Error running \"make\" in gadget source")
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+	err = stateMachine.buildGadgetTree()
+	asserter.AssertErrContains(err, "Error creating scratch/gadget")
+	osMkdir = os.Mkdir
+
+	// try to clone a repo that doesn't exist
+	imageDef := imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget: &imagedefinition.Gadget{
+			GadgetURL:  "http://fakerepo.git",
+			GadgetType: "git",
+		},
+	}
+	stateMachine.ImageDef = imageDef
+
+	err = stateMachine.buildGadgetTree()
+	asserter.AssertErrContains(err, "Error cloning gadget repository")
+
+	// try to copy a file that doesn't exist
+	imageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget: &imagedefinition.Gadget{
+			GadgetURL:  "file:///fake/file/that/does/not/exist",
+			GadgetType: "directory",
+		},
+	}
+	stateMachine.ImageDef = imageDef
+
+	err = stateMachine.buildGadgetTree()
+	asserter.AssertErrContains(err, "Error reading gadget tree")
+
+	// mock osutil.CopySpecialFile and run with /tmp as the gadget source
+	imageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget: &imagedefinition.Gadget{
+			GadgetURL:  "file:///tmp",
+			GadgetType: "directory",
+		},
+	}
+	stateMachine.ImageDef = imageDef
+
+	// mock osutil.CopySpecialFile
+	osutilCopySpecialFile = mockCopySpecialFile
+	t.Cleanup(func() {
+		osutilCopySpecialFile = osutil.CopySpecialFile
+	})
+	err = stateMachine.buildGadgetTree()
+	asserter.AssertErrContains(err, "Error copying gadget source")
+	osutilCopySpecialFile = osutil.CopySpecialFile
+
+	// run a "make" command that will fail by mocking exec.Command
+	testCaseName = "TestFailedBuildGadgetTree"
+	execCommand = fakeExecCommand
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+	wd, _ := os.Getwd()
+	sourcePath := filepath.Join(wd, "testdata", "gadget_source")
+	sourcePath = "file://" + sourcePath
+	imageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget: &imagedefinition.Gadget{
+			GadgetURL:  sourcePath,
+			GadgetType: "directory",
+		},
+	}
+	stateMachine.ImageDef = imageDef
+
+	err = stateMachine.buildGadgetTree()
+	asserter.AssertErrContains(err, "Error running \"make\" in gadget source")
+
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestCreateChroot runs the createChroot step and spot checks that some
 // expected files in the chroot exist
 func TestCreateChroot(t *testing.T) {
-	t.Run("test_create_chroot", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Pocket: "proposed",
-			},
-		}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Pocket: "proposed",
+		},
+	}
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		err = stateMachine.createChroot()
-		asserter.AssertErrNil(err, true)
+	err = stateMachine.createChroot()
+	asserter.AssertErrNil(err, true)
 
-		expectedFiles := []string{
-			"etc",
-			"home",
-			"boot",
-			"var",
-		}
-		for _, expectedFile := range expectedFiles {
-			fullPath := filepath.Join(stateMachine.tempDirs.chroot, expectedFile)
-			_, err := os.Stat(fullPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					t.Errorf("File \"%s\" should exist, but does not", fullPath)
-				}
+	expectedFiles := []string{
+		"etc",
+		"home",
+		"boot",
+		"var",
+	}
+	for _, expectedFile := range expectedFiles {
+		fullPath := filepath.Join(stateMachine.tempDirs.chroot, expectedFile)
+		_, err := os.Stat(fullPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("File \"%s\" should exist, but does not", fullPath)
 			}
 		}
+	}
 
-		// check that the hostname is set correctly
-		hostnameFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
-		hostnameData, err := os.ReadFile(hostnameFile)
-		asserter.AssertErrNil(err, true)
-		if string(hostnameData) != "ubuntu\n" {
-			t.Errorf("Expected hostname to be \"ubuntu\", but is \"%s\"", string(hostnameData))
+	// check that the hostname is set correctly
+	hostnameFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
+	hostnameData, err := os.ReadFile(hostnameFile)
+	asserter.AssertErrNil(err, true)
+	if string(hostnameData) != "ubuntu\n" {
+		t.Errorf("Expected hostname to be \"ubuntu\", but is \"%s\"", string(hostnameData))
+	}
+
+	// check that the resolv.conf file was truncated
+	resolvConfFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf")
+	resolvConfData, err := os.ReadFile(resolvConfFile)
+	asserter.AssertErrNil(err, true)
+	if string(resolvConfData) != "" {
+		t.Errorf("Expected resolv.conf to be empty, but is \"%s\"", string(resolvConfData))
+	}
+
+	// check that security, updates, and proposed were added to /etc/apt/sources.list
+	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+	sourcesListData, err := os.ReadFile(sourcesList)
+	asserter.AssertErrNil(err, true)
+
+	pockets := []string{
+		fmt.Sprintf("%s-security", stateMachine.ImageDef.Series),
+		fmt.Sprintf("%s-updates", stateMachine.ImageDef.Series),
+		fmt.Sprintf("%s-proposed", stateMachine.ImageDef.Series),
+	}
+
+	for _, pocket := range pockets {
+		if !strings.Contains(string(sourcesListData), pocket) {
+			t.Errorf("%s is not present in /etc/apt/sources.list", pocket)
 		}
-
-		// check that the resolv.conf file was truncated
-		resolvConfFile := filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf")
-		resolvConfData, err := os.ReadFile(resolvConfFile)
-		asserter.AssertErrNil(err, true)
-		if string(resolvConfData) != "" {
-			t.Errorf("Expected resolv.conf to be empty, but is \"%s\"", string(resolvConfData))
-		}
-
-		// check that security, updates, and proposed were added to /etc/apt/sources.list
-		sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
-		sourcesListData, err := os.ReadFile(sourcesList)
-		asserter.AssertErrNil(err, true)
-
-		pockets := []string{
-			fmt.Sprintf("%s-security", stateMachine.ImageDef.Series),
-			fmt.Sprintf("%s-updates", stateMachine.ImageDef.Series),
-			fmt.Sprintf("%s-proposed", stateMachine.ImageDef.Series),
-		}
-
-		for _, pocket := range pockets {
-			if !strings.Contains(string(sourcesListData), pocket) {
-				t.Errorf("%s is not present in /etc/apt/sources.list", pocket)
-			}
-		}
-	})
+	}
 }
 
 // TestFailedCreateChroot tests failure cases in createChroot
 func TestFailedCreateChroot(t *testing.T) {
-	t.Run("test_failed_create_chroot", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs:       &imagedefinition.Rootfs{},
-		}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs:       &imagedefinition.Rootfs{},
+	}
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// mock os.Mkdir
-		osMkdir = mockMkdir
-		defer func() {
-			osMkdir = os.Mkdir
-		}()
-		err = stateMachine.createChroot()
-		asserter.AssertErrContains(err, "Failed to create chroot")
+	// mock os.Mkdir
+	osMkdir = mockMkdir
+	t.Cleanup(func() {
 		osMkdir = os.Mkdir
-
-		// Setup the exec.Command mock
-		testCaseName = "TestFailedCreateChroot"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		err = stateMachine.createChroot()
-		asserter.AssertErrContains(err, "Error running debootstrap command")
-		execCommand = exec.Command
-
-		// Check if failure of open hostname file is detected
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		err = stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// Prepare a fallthrough debootstrap
-		testCaseName = "TestFailedCreateChrootNoHostname"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		osOpenFile = mockOpenFile
-		defer func() {
-			osOpenFile = os.OpenFile
-		}()
-
-		err = stateMachine.createChroot()
-		asserter.AssertErrContains(err, "unable to open hostname file")
-
-		osOpenFile = os.OpenFile
-		execCommand = exec.Command
-
-		// Check if failure of truncation is detected
-
-		// Clean the work directory
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		err = stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// Prepare a fallthrough debootstrap
-		testCaseName = "TestFailedCreateChrootSkip"
-		osTruncate = mockTruncate
-		defer func() {
-			osTruncate = os.Truncate
-		}()
-		err = stateMachine.createChroot()
-		asserter.AssertErrContains(err, "Error truncating resolv.conf")
-		osTruncate = os.Truncate
-		execCommand = exec.Command
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+	err = stateMachine.createChroot()
+	asserter.AssertErrContains(err, "Failed to create chroot")
+	osMkdir = os.Mkdir
+
+	// Setup the exec.Command mock
+	testCaseName = "TestFailedCreateChroot"
+	execCommand = fakeExecCommand
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+	err = stateMachine.createChroot()
+	asserter.AssertErrContains(err, "Error running debootstrap command")
+	execCommand = exec.Command
+
+	// Check if failure of open hostname file is detected
+
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	err = stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	// Prepare a fallthrough debootstrap
+	testCaseName = "TestFailedCreateChrootNoHostname"
+	execCommand = fakeExecCommand
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+	osOpenFile = mockOpenFile
+	t.Cleanup(func() {
+		osOpenFile = os.OpenFile
+	})
+
+	err = stateMachine.createChroot()
+	asserter.AssertErrContains(err, "unable to open hostname file")
+
+	osOpenFile = os.OpenFile
+	execCommand = exec.Command
+
+	// Check if failure of truncation is detected
+
+	// Clean the work directory
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	err = stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	// Prepare a fallthrough debootstrap
+	testCaseName = "TestFailedCreateChrootSkip"
+	osTruncate = mockTruncate
+	t.Cleanup(func() {
+		osTruncate = os.Truncate
+	})
+	err = stateMachine.createChroot()
+	asserter.AssertErrContains(err, "Error truncating resolv.conf")
+	osTruncate = os.Truncate
+	execCommand = exec.Command
+
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestFailedInstallPackages tests failure cases in installPackages
 func TestFailedInstallPackages(t *testing.T) {
-	t.Run("test_failed_install_packages", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs:       &imagedefinition.Rootfs{},
-			Customization: &imagedefinition.Customization{
-				ExtraPackages: []*imagedefinition.Package{
-					{
-						PackageName: "test1",
-					},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs:       &imagedefinition.Rootfs{},
+		Customization: &imagedefinition.Customization{
+			ExtraPackages: []*imagedefinition.Package{
+				{
+					PackageName: "test1",
 				},
 			},
-		}
+		},
+	}
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// create an /etc/resolv.conf in the chroot
-		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
-		asserter.AssertErrNil(err, true)
-		_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
-		asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		// mock os.MkdirTemp to cause a failure in mountTempFS
-		osMkdirTemp = mockMkdirTemp
-		defer func() {
-			osMkdirTemp = os.MkdirTemp
-		}()
-		err = stateMachine.installPackages()
-		asserter.AssertErrContains(err, "Error mounting temporary directory for mountpoint")
+	// create an /etc/resolv.conf in the chroot
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
+	asserter.AssertErrNil(err, true)
+
+	// mock os.MkdirTemp to cause a failure in mountTempFS
+	osMkdirTemp = mockMkdirTemp
+	t.Cleanup(func() {
 		osMkdirTemp = os.MkdirTemp
-
-		// Setup the exec.Command mock
-		testCaseName = "TestFailedInstallPackages"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		err = stateMachine.installPackages()
-		asserter.AssertErrContains(err, "Error running command")
-		execCommand = exec.Command
-
-		// delete the backed up resolv.conf to trigger another backup
-		err = os.Remove(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
-		asserter.AssertErrNil(err, true)
-		// mock helper.BackupAndCopyResolvConf
-		helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConf
-		defer func() {
-			helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
-		}()
-		err = stateMachine.installPackages()
-		asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
-		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
-
-		// clean up
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+	err = stateMachine.installPackages()
+	asserter.AssertErrContains(err, "Error mounting temporary directory for mountpoint")
+	osMkdirTemp = os.MkdirTemp
+
+	// Setup the exec.Command mock
+	testCaseName = "TestFailedInstallPackages"
+	execCommand = fakeExecCommand
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+	err = stateMachine.installPackages()
+	asserter.AssertErrContains(err, "Error running command")
+	execCommand = exec.Command
+
+	// delete the backed up resolv.conf to trigger another backup
+	err = os.Remove(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
+	asserter.AssertErrNil(err, true)
+	// mock helper.BackupAndCopyResolvConf
+	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConf
+	t.Cleanup(func() {
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+	})
+	err = stateMachine.installPackages()
+	asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
+	helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 }
 
 // TestFailedAddExtraPPAs tests failure cases in addExtraPPAs
 func TestFailedAddExtraPPAs(t *testing.T) {
-	t.Run("test_failed_add_extra_ppas", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		validPPA := &imagedefinition.PPA{
-			PPAName: "canonical-foundations/ubuntu-image",
-		}
-		invalidPPA := &imagedefinition.PPA{
-			PPAName:     "canonical-foundations/ubuntu-image",
-			Fingerprint: "TEST FINGERPRINT",
-		}
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs:       &imagedefinition.Rootfs{},
-			Customization: &imagedefinition.Customization{
-				ExtraPPAs: []*imagedefinition.PPA{
-					validPPA,
-				},
+	validPPA := &imagedefinition.PPA{
+		PPAName: "canonical-foundations/ubuntu-image",
+	}
+	invalidPPA := &imagedefinition.PPA{
+		PPAName:     "canonical-foundations/ubuntu-image",
+		Fingerprint: "TEST FINGERPRINT",
+	}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs:       &imagedefinition.Rootfs{},
+		Customization: &imagedefinition.Customization{
+			ExtraPPAs: []*imagedefinition.PPA{
+				validPPA,
 			},
-		}
+		},
+	}
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// create the /etc/apt/ dir in workdir
-		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d"), 0755)
-		asserter.AssertErrNil(err, true)
+	// create the /etc/apt/ dir in workdir
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d"), 0755)
+	asserter.AssertErrNil(err, true)
 
-		// mock os.Mkdir
-		osMkdir = mockMkdir
-		defer func() {
-			osMkdir = os.Mkdir
-		}()
-		err = stateMachine.addExtraPPAs()
-		asserter.AssertErrContains(err, "Failed to create apt sources.list.d")
+	// mock os.Mkdir
+	osMkdir = mockMkdir
+	defer func() {
 		osMkdir = os.Mkdir
+	}()
+	err = stateMachine.addExtraPPAs()
+	asserter.AssertErrContains(err, "Failed to create apt sources.list.d")
+	osMkdir = os.Mkdir
 
-		// mock os.MkdirTemp
-		osMkdirTemp = mockMkdirTemp
-		defer func() {
-			osMkdirTemp = os.MkdirTemp
-		}()
-		err = stateMachine.addExtraPPAs()
-		asserter.AssertErrContains(err, "Error creating temp dir for gpg")
+	// mock os.MkdirTemp
+	osMkdirTemp = mockMkdirTemp
+	defer func() {
 		osMkdirTemp = os.MkdirTemp
+	}()
+	err = stateMachine.addExtraPPAs()
+	asserter.AssertErrContains(err, "Error creating temp dir for gpg")
+	osMkdirTemp = os.MkdirTemp
 
-		// mock os.OpenFile
-		osOpenFile = mockOpenFile
-		defer func() {
-			osOpenFile = os.OpenFile
-		}()
-		err = stateMachine.addExtraPPAs()
-		asserter.AssertErrContains(err, "Error creating")
+	// mock os.OpenFile
+	osOpenFile = mockOpenFile
+	defer func() {
 		osOpenFile = os.OpenFile
+	}()
+	err = stateMachine.addExtraPPAs()
+	asserter.AssertErrContains(err, "Error creating")
+	osOpenFile = os.OpenFile
 
-		// Use an invalid PPA to trigger a failure in importPPAKeys
-		stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{invalidPPA}
-		err = stateMachine.addExtraPPAs()
-		asserter.AssertErrContains(err, "Error retrieving signing key")
-		stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{validPPA}
+	// Use an invalid PPA to trigger a failure in importPPAKeys
+	stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{invalidPPA}
+	err = stateMachine.addExtraPPAs()
+	asserter.AssertErrContains(err, "Error retrieving signing key")
+	stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{validPPA}
 
-		// mock os.RemoveAll
-		osRemoveAll = mockRemoveAll
-		defer func() {
-			osRemoveAll = os.RemoveAll
-		}()
-		err = stateMachine.addExtraPPAs()
-		asserter.AssertErrContains(err, "Error removing temporary gpg directory")
+	// mock os.RemoveAll
+	osRemoveAll = mockRemoveAll
+	defer func() {
 		osRemoveAll = os.RemoveAll
+	}()
+	err = stateMachine.addExtraPPAs()
+	asserter.AssertErrContains(err, "Error removing temporary gpg directory")
+	osRemoveAll = os.RemoveAll
 
-		// Test failing osRemoveAll in defered function
-		// mock os.RemoveAll
-		osRemoveAll = mockRemoveAll
-		defer func() {
-			osRemoveAll = os.RemoveAll
-		}()
-		// mock os.OpenFile
-		osOpenFile = mockOpenFile
-		defer func() {
-			osOpenFile = os.OpenFile
-		}()
-		err = stateMachine.addExtraPPAs()
-		asserter.AssertErrContains(err, "Error creating")
-		asserter.AssertErrContains(err, "after previous error")
+	// Test failing osRemoveAll in defered function
+	// mock os.RemoveAll
+	osRemoveAll = mockRemoveAll
+	defer func() {
 		osRemoveAll = os.RemoveAll
+	}()
+	// mock os.OpenFile
+	osOpenFile = mockOpenFile
+	defer func() {
 		osOpenFile = os.OpenFile
+	}()
+	err = stateMachine.addExtraPPAs()
+	asserter.AssertErrContains(err, "Error creating")
+	asserter.AssertErrContains(err, "after previous error")
+	osRemoveAll = os.RemoveAll
+	osOpenFile = os.OpenFile
 
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 func TestStatemachine_cleanExtraPPAs(t *testing.T) {
@@ -3968,7 +3929,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 	}
 
 	for _, tc := range testCases {
-		t.Run("test_customize_fstab_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
@@ -3989,7 +3950,6 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 			err := helper.SetDefaults(&stateMachine.ImageDef)
 			asserter.AssertErrNil(err, true)
 
-			// need workdir set up for this
 			err = stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 
@@ -4022,39 +3982,37 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 
 // TestStateMachine_customizeFstab_fail tests failures in the customizeFstab function
 func TestStateMachine_customizeFstab_fail(t *testing.T) {
-	t.Run("test_failed_customize_fstab", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		restoreCWD := helper.SaveCWD()
-		defer restoreCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs:       &imagedefinition.Rootfs{},
-			Customization: &imagedefinition.Customization{
-				Fstab: []*imagedefinition.Fstab{
-					{
-						Label:        "writable",
-						Mountpoint:   "/",
-						FSType:       "ext4",
-						MountOptions: "defaults",
-						Dump:         false,
-						FsckOrder:    1,
-					},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs:       &imagedefinition.Rootfs{},
+		Customization: &imagedefinition.Customization{
+			Fstab: []*imagedefinition.Fstab{
+				{
+					Label:        "writable",
+					Mountpoint:   "/",
+					FSType:       "ext4",
+					MountOptions: "defaults",
+					Dump:         false,
+					FsckOrder:    1,
 				},
 			},
-		}
+		},
+	}
 
-		osOpenFile = mockOpenFile
-		defer func() {
-			osOpenFile = os.OpenFile
-		}()
-		err := stateMachine.customizeFstab()
-		asserter.AssertErrContains(err, "Error opening fstab")
+	osOpenFile = mockOpenFile
+	t.Cleanup(func() {
+		osOpenFile = os.OpenFile
 	})
+	err := stateMachine.customizeFstab()
+	asserter.AssertErrContains(err, "Error opening fstab")
 }
 
 // TestGenerateRootfsTarball tests that a rootfs tarball is generated
@@ -4092,7 +4050,7 @@ func TestGenerateRootfsTarball(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_generate_rootfs_tarball_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			saveCWD := helper.SaveCWD()
 			defer saveCWD()
@@ -4112,7 +4070,6 @@ func TestGenerateRootfsTarball(t *testing.T) {
 				},
 			}
 
-			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
@@ -4141,453 +4098,441 @@ func TestGenerateRootfsTarball(t *testing.T) {
 // TestTarXattrs sets an xattr on a file, puts it in a tar archive,
 // extracts the tar archive and ensures the xattr is still present
 func TestTarXattrs(t *testing.T) {
-	t.Run("test_tar_xattrs", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
 
-		// create a file with xattrs in a temporary directory
-		xattrBytes := []byte("ui-test")
-		testDir, err := os.MkdirTemp("/tmp", "ubuntu-image-xattr-test")
-		asserter.AssertErrNil(err, true)
-		extractDir, err := os.MkdirTemp("/tmp", "ubuntu-image-xattr-test")
-		asserter.AssertErrNil(err, true)
-		testFile, err := os.CreateTemp(testDir, "test-xattrs-")
-		asserter.AssertErrNil(err, true)
-		testFileName := filepath.Base(testFile.Name())
-		defer os.RemoveAll(testDir)
-		defer os.RemoveAll(extractDir)
+	// create a file with xattrs in a temporary directory
+	xattrBytes := []byte("ui-test")
+	testDir, err := os.MkdirTemp("/tmp", "ubuntu-image-xattr-test")
+	asserter.AssertErrNil(err, true)
+	extractDir, err := os.MkdirTemp("/tmp", "ubuntu-image-xattr-test")
+	asserter.AssertErrNil(err, true)
+	testFile, err := os.CreateTemp(testDir, "test-xattrs-")
+	asserter.AssertErrNil(err, true)
+	testFileName := filepath.Base(testFile.Name())
+	defer os.RemoveAll(testDir)
+	defer os.RemoveAll(extractDir)
 
-		err = xattr.FSet(testFile, "user.test", xattrBytes)
-		asserter.AssertErrNil(err, true)
+	err = xattr.FSet(testFile, "user.test", xattrBytes)
+	asserter.AssertErrNil(err, true)
 
-		// now run the helper tar creation and extraction functions
-		tarPath := filepath.Join(testDir, "test-xattrs.tar")
-		err = helper.CreateTarArchive(testDir, tarPath, "uncompressed", false, false)
-		asserter.AssertErrNil(err, true)
+	// now run the helper tar creation and extraction functions
+	tarPath := filepath.Join(testDir, "test-xattrs.tar")
+	err = helper.CreateTarArchive(testDir, tarPath, "uncompressed", false, false)
+	asserter.AssertErrNil(err, true)
 
-		err = helper.ExtractTarArchive(tarPath, extractDir, false, false)
-		asserter.AssertErrNil(err, true)
+	err = helper.ExtractTarArchive(tarPath, extractDir, false, false)
+	asserter.AssertErrNil(err, true)
 
-		// now read the extracted file's extended attributes
-		finalXattrs, err := xattr.List(filepath.Join(extractDir, testFileName))
-		asserter.AssertErrNil(err, true)
+	// now read the extracted file's extended attributes
+	finalXattrs, err := xattr.List(filepath.Join(extractDir, testFileName))
+	asserter.AssertErrNil(err, true)
 
-		if !reflect.DeepEqual(finalXattrs, []string{"user.test"}) {
-			t.Errorf("test file \"%s\" does not have correct xattrs set", testFile.Name())
-		}
-	})
+	if !reflect.DeepEqual(finalXattrs, []string{"user.test"}) {
+		t.Errorf("test file \"%s\" does not have correct xattrs set", testFile.Name())
+	}
 }
 
 // TestPingXattrs runs the ExtractTarArchive file on a pre-made test file that contains /bin/ping
 // and ensures that the security.capability extended attribute is still present
 func TestPingXattrs(t *testing.T) {
-	t.Run("test_tar_xattrs", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
 
-		testDir, err := os.MkdirTemp("/tmp", "ubuntu-image-ping-xattr-test")
-		asserter.AssertErrNil(err, true)
-		//defer os.RemoveAll(testDir)
-		testFile := filepath.Join("testdata", "rootfs_tarballs", "ping.tar")
+	testDir, err := os.MkdirTemp("/tmp", "ubuntu-image-ping-xattr-test")
+	asserter.AssertErrNil(err, true)
+	//defer os.RemoveAll(testDir)
+	testFile := filepath.Join("testdata", "rootfs_tarballs", "ping.tar")
 
-		err = helper.ExtractTarArchive(testFile, testDir, true, true)
-		asserter.AssertErrNil(err, true)
+	err = helper.ExtractTarArchive(testFile, testDir, true, true)
+	asserter.AssertErrNil(err, true)
 
-		binPing := filepath.Join(testDir, "bin", "ping")
-		pingXattrs, err := xattr.List(binPing)
-		asserter.AssertErrNil(err, true)
-		if !reflect.DeepEqual(pingXattrs, []string{"security.capability"}) {
-			t.Error("ping has lost the security.capability xattr after tar extraction")
-		}
-	})
+	binPing := filepath.Join(testDir, "bin", "ping")
+	pingXattrs, err := xattr.List(binPing)
+	asserter.AssertErrNil(err, true)
+	if !reflect.DeepEqual(pingXattrs, []string{"security.capability"}) {
+		t.Error("ping has lost the security.capability xattr after tar extraction")
+	}
 }
 
 // TestFailedMakeQcow2Img tests failures in the makeQcow2Img function
 func TestFailedMakeQcow2Img(t *testing.T) {
-	t.Run("test_failed_make_qcow2_image", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Artifacts: &imagedefinition.Artifact{
-				Qcow2: &[]imagedefinition.Qcow2{
-					{
-						Qcow2Name: "test.qcow2",
-					},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Artifacts: &imagedefinition.Artifact{
+			Qcow2: &[]imagedefinition.Qcow2{
+				{
+					Qcow2Name: "test.qcow2",
 				},
 			},
-		}
+		},
+	}
 
-		// Setup the exec.Command mock
-		testCaseName = "TestFailedMakeQcow2Image"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
+	// Setup the exec.Command mock
+	testCaseName = "TestFailedMakeQcow2Image"
+	execCommand = fakeExecCommand
+	defer func() {
+		execCommand = exec.Command
+	}()
 
-		err := stateMachine.makeQcow2Img()
-		asserter.AssertErrContains(err, "Error creating qcow2 artifact")
-	})
+	err := stateMachine.makeQcow2Img()
+	asserter.AssertErrContains(err, "Error creating qcow2 artifact")
 }
 
 // TestPreseedResetChroot tests that calling prepareClassicImage on a
 // preseeded chroot correctly resets the chroot and preseeds over it
 func TestPreseedResetChroot(t *testing.T) {
-	t.Run("test_preseed_reset_chroot", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Snaps = []string{"lxd"}
-		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
-			},
-			Customization: &imagedefinition.Customization{
-				ExtraPackages: []*imagedefinition.Package{
-					{
-						PackageName: "squashfs-tools",
-					},
-					{
-						PackageName: "snapd",
-					},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Snaps = []string{"lxd"}
+	stateMachine.commonFlags.Channel = "stable"
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{
+			ExtraPackages: []*imagedefinition.Package{
+				{
+					PackageName: "squashfs-tools",
 				},
-				ExtraSnaps: []*imagedefinition.Snap{
-					{
-						SnapName: "hello",
-					},
-					{
-						SnapName: "core",
-					},
-					{
-						SnapName: "core20",
-					},
+				{
+					PackageName: "snapd",
 				},
 			},
-		}
-
-		err := helper.SetDefaults(&stateMachine.ImageDef)
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
-
-		// create chroot to preseed
-		err = stateMachine.createChroot()
-		asserter.AssertErrNil(err, true)
-
-		// install the packages that snap-preseed needs
-		err = stateMachine.installPackages()
-		asserter.AssertErrNil(err, true)
-
-		// first call prepareClassicImage to eventually preseed it
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrNil(err, true)
-
-		// now preseed the chroot
-		err = stateMachine.preseedClassicImage()
-		asserter.AssertErrNil(err, true)
-
-		// set up a new set of snaps to be installed
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Customization: &imagedefinition.Customization{
-				ExtraSnaps: []*imagedefinition.Snap{
-					{
-						SnapName: "ubuntu-image",
-					},
+			ExtraSnaps: []*imagedefinition.Snap{
+				{
+					SnapName: "hello",
+				},
+				{
+					SnapName: "core",
+				},
+				{
+					SnapName: "core20",
 				},
 			},
-		}
+		},
+	}
 
-		// call prepareClassicImage again to trigger the reset
-		err = stateMachine.prepareClassicImage()
+	err := helper.SetDefaults(&stateMachine.ImageDef)
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// create chroot to preseed
+	err = stateMachine.createChroot()
+	asserter.AssertErrNil(err, true)
+
+	// install the packages that snap-preseed needs
+	err = stateMachine.installPackages()
+	asserter.AssertErrNil(err, true)
+
+	// first call prepareClassicImage to eventually preseed it
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrNil(err, true)
+
+	// now preseed the chroot
+	err = stateMachine.preseedClassicImage()
+	asserter.AssertErrNil(err, true)
+
+	// set up a new set of snaps to be installed
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Customization: &imagedefinition.Customization{
+			ExtraSnaps: []*imagedefinition.Snap{
+				{
+					SnapName: "ubuntu-image",
+				},
+			},
+		},
+	}
+
+	// call prepareClassicImage again to trigger the reset
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrNil(err, true)
+
+	// make sure the snaps from both prepares are present
+	expectedSnaps := []string{"lxd", "hello", "ubuntu-image"}
+	for _, expectedSnap := range expectedSnaps {
+		snapGlobs, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot,
+			"var", "lib", "snapd", "seed", "snaps", fmt.Sprintf("%s*.snap", expectedSnap)))
 		asserter.AssertErrNil(err, true)
-
-		// make sure the snaps from both prepares are present
-		expectedSnaps := []string{"lxd", "hello", "ubuntu-image"}
-		for _, expectedSnap := range expectedSnaps {
-			snapGlobs, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot,
-				"var", "lib", "snapd", "seed", "snaps", fmt.Sprintf("%s*.snap", expectedSnap)))
-			asserter.AssertErrNil(err, true)
-			if len(snapGlobs) == 0 {
-				t.Errorf("expected snap %s to exist in the chroot but it does not", expectedSnap)
-			}
+		if len(snapGlobs) == 0 {
+			t.Errorf("expected snap %s to exist in the chroot but it does not", expectedSnap)
 		}
-	})
+	}
 }
 
 // TestFailedUpdateBootloader tests failures in the updateBootloader function
 func TestFailedUpdateBootloader(t *testing.T) {
-	t.Run("test_failed_update_bootloader", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget:       &imagedefinition.Gadget{},
-		}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget:       &imagedefinition.Gadget{},
+	}
 
-		// set up work dir
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	// set up work dir
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// first, test that updateBootloader fails when the rootfs partition
-		// has not been found in earlier steps
-		stateMachine.rootfsPartNum = -1
-		stateMachine.rootfsVolName = ""
-		err = stateMachine.updateBootloader()
-		asserter.AssertErrContains(err, "Error: could not determine partition number of the root filesystem")
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		// place a test gadget tree in the scratch directory so we don't
-		// have to build one
-		gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
-		err = os.MkdirAll(gadgetDir, 0755)
-		asserter.AssertErrNil(err, true)
+	// first, test that updateBootloader fails when the rootfs partition
+	// has not been found in earlier steps
+	stateMachine.rootfsPartNum = -1
+	stateMachine.rootfsVolName = ""
+	err = stateMachine.updateBootloader()
+	asserter.AssertErrContains(err, "Error: could not determine partition number of the root filesystem")
 
-		gadgetSource := filepath.Join("testdata", "gadget_tree")
-		gadgetDest := filepath.Join(gadgetDir, "install")
-		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
-		asserter.AssertErrNil(err, true)
-		// also copy gadget.yaml to the root of the scratch/gadget dir
-		err = osutil.CopyFile(
-			filepath.Join(gadgetDest, "meta", "gadget.yaml"),
-			filepath.Join(gadgetDest, "gadget.yaml"),
-			osutil.CopyFlagDefault,
-		)
-		asserter.AssertErrNil(err, true)
+	// place a test gadget tree in the scratch directory so we don't
+	// have to build one
+	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+	err = os.MkdirAll(gadgetDir, 0755)
+	asserter.AssertErrNil(err, true)
 
-		// prepare state in such a way that the rootfs partition was found in
-		// earlier steps
-		stateMachine.rootfsPartNum = 3
-		stateMachine.rootfsVolName = "pc"
+	gadgetSource := filepath.Join("testdata", "gadget_tree")
+	gadgetDest := filepath.Join(gadgetDir, "install")
+	err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+	asserter.AssertErrNil(err, true)
+	// also copy gadget.yaml to the root of the scratch/gadget dir
+	err = osutil.CopyFile(
+		filepath.Join(gadgetDest, "meta", "gadget.yaml"),
+		filepath.Join(gadgetDest, "gadget.yaml"),
+		osutil.CopyFlagDefault,
+	)
+	asserter.AssertErrNil(err, true)
 
-		// parse gadget.yaml and run updateBootloader with the mocked os.Mkdir
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrNil(err, true)
-		err = stateMachine.loadGadgetYaml()
-		asserter.AssertErrNil(err, true)
-		osMkdir = mockMkdir
-		defer func() {
-			osMkdir = os.Mkdir
-		}()
+	// prepare state in such a way that the rootfs partition was found in
+	// earlier steps
+	stateMachine.rootfsPartNum = 3
+	stateMachine.rootfsVolName = "pc"
 
-		err = stateMachine.updateBootloader()
-		asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	// parse gadget.yaml and run updateBootloader with the mocked os.Mkdir
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+	osMkdir = mockMkdir
+	t.Cleanup(func() {
+		osMkdir = os.Mkdir
 	})
+
+	err = stateMachine.updateBootloader()
+	asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
 }
 
 // TestUnsupportedBootloader tests that a warning is thrown if the
 // bootloader specified in gadget.yaml is not supported
 func TestUnsupportedBootloader(t *testing.T) {
-	t.Run("test_unsupported_bootloader", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Gadget:       &imagedefinition.Gadget{},
-		}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget:       &imagedefinition.Gadget{},
+	}
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-		// place a test gadget tree in the scratch directory so we don't
-		// have to build one
-		gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
-		err = os.MkdirAll(gadgetDir, 0755)
-		asserter.AssertErrNil(err, true)
+	// place a test gadget tree in the scratch directory so we don't
+	// have to build one
+	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+	err = os.MkdirAll(gadgetDir, 0755)
+	asserter.AssertErrNil(err, true)
 
-		gadgetSource := filepath.Join("testdata", "gadget_tree")
-		gadgetDest := filepath.Join(gadgetDir, "install")
-		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
-		asserter.AssertErrNil(err, true)
-		// also copy gadget.yaml to the root of the scratch/gadget dir
-		err = osutil.CopyFile(
-			filepath.Join(gadgetDest, "meta", "gadget.yaml"),
-			filepath.Join(gadgetDest, "gadget.yaml"),
-			osutil.CopyFlagDefault,
-		)
-		asserter.AssertErrNil(err, true)
-		// parse gadget.yaml
-		err = stateMachine.prepareGadgetTree()
-		asserter.AssertErrNil(err, true)
-		err = stateMachine.loadGadgetYaml()
-		asserter.AssertErrNil(err, true)
+	gadgetSource := filepath.Join("testdata", "gadget_tree")
+	gadgetDest := filepath.Join(gadgetDir, "install")
+	err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+	asserter.AssertErrNil(err, true)
+	// also copy gadget.yaml to the root of the scratch/gadget dir
+	err = osutil.CopyFile(
+		filepath.Join(gadgetDest, "meta", "gadget.yaml"),
+		filepath.Join(gadgetDest, "gadget.yaml"),
+		osutil.CopyFlagDefault,
+	)
+	asserter.AssertErrNil(err, true)
+	// parse gadget.yaml
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
 
-		// prepare state in such a way that the rootfs partition was found in
-		// earlier steps
-		stateMachine.rootfsPartNum = 3
-		stateMachine.rootfsVolName = "pc"
+	// prepare state in such a way that the rootfs partition was found in
+	// earlier steps
+	stateMachine.rootfsPartNum = 3
+	stateMachine.rootfsVolName = "pc"
 
-		// set the bootloader for the volume to "test"
-		stateMachine.GadgetInfo.Volumes["pc"].Bootloader = "test"
+	// set the bootloader for the volume to "test"
+	stateMachine.GadgetInfo.Volumes["pc"].Bootloader = "test"
 
-		// capture stdout, run updateBootloader and make sure the states were printed
-		stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
-		defer restoreStdout()
-		asserter.AssertErrNil(err, true)
+	// capture stdout, run updateBootloader and make sure the states were printed
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	defer restoreStdout()
+	asserter.AssertErrNil(err, true)
 
-		err = stateMachine.updateBootloader()
-		asserter.AssertErrNil(err, true)
+	err = stateMachine.updateBootloader()
+	asserter.AssertErrNil(err, true)
 
-		// restore stdout and examine what was printed
-		restoreStdout()
-		readStdout, err := io.ReadAll(stdout)
-		asserter.AssertErrNil(err, true)
-		if !strings.Contains(string(readStdout), "WARNING: updating bootloader test not yet supported") {
-			t.Error("Warning for unsupported bootloader not printed")
-		}
-	})
+	// restore stdout and examine what was printed
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
+	if !strings.Contains(string(readStdout), "WARNING: updating bootloader test not yet supported") {
+		t.Error("Warning for unsupported bootloader not printed")
+	}
 }
 
 // TestPreseedClassicImage unit tests the prepareClassicImage function
 func TestPreseedClassicImage(t *testing.T) {
-	t.Run("test_preseed_classic_image", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Snaps = []string{"lxd"}
-		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
-			},
-			Customization: &imagedefinition.Customization{
-				ExtraPackages: []*imagedefinition.Package{
-					{
-						PackageName: "squashfs-tools",
-					},
-					{
-						PackageName: "snapd",
-					},
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Snaps = []string{"lxd"}
+	stateMachine.commonFlags.Channel = "stable"
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{
+			ExtraPackages: []*imagedefinition.Package{
+				{
+					PackageName: "squashfs-tools",
 				},
-				ExtraSnaps: []*imagedefinition.Snap{
-					{
-						SnapName: "hello",
-					},
-					{
-						SnapName: "core",
-					},
-					{
-						SnapName: "core20",
-					},
+				{
+					PackageName: "snapd",
 				},
 			},
+			ExtraSnaps: []*imagedefinition.Snap{
+				{
+					SnapName: "hello",
+				},
+				{
+					SnapName: "core",
+				},
+				{
+					SnapName: "core20",
+				},
+			},
+		},
+	}
+
+	err := helper.SetDefaults(&stateMachine.ImageDef)
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	// create chroot to preseed
+	err = stateMachine.createChroot()
+	asserter.AssertErrNil(err, true)
+
+	// install the packages that snap-preseed needs
+	err = stateMachine.installPackages()
+	asserter.AssertErrNil(err, true)
+
+	// first call prepareClassicImage
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrNil(err, true)
+
+	// now preseed the chroot
+	err = stateMachine.preseedClassicImage()
+	asserter.AssertErrNil(err, true)
+
+	// make sure the snaps are fully preseeded
+	expectedSnaps := []string{"lxc", "lxd", "hello"}
+	for _, expectedSnap := range expectedSnaps {
+		snapPath := filepath.Join(stateMachine.tempDirs.chroot, "snap", "bin", expectedSnap)
+		_, err := os.Stat(snapPath)
+		if err != nil {
+			t.Errorf("File %s should be in chroot, but is missing", snapPath)
 		}
-
-		err := helper.SetDefaults(&stateMachine.ImageDef)
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		// create chroot to preseed
-		err = stateMachine.createChroot()
-		asserter.AssertErrNil(err, true)
-
-		// install the packages that snap-preseed needs
-		err = stateMachine.installPackages()
-		asserter.AssertErrNil(err, true)
-
-		// first call prepareClassicImage
-		err = stateMachine.prepareClassicImage()
-		asserter.AssertErrNil(err, true)
-
-		// now preseed the chroot
-		err = stateMachine.preseedClassicImage()
-		asserter.AssertErrNil(err, true)
-
-		// make sure the snaps are fully preseeded
-		expectedSnaps := []string{"lxc", "lxd", "hello"}
-		for _, expectedSnap := range expectedSnaps {
-			snapPath := filepath.Join(stateMachine.tempDirs.chroot, "snap", "bin", expectedSnap)
-			_, err := os.Stat(snapPath)
-			if err != nil {
-				t.Errorf("File %s should be in chroot, but is missing", snapPath)
-			}
-		}
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	})
+	}
 }
 
 // TestFailedPreseedClassicImage tests failures in the preseedClassicImage function
 func TestFailedPreseedClassicImage(t *testing.T) {
-	t.Run("test_failed_preseed_classic_image", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
 
-		// mock os.MkdirAll
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		err := stateMachine.preseedClassicImage()
-		asserter.AssertErrContains(err, "Error creating mountpoint")
+	// mock os.MkdirAll
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
 		osMkdirAll = os.MkdirAll
-
-		testCaseName = "TestFailedPreseedClassicImage"
-		execCommand = fakeExecCommand
-		defer func() {
-			execCommand = exec.Command
-		}()
-		err = stateMachine.preseedClassicImage()
-		asserter.AssertErrContains(err, "Error running command")
-		execCommand = exec.Command
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+	err := stateMachine.preseedClassicImage()
+	asserter.AssertErrContains(err, "Error creating mountpoint")
+	osMkdirAll = os.MkdirAll
+
+	testCaseName = "TestFailedPreseedClassicImage"
+	execCommand = fakeExecCommand
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+	err = stateMachine.preseedClassicImage()
+	asserter.AssertErrContains(err, "Error running command")
+	execCommand = exec.Command
+
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
 // TestStateMachine_defaultLocale tests that the default locale is set
@@ -4629,154 +4574,141 @@ func TestStateMachine_defaultLocale(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_default_locale_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 			var stateMachine ClassicStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 
-			// need workdir set up for this
 			err := stateMachine.makeTemporaryDirectories()
-			if err != nil {
-				t.Fatalf("Error making temporary directories: %v", err)
-			}
+			asserter.AssertErrNil(err, true)
+
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			// create the <chroot>/etc/default directory
 			defaultPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "default")
 			err = os.MkdirAll(defaultPath, 0744)
-			if err != nil {
-				t.Fatalf("Error creating etc directory: %v", err)
-			}
+			asserter.AssertErrNil(err, true)
 
 			// create the <chroot>/etc/default/locale file
 			localePath := filepath.Join(defaultPath, "locale")
 			err = os.WriteFile(localePath, []byte(tc.localeContents), 0600)
-			if err != nil {
-				t.Fatalf("Error creating locale file: %v", err)
-			}
+			asserter.AssertErrNil(err, true)
 
 			// call the function under test
 			err = stateMachine.setDefaultLocale()
-			if err != nil {
-				t.Fatalf("Error setting default locale: %v", err)
-			}
+			asserter.AssertErrNil(err, true)
 
 			// read the locale file and make sure it matches the expected contents
 			localeBytes, err := os.ReadFile(localePath)
-			if err != nil {
-				t.Fatalf("Error reading locale file: %v", err)
-			}
+			asserter.AssertErrNil(err, true)
+
 			if string(localeBytes) != tc.localeExpected {
 				t.Errorf("Expected locale contents \"%s\", but got \"%s\"",
 					tc.localeExpected, string(localeBytes))
 			}
-
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
 	}
 }
 
 // TestStateMachine_defaultLocaleFailures tests failures in the setDefaultLocale function
 func TestStateMachine_defaultLocaleFailures(t *testing.T) {
-	t.Run("test_default_locale_failures", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
+	asserter := helper.Asserter{T: t}
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
 
-		// need workdir set up for this
-		err := stateMachine.makeTemporaryDirectories()
-		if err != nil {
-			t.Fatalf("Error making temporary directories: %v", err)
-		}
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
 
-		// check failure in MkDirAll
-		osMkdirAll = mockMkdirAll
-		defer func() {
-			osMkdirAll = os.MkdirAll
-		}()
-		err = stateMachine.setDefaultLocale()
-		asserter.AssertErrContains(err, "Error creating default directory")
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// check failure in MkDirAll
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
 		osMkdirAll = os.MkdirAll
-
-		// check failure in WriteFile
-		osWriteFile = mockWriteFile
-		defer func() {
-			osWriteFile = os.WriteFile
-		}()
-		err = stateMachine.setDefaultLocale()
-		asserter.AssertErrContains(err, "Error writing to locale file")
-		osWriteFile = os.WriteFile
-
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+	err = stateMachine.setDefaultLocale()
+	asserter.AssertErrContains(err, "Error creating default directory")
+	osMkdirAll = os.MkdirAll
+
+	// check failure in WriteFile
+	osWriteFile = mockWriteFile
+	t.Cleanup(func() {
+		osWriteFile = os.WriteFile
+	})
+	err = stateMachine.setDefaultLocale()
+	asserter.AssertErrContains(err, "Error writing to locale file")
+	osWriteFile = os.WriteFile
 }
 
 func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
-	t.Run("test_clean_rootfs_real_rootfs", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		restoreCWD := helper.SaveCWD()
-		t.Cleanup(restoreCWD)
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	t.Cleanup(restoreCWD)
 
-		var stateMachine ClassicStateMachine
-		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-		stateMachine.parent = &stateMachine
-		stateMachine.Snaps = []string{"lxd"}
-		stateMachine.commonFlags.Channel = "stable"
-		stateMachine.commonFlags.Debug = true
-		stateMachine.ImageDef = imagedefinition.ImageDefinition{
-			Architecture: getHostArch(),
-			Series:       getHostSuite(),
-			Rootfs: &imagedefinition.Rootfs{
-				Archive: "ubuntu",
-			},
-			Customization: &imagedefinition.Customization{
-				ExtraPackages: []*imagedefinition.Package{
-					{
-						PackageName: "squashfs-tools",
-					},
-					{
-						PackageName: "snapd",
-					},
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Snaps = []string{"lxd"}
+	stateMachine.commonFlags.Channel = "stable"
+	stateMachine.commonFlags.Debug = true
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{
+			ExtraPackages: []*imagedefinition.Package{
+				{
+					PackageName: "squashfs-tools",
+				},
+				{
+					PackageName: "snapd",
 				},
 			},
+		},
+	}
+
+	err := helper.SetDefaults(&stateMachine.ImageDef)
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// also create chroot
+	err = stateMachine.createChroot()
+	asserter.AssertErrNil(err, true)
+
+	// install the packages that snap-preseed needs
+	err = stateMachine.installPackages()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.cleanRootfs()
+	asserter.AssertErrNil(err, true)
+
+	// Check cleaned files were removed
+	cleaned := []string{
+		filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
+		filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
+		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key"),
+		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key.pub"),
+		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key"),
+		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
+	}
+	for _, file := range cleaned {
+		_, err := os.Stat(file)
+		if !os.IsNotExist(err) {
+			t.Errorf("File %s should not exist, but does", file)
 		}
-
-		err := helper.SetDefaults(&stateMachine.ImageDef)
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrNil(err, true)
-
-		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
-
-		// also create chroot
-		err = stateMachine.createChroot()
-		asserter.AssertErrNil(err, true)
-
-		// install the packages that snap-preseed needs
-		err = stateMachine.installPackages()
-		asserter.AssertErrNil(err, true)
-
-		err = stateMachine.cleanRootfs()
-		asserter.AssertErrNil(err, true)
-
-		// Check cleaned files were removed
-		cleaned := []string{
-			filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
-			filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
-			filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key"),
-			filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key.pub"),
-			filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key"),
-			filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
-		}
-		for _, file := range cleaned {
-			_, err := os.Stat(file)
-			if !os.IsNotExist(err) {
-				t.Errorf("File %s should not exist, but does", file)
-			}
-		}
-	})
+	}
 }
 
 func TestClassicStateMachine_cleanRootfs(t *testing.T) {

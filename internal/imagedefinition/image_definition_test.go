@@ -83,7 +83,7 @@ func TestGeneratePocketList(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_generate_pocket_list_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			pocketList := generatePocketList(
 				tc.args.series,
 				tc.args.components,
@@ -108,141 +108,137 @@ func TestGeneratePocketList(t *testing.T) {
 
 // TestCustomErrors tests the custom json schema errors that we define
 func TestCustomErrors(t *testing.T) {
-	t.Run("test_custom_errors", func(t *testing.T) {
-		jsonContext := gojsonschema.NewJsonContext("testContext", nil)
-		errDetail := gojsonschema.ErrorDetails{
-			"key":   "testKey",
-			"value": "testValue",
-		}
-		missingURLErr := NewMissingURLError(
-			gojsonschema.NewJsonContext("testMissingURL", jsonContext),
-			52,
-			errDetail,
-		)
-		// spot check the description format
-		if !strings.Contains(missingURLErr.DescriptionFormat(),
-			"When key {{.key}} is specified as {{.value}}, a URL must be provided") {
-			t.Errorf("missingURLError description format \"%s\" is invalid",
-				missingURLErr.DescriptionFormat())
-		}
+	jsonContext := gojsonschema.NewJsonContext("testContext", nil)
+	errDetail := gojsonschema.ErrorDetails{
+		"key":   "testKey",
+		"value": "testValue",
+	}
+	missingURLErr := NewMissingURLError(
+		gojsonschema.NewJsonContext("testMissingURL", jsonContext),
+		52,
+		errDetail,
+	)
+	// spot check the description format
+	if !strings.Contains(missingURLErr.DescriptionFormat(),
+		"When key {{.key}} is specified as {{.value}}, a URL must be provided") {
+		t.Errorf("missingURLError description format \"%s\" is invalid",
+			missingURLErr.DescriptionFormat())
+	}
 
-		invalidPPAErr := NewInvalidPPAError(
-			gojsonschema.NewJsonContext("testInvalidPPA", jsonContext),
-			52,
-			errDetail,
-		)
-		// spot check the description format
-		if !strings.Contains(invalidPPAErr.DescriptionFormat(),
-			"Fingerprint is required for private PPAs") {
-			t.Errorf("invalidPPAError description format \"%s\" is invalid",
-				invalidPPAErr.DescriptionFormat())
-		}
+	invalidPPAErr := NewInvalidPPAError(
+		gojsonschema.NewJsonContext("testInvalidPPA", jsonContext),
+		52,
+		errDetail,
+	)
+	// spot check the description format
+	if !strings.Contains(invalidPPAErr.DescriptionFormat(),
+		"Fingerprint is required for private PPAs") {
+		t.Errorf("invalidPPAError description format \"%s\" is invalid",
+			invalidPPAErr.DescriptionFormat())
+	}
 
-		pathNotAbsoluteErr := NewPathNotAbsoluteError(
-			gojsonschema.NewJsonContext("testPathNotAbsolute", jsonContext),
-			52,
-			errDetail,
-		)
-		// spot check the description format
-		if !strings.Contains(pathNotAbsoluteErr.DescriptionFormat(),
-			"Key {{.key}} needs to be an absolute path ({{.value}})") {
-			t.Errorf("pathNotAbsoluteError description format \"%s\" is invalid",
-				pathNotAbsoluteErr.DescriptionFormat())
-		}
-		dependentKeyErr := NewDependentKeyError(
-			gojsonschema.NewJsonContext("testDependentKey", jsonContext),
-			52,
-			errDetail,
-		)
-		// spot check the description format
-		if !strings.Contains(dependentKeyErr.DescriptionFormat(),
-			"Key {{.key1}} cannot be used without key {{.key2}}") {
-			t.Errorf("dependentKeyError description format \"%s\" is invalid",
-				dependentKeyErr.DescriptionFormat())
-		}
-	})
+	pathNotAbsoluteErr := NewPathNotAbsoluteError(
+		gojsonschema.NewJsonContext("testPathNotAbsolute", jsonContext),
+		52,
+		errDetail,
+	)
+	// spot check the description format
+	if !strings.Contains(pathNotAbsoluteErr.DescriptionFormat(),
+		"Key {{.key}} needs to be an absolute path ({{.value}})") {
+		t.Errorf("pathNotAbsoluteError description format \"%s\" is invalid",
+			pathNotAbsoluteErr.DescriptionFormat())
+	}
+	dependentKeyErr := NewDependentKeyError(
+		gojsonschema.NewJsonContext("testDependentKey", jsonContext),
+		52,
+		errDetail,
+	)
+	// spot check the description format
+	if !strings.Contains(dependentKeyErr.DescriptionFormat(),
+		"Key {{.key1}} cannot be used without key {{.key2}}") {
+		t.Errorf("dependentKeyError description format \"%s\" is invalid",
+			dependentKeyErr.DescriptionFormat())
+	}
 }
 
 // TestImageDefinition_SetDefaults make sure we do not add a boolean field
 // with a default value (because we cannot properly apply the default value)
 func TestImageDefinition_SetDefaults(t *testing.T) {
-	t.Run("test_image_definition_valid_defaults", func(t *testing.T) {
-		asserter := helper.Asserter{T: t}
-		imageDef := &ImageDefinition{
-			Gadget: &Gadget{},
-			Rootfs: &Rootfs{
-				Seed:    &Seed{},
-				Tarball: &Tarball{},
-			},
-			Customization: &Customization{
-				Installer:     &Installer{},
-				CloudInit:     &CloudInit{},
-				ExtraPPAs:     []*PPA{{}},
-				ExtraPackages: []*Package{{}},
-				ExtraSnaps:    []*Snap{{}},
-				Fstab:         []*Fstab{{}},
-				Manual:        &Manual{},
-			},
-			Artifacts: &Artifact{
-				Img:       &[]Img{{}},
-				Iso:       &[]Iso{{}},
-				Qcow2:     &[]Qcow2{{}},
-				Manifest:  &Manifest{},
-				Filelist:  &Filelist{},
-				Changelog: &Changelog{},
-				RootfsTar: &RootfsTar{},
-			},
-		}
+	asserter := helper.Asserter{T: t}
+	imageDef := &ImageDefinition{
+		Gadget: &Gadget{},
+		Rootfs: &Rootfs{
+			Seed:    &Seed{},
+			Tarball: &Tarball{},
+		},
+		Customization: &Customization{
+			Installer:     &Installer{},
+			CloudInit:     &CloudInit{},
+			ExtraPPAs:     []*PPA{{}},
+			ExtraPackages: []*Package{{}},
+			ExtraSnaps:    []*Snap{{}},
+			Fstab:         []*Fstab{{}},
+			Manual:        &Manual{},
+		},
+		Artifacts: &Artifact{
+			Img:       &[]Img{{}},
+			Iso:       &[]Iso{{}},
+			Qcow2:     &[]Qcow2{{}},
+			Manifest:  &Manifest{},
+			Filelist:  &Filelist{},
+			Changelog: &Changelog{},
+			RootfsTar: &RootfsTar{},
+		},
+	}
 
-		want := &ImageDefinition{
-			Gadget: &Gadget{},
-			Rootfs: &Rootfs{
-				Seed: &Seed{
-					Vcs: helper.BoolPtr(true),
-				},
-				Tarball:    &Tarball{},
-				Components: []string{"main", "restricted"},
-				Archive:    "ubuntu",
-				Flavor:     "ubuntu",
-				Mirror:     "http://archive.ubuntu.com/ubuntu/",
-				Pocket:     "release",
+	want := &ImageDefinition{
+		Gadget: &Gadget{},
+		Rootfs: &Rootfs{
+			Seed: &Seed{
+				Vcs: helper.BoolPtr(true),
 			},
-			Customization: &Customization{
-				Components: []string{"main", "restricted", "universe"},
-				Pocket:     "release",
-				Installer:  &Installer{},
-				CloudInit:  &CloudInit{},
-				ExtraPPAs: []*PPA{{
-					KeepEnabled: helper.BoolPtr(true),
-				}},
-				ExtraPackages: []*Package{{}},
-				ExtraSnaps: []*Snap{{
-					Store:   "canonical",
-					Channel: "stable",
-				}},
-				Fstab: []*Fstab{{
-					MountOptions: "defaults",
-				}},
-				Manual: &Manual{},
+			Tarball:    &Tarball{},
+			Components: []string{"main", "restricted"},
+			Archive:    "ubuntu",
+			Flavor:     "ubuntu",
+			Mirror:     "http://archive.ubuntu.com/ubuntu/",
+			Pocket:     "release",
+		},
+		Customization: &Customization{
+			Components: []string{"main", "restricted", "universe"},
+			Pocket:     "release",
+			Installer:  &Installer{},
+			CloudInit:  &CloudInit{},
+			ExtraPPAs: []*PPA{{
+				KeepEnabled: helper.BoolPtr(true),
+			}},
+			ExtraPackages: []*Package{{}},
+			ExtraSnaps: []*Snap{{
+				Store:   "canonical",
+				Channel: "stable",
+			}},
+			Fstab: []*Fstab{{
+				MountOptions: "defaults",
+			}},
+			Manual: &Manual{},
+		},
+		Artifacts: &Artifact{
+			Img:       &[]Img{{}},
+			Iso:       &[]Iso{{}},
+			Qcow2:     &[]Qcow2{{}},
+			Manifest:  &Manifest{},
+			Filelist:  &Filelist{},
+			Changelog: &Changelog{},
+			RootfsTar: &RootfsTar{
+				Compression: "uncompressed",
 			},
-			Artifacts: &Artifact{
-				Img:       &[]Img{{}},
-				Iso:       &[]Iso{{}},
-				Qcow2:     &[]Qcow2{{}},
-				Manifest:  &Manifest{},
-				Filelist:  &Filelist{},
-				Changelog: &Changelog{},
-				RootfsTar: &RootfsTar{
-					Compression: "uncompressed",
-				},
-			},
-		}
+		},
+	}
 
-		err := helper.SetDefaults(imageDef)
-		asserter.AssertErrNil(err, true)
+	err := helper.SetDefaults(imageDef)
+	asserter.AssertErrNil(err, true)
 
-		asserter.AssertEqual(want, imageDef, cmp.AllowUnexported(ImageDefinition{}))
-	})
+	asserter.AssertEqual(want, imageDef, cmp.AllowUnexported(ImageDefinition{}))
 }
 
 func TestImageDefinition_securityMirror(t *testing.T) {
