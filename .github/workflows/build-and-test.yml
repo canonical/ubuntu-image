@@ -2,22 +2,64 @@ name: Build and Tests
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  test:
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        test-scenario: [short, long]
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 2
       - name: install-go
         run: sudo snap install go --classic
+
       - name: build
         run: go build ./...
+
       - name: apt-update
         run: sudo apt update
+
       - name: install-test-dependencies
         run: sudo apt install -y snapd germinate mtools debootstrap eatmydata fdisk gdisk qemu-system-aarch64 qemu-user-static ubuntu-dev-tools
-      - name: test
-        run: sudo go test -timeout 0 -v -race -coverprofile=coverage.out -covermode=atomic ./...
-      - name: Upload coverage to Codecov
-        run: bash <(curl -s https://codecov.io/bash)
+
+      - name: short tests
+        if: ${{ matrix.test-scenario == 'short' }}
+        run: sudo go test -timeout 0 -v -test.short -coverprofile=.coverage/coverage-short.out -covermode=atomic ./...
+
+      - name: long tests
+        if: ${{ matrix.test-scenario == 'long' }}
+        run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -covermode=atomic ./...
+
+      - name: Upload the coverage results
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-files
+          path: ".coverage/coverage*.out"
+
+  code-coverage:
+    needs: [test]
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Download the coverage files
+      uses: actions/download-artifact@v3
+      with:
+        name: coverage-files
+        path: .coverage/
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      # uploading to codecov occasionally fails, so continue running the test
+      # workflow regardless of the upload
+      continue-on-error: true
+      with:
+        fail_ci_if_error: true
+        flags: unittests
+        name: codecov-umbrella
+        files: .coverage/coverage-*.out
+        verbose: true
