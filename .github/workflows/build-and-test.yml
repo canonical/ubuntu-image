@@ -46,4 +46,4 @@ jobs:
           name: coverage-files
           path: ".coverage/coverage*.out"
 
-      - uses: ./github/coverage
+      - uses: ./.github/coverage
