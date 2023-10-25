@@ -2264,13 +2264,13 @@ func TestGeneratePackageManifest(t *testing.T) {
 	// Setup the exec.Command mock
 	testCaseName = "TestGeneratePackageManifest"
 	execCommand = fakeExecCommand
-	defer func() {
+	t.Cleanup(func() {
 		execCommand = exec.Command
-	}()
+	})
 	// We need the output directory set for this
 	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(outputDir)
+	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
 	var stateMachine ClassicStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -2291,7 +2291,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 	}
 	err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.commonFlags.OutputDir) })
 
 	err = stateMachine.generatePackageManifest()
 	asserter.AssertErrNil(err, true)
@@ -2370,13 +2370,13 @@ func TestGenerateFilelist(t *testing.T) {
 	// Setup the exec.Command mock
 	testCaseName = "TestGenerateFilelist"
 	execCommand = fakeExecCommand
-	defer func() {
+	t.Cleanup(func() {
 		execCommand = exec.Command
-	}()
+	})
 	// We need the output directory set for this
 	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(outputDir)
+	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
 	var stateMachine ClassicStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -2397,7 +2397,7 @@ func TestGenerateFilelist(t *testing.T) {
 	}
 	err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.commonFlags.OutputDir) })
 
 	err = stateMachine.generateFilelist()
 	asserter.AssertErrNil(err, true)
@@ -2445,7 +2445,7 @@ func TestFailedGenerateFilelist(t *testing.T) {
 	// We need the output directory set for this
 	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(outputDir)
+	t.Cleanup(func() { os.RemoveAll(outputDir) })
 	stateMachine.commonFlags.OutputDir = outputDir
 
 	// Setup the exec.Command mock - version from the success test
@@ -4137,8 +4137,8 @@ func TestTarXattrs(t *testing.T) {
 	testFile, err := os.CreateTemp(testDir, "test-xattrs-")
 	asserter.AssertErrNil(err, true)
 	testFileName := filepath.Base(testFile.Name())
-	defer os.RemoveAll(testDir)
-	defer os.RemoveAll(extractDir)
+	t.Cleanup(func() { os.RemoveAll(testDir) })
+	t.Cleanup(func() { os.RemoveAll(extractDir) })
 
 	err = xattr.FSet(testFile, "user.test", xattrBytes)
 	asserter.AssertErrNil(err, true)
@@ -4173,7 +4173,7 @@ func TestPingXattrs(t *testing.T) {
 
 	testDir, err := os.MkdirTemp("/tmp", "ubuntu-image-ping-xattr-test")
 	asserter.AssertErrNil(err, true)
-	//defer os.RemoveAll(testDir)
+	t.Cleanup(func() { os.RemoveAll(testDir) })
 	testFile := filepath.Join("testdata", "rootfs_tarballs", "ping.tar")
 
 	err = helper.ExtractTarArchive(testFile, testDir, true, true)

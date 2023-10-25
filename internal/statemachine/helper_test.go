@@ -1097,7 +1097,7 @@ func TestManifestRevisionFormat(t *testing.T) {
 	tempDir := filepath.Join("/tmp", "manifest-revision-format-"+uuid.NewString())
 	err := os.Mkdir(tempDir, 0755)
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() { os.RemoveAll(tempDir) })
 
 	fakeSnaps := []string{"test1_123.snap", "test2_456.snap", "test3_789.snap"}
 	for _, fakeSnap := range fakeSnaps {
@@ -1313,9 +1313,9 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 
 	// mock seed.Open
 	seedOpen = mockSeedOpen
-	defer func() {
+	t.Cleanup(func() {
 		seedOpen = seed.Open
-	}()
+	})
 	_, err = getPreseededSnaps(stateMachine.tempDirs.rootfs)
 	asserter.AssertErrContains(err, "Test error")
 	seedOpen = seed.Open
@@ -1329,7 +1329,8 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 	err = os.Rename(filepath.Join(stateMachine.tempDirs.rootfs, "model"),
 		filepath.Join(seedDir, "assertions", "model"))
 	asserter.AssertErrNil(err, true)
-	// move seed.yaml to cause an error in LoadMeta
+
+	// move seed.yaml to cause an error in LoadMetadata
 	err = os.Rename(filepath.Join(seedDir, "seed.yaml"),
 		filepath.Join(seedDir, "seed.yaml.bak"))
 	asserter.AssertErrNil(err, true)
