@@ -22,6 +22,7 @@ func mockRename(string, string) error {
 
 // TestRestoreResolvConf tests if resolv.conf is restored correctly
 func TestRestoreResolvConf(t *testing.T) {
+	t.Parallel()
 	asserter := Asserter{T: t}
 	// Prepare temporary directory
 	workDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
@@ -97,9 +98,9 @@ func TestFailedRestoreResolvConf(t *testing.T) {
 
 	// Mock the os.Rename failure
 	osRename = mockRename
-	defer func() {
+	t.Cleanup(func() {
 		osRename = os.Rename
-	}()
+	})
 	err = RestoreResolvConf(workDir)
 	asserter.AssertErrContains(err, "Error moving file")
 
@@ -109,9 +110,9 @@ func TestFailedRestoreResolvConf(t *testing.T) {
 	err = os.Symlink("resolv.conf.tmp", mainConfPath)
 	asserter.AssertErrNil(err, true)
 	osRemove = mockRemove
-	defer func() {
+	t.Cleanup(func() {
 		osRemove = os.Remove
-	}()
+	})
 	err = RestoreResolvConf(workDir)
 	asserter.AssertErrContains(err, "Error removing file")
 }
@@ -152,6 +153,7 @@ type S7 struct {
 }
 
 func TestSetDefaults(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		needsDefaults interface{}
 	}
@@ -290,6 +292,7 @@ func TestSetDefaults(t *testing.T) {
 
 // TestCheckEmptyFields unit tests the CheckEmptyFields function
 func TestCheckEmptyFields(t *testing.T) {
+	t.Parallel()
 	// define the struct we will use to test
 	type testStruct struct {
 		A string `yaml:"a" json:"fieldA,required"`

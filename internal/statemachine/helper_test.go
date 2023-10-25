@@ -29,6 +29,7 @@ import (
 
 // TestMaxOffset tests the functionality of the maxOffset function
 func TestMaxOffset(t *testing.T) {
+	t.Parallel()
 	lesser := quantity.Offset(0)
 	greater := quantity.Offset(1)
 
@@ -66,27 +67,27 @@ func TestFailedHandleSecureBoot(t *testing.T) {
 
 	// mock os.Mkdir
 	osMkdirAll = mockMkdirAll
-	defer func() {
+	t.Cleanup(func() {
 		osMkdirAll = os.MkdirAll
-	}()
+	})
 	err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 	asserter.AssertErrContains(err, "Error creating ubuntu dir")
 	osMkdirAll = os.MkdirAll
 
 	// mock os.ReadDir
 	osReadDir = mockReadDir
-	defer func() {
+	t.Cleanup(func() {
 		osReadDir = os.ReadDir
-	}()
+	})
 	err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 	asserter.AssertErrContains(err, "Error reading boot dir")
 	osReadDir = os.ReadDir
 
 	// mock os.Rename
 	osRename = mockRename
-	defer func() {
+	t.Cleanup(func() {
 		osRename = os.Rename
-	}()
+	})
 	err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 	asserter.AssertErrContains(err, "Error copying boot dir")
 	osRename = os.Rename
@@ -118,27 +119,27 @@ func TestFailedHandleSecureBootPiboot(t *testing.T) {
 
 	// mock os.Mkdir
 	osMkdirAll = mockMkdirAll
-	defer func() {
+	t.Cleanup(func() {
 		osMkdirAll = os.MkdirAll
-	}()
+	})
 	err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 	asserter.AssertErrContains(err, "Error creating ubuntu dir")
 	osMkdirAll = os.MkdirAll
 
 	// mock os.ReadDir
 	osReadDir = mockReadDir
-	defer func() {
+	t.Cleanup(func() {
 		osReadDir = os.ReadDir
-	}()
+	})
 	err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 	asserter.AssertErrContains(err, "Error reading boot dir")
 	osReadDir = os.ReadDir
 
 	// mock os.Rename
 	osRename = mockRename
-	defer func() {
+	t.Cleanup(func() {
 		osRename = os.Rename
-	}()
+	})
 	err = stateMachine.handleSecureBoot(volume, stateMachine.tempDirs.rootfs)
 	asserter.AssertErrContains(err, "Error copying boot dir")
 	osRename = os.Rename
@@ -203,27 +204,27 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 
 	// mock os.Mkdir
 	osMkdir = mockMkdir
-	defer func() {
+	t.Cleanup(func() {
 		osMkdir = os.Mkdir
-	}()
+	})
 	err = stateMachine.handleLkBootloader(volume)
 	asserter.AssertErrContains(err, "Failed to create gadget dir")
 	osMkdir = os.Mkdir
 
 	// mock os.ReadDir
 	osReadDir = mockReadDir
-	defer func() {
+	t.Cleanup(func() {
 		osReadDir = os.ReadDir
-	}()
+	})
 	err = stateMachine.handleLkBootloader(volume)
 	asserter.AssertErrContains(err, "Error reading lk bootloader dir")
 	osReadDir = os.ReadDir
 
 	// mock osutil.CopySpecialFile
 	osutilCopySpecialFile = mockCopySpecialFile
-	defer func() {
+	t.Cleanup(func() {
 		osutilCopySpecialFile = osutil.CopySpecialFile
-	}()
+	})
 	err = stateMachine.handleLkBootloader(volume)
 	asserter.AssertErrContains(err, "Error copying lk bootloader dir")
 	osutilCopySpecialFile = osutil.CopySpecialFile
@@ -344,9 +345,9 @@ func TestFailedCleanup(t *testing.T) {
 	stateMachine.cleanWorkDir = true
 
 	osRemoveAll = mockRemoveAll
-	defer func() {
+	t.Cleanup(func() {
 		osRemoveAll = os.RemoveAll
-	}()
+	})
 	err := stateMachine.cleanup()
 	asserter.AssertErrContains(err, "Error cleaning up workDir")
 }
@@ -382,9 +383,9 @@ func TestFailedWriteOffsetValues(t *testing.T) {
 	// mock os.Open file to force it to use os.O_APPEND, which causes
 	// errors in file.WriteAt()
 	osOpenFile = mockOpenFileAppend
-	defer func() {
+	t.Cleanup(func() {
 		osOpenFile = os.OpenFile
-	}()
+	})
 	err = writeOffsetValues(volume, imgPath, 512, 0)
 	asserter.AssertErrContains(err, "Failed to write offset to disk")
 	osOpenFile = os.OpenFile
@@ -468,6 +469,7 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 
 // TestGenerateUniqueDiskID ensures that we generate unique disk IDs
 func TestGenerateUniqueDiskID(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name        string
 		existing    [][]byte
@@ -525,6 +527,7 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 
 // TestGetHostArch unit tests the getHostArch function
 func TestGetHostArch(t *testing.T) {
+	t.Parallel()
 	hostArch := getHostArch()
 	switch runtime.GOARCH {
 	case "amd64":
@@ -565,6 +568,7 @@ func TestGetHostArch(t *testing.T) {
 // TestGetHostSuite unit tests the getHostSuite function to make sure
 // it returns a string with length greater than zero
 func TestGetHostSuite(t *testing.T) {
+	t.Parallel()
 	hostSuite := getHostSuite()
 	if len(hostSuite) == 0 {
 		t.Error("getHostSuite could not get the host suite")
@@ -573,6 +577,7 @@ func TestGetHostSuite(t *testing.T) {
 
 // TestGetQemuStaticForArch unit tests the getQemuStaticForArch function
 func TestGetQemuStaticForArch(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		arch     string
 		expected string
@@ -597,6 +602,7 @@ func TestGetQemuStaticForArch(t *testing.T) {
 
 // TestGenerateGerminateCmd unit tests the generateGerminateCmd function
 func TestGenerateGerminateCmd(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		mirror   string
@@ -670,6 +676,7 @@ func TestGenerateGerminateCmd(t *testing.T) {
 
 // TestValidateInput tests that invalid state machine command line arguments result in a failure
 func TestValidateInput(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name    string
 		until   string
@@ -703,6 +710,7 @@ func TestValidateInput(t *testing.T) {
 // TestValidateUntilThru ensures that using invalid value for --thru
 // or --until returns an error
 func TestValidateUntilThru(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name  string
 		until string
@@ -747,6 +755,7 @@ func TestClassicMachine_manualMakeDirs_fail(t *testing.T) {
 
 // TestFailedManualCopyFile tests the fail case of the manualCopyFile function
 func TestFailedManualCopyFile(t *testing.T) {
+	t.Parallel()
 	asserter := helper.Asserter{T: t}
 
 	copyFiles := []*imagedefinition.CopyFile{
@@ -761,6 +770,7 @@ func TestFailedManualCopyFile(t *testing.T) {
 
 // TestFailedManualTouchFile tests the fail case of the manualTouchFile function
 func TestFailedManualTouchFile(t *testing.T) {
+	t.Parallel()
 	asserter := helper.Asserter{T: t}
 
 	touchFiles := []*imagedefinition.TouchFile{
@@ -774,6 +784,7 @@ func TestFailedManualTouchFile(t *testing.T) {
 
 // TestFailedManualExecute tests the fail case of the manualExecute function
 func TestFailedManualExecute(t *testing.T) {
+	t.Parallel()
 	asserter := helper.Asserter{T: t}
 
 	executes := []*imagedefinition.Execute{
@@ -787,6 +798,7 @@ func TestFailedManualExecute(t *testing.T) {
 
 // TestFailedManualAddGroup tests the fail case of the manualAddGroup function
 func TestFailedManualAddGroup(t *testing.T) {
+	t.Parallel()
 	asserter := helper.Asserter{T: t}
 
 	addGroups := []*imagedefinition.AddGroup{
@@ -801,6 +813,7 @@ func TestFailedManualAddGroup(t *testing.T) {
 
 // TestFailedManualAddUser tests the fail case of the manualAddUser function
 func TestFailedManualAddUser(t *testing.T) {
+	t.Parallel()
 	asserter := helper.Asserter{T: t}
 
 	addUsers := []*imagedefinition.AddUser{
@@ -815,6 +828,7 @@ func TestFailedManualAddUser(t *testing.T) {
 
 // TestGenerateAptCmd unit tests the generateAptCmd function
 func TestGenerateAptCmds(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name        string
 		targetDir   string
@@ -893,6 +907,7 @@ Components: main`,
 */
 // TestCreatePPAInfo unit tests the createPPAInfo function
 func TestCreatePPAInfo(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name             string
 		ppa              *imagedefinition.PPA
@@ -936,6 +951,7 @@ func TestCreatePPAInfo(t *testing.T) {
 
 // TestImportPPAKeys unit tests the importPPAKeys function
 func TestImportPPAKeys(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name        string
 		ppa         *imagedefinition.PPA
@@ -992,12 +1008,12 @@ func TestImportPPAKeys(t *testing.T) {
 
 			// create a temporary gpg keyring directory
 			tmpGPGDir, err := os.MkdirTemp("/tmp", "ubuntu-image-gpg-test")
-			defer os.RemoveAll(tmpGPGDir)
+			t.Cleanup(func() { os.RemoveAll(tmpGPGDir) })
 			asserter.AssertErrNil(err, true)
 
 			// create a temporary trusted.gpg.d directory
 			tmpTrustedDir, err := os.MkdirTemp("/tmp", "ubuntu-image-trusted.gpg.d")
-			//defer os.RemoveAll(tmpTrustedDir)
+			t.Cleanup(func() { os.RemoveAll(tmpTrustedDir) })
 			asserter.AssertErrNil(err, true)
 
 			keyFilePath := filepath.Join(tmpTrustedDir, tc.keyFileName)
@@ -1021,12 +1037,12 @@ func TestFailedImportPPAKeys(t *testing.T) {
 
 	// create a temporary gpg keyring directory
 	tmpGPGDir, err := os.MkdirTemp("/tmp", "ubuntu-image-gpg-test")
-	defer os.RemoveAll(tmpGPGDir)
+	t.Cleanup(func() { os.RemoveAll(tmpGPGDir) })
 	asserter.AssertErrNil(err, true)
 
 	// create a temporary trusted.gpg.d directory
 	tmpTrustedDir, err := os.MkdirTemp("/tmp", "ubuntu-image-trusted.gpg.d")
-	defer os.RemoveAll(tmpTrustedDir)
+	t.Cleanup(func() { os.RemoveAll(tmpTrustedDir) })
 	asserter.AssertErrNil(err, true)
 	keyFilePath := filepath.Join(tmpTrustedDir, "test.key")
 
@@ -1046,27 +1062,27 @@ func TestFailedImportPPAKeys(t *testing.T) {
 
 	// mock http.Get
 	httpGet = mockGet
-	defer func() {
+	t.Cleanup(func() {
 		httpGet = http.Get
-	}()
+	})
 	err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 	asserter.AssertErrContains(err, "Error getting signing key")
 	httpGet = http.Get
 
 	// mock io.ReadAll
 	ioReadAll = mockReadAll
-	defer func() {
+	t.Cleanup(func() {
 		ioReadAll = io.ReadAll
-	}()
+	})
 	err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 	asserter.AssertErrContains(err, "Error reading signing key")
 	ioReadAll = io.ReadAll
 
 	// mock json.Unmarshal
 	jsonUnmarshal = mockUnmarshal
-	defer func() {
+	t.Cleanup(func() {
 		jsonUnmarshal = json.Unmarshal
-	}()
+	})
 	err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, false)
 	asserter.AssertErrContains(err, "Error unmarshalling launchpad API response")
 	jsonUnmarshal = json.Unmarshal
@@ -1131,7 +1147,7 @@ func TestLP1981720(t *testing.T) {
 	// create a temporary file for contentRoot
 	contentRoot := filepath.Join("/tmp", uuid.NewString())
 	err = os.Mkdir(contentRoot, 0755)
-	defer os.RemoveAll(contentRoot)
+	t.Cleanup(func() { os.RemoveAll(contentRoot) })
 	asserter.AssertErrNil(err, true)
 	testFile, err := os.Create(filepath.Join(contentRoot, "test.txt"))
 	asserter.AssertErrNil(err, true)
@@ -1151,8 +1167,6 @@ func TestLP1981720(t *testing.T) {
 	if !bytes.Contains(structureContent, testData) {
 		t.Errorf("Test data is missing from output of copyStructureContent")
 	}
-
-	os.RemoveAll(contentRoot)
 }
 
 // TestCheckCustomizationSteps unit tests the checkCustomizationSteps function
@@ -1259,9 +1273,9 @@ func TestFailedMountTempFS(t *testing.T) {
 
 	// mock os.MkdirTemp
 	osMkdirTemp = mockMkdirTemp
-	defer func() {
+	t.Cleanup(func() {
 		osMkdirTemp = os.MkdirTemp
-	}()
+	})
 	_, _, err := mountTempFS("", "", "")
 	asserter.AssertErrContains(err, "Test error")
 	osMkdirTemp = os.MkdirTemp
@@ -1391,21 +1405,26 @@ func TestFailedUpdateGrub(t *testing.T) {
 	var stateMachine StateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
 	// mock os.Mkdir
 	osMkdir = mockMkdir
-	defer func() {
+	t.Cleanup(func() {
 		osMkdir = os.Mkdir
-	}()
-	err := stateMachine.updateGrub("", 0)
+	})
+	err = stateMachine.updateGrub("", 0)
 	asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
 	osMkdir = os.Mkdir
 
 	// Setup the exec.Command mock to mock losetup
 	testCaseName = "TestFailedUpdateGrubLosetup"
 	execCommand = fakeExecCommand
-	defer func() {
+	t.Cleanup(func() {
 		execCommand = exec.Command
-	}()
+	})
 	err = stateMachine.updateGrub("", 0)
 	asserter.AssertErrContains(err, "Error running losetup command")
 
@@ -1458,8 +1477,8 @@ func TestStateMachine_setConfDefDir(t *testing.T) {
 			tName := strings.ReplaceAll(tc.name, " ", "_")
 
 			tmpDirPath := filepath.Join("/tmp", tName)
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 
 			err := os.Mkdir(tmpDirPath, 0755)
 			t.Cleanup(func() {

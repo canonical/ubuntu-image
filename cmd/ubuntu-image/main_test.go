@@ -19,36 +19,37 @@ var (
 	ErrAtTeardown = errors.New("Fail at Teardown")
 )
 
-type MockedStateMachine struct {
+type mockedStateMachine struct {
 	whenToFail string
 }
 
-func (mockSM *MockedStateMachine) Setup() error {
+func (mockSM *mockedStateMachine) Setup() error {
 	if mockSM.whenToFail == "Setup" {
 		return ErrAtSetup
 	}
 	return nil
 }
 
-func (mockSM *MockedStateMachine) Run() error {
+func (mockSM *mockedStateMachine) Run() error {
 	if mockSM.whenToFail == "Run" {
 		return ErrAtRun
 	}
 	return nil
 }
 
-func (mockSM *MockedStateMachine) Teardown() error {
+func (mockSM *mockedStateMachine) Teardown() error {
 	if mockSM.whenToFail == "Teardown" {
 		return ErrAtTeardown
 	}
 	return nil
 }
 
-func (mockSM *MockedStateMachine) SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts) {
+func (mockSM *mockedStateMachine) SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts) {
 }
 
 // TestValidCommands tests that certain valid commands are parsed correctly
 func TestValidCommands(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name    string
 		command string
@@ -111,6 +112,7 @@ func TestValidCommands(t *testing.T) {
 
 // TestInvalidCommands tests invalid commands argument/flag combinations
 func TestInvalidCommands(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name          string
 		command       []string
@@ -211,8 +213,8 @@ func TestVersion(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 			// Override os.Exit temporarily
 			oldOsExit := osExit
 			defer func() {
@@ -335,7 +337,7 @@ func TestExecuteStateMachine(t *testing.T) {
 			flag.CommandLine = flag.NewFlagSet("failed_state_machine", flag.ExitOnError)
 			os.Args = flags
 
-			gotErr := executeStateMachine(&MockedStateMachine{
+			gotErr := executeStateMachine(&mockedStateMachine{
 				whenToFail: tc.whenToFail,
 			})
 			asserter.AssertErrContains(gotErr, tc.expectedError)
