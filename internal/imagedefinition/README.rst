@@ -242,6 +242,7 @@ The following specification defines what is supported in the YAML:
            # ubuntu-image will support creating many different types of
            # artifacts, including the actual images, manifest files,
            # changelogs, and a list of files in the rootfs.
+         # Set a custom fstab. The existing one (if any) will be truncated.
          fstab: (optional)
            -
              # the value of LABEL= for the fstab entry
@@ -256,10 +257,6 @@ The following specification defines what is supported in the YAML:
              dump: <bool> (optional)
              # the order to fsck the filesystem
              fsck-order: <int>
-         # Define what to do with the existing (if any) fstab file. 
-         # Default to "false", which will keep existing entries and append new
-         # ones (if any)
-         fstab_truncate: <bool> (optional)
        artifacts:
          # Used to specify that ubuntu-image should create a .img file.
          img: (optional)

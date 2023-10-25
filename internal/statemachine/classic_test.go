@@ -3740,12 +3740,11 @@ func TestCustomizeFstab(t *testing.T) {
 	testCases := []struct {
 		name          string
 		fstab         []*imagedefinition.Fstab
-		fstabTruncate bool
 		expectedFstab string
 		existingFstab string
 	}{
 		{
-			name: "one_entry to an empty fstab",
+			name: "one entry to an empty fstab",
 			fstab: []*imagedefinition.Fstab{
 				{
 					Label:        "writable",
@@ -3760,7 +3759,7 @@ func TestCustomizeFstab(t *testing.T) {
 `,
 		},
 		{
-			name: "one_entry to a non-empty fstab",
+			name: "one entry to a non-empty fstab",
 			fstab: []*imagedefinition.Fstab{
 				{
 					Label:        "writable",
@@ -3771,30 +3770,12 @@ func TestCustomizeFstab(t *testing.T) {
 					FsckOrder:    1,
 				},
 			},
-			expectedFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1
-LABEL=writable	/	ext4	defaults	1	1
+			expectedFstab: `LABEL=writable	/	ext4	defaults	1	1
 `,
 			existingFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1`,
 		},
 		{
-			name: "one_entry to a non-empty fstab to be truncated",
-			fstab: []*imagedefinition.Fstab{
-				{
-					Label:        "writable",
-					Mountpoint:   "/",
-					FSType:       "ext4",
-					MountOptions: "defaults",
-					Dump:         true,
-					FsckOrder:    1,
-				},
-			},
-			fstabTruncate: true,
-			expectedFstab: `LABEL=writable	/	ext4	defaults	1	1
-`,
-			existingFstab: `LABEL=xxx /test ext4 discard,errors=remount-ro 0 1`,
-		},
-		{
-			name: "two_entries",
+			name: "two entries",
 			fstab: []*imagedefinition.Fstab{
 				{
 					Label:        "writable",
@@ -3817,19 +3798,6 @@ LABEL=writable	/	ext4	defaults	1	1
 LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 `,
 		},
-		{
-			name: "defaults_assumed",
-			fstab: []*imagedefinition.Fstab{
-				{
-					Label:      "writable",
-					Mountpoint: "/",
-					FSType:     "ext4",
-					FsckOrder:  1,
-				},
-			},
-			expectedFstab: `LABEL=writable	/	ext4	defaults	0	1
-`,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -3846,8 +3814,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 				Series:       getHostSuite(),
 				Rootfs:       &imagedefinition.Rootfs{},
 				Customization: &imagedefinition.Customization{
-					Fstab:         tc.fstab,
-					FstabTruncate: helper.BoolPtr(tc.fstabTruncate),
+					Fstab: tc.fstab,
 				},
 			}
 
@@ -3911,7 +3878,6 @@ func TestStateMachine_customizeFstab_fail(t *testing.T) {
 						FsckOrder:    1,
 					},
 				},
-				FstabTruncate: helper.BoolPtr(true),
 			},
 		}
 
@@ -3921,11 +3887,6 @@ func TestStateMachine_customizeFstab_fail(t *testing.T) {
 		}()
 		err := stateMachine.customizeFstab()
 		asserter.AssertErrContains(err, "Error opening fstab")
-		osOpenFile = os.OpenFile
-
-		stateMachine.ImageDef.Customization.FstabTruncate = nil
-		err = stateMachine.customizeFstab()
-		asserter.AssertErrContains(err, imagedefinition.ErrFstabTruncateNil.Error())
 	})
 }
 
