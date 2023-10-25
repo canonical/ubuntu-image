@@ -32,6 +32,13 @@ import (
 
 var yamlMarshal = yaml.Marshal
 
+func TestMain(m *testing.M) {
+	basicChroot = NewBasicChroot()
+	code := m.Run()
+	basicChroot.Clean()
+	os.Exit(code)
+}
+
 // TestClassicSetup tests a successful run of the polymorphed Setup function
 func TestClassicSetup(t *testing.T) {
 	asserter := helper.Asserter{T: t}
@@ -1476,8 +1483,7 @@ func TestStateMachine_manualCustomization(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	// also create chroot
-	err = stateMachine.createChroot()
+	err = getBasicChroot(stateMachine.StateMachine)
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.manualCustomization()
