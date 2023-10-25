@@ -1,0 +1,21 @@
+name: 'Coverage Upload'
+description: 'Upload coverage files to codecov'
+runs:
+  using: "composite"
+  steps: 
+    - name: Download the coverage files
+      uses: actions/download-artifact@v3
+      with:
+        name: coverage-files
+        path: .coverage/
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      # uploading to codecov occasionally fails, so continue running the test
+      # workflow regardless of the upload
+      continue-on-error: true
+      with:
+        fail_ci_if_error: true
+        flags: unittests
+        files: .coverage/coverage-*.out
+        verbose: true
