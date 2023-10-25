@@ -63,8 +63,8 @@ func TestFailedSnapSetup(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test_failed_snap_setup_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 
 			// use both --until and --thru to trigger this failure
 			var stateMachine SnapStateMachine
@@ -112,7 +112,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 	stateMachine.Opts.FactoryImage = true
 	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(workDir)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
 
 	err = stateMachine.Setup()
@@ -274,8 +274,8 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 
 			var stateMachine SnapStateMachine
 			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
@@ -321,8 +321,8 @@ func TestGenerateSnapManifest(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test_generate_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 
 			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
@@ -500,8 +500,8 @@ func TestSnapFlagSyntax(t *testing.T) {
 				t.Skip("Test for amd64 only")
 			}
 			asserter := helper.Asserter{T: t}
-			saveCWD := helper.SaveCWD()
-			defer saveCWD()
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
 
 			var stateMachine SnapStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()

@@ -11,6 +11,7 @@ import (
 )
 
 func TestGeneratePocketList(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		series         string
 		components     []string
@@ -108,6 +109,7 @@ func TestGeneratePocketList(t *testing.T) {
 
 // TestCustomErrors tests the custom json schema errors that we define
 func TestCustomErrors(t *testing.T) {
+	t.Parallel()
 	jsonContext := gojsonschema.NewJsonContext("testContext", nil)
 	errDetail := gojsonschema.ErrorDetails{
 		"key":   "testKey",
@@ -164,6 +166,7 @@ func TestCustomErrors(t *testing.T) {
 // TestImageDefinition_SetDefaults make sure we do not add a boolean field
 // with a default value (because we cannot properly apply the default value)
 func TestImageDefinition_SetDefaults(t *testing.T) {
+	t.Parallel()
 	asserter := helper.Asserter{T: t}
 	imageDef := &ImageDefinition{
 		Gadget: &Gadget{},
