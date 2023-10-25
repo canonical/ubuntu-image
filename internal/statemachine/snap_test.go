@@ -154,7 +154,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 	stateMachine.Opts.Snaps = []string{"hello-world"}
 	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(workDir)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
 
 	err = stateMachine.Setup()
@@ -257,7 +257,7 @@ func TestFailedPrepareImage(t *testing.T) {
 }
 
 // TestPopulateSnapRootfsContents runs the state machine through populate_rootfs_contents and examines
-// the rootfs to ensure at least some of the correct file are in place
+// the rootfs to ensure at least some of the correct files are in place
 func TestPopulateSnapRootfsContents(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
@@ -280,7 +280,8 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 			var stateMachine SnapStateMachine
 			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
-			defer os.RemoveAll(workDir)
+			t.Cleanup(func() { os.RemoveAll(workDir) })
+
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			stateMachine.Args.ModelAssertion = tc.modelAssertion
@@ -293,7 +294,6 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 			err = stateMachine.Run()
 			asserter.AssertErrNil(err, true)
 
-			// check the files before Teardown
 			for _, file := range tc.fileList {
 				_, err := os.Stat(filepath.Join(stateMachine.tempDirs.rootfs, file))
 				if err != nil {
@@ -315,11 +315,11 @@ func TestGenerateSnapManifest(t *testing.T) {
 		name   string
 		seeded bool
 	}{
-		{"snap_manifest_regular", false},
-		{"snap_manifest_seeded", true},
+		{"generate_snap_manifest_regular", false},
+		{"generate_snap_manifest_seeded", true},
 	}
 	for _, tc := range testCases {
-		t.Run("test_generate_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			restoreCWD := helper.SaveCWD()
 			defer restoreCWD()
@@ -402,7 +402,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 
 	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(workDir)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
 	var stateMachine SnapStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
@@ -495,7 +495,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 		{"invalid_syntax", []string{"hello=edge=stable", "core20"}, false},
 	}
 	for _, tc := range testCases {
-		t.Run("test_snap_flag_syntax_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			if runtime.GOARCH != "amd64" {
 				t.Skip("Test for amd64 only")
 			}
@@ -512,7 +512,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 			stateMachine.Opts.Snaps = tc.snapArgs
 			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
-			defer os.RemoveAll(workDir)
+			t.Cleanup(func() { os.RemoveAll(workDir) })
 			stateMachine.stateMachineFlags.WorkDir = workDir
 			stateMachine.commonFlags.OutputDir = workDir
 
@@ -603,7 +603,7 @@ func TestSnapRevisions(t *testing.T) {
 	}
 	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(workDir)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
 	stateMachine.commonFlags.OutputDir = workDir
 
@@ -653,7 +653,7 @@ func TestValidationFlag(t *testing.T) {
 	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
 	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(workDir)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
 	stateMachine.stateMachineFlags.Thru = "prepare_image"
 	stateMachine.commonFlags.Validation = "enforce"
@@ -728,7 +728,7 @@ func TestPreseedFlag(t *testing.T) {
 	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
 	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(workDir)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
 	stateMachine.stateMachineFlags.Thru = "prepare_image"
 	stateMachine.Opts.Preseed = true

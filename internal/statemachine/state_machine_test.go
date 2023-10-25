@@ -300,7 +300,7 @@ func TestUntilThru(t *testing.T) {
 				if err := os.Mkdir(tempDir, 0755); err != nil {
 					t.Errorf("Could not create workdir: %s\n", err.Error())
 				}
-				defer os.RemoveAll(tempDir)
+				t.Cleanup(func() { os.RemoveAll(tempDir) })
 				partialStateMachine.stateMachineFlags.WorkDir = tempDir
 
 				if tc.name == "until" {

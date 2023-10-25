@@ -28,7 +28,7 @@ func TestRestoreResolvConf(t *testing.T) {
 	workDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
 	err := os.Mkdir(workDir, 0755)
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(workDir)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
 
 	// Create test objects for a regular backup
 	err = os.MkdirAll(filepath.Join(workDir, "etc"), 0755)
@@ -84,7 +84,7 @@ func TestFailedRestoreResolvConf(t *testing.T) {
 	workDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
 	err := os.Mkdir(workDir, 0755)
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(workDir)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
 
 	// Create test environment
 	err = os.MkdirAll(filepath.Join(workDir, "etc"), 0755)

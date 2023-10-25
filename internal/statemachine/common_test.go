@@ -114,7 +114,7 @@ func TestDetermineOutputDirectory(t *testing.T) {
 			err = stateMachine.determineOutputDirectory()
 			asserter.AssertErrNil(err, true)
 			if tc.cleanUp {
-				defer os.RemoveAll(stateMachine.commonFlags.OutputDir)
+				t.Cleanup(func() { os.RemoveAll(stateMachine.commonFlags.OutputDir) })
 			}
 
 			// ensure the correct output dir was set and that it exists
@@ -167,7 +167,7 @@ func TestLoadGadgetYaml(t *testing.T) {
 	// ensure unpack exists
 	err = os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(preserveDir)
+	t.Cleanup(func() { os.RemoveAll(preserveDir) })
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrNil(err, true)
 
@@ -235,7 +235,7 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 	defer func() {
 		os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
 	}()
-	defer os.RemoveAll(preserveDir)
+	t.Cleanup(func() { os.RemoveAll(preserveDir) })
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrContains(err, "Error creating preserve_unpack directory")
 	osMkdirAll = os.MkdirAll
@@ -437,7 +437,7 @@ func TestPopulateBootfsContents(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// set a valid yaml file and load it in
 	stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -484,7 +484,7 @@ func TestPopulateBootfsContentsPiboot(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// set a valid yaml file and load it in
 	stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -529,7 +529,7 @@ func TestFailedPopulateBootfsContents(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// set a valid yaml file and load it in
 	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-seed.yaml")
@@ -609,7 +609,7 @@ func TestPopulatePreparePartitions(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// set a valid yaml file and load it in
 	stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -675,7 +675,7 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// set a valid yaml file and load it in
 	stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -735,7 +735,7 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// set a valid yaml file and load it in
 	// we use a special gadget.yaml here, special for this testcase
@@ -822,12 +822,12 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
-			defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			// also set up an output directory
 			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
-			defer os.RemoveAll(outDir)
+			t.Cleanup(func() { os.RemoveAll(outDir) })
 			stateMachine.commonFlags.OutputDir = outDir
 
 			// set up volume names
@@ -913,12 +913,12 @@ func TestFailedMakeDisk(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// also set up an output directory
 	outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
-	defer os.RemoveAll(outDir)
+	t.Cleanup(func() { os.RemoveAll(outDir) })
 	stateMachine.commonFlags.OutputDir = outDir
 	err = stateMachine.determineOutputDirectory()
 	asserter.AssertErrNil(err, true)
@@ -1116,12 +1116,12 @@ func TestImageSizeFlag(t *testing.T) {
 
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
-			//defer os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+			//t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			// also set up an output directory
 			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
-			//defer os.RemoveAll(outDir)
+			//t.Cleanup(func() { os.RemoveAll(outDir) })
 			stateMachine.commonFlags.OutputDir = outDir
 
 			// set up volume names
