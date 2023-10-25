@@ -5,17 +5,15 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/snapcore/snapd/osutil"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
-
-func init() {
-	basicChroot = NewBasicChroot()
-}
 
 var basicImageDef = imagedefinition.ImageDefinition{
 	Architecture: getHostArch(),
@@ -57,23 +55,27 @@ func (b *basicChrooter) init() error {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = basicImageDef
-	// prepare the dir
+	path := filepath.Join("/tmp", "ubuntu-image-chroot-"+uuid.NewString())
+	stateMachine.tempDirs.chroot = path
 
 	err := stateMachine.createChroot()
 	if err != nil {
 		return err
 	}
 
-	basicChroot.path = stateMachine.tempDirs.chroot
+	b.path = path
 
 	return nil
+}
+
+func (b *basicChrooter) Clean() {
+	os.RemoveAll(b.path)
 }
 
 // getBasicChroot initializes and/or set the basicChroot path to
 // the given stateMachine
 func getBasicChroot(s StateMachine) error {
 	if basicChroot.isInit() {
-
 		return setBasicChrootPath(s)
 	}
 
