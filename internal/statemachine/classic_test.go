@@ -4288,7 +4288,10 @@ func TestPreseedResetChroot(t *testing.T) {
 			},
 		}
 
-		err := stateMachine.makeTemporaryDirectories()
+		err := helper.SetDefaults(&stateMachine.ImageDef)
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
@@ -4518,7 +4521,10 @@ func TestPreseedClassicImage(t *testing.T) {
 			},
 		}
 
-		err := stateMachine.makeTemporaryDirectories()
+		err := helper.SetDefaults(&stateMachine.ImageDef)
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		// create chroot to preseed
@@ -4736,7 +4742,10 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 			},
 		}
 
-		err := stateMachine.makeTemporaryDirectories()
+		err := helper.SetDefaults(&stateMachine.ImageDef)
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
