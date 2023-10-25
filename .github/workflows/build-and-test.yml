@@ -40,10 +40,10 @@ jobs:
         if: ${{ matrix.test-scenario == 'long' }}
         run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -covermode=atomic ./...
 
-      - name: Upload the coverage results
-        uses: actions/upload-artifact@v3
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
         with:
-          name: coverage-files
-          path: ".coverage/coverage*.out"
-
-      - uses: ./.github/coverage
+          fail_ci_if_error: true
+          flags: unittests
+          files: .coverage/coverage-*.out
+          verbose: true
