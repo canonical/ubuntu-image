@@ -1018,7 +1018,7 @@ func (stateMachine *StateMachine) customizeFstab() error {
 
 	fstabPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab")
 
-	fstabIO, err := osOpenFile(fstabPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+	fstabIO, err := osOpenFile(fstabPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("Error opening fstab: %s", err.Error())
 	}
