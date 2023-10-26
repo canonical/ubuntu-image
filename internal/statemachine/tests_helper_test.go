@@ -28,26 +28,34 @@ var basicImageDef = imagedefinition.ImageDefinition{
 // this variable should be treated as a singleton
 var basicChroot *basicChrooter
 
+// basicChrooter provides a way to manage a basic chroot
 type basicChrooter struct {
 	m    sync.Mutex
 	path string
 }
 
+// NewBasicChroot creates but do not really initializes
+// a basicChroot. Initialization will be done by the first
+// user of the basicChroot
 func NewBasicChroot() *basicChrooter {
 	return &basicChrooter{
 		m: sync.Mutex{},
 	}
 }
 
+// isInit safely checks if the basicChroot is initialized
 func (b *basicChrooter) isInit() bool {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return len(b.path) != 0
 }
 
+// init initializes the basicChroot
 func (b *basicChrooter) init() error {
 	// We need to protect the whole time the chroot is being created
 	// because we do not want to trigger multiple chroot creation in parallel
+	// This may block several tests during ~1-2min but this is an acceptable
+	// drawback to then win some time.
 	b.m.Lock()
 	defer b.m.Unlock()
 
@@ -68,6 +76,9 @@ func (b *basicChrooter) init() error {
 	return nil
 }
 
+// Clean removes the chroot
+// This method is expected to be called only once at the end of the
+// test suite.
 func (b *basicChrooter) Clean() {
 	os.RemoveAll(b.path)
 }
@@ -75,19 +86,18 @@ func (b *basicChrooter) Clean() {
 // getBasicChroot initializes and/or set the basicChroot path to
 // the given stateMachine
 func getBasicChroot(s StateMachine) error {
-	if basicChroot.isInit() {
-		return setBasicChrootPath(s)
+	if !basicChroot.isInit() {
+		err := basicChroot.init()
+		if err != nil {
+			return err
+		}
 	}
 
-	err := basicChroot.init()
-	if err != nil {
-		return err
-	}
-
-	return setBasicChrootPath(s)
+	return provideChroot(s)
 }
 
-func setBasicChrootPath(s StateMachine) error {
+// provideChroot provides a copy of the basicChroot to the given stateMachine
+func provideChroot(s StateMachine) error {
 	basicChroot.m.Lock()
 	defer basicChroot.m.Unlock()
 
