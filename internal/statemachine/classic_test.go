@@ -1411,6 +1411,7 @@ chpasswd:
 
 // TestStateMachine_manualCustomization unit tests the manualCustomization function
 func TestStateMachine_manualCustomization(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -1645,8 +1646,7 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	// also create chroot
-	err = stateMachine.createChroot()
+	err = getBasicChroot(stateMachine.StateMachine)
 	asserter.AssertErrNil(err, true)
 
 	// create an /etc/resolv.conf in the chroot
@@ -1918,8 +1918,7 @@ func TestStateMachine_PopulateClassicRootfsContents(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	// also create chroot
-	err = stateMachine.createChroot()
+	err = getBasicChroot(stateMachine.StateMachine)
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.populateClassicRootfsContents()
@@ -1984,8 +1983,7 @@ func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	// also create chroot
-	err = stateMachine.createChroot()
+	err = getBasicChroot(stateMachine.StateMachine)
 	asserter.AssertErrNil(err, true)
 
 	// mock os.ReadDir
@@ -4228,6 +4226,7 @@ func TestFailedMakeQcow2Img(t *testing.T) {
 // TestPreseedResetChroot tests that calling prepareClassicImage on a
 // preseeded chroot correctly resets the chroot and preseeds over it
 func TestPreseedResetChroot(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -4277,8 +4276,7 @@ func TestPreseedResetChroot(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	// create chroot to preseed
-	err = stateMachine.createChroot()
+	err = getBasicChroot(stateMachine.StateMachine)
 	asserter.AssertErrNil(err, true)
 
 	// install the packages that snap-preseed needs
@@ -4457,6 +4455,7 @@ func TestUnsupportedBootloader(t *testing.T) {
 
 // TestPreseedClassicImage unit tests the prepareClassicImage function
 func TestPreseedClassicImage(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -4505,8 +4504,7 @@ func TestPreseedClassicImage(t *testing.T) {
 	err = stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
 
-	// create chroot to preseed
-	err = stateMachine.createChroot()
+	err = getBasicChroot(stateMachine.StateMachine)
 	asserter.AssertErrNil(err, true)
 
 	// install the packages that snap-preseed needs
@@ -4675,6 +4673,7 @@ func TestStateMachine_defaultLocaleFailures(t *testing.T) {
 }
 
 func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -4714,8 +4713,7 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	// also create chroot
-	err = stateMachine.createChroot()
+	err = getBasicChroot(stateMachine.StateMachine)
 	asserter.AssertErrNil(err, true)
 
 	// install the packages that snap-preseed needs
