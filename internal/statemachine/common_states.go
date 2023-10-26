@@ -84,7 +84,7 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 	if err := osutilCopyFile(stateMachine.YamlFilePath,
 		gadgetYamlDst, osutil.CopyFlagOverwrite); err != nil {
 		return fmt.Errorf(`Error copying gadget.yaml to %s: %s
-The gadget.yaml file is expected to be located in a "meta" subdirectory of the provided gadget directory.
+The gadget.yaml file is expected to be located in a "meta" subdirectory of the provided built gadget directory.
 `, gadgetYamlDst, err.Error())
 	}
 
