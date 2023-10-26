@@ -242,6 +242,7 @@ The following specification defines what is supported in the YAML:
            # ubuntu-image will support creating many different types of
            # artifacts, including the actual images, manifest files,
            # changelogs, and a list of files in the rootfs.
+         # Set a custom fstab. The existing one (if any) will be truncated.
          fstab: (optional)
            -
              # the value of LABEL= for the fstab entry

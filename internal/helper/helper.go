@@ -135,14 +135,16 @@ func SetDefaults(needsDefaults interface{}) error {
 				}
 				// special case for pointer to bools
 			} else if field.Type().Elem() == reflect.TypeOf(true) {
-				// make sure the pointer is never nil in case no value
-				// was set
-				if field.IsNil() {
-					field.Set(reflect.ValueOf(BoolPtr(false)))
+				// if a value is set, do nothing
+				if !field.IsNil() {
+					continue
 				}
 				tags := elem.Type().Field(i).Tag
 				defaultValue, hasDefault := tags.Lookup("default")
 				if !hasDefault {
+					// If no default and no value is set, make sure we have a valid
+					// value consistent with the "zero" value for a bool (false)
+					field.Set(reflect.ValueOf(BoolPtr(false)))
 					continue
 				}
 				if defaultValue == "true" {

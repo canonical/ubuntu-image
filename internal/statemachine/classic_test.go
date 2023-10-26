@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -1855,9 +1854,9 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 	})
 }
 
-// TestPopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
+// TestStateMachine_PopulateClassicRootfsContents runs the state machine through populate_rootfs_contents and examines
 // the rootfs to ensure at least some of the correct file are in place
-func TestPopulateClassicRootfsContents(t *testing.T) {
+func TestStateMachine_PopulateClassicRootfsContents(t *testing.T) {
 	t.Run("test_populate_classic_rootfs_contents", func(t *testing.T) {
 		if runtime.GOARCH != "amd64" {
 			t.Skip("Test for amd64 only")
@@ -1875,6 +1874,7 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 			Rootfs: &imagedefinition.Rootfs{
 				Archive: "ubuntu",
 			},
+			Customization: &imagedefinition.Customization{},
 		}
 
 		// need workdir set up for this
@@ -1901,13 +1901,34 @@ func TestPopulateClassicRootfsContents(t *testing.T) {
 			}
 		}
 
+		// return when Customization.Fstab is not empty
+		stateMachine.ImageDef.Customization.Fstab = []*imagedefinition.Fstab{
+			{
+				Label:        "writable",
+				Mountpoint:   "/",
+				FSType:       "ext4",
+				MountOptions: "defaults",
+				Dump:         true,
+				FsckOrder:    1,
+			},
+		}
+
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
+
+		// return when no Customization
+		stateMachine.ImageDef.Customization = nil
+
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
+
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
-// TestFailedPopulateClassicRootfsContents tests failed scenarios in populateClassicRootfsContents
+// TestStateMachine_FailedPopulateClassicRootfsContents tests failed scenarios in populateClassicRootfsContents
 // this is accomplished by mocking functions
-func TestFailedPopulateClassicRootfsContents(t *testing.T) {
+func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 	t.Run("test_failed_populate_classic_rootfs_contents", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
 		var stateMachine ClassicStateMachine
@@ -1959,6 +1980,24 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		asserter.AssertErrContains(err, "Error writing to fstab")
 		osWriteFile = os.WriteFile
 
+		// mock os.ReadFile
+		osReadFile = mockReadFile
+		defer func() {
+			osReadFile = os.ReadFile
+		}()
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrContains(err, "Error reading fstab")
+		osReadFile = os.ReadFile
+
+		// return when existing fstab contains LABEL=writable
+		//nolint:gosec,G306
+		err = os.WriteFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
+			[]byte("LABEL=writable\n"),
+			0644)
+		asserter.AssertErrNil(err, true)
+		err = stateMachine.populateClassicRootfsContents()
+		asserter.AssertErrNil(err, true)
+
 		// create an /etc/resolv.conf.tmp in the chroot
 		err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0755)
 		asserter.AssertErrNil(err, true)
@@ -1974,6 +2013,106 @@ func TestFailedPopulateClassicRootfsContents(t *testing.T) {
 		asserter.AssertErrContains(err, "Error restoring /etc/resolv.conf")
 		helperRestoreResolvConf = helper.RestoreResolvConf
 	})
+}
+
+// TestSateMachine_fixFstab tests functionality of the fixFstab function
+func TestSateMachine_fixFstab(t *testing.T) {
+	testCases := []struct {
+		name          string
+		existingFstab string
+		expectedFstab string
+	}{
+		{
+			name:          "add entry to an existing but empty fstab",
+			existingFstab: "# UNCONFIGURED FSTAB",
+			expectedFstab: `LABEL=writable	/	ext4	discard,errors=remount-ro	0	1
+`,
+		},
+		{
+			name: "fix existing entry amongst several others",
+			existingFstab: `# /etc/fstab: static file system information.
+UUID=1565-1398	/	ext4	defaults	0	0
+#Here is another comment that should be left in place
+/dev/mapper/vgubuntu-swap_1	none	swap	sw	0	0
+`,
+			expectedFstab: `# /etc/fstab: static file system information.
+LABEL=writable	/	ext4	discard,errors=remount-ro	0	1
+#Here is another comment that should be left in place
+/dev/mapper/vgubuntu-swap_1	none	swap	sw	0	0
+`,
+		},
+		{
+			name: "fix existing entry amongst several others (with spaces)",
+			existingFstab: `# /etc/fstab: static file system information.
+UUID=1565-1398	/	ext4	defaults	0	0
+/dev/mapper/vgubuntu-swap_1	none  swap sw      0   0
+`,
+			expectedFstab: `# /etc/fstab: static file system information.
+LABEL=writable	/	ext4	discard,errors=remount-ro	0	1
+/dev/mapper/vgubuntu-swap_1	none	swap	sw	0	0
+`,
+		},
+		{
+			name: "fix only one root mount point",
+			existingFstab: `# /etc/fstab: static file system information.
+UUID=1565-1398	/	ext4	defaults	0	0
+UUID=1234-5678	/	ext4	defaults	0	0
+`,
+			expectedFstab: `# /etc/fstab: static file system information.
+LABEL=writable	/	ext4	discard,errors=remount-ro	0	1
+UUID=1234-5678	/	ext4	defaults	0	0
+`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			saveCWD := helper.SaveCWD()
+			defer saveCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture:  getHostArch(),
+				Series:        getHostSuite(),
+				Rootfs:        &imagedefinition.Rootfs{},
+				Customization: &imagedefinition.Customization{},
+			}
+
+			// set the defaults for the imageDef
+			err := helper.SetDefaults(&stateMachine.ImageDef)
+			asserter.AssertErrNil(err, true)
+
+			// need workdir set up for this
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			// create the <chroot>/etc directory
+			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.rootfs, "etc"), 0644)
+			asserter.AssertErrNil(err, true)
+
+			fstabPath := filepath.Join(stateMachine.tempDirs.rootfs, "etc", "fstab")
+
+			// simulate an already existing fstab file
+			if len(tc.existingFstab) != 0 {
+				err = osWriteFile(fstabPath, []byte(tc.existingFstab), 0644)
+				asserter.AssertErrNil(err, true)
+			}
+
+			err = stateMachine.fixFstab()
+			asserter.AssertErrNil(err, true)
+
+			fstabBytes, err := os.ReadFile(fstabPath)
+			asserter.AssertErrNil(err, true)
+
+			if string(fstabBytes) != tc.expectedFstab {
+				t.Errorf("Expected fstab content \"%s\", but got \"%s\"",
+					tc.expectedFstab, string(fstabBytes))
+			}
+		})
+	}
 }
 
 // TestGeneratePackageManifest tests if classic image manifest generation works
@@ -3602,10 +3741,11 @@ func TestCustomizeFstab(t *testing.T) {
 		name          string
 		fstab         []*imagedefinition.Fstab
 		expectedFstab string
+		existingFstab string
 	}{
 		{
-			"one_entry",
-			[]*imagedefinition.Fstab{
+			name: "one entry to an empty fstab",
+			fstab: []*imagedefinition.Fstab{
 				{
 					Label:        "writable",
 					Mountpoint:   "/",
@@ -3615,12 +3755,28 @@ func TestCustomizeFstab(t *testing.T) {
 					FsckOrder:    1,
 				},
 			},
-			`LABEL=writable	/	ext4	defaults	1	1
+			expectedFstab: `LABEL=writable	/	ext4	defaults	1	1
 `,
 		},
 		{
-			"two_entries",
-			[]*imagedefinition.Fstab{
+			name: "one entry to a non-empty fstab",
+			fstab: []*imagedefinition.Fstab{
+				{
+					Label:        "writable",
+					Mountpoint:   "/",
+					FSType:       "ext4",
+					MountOptions: "defaults",
+					Dump:         true,
+					FsckOrder:    1,
+				},
+			},
+			expectedFstab: `LABEL=writable	/	ext4	defaults	1	1
+`,
+			existingFstab: `LABEL=xxx / ext4 discard,errors=remount-ro 0 1`,
+		},
+		{
+			name: "two entries",
+			fstab: []*imagedefinition.Fstab{
 				{
 					Label:        "writable",
 					Mountpoint:   "/",
@@ -3638,21 +3794,8 @@ func TestCustomizeFstab(t *testing.T) {
 					FsckOrder:    1,
 				},
 			},
-			`LABEL=writable	/	ext4	defaults	0	1
+			expectedFstab: `LABEL=writable	/	ext4	defaults	0	1
 LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
-`,
-		},
-		{
-			"defaults_assumed",
-			[]*imagedefinition.Fstab{
-				{
-					Label:      "writable",
-					Mountpoint: "/",
-					FSType:     "ext4",
-					FsckOrder:  1,
-				},
-			},
-			`LABEL=writable	/	ext4	defaults	0	1
 `,
 		},
 	}
@@ -3687,13 +3830,19 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc"), 0644)
 			asserter.AssertErrNil(err, true)
 
+			fstabPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab")
+
+			// simulate an already existing fstab file
+			if len(tc.existingFstab) != 0 {
+				err = osWriteFile(fstabPath, []byte(tc.existingFstab), 0644)
+				asserter.AssertErrNil(err, true)
+			}
+
 			// customize the fstab, ensure no errors, and check the contents
 			err = stateMachine.customizeFstab()
 			asserter.AssertErrNil(err, true)
 
-			fstabBytes, err := os.ReadFile(
-				filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
-			)
+			fstabBytes, err := os.ReadFile(fstabPath)
 			asserter.AssertErrNil(err, true)
 
 			if string(fstabBytes) != tc.expectedFstab {
@@ -3704,12 +3853,12 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 	}
 }
 
-// TestFailedCustomizeFstab tests failures in the customizeFstab function
-func TestFailedCustomizeFstab(t *testing.T) {
+// TestStateMachine_customizeFstab_fail tests failures in the customizeFstab function
+func TestStateMachine_customizeFstab_fail(t *testing.T) {
 	t.Run("test_failed_customize_fstab", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+		restoreCWD := helper.SaveCWD()
+		defer restoreCWD()
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -3732,14 +3881,12 @@ func TestFailedCustomizeFstab(t *testing.T) {
 			},
 		}
 
-		// mock os.OpenFile
 		osOpenFile = mockOpenFile
 		defer func() {
 			osOpenFile = os.OpenFile
 		}()
 		err := stateMachine.customizeFstab()
 		asserter.AssertErrContains(err, "Error opening fstab")
-		osOpenFile = os.OpenFile
 	})
 }
 
@@ -4446,59 +4593,6 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 			}
 		}
 	})
-}
-
-type osMockConf struct {
-	osutilCopySpecialFileThreshold uint
-	ReadDirThreshold               uint
-	RemoveThreshold                uint
-	TruncateThreshold              uint
-}
-
-type osMock struct {
-	conf                            *osMockConf
-	beforeOsutilCopySpecialFileFail uint
-	beforeReadDirFail               uint
-	beforeRemoveFail                uint
-	beforeTruncateFail              uint
-}
-
-func (o *osMock) CopySpecialFile(path, dest string) error {
-	if o.beforeOsutilCopySpecialFileFail >= o.conf.osutilCopySpecialFileThreshold {
-		return fmt.Errorf("CopySpecialFile fail")
-	}
-	o.beforeOsutilCopySpecialFileFail++
-	return nil
-}
-
-func (o *osMock) ReadDir(name string) ([]fs.DirEntry, error) {
-	if o.beforeReadDirFail >= o.conf.ReadDirThreshold {
-		return nil, fmt.Errorf("ReadDir fail")
-	}
-	o.beforeReadDirFail++
-	return []fs.DirEntry{}, nil
-}
-
-func (o *osMock) Remove(name string) error {
-	if o.beforeRemoveFail >= o.conf.RemoveThreshold {
-		return fmt.Errorf("Remove fail")
-	}
-	o.beforeRemoveFail++
-
-	return nil
-}
-
-func (o *osMock) Truncate(name string, size int64) error {
-	if o.beforeTruncateFail >= o.conf.TruncateThreshold {
-		return fmt.Errorf("Truncate fail")
-	}
-	o.beforeTruncateFail++
-
-	return nil
-}
-
-func NewOSMock(conf *osMockConf) *osMock {
-	return &osMock{conf: conf}
 }
 
 func TestClassicStateMachine_cleanRootfs(t *testing.T) {
