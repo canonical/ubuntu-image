@@ -83,7 +83,9 @@ func (stateMachine *StateMachine) loadGadgetYaml() error {
 	gadgetYamlDst := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "gadget.yaml")
 	if err := osutilCopyFile(stateMachine.YamlFilePath,
 		gadgetYamlDst, osutil.CopyFlagOverwrite); err != nil {
-		return fmt.Errorf("Error copying gadget.yaml to %s: %s", gadgetYamlDst, err.Error())
+		return fmt.Errorf(`Error copying gadget.yaml to %s: %s
+The gadget.yaml file is expected to be located in a "meta" subdirectory of the provided gadget directory.
+`, gadgetYamlDst, err.Error())
 	}
 
 	// read in the gadget.yaml as bytes, because snapd expects it that way
