@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
@@ -784,6 +785,21 @@ func mountTempFS(targetDir, scratchDir, mountpoint string) (mountCmds, umountCmd
 	mountCmds = []*exec.Cmd{execCommand("mount", "--bind", tempDir, targetPath)}
 	umountCmds = []*exec.Cmd{execCommand("umount", targetPath)}
 	return mountCmds, umountCmds, nil
+}
+
+// manualMakeDirs creates a directory (and intermediate directories) into the chroot
+func manualMakeDirs(customizations []*imagedefinition.MakeDirs, targetDir string, debug bool) error {
+	for _, c := range customizations {
+		path := filepath.Join(targetDir, c.Path)
+		if debug {
+			fmt.Printf("Creating directory \"%s\"\n", path)
+		}
+		if err := osMkdirAll(path, fs.FileMode(c.Permissions)); err != nil {
+			return fmt.Errorf("Error creating directory \"%s\" into chroot: %s",
+				path, err.Error())
+		}
+	}
+	return nil
 }
 
 // manualCopyFile copies a file into the chroot

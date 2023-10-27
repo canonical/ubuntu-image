@@ -751,6 +751,25 @@ func TestValidateUntilThru(t *testing.T) {
 	}
 }
 
+// TestClassicMachine_manualMakeDirs_fail tests the fail case of the manualMkdir function
+func TestClassicMachine_manualMakeDirs_fail(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+
+	mkdirs := []*imagedefinition.MakeDirs{
+		{
+			Path:        "/test",
+			Permissions: 0755,
+		},
+	}
+
+	// Create a file where we will then try to create a directory
+	_, err := osCreate("/tmp/test")
+	asserter.AssertErrNil(err, true)
+
+	err = manualMakeDirs(mkdirs, "/tmp", true)
+	asserter.AssertErrContains(err, "Error creating directory")
+}
+
 // TestFailedManualCopyFile tests the fail case of the manualCopyFile function
 func TestFailedManualCopyFile(t *testing.T) {
 	t.Run("test_failed_manual_copy_file", func(t *testing.T) {
