@@ -139,6 +139,27 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		// do custom validation for manual customization paths
 		if imageDefinition.Customization.Manual != nil {
 			jsonContext := gojsonschema.NewJsonContext("manual_path_validation", nil)
+			if imageDefinition.Customization.Manual.MakeDirs != nil {
+				for _, mkdir := range imageDefinition.Customization.Manual.MakeDirs {
+					// XXX: filepath.IsAbs() does returns true for paths like /../../something
+					// and those are NOT absolute paths.
+					if !filepath.IsAbs(mkdir.Path) || strings.Contains(mkdir.Path, "/../") {
+						errDetail := gojsonschema.ErrorDetails{
+							"key":   "customization:manual:mkdir:destination",
+							"value": mkdir.Path,
+						}
+						result.AddError(
+							imagedefinition.NewPathNotAbsoluteError(
+								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
+									jsonContext),
+								52,
+								errDetail,
+							),
+							errDetail,
+						)
+					}
+				}
+			}
 			if imageDefinition.Customization.Manual.CopyFile != nil {
 				for _, copy := range imageDefinition.Customization.Manual.CopyFile {
 					// XXX: filepath.IsAbs() does returns true for paths like /../../something
@@ -1056,6 +1077,11 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
 	if err != nil {
 		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
+	}
+
+	err = manualMakeDirs(classicStateMachine.ImageDef.Customization.Manual.MakeDirs, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
 
 	err = manualCopyFile(classicStateMachine.ImageDef.Customization.Manual.CopyFile, classicStateMachine.ConfDefPath, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
