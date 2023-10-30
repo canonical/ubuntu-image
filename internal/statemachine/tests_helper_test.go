@@ -3,6 +3,7 @@ package statemachine
 import (
 	"fmt"
 	"io/fs"
+	"os/exec"
 )
 
 type osMockConf struct {
@@ -62,4 +63,16 @@ func (o *osMock) Truncate(name string, size int64) error {
 
 func NewOSMock(conf *osMockConf) *osMock {
 	return &osMock{conf: conf}
+}
+
+type mockExecCmd struct{}
+
+func NewMockExecCommand() *mockExecCmd {
+	return &mockExecCmd{}
+}
+
+func (m *mockExecCmd) Command(cmd string, args ...string) *exec.Cmd {
+	// Replace the command with an echo of it
+	//nolint:gosec,G204
+	return exec.Command("echo", append([]string{cmd}, args...)...)
 }

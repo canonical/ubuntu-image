@@ -1008,7 +1008,27 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 
 	// Slice used to store all the commands that need to be run
 	// to properly update grub.cfg in the chroot
+	// updateGrubCmds should be filled as a FIFO list
 	var updateGrubCmds []*exec.Cmd
+	// Slice used to store all the commands that need to be run
+	// to properly cleanup everything after the update of grub.cfg
+	// updateGrubCmds should be filled as a LIFO list (so new entries should added at the start of the slice)
+	var teardownCmds []*exec.Cmd
+
+	defer func() {
+		for _, teardownCmd := range teardownCmds {
+			cmdOutput := helper.SetCommandOutput(teardownCmd, stateMachine.commonFlags.Debug)
+			tmpErr := teardownCmd.Run()
+			if tmpErr != nil {
+				if err != nil {
+					err = fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+						teardownCmd.String(), err.Error(), cmdOutput.String())
+				} else {
+					err = tmpErr
+				}
+			}
+		}
+	}()
 
 	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
 
@@ -1017,34 +1037,35 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		return err
 	}
 
-	var umounts []*exec.Cmd
+	// detach the loopback device
+	teardownCmds = append(teardownCmds,
+		//nolint:gosec,G204
+		execCommand("losetup", "--detach", loopUsed),
+	)
+
 	updateGrubCmds = append(updateGrubCmds,
 		// mount the rootfs partition in which to run update-grub
 		//nolint:gosec,G204
-		exec.Command("mount",
+		execCommand("mount",
 			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
 			mountDir,
 		),
 	)
+
+	teardownCmds = append([]*exec.Cmd{execCommand("umount", mountDir)}, teardownCmds...)
 
 	// set up the mountpoints
 	mountPoints := []string{"/dev", "/proc", "/sys"}
 	for _, mountPoint := range mountPoints {
 		mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
 		updateGrubCmds = append(updateGrubCmds, mountCmds...)
-		umounts = append(umounts, umountCmds...)
-		defer func(cmds []*exec.Cmd) {
-			_ = runAll(cmds)
-		}(umountCmds)
-
+		teardownCmds = append(umountCmds, teardownCmds...)
 	}
-	// make sure to unmount the disk too
-	umounts = append(umounts, exec.Command("umount", mountDir))
 
 	// divert GRUB's os-prober as we don't want to scan for other OSes on
 	// the build system
 	updateGrubCmds = append(updateGrubCmds,
-		exec.Command("chroot",
+		execCommand("chroot",
 			mountDir,
 			"dpkg-divert",
 			"--local",
@@ -1055,17 +1076,9 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		),
 	)
 
-	// actually run update-grub
-	updateGrubCmds = append(updateGrubCmds,
-		exec.Command("chroot",
-			mountDir,
-			"update-grub",
-		),
-	)
-
 	// undivert GRUB's os-prober
-	updateGrubCmds = append(updateGrubCmds,
-		exec.Command("chroot",
+	teardownCmds = append([]*exec.Cmd{
+		execCommand("chroot",
 			mountDir,
 			"dpkg-divert",
 			"--remove",
@@ -1074,21 +1087,17 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 			"/etc/grub.d/30_os-prober.dpkg-divert",
 			"--rename",
 			"/etc/grub.d/30_os-prober",
+		)},
+		teardownCmds...,
+	)
+
+	// actually run update-grub
+	updateGrubCmds = append(updateGrubCmds,
+		execCommand("chroot",
+			mountDir,
+			"update-grub",
 		),
 	)
-
-	// unmount /dev /proc and /sys
-	updateGrubCmds = append(updateGrubCmds, umounts...)
-
-	// tear down the loopback
-	teardownCmd := exec.Command("losetup",
-		"--detach",
-		loopUsed,
-	)
-	defer func() {
-		_ = teardownCmd.Run()
-	}()
-	updateGrubCmds = append(updateGrubCmds, teardownCmd)
 
 	// now run all the commands
 	for _, cmd := range updateGrubCmds {
