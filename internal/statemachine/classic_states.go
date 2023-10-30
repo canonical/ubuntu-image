@@ -430,14 +430,12 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		return fmt.Errorf("Error creating scratch/gadget directory: %s", err.Error())
 	}
 
-	var sourceDir string
 	switch classicStateMachine.ImageDef.Gadget.GadgetType {
 	case "git":
 		err := cloneGitRepo(classicStateMachine.ImageDef, gadgetDir)
 		if err != nil {
 			return fmt.Errorf("Error cloning gadget repository: \"%s\"", err.Error())
 		}
-		sourceDir = gadgetDir
 	case "directory":
 		gadgetTreePath := strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
 		if !filepath.IsAbs(gadgetTreePath) {
@@ -455,8 +453,6 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 				return fmt.Errorf("Error copying gadget source: %s", err.Error())
 			}
 		}
-
-		sourceDir = filepath.Join(gadgetDir)
 	}
 
 	// now run "make" to build the gadget tree
@@ -474,7 +470,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	}...)
 	// add the current ENV to the command
 	makeCmd.Env = append(makeCmd.Env, os.Environ()...)
-	makeCmd.Dir = sourceDir
+	makeCmd.Dir = gadgetDir
 
 	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.Debug)
 
@@ -503,20 +499,20 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 			gadgetTree, _ = filepath.Abs(gadgetTree)
 		}
 	} else {
-		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget", "install")
 	}
-	files, err := osReadDir(gadgetTree)
+	entries, err := osReadDir(gadgetTree)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 	}
-	for _, gadgetFile := range files {
-		srcFile := filepath.Join(gadgetTree, gadgetFile.Name())
+	for _, gadgetEntry := range entries {
+		srcFile := filepath.Join(gadgetTree, gadgetEntry.Name())
 		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
-			return fmt.Errorf("Error copying gadget tree: %s", err.Error())
+			return fmt.Errorf("Error copying gadget tree entry: %s", err.Error())
 		}
 	}
 
-	classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "gadget.yaml")
+	classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, gadgetYamlPathInTree)
 
 	return nil
 }

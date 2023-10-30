@@ -33,6 +33,8 @@ const (
 	metadataStateFile = "ubuntu-image.json"
 )
 
+var gadgetYamlPathInTree = filepath.Join("meta", "gadget.yaml")
+
 // define some functions that can be mocked by test cases
 var gadgetLayoutVolume = gadget.LayoutVolume
 var gadgetNewMountedFilesystemWriter = gadget.NewMountedFilesystemWriter

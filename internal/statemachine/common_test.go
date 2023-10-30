@@ -209,6 +209,7 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 		}()
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrContains(err, "Error copying gadget.yaml")
+		asserter.AssertErrContains(err, "\nThe gadget.yaml file is expected to be located in a \"meta\" subdirectory of the provided built gadget directory.\n")
 		osutilCopyFile = osutil.CopyFile
 
 		// mock osReadFile

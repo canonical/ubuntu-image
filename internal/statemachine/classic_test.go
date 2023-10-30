@@ -430,10 +430,13 @@ func TestPrepareGadgetTree(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
-		// place a test gadget tree in the  scratch directory so we don't have to build one
+		// place a test gadget tree in the scratch directory so we don't have to build one
+		gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = os.MkdirAll(gadgetDir, 0755)
+		asserter.AssertErrNil(err, true)
+
 		gadgetSource := filepath.Join("testdata", "gadget_tree")
-		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
-		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+		err = osutil.CopySpecialFile(gadgetSource, filepath.Join(gadgetDir, "install"))
 		asserter.AssertErrNil(err, true)
 
 		err = stateMachine.prepareGadgetTree()
@@ -505,9 +508,12 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// place a test gadget tree in the  scratch directory so we don't have to build one
+		gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = os.MkdirAll(gadgetDir, 0755)
+		asserter.AssertErrNil(err, true)
+
 		gadgetSource := filepath.Join("testdata", "gadget_tree")
-		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
-		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
+		err = osutil.CopySpecialFile(gadgetSource, filepath.Join(gadgetDir, "install"))
 		asserter.AssertErrNil(err, true)
 
 		// mock os.Mkdir
@@ -2895,8 +2901,8 @@ func TestBuildGadgetTreeGit(t *testing.T) {
 func TestBuildGadgetTreeDirectory(t *testing.T) {
 	t.Run("test_build_gadget_tree_directory", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		saveCWD := helper.SaveCWD()
-		defer saveCWD()
+		restoreCWD := helper.SaveCWD()
+		defer restoreCWD()
 
 		var stateMachine ClassicStateMachine
 		stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -2905,11 +2911,12 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		// need workdir set up for this
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 		// git clone the gadget into a /tmp dir
 		gadgetDir, err := os.MkdirTemp("", "pc-gadget-")
 		asserter.AssertErrNil(err, true)
-		defer os.RemoveAll(gadgetDir)
+		t.Cleanup(func() { os.RemoveAll(gadgetDir) })
 		gitCloneCommand := *exec.Command(
 			"git",
 			"clone",
@@ -2924,7 +2931,7 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// now set up the image definition to build from this directory
-		imageDef := imagedefinition.ImageDefinition{
+		stateMachine.ImageDef = imagedefinition.ImageDefinition{
 			Architecture: getHostArch(),
 			Series:       getHostSuite(),
 			Gadget: &imagedefinition.Gadget{
@@ -2932,8 +2939,6 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 				GadgetType: "directory",
 			},
 		}
-
-		stateMachine.ImageDef = imageDef
 
 		err = stateMachine.buildGadgetTree()
 		asserter.AssertErrNil(err, true)
@@ -2944,9 +2949,6 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 		err = stateMachine.loadGadgetYaml()
 		asserter.AssertErrNil(err, true)
-
-		os.RemoveAll(gadgetDir)
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
@@ -4242,8 +4244,12 @@ func TestFailedUpdateBootloader(t *testing.T) {
 
 		// place a test gadget tree in the scratch directory so we don't
 		// have to build one
+		gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = os.MkdirAll(gadgetDir, 0755)
+		asserter.AssertErrNil(err, true)
+
 		gadgetSource := filepath.Join("testdata", "gadget_tree")
-		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		gadgetDest := filepath.Join(gadgetDir, "install")
 		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
 		asserter.AssertErrNil(err, true)
 		// also copy gadget.yaml to the root of the scratch/gadget dir
@@ -4301,11 +4307,15 @@ func TestUnsupportedBootloader(t *testing.T) {
 
 		// place a test gadget tree in the scratch directory so we don't
 		// have to build one
+		gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		err = os.MkdirAll(gadgetDir, 0755)
+		asserter.AssertErrNil(err, true)
+
 		gadgetSource := filepath.Join("testdata", "gadget_tree")
-		gadgetDest := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+		gadgetDest := filepath.Join(gadgetDir, "install")
 		err = osutil.CopySpecialFile(gadgetSource, gadgetDest)
 		asserter.AssertErrNil(err, true)
-		// also copy gadget.yaml to the root of the scratc/gadget dir
+		// also copy gadget.yaml to the root of the scratch/gadget dir
 		err = osutil.CopyFile(
 			filepath.Join(gadgetDest, "meta", "gadget.yaml"),
 			filepath.Join(gadgetDest, "gadget.yaml"),
