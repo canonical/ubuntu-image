@@ -71,6 +71,8 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"private_ppa_without_fingerprint", "test_private_ppa_without_fingerprint.yaml", false, "Fingerprint is required for private PPAs"},
 		{"invalid_paths_in_manual_copy", "test_invalid_paths_in_manual_copy.yaml", false, "needs to be an absolute path (../../malicious)"},
 		{"invalid_paths_in_manual_copy_bug", "test_invalid_paths_in_manual_copy.yaml", false, "needs to be an absolute path (/../../malicious)"},
+		{"invalid_paths_in_manual_mkdir", "test_invalid_paths_in_manual_mkdir.yaml", false, "needs to be an absolute path (../../malicious)"},
+		{"invalid_paths_in_manual_mkdir_bug", "test_invalid_paths_in_manual_mkdir.yaml", false, "needs to be an absolute path (/../../malicious)"},
 		{"invalid_paths_in_manual_touch_file", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (../../malicious)"},
 		{"invalid_paths_in_manual_touch_file_bug", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (/../../malicious)"},
 		{"img_specified_without_gadget", "test_image_without_gadget.yaml", false, "Key img cannot be used without key gadget:"},
@@ -1441,6 +1443,16 @@ func TestStateMachine_manualCustomization(t *testing.T) {
 			},
 			Customization: &imagedefinition.Customization{
 				Manual: &imagedefinition.Manual{
+					MakeDirs: []*imagedefinition.MakeDirs{
+						{
+							Path:        "/etc/foo/bar",
+							Permissions: 0755,
+						},
+						{
+							Path:        "/etc/baz/test",
+							Permissions: 0644,
+						},
+					},
 					CopyFile: []*imagedefinition.CopyFile{
 						{
 							Source: filepath.Join("testdata", "test_script"),
@@ -1488,6 +1500,15 @@ func TestStateMachine_manualCustomization(t *testing.T) {
 
 		err = stateMachine.manualCustomization()
 		asserter.AssertErrNil(err, true)
+
+		// Check that the correct directories exist
+		testDirectories := []string{"/etc/foo/bar", "/etc/baz/test"}
+		for _, dirName := range testDirectories {
+			_, err := os.Stat(filepath.Join(stateMachine.tempDirs.chroot, dirName))
+			if err != nil {
+				t.Errorf("directory %s should exist, but it does not", dirName)
+			}
+		}
 
 		// Check that the correct files exist
 		testFiles := []string{"test_copy_file", "test_touch_file", "test_execute"}
@@ -1547,6 +1568,18 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 		expectedErr          string
 		manualCustomizations *imagedefinition.Manual
 	}{
+		{
+			name:        "failing manualMakeDirs",
+			expectedErr: "not a directory",
+			manualCustomizations: &imagedefinition.Manual{
+				MakeDirs: []*imagedefinition.MakeDirs{
+					{
+						Path:        filepath.Join("/etc", "resolv.conf"),
+						Permissions: 0755,
+					},
+				},
+			},
+		},
 		{
 			name:        "failing manualCopyFile",
 			expectedErr: "cp: cannot stat 'this/path/does/not/exist'",
@@ -2528,6 +2561,15 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
 					cmd.String(), err.Error(), outPut.String())
+			}
+		}
+
+		// test make-dirs customization
+		addedDir := filepath.Join(mountDir, "etc", "foo", "bar")
+		_, err = os.Stat(addedDir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("Directory \"%s\" should exist, but does not", addedDir)
 			}
 		}
 
