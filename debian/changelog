@@ -36,6 +36,7 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Make sure the fstab file is cleanly overridden (LP: #2031889)
   * Always look for gadget.yaml file in meta directory
   * Add a make-dirs manual customization option to create directories in the rootfs
+  * use eatmydata to speed up debootstrap
 
   [ Alfonso Sanchez-Beato ]
   * Update to latest snapd, adapting to changes in layouts code.
