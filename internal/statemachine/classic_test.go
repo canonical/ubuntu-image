@@ -3259,6 +3259,8 @@ func TestCreateChroot(t *testing.T) {
 		err := stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
+		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
 		err = stateMachine.createChroot()
 		asserter.AssertErrNil(err, true)
 
@@ -3310,7 +3312,6 @@ func TestCreateChroot(t *testing.T) {
 				t.Errorf("%s is not present in /etc/apt/sources.list", pocket)
 			}
 		}
-		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
 }
 
