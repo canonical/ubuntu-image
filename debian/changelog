@@ -37,6 +37,7 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Always look for gadget.yaml file in meta directory
   * Add a make-dirs manual customization option to create directories in the rootfs
   * use eatmydata to speed up debootstrap
+  * Make sure we unmount/detach everything if the update_bootloader state is failing
 
   [ Alfonso Sanchez-Beato ]
   * Update to latest snapd, adapting to changes in layouts code.
