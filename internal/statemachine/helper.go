@@ -975,7 +975,8 @@ func runAll(cmds []*exec.Cmd) error {
 }
 
 // associateLoopDevice associates a file to a loop device and returns the loop device number
-func (stateMachine *StateMachine) associateLoopDevice(path string) (string, error) {
+// Also returns the command to detach the loop device during teardown
+func (stateMachine *StateMachine) associateLoopDevice(path string) (string, *exec.Cmd, error) {
 	// run the losetup command and read the output to determine which loopback was used
 	losetupCmd := execCommand("losetup",
 		"--find",
@@ -992,9 +993,34 @@ func (stateMachine *StateMachine) associateLoopDevice(path string) (string, erro
 			losetupCmd.String(),
 			err.Error(),
 		)
-		return "", err
+		return "", nil, err
 	}
-	return strings.TrimSpace(string(losetupOutput)), nil
+
+	loopUsed := strings.TrimSpace(string(losetupOutput))
+
+	//nolint:gosec,G204
+	losetupDetachCmd := execCommand("losetup", "--detach", loopUsed)
+
+	return loopUsed, losetupDetachCmd, nil
+}
+
+// divertOSProber divert GRUB's os-prober as we don't want to scan for other OSes on
+// the build system
+func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
+	dpkgDivert := "dpkg-divert"
+
+	commonArgs := []string{
+		"--local",
+		"--divert",
+		"/etc/grub.d/30_os-prober.dpkg-divert",
+		"--rename",
+		"/etc/grub.d/30_os-prober",
+	}
+
+	divert := append([]string{mountDir, dpkgDivert}, commonArgs...)
+	undivert := append([]string{mountDir, dpkgDivert, "--remove"}, commonArgs...)
+
+	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
 }
 
 // updateGrub mounts the resulting image and runs update-grub
@@ -1032,16 +1058,13 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 
 	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
 
-	loopUsed, err := stateMachine.associateLoopDevice(imgPath)
+	loopUsed, losetupDetachCmd, err := stateMachine.associateLoopDevice(imgPath)
 	if err != nil {
 		return err
 	}
 
 	// detach the loopback device
-	teardownCmds = append(teardownCmds,
-		//nolint:gosec,G204
-		execCommand("losetup", "--detach", loopUsed),
-	)
+	teardownCmds = append(teardownCmds, losetupDetachCmd)
 
 	updateGrubCmds = append(updateGrubCmds,
 		// mount the rootfs partition in which to run update-grub
@@ -1062,34 +1085,10 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		teardownCmds = append(umountCmds, teardownCmds...)
 	}
 
-	// divert GRUB's os-prober as we don't want to scan for other OSes on
-	// the build system
-	updateGrubCmds = append(updateGrubCmds,
-		execCommand("chroot",
-			mountDir,
-			"dpkg-divert",
-			"--local",
-			"--divert",
-			"/etc/grub.d/30_os-prober.dpkg-divert",
-			"--rename",
-			"/etc/grub.d/30_os-prober",
-		),
-	)
+	divert, undivert := divertOSProber(mountDir)
 
-	// undivert GRUB's os-prober
-	teardownCmds = append([]*exec.Cmd{
-		execCommand("chroot",
-			mountDir,
-			"dpkg-divert",
-			"--remove",
-			"--local",
-			"--divert",
-			"/etc/grub.d/30_os-prober.dpkg-divert",
-			"--rename",
-			"/etc/grub.d/30_os-prober",
-		)},
-		teardownCmds...,
-	)
+	updateGrubCmds = append(updateGrubCmds, divert)
+	teardownCmds = append([]*exec.Cmd{undivert}, teardownCmds...)
 
 	// actually run update-grub
 	updateGrubCmds = append(updateGrubCmds,
