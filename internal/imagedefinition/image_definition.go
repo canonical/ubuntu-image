@@ -115,6 +115,7 @@ type Snap struct {
 
 // Manual provides manual customization options
 type Manual struct {
+	MakeDirs  []*MakeDirs  `yaml:"make-dirs"  json:"MakeDirs,omitempty"`
 	CopyFile  []*CopyFile  `yaml:"copy-file"  json:"CopyFile,omitempty"`
 	Execute   []*Execute   `yaml:"execute"    json:"Execute,omitempty"`
 	TouchFile []*TouchFile `yaml:"touch-file" json:"TouchFile,omitempty"`
@@ -130,6 +131,12 @@ type Fstab struct {
 	MountOptions string `yaml:"mount-options"   json:"MountOptions" default:"defaults"`
 	Dump         bool   `yaml:"dump"            json:"Dump,omitempty"`
 	FsckOrder    int    `yaml:"fsck-order"      json:"FsckOrder"`
+}
+
+// MakeDirs allows users to copy files into the rootfs of an image
+type MakeDirs struct {
+	Path        string `yaml:"path" json:"Path"`
+	Permissions uint32 `yaml:"permissions"      json:"Permissions" default:"0755"`
 }
 
 // CopyFile allows users to copy files into the rootfs of an image

@@ -71,6 +71,11 @@ func executeStateMachine(sm statemachine.SmInterface) error {
 // unhidePackOpts make pack options visible in help if the pack command is used
 // This should be removed when the pack command is made visible to everyone
 func unhidePackOpts(parser *flags.Parser) {
+	// Save given options before removing them temporarily
+	// otherwise the help will be displayed twice
+	opts := parser.Options
+	parser.Options = 0
+	defer func() { parser.Options = opts }()
 	// parse once to determine the active command
 	// we do not care about error here since we will reparse again
 	_, _ = parser.Parse()

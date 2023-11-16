@@ -77,7 +77,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 	}
 
 	// set the gadget yaml location
-	snapStateMachine.YamlFilePath = filepath.Join(stateMachine.tempDirs.unpack, "gadget", "meta", "gadget.yaml")
+	snapStateMachine.YamlFilePath = filepath.Join(stateMachine.tempDirs.unpack, "gadget", gadgetYamlPathInTree)
 
 	return nil
 }

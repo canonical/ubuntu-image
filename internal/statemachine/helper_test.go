@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -751,6 +752,25 @@ func TestValidateUntilThru(t *testing.T) {
 	}
 }
 
+// TestClassicMachine_manualMakeDirs_fail tests the fail case of the manualMkdir function
+func TestClassicMachine_manualMakeDirs_fail(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+
+	mkdirs := []*imagedefinition.MakeDirs{
+		{
+			Path:        "/test",
+			Permissions: 0755,
+		},
+	}
+
+	// Create a file where we will then try to create a directory
+	_, err := osCreate("/tmp/test")
+	asserter.AssertErrNil(err, true)
+
+	err = manualMakeDirs(mkdirs, "/tmp", true)
+	asserter.AssertErrContains(err, "Error creating directory")
+}
+
 // TestFailedManualCopyFile tests the fail case of the manualCopyFile function
 func TestFailedManualCopyFile(t *testing.T) {
 	t.Run("test_failed_manual_copy_file", func(t *testing.T) {
@@ -1348,6 +1368,65 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 
 		os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 	})
+}
+
+// TestStateMachine_updateGrub_checkcmds checks commands to update grub order is ok
+func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.commonFlags.Debug = true
+	stateMachine.commonFlags.OutputDir = "/tmp"
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	mockCmder := NewMockExecCommand()
+
+	execCommand = mockCmder.Command
+	t.Cleanup(func() { execCommand = exec.Command })
+
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	t.Cleanup(func() { restoreStdout() })
+
+	err = stateMachine.updateGrub("", 2)
+	asserter.AssertErrNil(err, true)
+
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+
+	expectedCmds := []*regexp.Regexp{
+		regexp.MustCompile("mount .*p2 .*/scratch/loopback"),
+		regexp.MustCompile("mount --bind /dev .*/scratch/loopback/dev"),
+		regexp.MustCompile("mount --bind /proc .*/scratch/loopback/proc"),
+		regexp.MustCompile("mount --bind /sys .*/scratch/loopback/sys"),
+		regexp.MustCompile("chroot .*/scratch/loopback dpkg-divert"),
+		regexp.MustCompile("chroot .*/scratch/loopback update-grub"),
+		regexp.MustCompile("chroot .*/scratch/loopback dpkg-divert --remove"),
+		regexp.MustCompile("mount --make-rprivate .*/scratch/loopback/sys"),
+		regexp.MustCompile("umount --recursive .*scratch/loopback/sys"),
+		regexp.MustCompile("mount --make-rprivate .*/scratch/loopback/proc"),
+		regexp.MustCompile("umount --recursive .*scratch/loopback/proc"),
+		regexp.MustCompile("mount --make-rprivate .*/scratch/loopback/dev"),
+		regexp.MustCompile("umount --recursive .*scratch/loopback/dev"),
+		regexp.MustCompile("umount .*scratch/loopback"),
+		regexp.MustCompile("losetup --detach .* /tmp"),
+	}
+
+	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
+	if len(expectedCmds) != len(gotCmds) {
+		t.Fatalf("%v commands to be executed, expected %v", len(gotCmds), len(expectedCmds))
+	}
+
+	for i, gotCmd := range gotCmds {
+		expected := expectedCmds[i]
+
+		if !expected.Match([]byte(gotCmd)) {
+			t.Errorf("Cmd \"%v\" not matching. Expected %v\n", gotCmd, expected.String())
+		}
+	}
 }
 
 // TestFailedUpdateGrub tests failures in the updateGrub function

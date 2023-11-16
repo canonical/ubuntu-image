@@ -200,6 +200,16 @@ The following specification defines what is supported in the YAML:
          # artifacts are generated, ubuntu-image can automatically
          # perform some manual customization to the rootfs.
          manual: (optional)
+           # Create directories in the rootfs of the image
+           make-dirs: (optional)
+             -
+               # The path to the directory to create
+               # Every intermediate directories missing on the path
+               # will be created.
+               path: <string>
+               # Permissions to give to the directory and any missing
+               # intermediate directories.
+               permissions: <uint32>
            # Copies files from the host system to the rootfs of
            # the image.
            copy-file: (optional)
@@ -242,6 +252,7 @@ The following specification defines what is supported in the YAML:
            # ubuntu-image will support creating many different types of
            # artifacts, including the actual images, manifest files,
            # changelogs, and a list of files in the rootfs.
+         # Set a custom fstab. The existing one (if any) will be truncated.
          fstab: (optional)
            -
              # the value of LABEL= for the fstab entry

@@ -27,8 +27,10 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
-var seedVersionRegex = regexp.MustCompile(`^[a-z0-9].*`)
-var localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
+var (
+	seedVersionRegex   = regexp.MustCompile(`^[a-z0-9].*`)
+	localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
+)
 
 // parseImageDefinition parses the provided yaml file and ensures it is valid
 func (stateMachine *StateMachine) parseImageDefinition() error {
@@ -137,6 +139,27 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		// do custom validation for manual customization paths
 		if imageDefinition.Customization.Manual != nil {
 			jsonContext := gojsonschema.NewJsonContext("manual_path_validation", nil)
+			if imageDefinition.Customization.Manual.MakeDirs != nil {
+				for _, mkdir := range imageDefinition.Customization.Manual.MakeDirs {
+					// XXX: filepath.IsAbs() does returns true for paths like /../../something
+					// and those are NOT absolute paths.
+					if !filepath.IsAbs(mkdir.Path) || strings.Contains(mkdir.Path, "/../") {
+						errDetail := gojsonschema.ErrorDetails{
+							"key":   "customization:manual:mkdir:destination",
+							"value": mkdir.Path,
+						}
+						result.AddError(
+							imagedefinition.NewPathNotAbsoluteError(
+								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
+									jsonContext),
+								52,
+								errDetail,
+							),
+							errDetail,
+						)
+					}
+				}
+			}
 			if imageDefinition.Customization.Manual.CopyFile != nil {
 				for _, copy := range imageDefinition.Customization.Manual.CopyFile {
 					// XXX: filepath.IsAbs() does returns true for paths like /../../something
@@ -407,14 +430,12 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		return fmt.Errorf("Error creating scratch/gadget directory: %s", err.Error())
 	}
 
-	var sourceDir string
 	switch classicStateMachine.ImageDef.Gadget.GadgetType {
 	case "git":
 		err := cloneGitRepo(classicStateMachine.ImageDef, gadgetDir)
 		if err != nil {
 			return fmt.Errorf("Error cloning gadget repository: \"%s\"", err.Error())
 		}
-		sourceDir = gadgetDir
 	case "directory":
 		gadgetTreePath := strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
 		if !filepath.IsAbs(gadgetTreePath) {
@@ -432,8 +453,6 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 				return fmt.Errorf("Error copying gadget source: %s", err.Error())
 			}
 		}
-
-		sourceDir = filepath.Join(gadgetDir)
 	}
 
 	// now run "make" to build the gadget tree
@@ -451,7 +470,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	}...)
 	// add the current ENV to the command
 	makeCmd.Env = append(makeCmd.Env, os.Environ()...)
-	makeCmd.Dir = sourceDir
+	makeCmd.Dir = gadgetDir
 
 	makeOutput := helper.SetCommandOutput(makeCmd, classicStateMachine.commonFlags.Debug)
 
@@ -480,20 +499,20 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 			gadgetTree, _ = filepath.Abs(gadgetTree)
 		}
 	} else {
-		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget")
+		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget", "install")
 	}
-	files, err := osReadDir(gadgetTree)
+	entries, err := osReadDir(gadgetTree)
 	if err != nil {
 		return fmt.Errorf("Error reading gadget tree: %s", err.Error())
 	}
-	for _, gadgetFile := range files {
-		srcFile := filepath.Join(gadgetTree, gadgetFile.Name())
+	for _, gadgetEntry := range entries {
+		srcFile := filepath.Join(gadgetTree, gadgetEntry.Name())
 		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
-			return fmt.Errorf("Error copying gadget tree: %s", err.Error())
+			return fmt.Errorf("Error copying gadget tree entry: %s", err.Error())
 		}
 	}
 
-	classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, "gadget.yaml")
+	classicStateMachine.YamlFilePath = filepath.Join(gadgetDir, gadgetYamlPathInTree)
 
 	return nil
 }
@@ -1014,9 +1033,9 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 func (stateMachine *StateMachine) customizeFstab() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// open /etc/fstab for writing
-	fstabIO, err := osOpenFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab"),
-		os.O_CREATE|os.O_WRONLY, 0644)
+	fstabPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab")
+
+	fstabIO, err := osOpenFile(fstabPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("Error opening fstab: %s", err.Error())
 	}
@@ -1040,6 +1059,7 @@ func (stateMachine *StateMachine) customizeFstab() error {
 		)
 		fstabEntries = append(fstabEntries, fstabEntry)
 	}
+
 	_, err = fstabIO.Write([]byte(strings.Join(fstabEntries, "\n") + "\n"))
 
 	return err
@@ -1053,6 +1073,11 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
 	if err != nil {
 		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
+	}
+
+	err = manualMakeDirs(classicStateMachine.ImageDef.Customization.Manual.MakeDirs, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
 
 	err = manualCopyFile(classicStateMachine.ImageDef.Customization.Manual.CopyFile, classicStateMachine.ConfDefPath, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
@@ -1289,24 +1314,68 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 		}
 	}
 
-	if classicStateMachine.ImageDef.Customization != nil {
-		if len(classicStateMachine.ImageDef.Customization.Fstab) == 0 {
-			fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
-			fstabBytes, err := osReadFile(fstabPath)
-			if err == nil {
-				if !strings.Contains(string(fstabBytes), "LABEL=writable") {
-					re := regexp.MustCompile(`(?m:^LABEL=\S+\s+/\s+(.*)$)`)
-					newContents := re.ReplaceAll(fstabBytes, []byte("LABEL=writable\t/\t$1"))
-					if !strings.Contains(string(newContents), "LABEL=writable") {
-						newContents = []byte("LABEL=writable   /    ext4   defaults    0 0\n")
-					}
-					err := osWriteFile(fstabPath, newContents, 0644)
-					if err != nil {
-						return fmt.Errorf("Error writing to fstab: %s", err.Error())
-					}
-				}
-			}
+	if classicStateMachine.ImageDef.Customization == nil {
+		return nil
+	}
+
+	return classicStateMachine.fixFstab()
+}
+
+// fixFstab makes sure the fstab contains a valid entry for the root mount point
+func (stateMachine *StateMachine) fixFstab() error {
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	if len(classicStateMachine.ImageDef.Customization.Fstab) != 0 {
+		return nil
+	}
+
+	fstabPath := filepath.Join(classicStateMachine.tempDirs.rootfs, "etc", "fstab")
+	fstabBytes, err := osReadFile(fstabPath)
+	if err != nil {
+		return fmt.Errorf("Error reading fstab: %s", err.Error())
+	}
+
+	rootMountFound := false
+	newLines := make([]string, 0)
+	rootFSLabel := "writable"
+	rootFSOptions := "discard,errors=remount-ro"
+	fsckOrder := "1"
+
+	lines := strings.Split(string(fstabBytes), "\n")
+	for _, l := range lines {
+		if l == "# UNCONFIGURED FSTAB" {
+			// omit this line if still present
+			continue
 		}
+
+		if strings.HasPrefix(l, "#") {
+			newLines = append(newLines, l)
+			continue
+		}
+
+		entry := strings.Fields(l)
+		if len(entry) < 6 {
+			// ignore invalid fstab entry
+			continue
+		}
+
+		if entry[1] == "/" && !rootMountFound {
+			entry[0] = "LABEL=" + rootFSLabel
+			entry[3] = rootFSOptions
+			entry[5] = fsckOrder
+
+			rootMountFound = true
+		}
+		newLines = append(newLines, strings.Join(entry, "\t"))
+	}
+
+	if !rootMountFound {
+		newLines = append(newLines, fmt.Sprintf("LABEL=%s	/	ext4	%s	0	%s", rootFSLabel, rootFSOptions, fsckOrder))
+	}
+
+	err = osWriteFile(fstabPath, []byte(strings.Join(newLines, "\n")+"\n"), 0644)
+	if err != nil {
+		return fmt.Errorf("Error writing to fstab: %s", err.Error())
 	}
 	return nil
 }

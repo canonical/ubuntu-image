@@ -25,6 +25,10 @@ rootfs:
       - standard
       - cloud-image
 customization:
+  manual:
+    make-dirs:
+      - path: /etc/foo/bar
+        permissions: 0755
   cloud-init:
     user-data: |
       #cloud-config
