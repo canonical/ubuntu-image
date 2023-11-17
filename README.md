@@ -38,7 +38,7 @@ The "gadget.yaml" specification has moved to [the snapcraft forum](https://forum
 
 # Build Instructions
 
-* Ensure golang >= 1.18 is installed
+* Ensure golang >= 1.21 is installed
 * Clone the git repository using `git clone https://github.com/canonical/ubuntu-image.git`
 * `cd` into the newly cloned repository
 * Run `go build -o . ./...`

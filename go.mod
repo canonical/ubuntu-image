@@ -1,6 +1,6 @@
 module github.com/canonical/ubuntu-image
 
-go 1.18
+go 1.21
 
 require (
 	github.com/diskfs/go-diskfs v0.0.0-20211104185512-274de576a1a5

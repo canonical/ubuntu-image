@@ -1388,14 +1388,14 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
 
-	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	stdout, restoreStdout, _ := helper.CaptureStd(&os.Stdout)
 	t.Cleanup(func() { restoreStdout() })
 
 	err = stateMachine.updateGrub("", 2)
 	asserter.AssertErrNil(err, true)
 
 	restoreStdout()
-	readStdout, err := io.ReadAll(stdout)
+	readStdout, _ := io.ReadAll(stdout)
 
 	expectedCmds := []*regexp.Regexp{
 		regexp.MustCompile("mount .*p2 .*/scratch/loopback"),
