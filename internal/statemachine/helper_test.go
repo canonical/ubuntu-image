@@ -1417,7 +1417,7 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 
 	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
 	if len(expectedCmds) != len(gotCmds) {
-	a	t.Fatalf("%v commands to be executed, expected %v", len(gotCmds), len(expectedCmds))
+		t.Fatalf("%v commands to be executed, expected %v", len(gotCmds), len(expectedCmds))
 	}
 
 	for i, gotCmd := range gotCmds {
