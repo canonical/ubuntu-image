@@ -377,6 +377,8 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
 
 	stateMachine.CurrentStep = partialStateMachine.CurrentStep
+	stateMachine.Packages = partialStateMachine.Packages
+	stateMachine.Snaps = partialStateMachine.Snaps
 	stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
 	stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
 	stateMachine.ImageSizes = partialStateMachine.ImageSizes
@@ -387,6 +389,8 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
 	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
 	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
+	stateMachine.tempDirs.chroot = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "chroot")
+	stateMachine.tempDirs.scratch = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "scratch")
 
 	// due to https://github.com/golang/go/issues/10415 we need to set back the volume
 	// structs we reset before encoding (see writeMetadata())
@@ -445,6 +449,7 @@ func (stateMachine *StateMachine) Run() error {
 	// iterate through the states
 	for i := 0; i < len(stateMachine.states); i++ {
 		stateFunc := stateMachine.states[i]
+		stateMachine.CurrentStep = stateFunc.name
 		if stateFunc.name == stateMachine.stateMachineFlags.Until {
 			break
 		}
