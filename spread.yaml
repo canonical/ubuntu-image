@@ -1,24 +1,115 @@
 project: ubuntu-image
 
+environment:
+    # On some distros the default GOPROXY setting is 'direct' (eg. Fedora).
+    # Some of the external go packages may get removed or could be temporary
+    # offline (as happened with maze.io/x/crypt), and then the sources are
+    # only available through the proxy cache. Play it safe and enable the
+    # proxy to allow for least CI interruptions.
+    GOPROXY: https://proxy.golang.org,direct
+    LANG: "C.UTF-8"
+    LANGUAGE: "en"
+
 backends:
-  lxd:
+  google:
+    key: '$(HOST: echo "$SPREAD_GOOGLE_KEY")'
+    location: snapd-spread/us-east1-b
+    halt-timeout: 2h
     systems:
-      - ubuntu-18.04
-      - ubuntu-20.04
-        #- ubuntu-22.04
+      - ubuntu-16.04-64:
+            workers: 8
+            storage: 12G
+      - ubuntu-18.04-64:
+            storage: 12G
+            workers: 8
+      - ubuntu-20.04-64:
+            storage: 12G
+            workers: 8
+      - ubuntu-22.04-64:
+            storage: 12G
+            workers: 8
+      - ubuntu-23.04-64:
+            storage: 12G
+            workers: 8
+      - ubuntu-23.10-64:
+            storage: 12G
+            workers: 8
+  qemu:
+    memory: 4G
+    systems:
+      - ubuntu-16.04-64:
+            username: ubuntu
+            password: ubuntu
+      - ubuntu-18.04-64:
+            username: ubuntu
+            password: ubuntu
+      - ubuntu-20.04-64:
+            username: ubuntu
+            password: ubuntu
+      - ubuntu-22.04-64:
+            username: ubuntu
+            password: ubuntu
+      - ubuntu-23.04-64:
+            username: ubuntu
+            password: ubuntu
+      - ubuntu-23.10-64:
+            username: ubuntu
+            password: ubuntu
 
 path: /home/ubuntu-image
 
+exclude:
+    - .git
+
 prepare: |
+  # NOTE: This part of the code needs to be in spread.yaml as it runs before
+  # the rest of the source code (including the tests/lib directory) is
+  # around. The purpose of this code is to fix some connectivity issues and
+  # then apply the delta of the git repository.
+
+  # apt update is hanging on security.ubuntu.com with IPv6, prefer IPv4 over IPv6
+  cat <<EOF > gai.conf
+  precedence  ::1/128       50
+  precedence  ::/0          40
+  precedence  2002::/16     30
+  precedence ::/96          20
+  precedence ::ffff:0:0/96 100
+  EOF
+  if ! mv gai.conf /etc/gai.conf; then
+      echo "/etc/gai.conf is not writable, ubuntu-core system? apt update won't be affected in that case"
+      rm -f gai.conf
+  fi
+  if command -v restorecon ; then
+      # restore proper context otherwise SELinux may complain
+      restorecon -v /etc/gai.conf
+  fi
+
+  if systemctl is-enabled unattended-upgrades.service; then
+    systemctl stop unattended-upgrades.service
+    systemctl mask unattended-upgrades.service
+  fi
+
+  # Make sure ssh service is restarted after it is killed by spread (pkill -o -HUP sshd)
+  # during the machine setup in google systems. For more details see lp:2011458
+  if [ "$SPREAD_BACKEND" = "google" ] && [[ "$SPREAD_SYSTEM" == ubuntu-2* ]] && ! systemctl is-active ssh; then
+      systemctl restart ssh
+  fi
+
   apt update
-  apt install -y snapd libc6-dev gcc-multilib
+  apt install -y snapd libc6-dev gcc-multilib git
   snap install core20 --channel=latest/edge
   snap install --classic snapcraft
+  snap install --classic yq
   snap install --classic go --channel=1.19/stable
   unset SHELL
+  git clone https://git.launchpad.net/ubuntu-images
+  git clone https://github.com/snapcore/models
   snapcraft --destructive-mode
   snap install --classic --dangerous ubuntu-image_*.snap
+  mkdir /tmp/workdir
 
 suites:
   tests/:
     summary: Integration tests for ubuntu-image
+
+kill-timeout: 30m
