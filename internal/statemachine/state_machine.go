@@ -129,6 +129,9 @@ type StateMachine struct {
 
 	// names of images for each volume
 	VolumeNames map[string]string
+
+	Packages []string
+	Snaps    []string
 }
 
 // SetCommonOpts stores the common options for all image types in the struct
