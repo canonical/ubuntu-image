@@ -48,6 +48,8 @@ func TestClassicSetup(t *testing.T) {
 	var stateMachine ClassicStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_amd64.yaml")
 
 	err := stateMachine.Setup()
 	asserter.AssertErrNil(err, true)
@@ -276,14 +278,6 @@ func TestFailedCalculateStates(t *testing.T) {
 	})
 	err := stateMachine.calculateStates()
 	asserter.AssertErrContains(err, "Test Error")
-	helperCheckTags = helper.CheckTags
-
-	// now set a --thru flag for a state that doesn't exist
-	stateMachine.stateMachineFlags.Thru = "fake_state"
-
-	// now calculate the states and ensure that the expected states are in the slice
-	err = stateMachine.calculateStates()
-	asserter.AssertErrContains(err, "not a valid state name")
 }
 
 // TestPrintStates ensures the states are printed to stdout when the --debug flag is set
@@ -399,6 +393,8 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.stateMachineFlags.Resume = true
 	stateMachine.stateMachineFlags.WorkDir = testDir
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_amd64.yaml")
 
 	err := stateMachine.Setup()
 	asserter.AssertErrContains(err, "error reading metadata file")

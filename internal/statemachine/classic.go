@@ -64,8 +64,6 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 		return err
 	}
 
-	fmt.Printf("states: %v\n", classicStateMachine.states)
-
 	// validate values of until and thru
 	if err := classicStateMachine.validateUntilThru(); err != nil {
 		return err
@@ -75,8 +73,6 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 	if err := classicStateMachine.readMetadata(metadataStateFile); err != nil {
 		return err
 	}
-
-	fmt.Printf("states: %v\n", classicStateMachine.states)
 
 	return nil
 }
