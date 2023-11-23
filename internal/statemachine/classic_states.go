@@ -154,7 +154,6 @@ func (stateMachine *StateMachine) createChroot() error {
 
 	debootstrapCmd := generateDebootstrapCmd(classicStateMachine.ImageDef,
 		stateMachine.tempDirs.chroot,
-		classicStateMachine.Packages,
 	)
 
 	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, classicStateMachine.commonFlags.Debug)
