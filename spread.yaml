@@ -7,6 +7,15 @@ backends:
       - ubuntu-20.04
         #- ubuntu-22.04
 
+  google:
+    key: '$(HOST: echo "$SPREAD_GOOGLE_KEY")'
+    location: snapd-spread/us-east1-b
+    halt-timeout: 2h
+    systems:
+      - ubuntu-18.04-64:
+      - ubuntu-20.04-64:
+
+
 path: /home/ubuntu-image
 
 prepare: |

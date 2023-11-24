@@ -4,19 +4,25 @@ on: [pull_request]
 
 jobs:
   spread:
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        system:
-          - ubuntu-18.04
-          - ubuntu-20.04
+    runs-on: self-hosted
     steps:
+      - name: Cleanup job workspace
+        id: cleanup-job-workspace
+        run: |
+            rm -rf "${{ github.workspace }}"
+            mkdir "${{ github.workspace }}"
+
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 2
-      - name: Download spread
-        run: curl -s https://storage.googleapis.com/snapd-spread-tests/spread/spread-amd64.tar.gz | tar -xz
-      - name: Init lxd
-        run: sudo lxd init --auto
+          fetch-depth: 0
+
       - name: Run spread tests
-        run: sudo ./spread lxd:${{ matrix.system }}
+        run: spread google:tests/
+
+      - name: Discard spread workers
+        if: always()
+        run: |
+          shopt -s nullglob;
+          for r in .spread-reuse.*.yaml; do
+            spread -discard -reuse-pid="$(echo "$r" | grep -o -E '[0-9]+')";
+          done
