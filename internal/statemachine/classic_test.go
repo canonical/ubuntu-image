@@ -323,18 +323,19 @@ func TestPrintStates(t *testing.T) {
 [7] prepare_image
 [8] preseed_image
 [9] clean_rootfs
-[10] customize_fstab
-[11] perform_manual_customization
-[12] set_default_locale
-[13] populate_rootfs_contents
-[14] generate_disk_info
-[15] calculate_rootfs_size
-[16] populate_bootfs_contents
-[17] populate_prepare_partitions
-[18] make_disk
-[19] update_bootloader
-[20] generate_manifest
-[21] finish
+[10] customize_sources_list
+[11] customize_fstab
+[12] perform_manual_customization
+[13] set_default_locale
+[14] populate_rootfs_contents
+[15] generate_disk_info
+[16] calculate_rootfs_size
+[17] populate_bootfs_contents
+[18] populate_prepare_partitions
+[19] make_disk
+[20] update_bootloader
+[21] generate_manifest
+[22] finish
 `
 		if !strings.Contains(string(readStdout), expectedStates) {
 			t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -2054,6 +2055,118 @@ func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 	})
 }
 
+// TestSateMachine_customizeSourcesList tests functionality of the customizeSourcesList state function
+func TestSateMachine_customizeSourcesList(t *testing.T) {
+	testCases := []struct {
+		name                string
+		existingSourcesList string
+		customization       *imagedefinition.Customization
+		mockFuncs           func() func()
+		expectedErr         string
+		expectedSourcesList string
+	}{
+		{
+			name:                "set default",
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			customization:       &imagedefinition.Customization{},
+			expectedSourcesList: `deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
+`,
+		},
+		{
+			name:                "set less components",
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			customization: &imagedefinition.Customization{
+				Components: []string{"main"},
+			},
+			expectedSourcesList: `deb http://archive.ubuntu.com/ubuntu/ jammy main
+`,
+		},
+		{
+			name:                "set components and pocket",
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			customization: &imagedefinition.Customization{
+				Components: []string{"main"},
+				Pocket:     "security",
+			},
+			expectedSourcesList: `deb http://archive.ubuntu.com/ubuntu/ jammy main
+deb http://security.ubuntu.com/ubuntu/ jammy-security main
+`,
+		},
+		{
+			name:                "fail to write sources.list",
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			customization: &imagedefinition.Customization{
+				Components: []string{"main"},
+				Pocket:     "security",
+			},
+			expectedSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			expectedErr:         "unable to open sources.list file",
+			mockFuncs: func() func() {
+				mock := NewOSMock(
+					&osMockConf{
+						OpenFileThreshold: 0,
+					},
+				)
+
+				osOpenFile = mock.OpenFile
+				return func() { osOpenFile = os.OpenFile }
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			restoreCWD := helper.SaveCWD()
+			defer restoreCWD()
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture:  getHostArch(),
+				Series:        getHostSuite(),
+				Rootfs:        &imagedefinition.Rootfs{},
+				Customization: tc.customization,
+			}
+
+			err := helper.SetDefaults(&stateMachine.ImageDef)
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt"), 0644)
+			asserter.AssertErrNil(err, true)
+
+			sourcesListPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+
+			err = osWriteFile(sourcesListPath, []byte(tc.existingSourcesList), 0644)
+			asserter.AssertErrNil(err, true)
+
+			if tc.mockFuncs != nil {
+				restoreMock := tc.mockFuncs()
+				t.Cleanup(restoreMock)
+			}
+
+			err = stateMachine.customizeSourcesList()
+			if err != nil || len(tc.expectedErr) != 0 {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+
+			sourcesListBytes, err := os.ReadFile(sourcesListPath)
+			asserter.AssertErrNil(err, true)
+
+			if string(sourcesListBytes) != tc.expectedSourcesList {
+				t.Errorf("Expected sources.list content \"%s\", but got \"%s\"",
+					tc.expectedSourcesList, string(sourcesListBytes))
+			}
+		})
+	}
+}
+
 // TestSateMachine_fixFstab tests functionality of the fixFstab function
 func TestSateMachine_fixFstab(t *testing.T) {
 	testCases := []struct {
@@ -2605,6 +2718,15 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			t.Errorf("Expected LANG=C.UTF-8 in %s, but got %s", localeFile, string(localeBytes))
 		}
 
+		// check if components and pocket correctly setup in /etc/apt/sources.list
+		aptSourcesListBytes, err := os.ReadFile(filepath.Join(mountDir, "etc", "apt", "sources.list"))
+		asserter.AssertErrNil(err, true)
+		wantAptSourcesList := `deb http://archive.ubuntu.com/ubuntu/ jammy main universe restricted multiverse
+deb http://security.ubuntu.com/ubuntu/ jammy-security main universe restricted multiverse
+deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe restricted multiverse
+deb http://archive.ubuntu.com/ubuntu/ jammy-proposed main universe restricted multiverse
+`
+		asserter.AssertEqual(wantAptSourcesList, string(aptSourcesListBytes))
 	})
 }
 
@@ -3302,8 +3424,8 @@ func TestCreateChroot(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		pockets := []string{
-			fmt.Sprintf("%s-updates", stateMachine.ImageDef.Series),
 			fmt.Sprintf("%s-security", stateMachine.ImageDef.Series),
+			fmt.Sprintf("%s-updates", stateMachine.ImageDef.Series),
 			fmt.Sprintf("%s-proposed", stateMachine.ImageDef.Series),
 		}
 
@@ -4166,7 +4288,10 @@ func TestPreseedResetChroot(t *testing.T) {
 			},
 		}
 
-		err := stateMachine.makeTemporaryDirectories()
+		err := helper.SetDefaults(&stateMachine.ImageDef)
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
@@ -4396,7 +4521,10 @@ func TestPreseedClassicImage(t *testing.T) {
 			},
 		}
 
-		err := stateMachine.makeTemporaryDirectories()
+		err := helper.SetDefaults(&stateMachine.ImageDef)
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		// create chroot to preseed
@@ -4614,7 +4742,10 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 			},
 		}
 
-		err := stateMachine.makeTemporaryDirectories()
+		err := helper.SetDefaults(&stateMachine.ImageDef)
+		asserter.AssertErrNil(err, true)
+
+		err = stateMachine.makeTemporaryDirectories()
 		asserter.AssertErrNil(err, true)
 
 		t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
