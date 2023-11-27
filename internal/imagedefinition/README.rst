@@ -67,7 +67,7 @@ The following specification defines what is supported in the YAML:
        # archive-tasks, or tarball.
        rootfs:
          # Components are a list of apt sources, such as main,
-         # universe, and restricted. Defaults to "main,restricted".
+         # universe, and restricted. Defaults to "release".
          components: (optional)
            - <string>
            - <string>
@@ -128,22 +128,7 @@ The following specification defines what is supported in the YAML:
        # ubuntu-image supports building automatically with some
        # customizations to the image. Note that if customization
        # is specified, at least one of the subkeys should be used
-       # This is only supported for classic image building 
        customization: (optional)
-         # Components are a list of apt sources, such as main,
-         # universe, and restricted. Defaults to "main, restricted, universe".
-         # These are used in the resulting img, not to build it.
-         components: (optional)
-           - <string>
-           - <string>
-         # Ubuntu offers several pockets, which often imply the
-         # inclusion of other pockets. The release pocket only
-         # includes itself. The security pocket includes itself
-         # and the release pocket. Updates includes updates,
-         # security, and release. Proposed includes all pockets.
-         # Defaults to "release".
-         # This value is in the resulting img, not to build it.
-         pocket: release | security | updates | proposed (optional)
          # Used only for installer images
          installer: (optional)
            preseeds: (optional)

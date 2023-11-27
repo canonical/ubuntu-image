@@ -38,7 +38,6 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Add a make-dirs manual customization option to create directories in the rootfs
   * use eatmydata to speed up debootstrap
   * Make sure we unmount/detach everything if the update_bootloader state is failing
-  * Enable distinguish build and target components/pockets
 
   [ Alfonso Sanchez-Beato ]
   * Update to latest snapd, adapting to changes in layouts code.

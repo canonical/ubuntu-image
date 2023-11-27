@@ -4,78 +4,70 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/xeipuuv/gojsonschema"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 func TestGeneratePocketList(t *testing.T) {
-	type args struct {
-		series         string
-		components     []string
-		mirror         string
-		securityMirror string
-		pocket         string
-	}
-
 	testCases := []struct {
 		name            string
 		imageDef        ImageDefinition
-		args            args
 		expectedPockets []string
 	}{
 		{
-			name: "release",
-			args: args{
-				series:         "jammy",
-				components:     []string{"main", "universe"},
-				mirror:         "http://archive.ubuntu.com/ubuntu/",
-				securityMirror: "http://security.ubuntu.com/ubuntu/",
-				pocket:         "release",
+			"release",
+			ImageDefinition{
+				Series: "jammy",
+				Rootfs: &Rootfs{
+					Pocket:     "release",
+					Components: []string{"main", "universe"},
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
+				},
 			},
-			expectedPockets: []string{"deb http://archive.ubuntu.com/ubuntu/ jammy main universe\n"},
+			[]string{},
 		},
 		{
-			name: "security",
-			args: args{
-				series:         "jammy",
-				components:     []string{"main"},
-				mirror:         "http://archive.ubuntu.com/ubuntu/",
-				pocket:         "security",
-				securityMirror: "http://security.ubuntu.com/ubuntu/",
+			"security",
+			ImageDefinition{
+				Architecture: "amd64",
+				Series:       "jammy",
+				Rootfs: &Rootfs{
+					Pocket:     "security",
+					Components: []string{"main"},
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
+				},
 			},
-			expectedPockets: []string{
-				"deb http://archive.ubuntu.com/ubuntu/ jammy main\n",
-				"deb http://security.ubuntu.com/ubuntu/ jammy-security main\n",
-			},
+			[]string{"deb http://security.ubuntu.com/ubuntu/ jammy-security main\n"},
 		},
 		{
-			name: "updates",
-			args: args{
-				series:         "jammy",
-				components:     []string{"main", "universe", "multiverse"},
-				mirror:         "http://ports.ubuntu.com/",
-				securityMirror: "http://ports.ubuntu.com/",
-				pocket:         "updates",
+			"updates",
+			ImageDefinition{
+				Architecture: "arm64",
+				Series:       "jammy",
+				Rootfs: &Rootfs{
+					Pocket:     "updates",
+					Components: []string{"main", "universe", "multiverse"},
+					Mirror:     "http://ports.ubuntu.com/",
+				},
 			},
-			expectedPockets: []string{
-				"deb http://ports.ubuntu.com/ jammy main universe multiverse\n",
+			[]string{
 				"deb http://ports.ubuntu.com/ jammy-security main universe multiverse\n",
 				"deb http://ports.ubuntu.com/ jammy-updates main universe multiverse\n",
 			},
 		},
 		{
-			name: "proposed",
-			args: args{
-				series:         "jammy",
-				components:     []string{"main", "universe", "multiverse", "restricted"},
-				mirror:         "http://archive.ubuntu.com/ubuntu/",
-				securityMirror: "http://security.ubuntu.com/ubuntu/",
-				pocket:         "proposed",
+			"proposed",
+			ImageDefinition{
+				Architecture: "amd64",
+				Series:       "jammy",
+				Rootfs: &Rootfs{
+					Pocket:     "proposed",
+					Components: []string{"main", "universe", "multiverse", "restricted"},
+					Mirror:     "http://archive.ubuntu.com/ubuntu/",
+				},
 			},
-			expectedPockets: []string{
-				"deb http://archive.ubuntu.com/ubuntu/ jammy main universe multiverse restricted\n",
+			[]string{
 				"deb http://security.ubuntu.com/ubuntu/ jammy-security main universe multiverse restricted\n",
 				"deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe multiverse restricted\n",
 				"deb http://archive.ubuntu.com/ubuntu/ jammy-proposed main universe multiverse restricted\n",
@@ -84,13 +76,7 @@ func TestGeneratePocketList(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_pocket_list_"+tc.name, func(t *testing.T) {
-			pocketList := generatePocketList(
-				tc.args.series,
-				tc.args.components,
-				tc.args.mirror,
-				tc.args.securityMirror,
-				tc.args.pocket,
-			)
+			pocketList := tc.imageDef.GeneratePocketList()
 			for _, expectedPocket := range tc.expectedPockets {
 				found := false
 				for _, pocket := range pocketList {
@@ -168,7 +154,7 @@ func TestCustomErrors(t *testing.T) {
 func TestImageDefinition_SetDefaults(t *testing.T) {
 	t.Run("test_image_definition_valid_defaults", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		imageDef := &ImageDefinition{
+		err := helper.SetDefaults(&ImageDefinition{
 			Gadget: &Gadget{},
 			Rootfs: &Rootfs{
 				Seed:    &Seed{},
@@ -192,118 +178,7 @@ func TestImageDefinition_SetDefaults(t *testing.T) {
 				Changelog: &Changelog{},
 				RootfsTar: &RootfsTar{},
 			},
-		}
-
-		want := &ImageDefinition{
-			Gadget: &Gadget{},
-			Rootfs: &Rootfs{
-				Seed: &Seed{
-					Vcs: helper.BoolPtr(true),
-				},
-				Tarball:    &Tarball{},
-				Components: []string{"main", "restricted"},
-				Archive:    "ubuntu",
-				Flavor:     "ubuntu",
-				Mirror:     "http://archive.ubuntu.com/ubuntu/",
-				Pocket:     "release",
-			},
-			Customization: &Customization{
-				Components: []string{"main", "restricted", "universe"},
-				Pocket:     "release",
-				Installer:  &Installer{},
-				CloudInit:  &CloudInit{},
-				ExtraPPAs: []*PPA{{
-					KeepEnabled: helper.BoolPtr(true),
-				}},
-				ExtraPackages: []*Package{{}},
-				ExtraSnaps: []*Snap{{
-					Store:   "canonical",
-					Channel: "stable",
-				}},
-				Fstab: []*Fstab{{
-					MountOptions: "defaults",
-				}},
-				Manual: &Manual{},
-			},
-			Artifacts: &Artifact{
-				Img:       &[]Img{{}},
-				Iso:       &[]Iso{{}},
-				Qcow2:     &[]Qcow2{{}},
-				Manifest:  &Manifest{},
-				Filelist:  &Filelist{},
-				Changelog: &Changelog{},
-				RootfsTar: &RootfsTar{
-					Compression: "uncompressed",
-				},
-			},
-		}
-
-		err := helper.SetDefaults(imageDef)
-		asserter.AssertErrNil(err, true)
-
-		asserter.AssertEqual(want, imageDef, cmp.AllowUnexported(ImageDefinition{}))
-	})
-}
-
-func TestImageDefinition_securityMirror(t *testing.T) {
-	type fields struct {
-		Architecture string
-		Rootfs       *Rootfs
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   string
-	}{
-		{
-			name: "amd64",
-			fields: fields{
-				Architecture: "amd64",
-				Rootfs: &Rootfs{
-					Mirror: "http://archive.ubuntu.com/ubuntu/",
-				},
-			},
-			want: "http://security.ubuntu.com/ubuntu/",
-		},
-		{
-			name: "i386",
-			fields: fields{
-				Architecture: "i386",
-				Rootfs: &Rootfs{
-					Mirror: "http://archive.ubuntu.com/ubuntu/",
-				},
-			},
-			want: "http://security.ubuntu.com/ubuntu/",
-		},
-		{
-			name: "arm64",
-			fields: fields{
-				Architecture: "arm64",
-				Rootfs: &Rootfs{
-					Mirror: "http://archive.ubuntu.com/ubuntu/",
-				},
-			},
-			want: "http://archive.ubuntu.com/ubuntu/",
-		},
-		{
-			name: "no arch",
-			fields: fields{
-				Rootfs: &Rootfs{
-					Mirror: "http://archive.ubuntu.com/ubuntu/",
-				},
-			},
-			want: "http://archive.ubuntu.com/ubuntu/",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			imageDef := ImageDefinition{
-				Architecture: tt.fields.Architecture,
-				Rootfs:       tt.fields.Rootfs,
-			}
-			if got := imageDef.securityMirror(); got != tt.want {
-				t.Errorf("ImageDefinition.securityMirror() = %v, want %v", got, tt.want)
-			}
 		})
-	}
+		asserter.AssertErrNil(err, true)
+	})
 }
