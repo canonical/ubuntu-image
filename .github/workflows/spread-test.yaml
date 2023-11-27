@@ -5,12 +5,6 @@ on: [pull_request]
 jobs:
   spread:
     runs-on: self-hosted
-    strategy:
-      matrix:
-        system:
-          - ubuntu-18.04
-          - ubuntu-20.04
-          - ubuntu-22.04
     steps:
       - name: Cleanup job workspace
         id: cleanup-job-workspace
@@ -32,7 +26,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: "${{ github.workspace }}/.test-results"
-          key: "${{ github.job }}-results-${{ github.run_id }}-${{ matrix.system }}-${{ steps.get-previous-attempt.outputs.previous_attempt }}"
+          key: "${{ github.job }}-results-${{ github.run_id }}-${{ steps.get-previous-attempt.outputs.previous_attempt }}"
     
       - name: Prepare test results env and vars
         id: prepare-test-results-env
@@ -64,8 +58,6 @@ jobs:
 
       - name: Run spread tests
         if: "!contains(github.event.pull_request.labels.*.name, 'Skip spread')"
-        env:
-            SPREAD_GOOGLE_KEY: ${{ secrets.SPREAD_GOOGLE_KEY }}
         run: |
             # Register a problem matcher to highlight spread failures
             echo "::add-matcher::.github/spread-problem-matcher.json"
@@ -74,7 +66,7 @@ jobs:
             SPREAD=spread
 
             # Save previous failed test results in FAILED_TESTS env var
-            RUN_TESTS="$BACKEND:${{ matrix.system }}:tests/..."
+            RUN_TESTS="$BACKEND:tests/..."
             if [ -n "$FAILED_TESTS" ]; then
                 RUN_TESTS="$FAILED_TESTS"
             fi
@@ -103,7 +95,7 @@ jobs:
                 BACKEND=google
 
                 echo "Determining which tests were executed"
-                RUN_TESTS="$BACKEND:${{ matrix.system }}:tests/..."
+                RUN_TESTS="$BACKEND:tests/..."
                 if [ -n "$FAILED_TESTS" ]; then
                     RUN_TESTS="$FAILED_TESTS"
                 fi
@@ -123,5 +115,5 @@ jobs:
         uses: actions/cache/save@v3
         with:
           path: "${{ github.workspace }}/.test-results"
-          key: "${{ github.job }}-results-${{ github.run_id }}-${{ matrix.system }}-${{ github.run_attempt }}"
+          key: "${{ github.job }}-results-${{ github.run_id }}-${{ github.run_attempt }}"
 
