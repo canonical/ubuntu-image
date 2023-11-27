@@ -112,3 +112,11 @@ It will print how to reuse the systems. Make sure to use
 UEFI support with QEMU backend of spread requires a BIOS from the 
 [OVMF](https://wiki.ubuntu.com/UEFI/OVMF) package, 
 which can be installed with `sudo apt install ovmf`.
+
+### Maintaining tests helpers
+
+Spread tests rely on [snapd-testing-tools](https://github.com/snapcore/snapd-testing-tools). To update the subtree of this project, run:
+
+```bash
+git subtree pull --prefix tests/lib/external/snapd-testing-tools/ https://github.com/snapcore/snapd-testing-tools.git main --squash
+```
