@@ -1,24 +1,6 @@
-ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
-
-  [ William 'jawn-smith' Wilson ]
-  * Redesign classic image builds to use image definition file.
-
-  [ mjdonis ]
-  * Add missing dependencies for classic images (LP: #2018758)
-
-  [ Loïc Minier ]
-  * Set hostname to ubuntu instead of letting debootstrap copy it from the
-    build environment.
-  * Add trailing newline at end of fstab.
-  * Don't scan build machine for OS entries when generating GRUB config:
-    dpkg-divert os-prober around update-grub.
-
-  [ Alfonso Sanchez-Beato ]
-  * Run patchelf so we get dynamic linker and libs from the core22 base.
+ubuntu-image (3.1) UNRELEASED; urgency=medium
 
   [ Łukasz 'sil2100' Zemczak ]
-  * Fix handling of resolv.conf in chroot, making sure we don't leak the build
-    environment by accident.
   * Use snap-preseed --reset for preseed resetting
   * Set a default locale during build
 
@@ -43,7 +25,31 @@ ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
   * Update to latest snapd, adapting to changes in layouts code.
   * Fix calculation of volume sizes after latest snapd changes
 
- -- Alfonso Sanchez-Beato <alfonso.sanchez-beato@canonical.com>  Fri, 13 Oct 2023 11:26:23 +0100
+ -- Paul Mars <paul.mars@canonical.com>  Mon, 27 Nov 2023 15:03:07 +0100
+
+ubuntu-image (3.0+23.04ubuntu1) UNRELEASED; urgency=medium
+
+  [ William 'jawn-smith' Wilson ]
+  * Redesign classic image builds to use image definition file.
+
+  [ mjdonis ]
+  * Add missing dependencies for classic images (LP: #2018758)
+
+  [ Loïc Minier ]
+  * Set hostname to ubuntu instead of letting debootstrap copy it from the
+    build environment.
+  * Add trailing newline at end of fstab.
+  * Don't scan build machine for OS entries when generating GRUB config:
+    dpkg-divert os-prober around update-grub.
+
+  [ Alfonso Sanchez-Beato ]
+  * Run patchelf so we get dynamic linker and libs from the core22 base.
+
+  [ Łukasz 'sil2100' Zemczak ]
+  * Fix handling of resolv.conf in chroot, making sure we don't leak the build
+    environment by accident.
+
+ -- Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>  Wed, 12 Jul 2023 12:55:52 +0200
 
 ubuntu-image (2.2+22.10ubuntu1) kinetic; urgency=medium
 
