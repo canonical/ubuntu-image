@@ -22,3 +22,6 @@ debian/ubuntu-image.substvars
 debian/files
 obj-*
 vendor/
+
+# snap
+ubuntu-image*.snap
