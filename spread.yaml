@@ -97,7 +97,7 @@ prepare: |
 
   apt update
   apt install -y snapd libc6-dev gcc-multilib git
-  snap install core20 --channel=latest/edge
+  snap install core22 --channel=latest/edge
   snap install --classic snapcraft
   snap install yq
   snap install --classic go --channel=1.19/stable
