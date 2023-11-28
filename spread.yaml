@@ -19,9 +19,9 @@ backends:
       # - ubuntu-16.04-64:
       #       workers: 1
       #       storage: 12G
-      - ubuntu-18.04-64:
-            storage: 12G
-            workers: 1
+      # - ubuntu-18.04-64:
+      #       storage: 12G
+      #       workers: 1
       - ubuntu-20.04-64:
             storage: 12G
             workers: 1
@@ -40,9 +40,9 @@ backends:
       # - ubuntu-16.04-64:
       #       username: ubuntu
       #       password: ubuntu
-      - ubuntu-18.04-64:
-            username: ubuntu
-            password: ubuntu
+      # - ubuntu-18.04-64:
+      #       username: ubuntu
+      #       password: ubuntu
       - ubuntu-20.04-64:
             username: ubuntu
             password: ubuntu
@@ -100,12 +100,11 @@ prepare: |
   snap install core22 --channel=latest/edge
   snap install --classic snapcraft
   snap install yq
-  snap install --classic go --channel=1.19/stable
   unset SHELL
   git clone https://git.launchpad.net/ubuntu-images
   git clone https://github.com/snapcore/models
   snapcraft --destructive-mode
-  snap install --classic --dangerous ubuntu-image_*.snap
+  snap install --classic --dangerous ./tests/ubuntu-image_*.snap
   mkdir /tmp/workdir
 
 suites:

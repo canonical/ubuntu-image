@@ -3,8 +3,32 @@ name: Run a spread test of the generated snap
 on: [pull_request]
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Build snap
+        id: build-snap
+        uses: snapcore/action-build@v1
+
+      - name: Upload snap artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: snap
+          path: ${{ steps.build-snap.outputs.snap }}
+
+      - name: Verify snapcraft snap
+        run: |
+          sudo snap install --dangerous --classic ${{ steps.build-snap.outputs.snap }}
+
   spread:
     runs-on: self-hosted
+    needs: [build]
+
     steps:
       - name: Cleanup job workspace
         id: cleanup-job-workspace
@@ -15,6 +39,12 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 2
+
+      - name: Download snap artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: snap
+          path: tests
 
       - name: Get previous attempt
         id: get-previous-attempt
