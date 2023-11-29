@@ -66,6 +66,10 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 		return err
 	}
 
+	if err := classicStateMachine.SetSeries(); err != nil {
+		return err
+	}
+
 	classicStateMachine.displayStates()
 
 	if classicStateMachine.commonFlags.DryRun {
@@ -77,6 +81,11 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 	}
 
 	return classicStateMachine.determineOutputDirectory()
+}
+
+func (classicStateMachine *ClassicStateMachine) SetSeries() error {
+	classicStateMachine.series = classicStateMachine.ImageDef.Series
+	return nil
 }
 
 // parseImageDefinition parses the provided yaml file and ensures it is valid

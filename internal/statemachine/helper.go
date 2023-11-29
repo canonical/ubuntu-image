@@ -40,6 +40,12 @@ const (
 var runCmd = helper.RunCmd
 var blockSize string = "1"
 
+var (
+	MKE2FS_CONFIG_ENV  = "MKE2FS_CONFIG"
+	MKE2FS_CONFIG_FILE = "mke2fs.conf"
+	MKE2FS_BASE_PATH   = "/etc/ubuntu-image/mkfs"
+)
+
 // validateInput ensures that command line flags for the state machine are valid. These
 // flags are applicable to all image types
 func (stateMachine *StateMachine) validateInput() error {
@@ -237,7 +243,7 @@ func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, stru
 		return err
 	}
 
-	return makeFS(structure, contentRoot, partImg, stateMachine.SectorSize)
+	return makeFS(structure, contentRoot, partImg, stateMachine.SectorSize, stateMachine.series)
 }
 
 // prepareDiskImg prepares a raw image
@@ -264,10 +270,16 @@ func prepareDiskImg(structure gadget.VolumeStructure, partImg string, blockSize 
 }
 
 // makeFS actually creates the filesystem for the given structure
-func makeFS(structure gadget.VolumeStructure, contentRoot string, partImg string, sectorSize quantity.Size) error {
+func makeFS(structure gadget.VolumeStructure, contentRoot string, partImg string, sectorSize quantity.Size, series string) error {
 	hasC, err := hasContent(structure, contentRoot)
 	if err != nil {
 		return err
+	}
+
+	// select the mkfs.ext4 conf to use
+	err = setMk2fsConf(series)
+	if err != nil {
+		return fmt.Errorf("Error preparing env for mkfs: %s", err.Error())
 	}
 
 	if hasC {
@@ -316,6 +328,19 @@ func fixDiskIDOnMBR(imgName string) error {
 	}
 
 	return nil
+}
+
+// The MKE2FS_BASE_PATH folder is setup to handle codename and release number as a series.
+func setMk2fsConf(series string) error {
+	mk2fsConfPath := strings.Join([]string{osGetenv("SNAP"), MKE2FS_BASE_PATH, series, MKE2FS_CONFIG_FILE}, "/")
+
+	_, err := os.Stat(mk2fsConfPath)
+	if err != nil {
+		fmt.Printf("WARNING: No mkfs configuration found for this series: %s. Will fallback on the default one.\n", series)
+		return nil
+	}
+
+	return osSetenv(MKE2FS_CONFIG_ENV, mk2fsConfPath)
 }
 
 // handleSecureBoot handles a special case where files need to be moved from /boot/ to

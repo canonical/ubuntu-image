@@ -1,6 +1,11 @@
 package statemachine
 
 import (
+	"fmt"
+	"os"
+
+	"github.com/snapcore/snapd/asserts"
+
 	"github.com/canonical/ubuntu-image/internal/commands"
 )
 
@@ -52,6 +57,10 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 		return err
 	}
 
+	if err := snapStateMachine.SetSeries(); err != nil {
+		return err
+	}
+
 	snapStateMachine.displayStates()
 
 	if snapStateMachine.commonFlags.DryRun {
@@ -63,4 +72,51 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 	}
 
 	return snapStateMachine.determineOutputDirectory()
+}
+
+func (snapStateMachine *SnapStateMachine) SetSeries() error {
+	model, err := snapStateMachine.decodeModelAssertion()
+	if err != nil {
+		return err
+	}
+
+	// we extracted a "core" series, containing only the major version, not minor
+	// In this case we will always end up using the LTS, so .04 minor version.
+	snapStateMachine.series = fmt.Sprintf("%s.04", model.Series())
+
+	return nil
+}
+
+// decodeModelAssertion() was copied and slightly adapted from image/image_linux.go
+// in https://github.com/snapcore/snapd/
+// Commit: 6ab16e24bc7e2ee386a07716a5b3eeb520ffc022
+
+// these are postponed, not implemented or abandoned, not finalized,
+// don't let them sneak in into a used model assertion
+var reserved = []string{"core", "os", "class", "allowed-modes"}
+
+func (snapStateMachine *SnapStateMachine) decodeModelAssertion() (*asserts.Model, error) {
+	fn := snapStateMachine.Args.ModelAssertion
+
+	rawAssert, err := os.ReadFile(fn)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read model assertion: %s", err)
+	}
+
+	ass, err := asserts.Decode(rawAssert)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode model assertion %q: %s", fn, err)
+	}
+	modela, ok := ass.(*asserts.Model)
+	if !ok {
+		return nil, fmt.Errorf("assertion in %q is not a model assertion", fn)
+	}
+
+	for _, rsvd := range reserved {
+		if modela.Header(rsvd) != nil {
+			return nil, fmt.Errorf("model assertion cannot have reserved/unsupported header %q set", rsvd)
+		}
+	}
+
+	return modela, nil
 }
