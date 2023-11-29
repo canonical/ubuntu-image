@@ -28,6 +28,8 @@ parts:
     plugin: nil
     source: .
     source-type: git
+    build-packages:
+      - ubuntu-dev-tools
     build-snaps:
       - go
     stage-packages:
@@ -54,8 +56,11 @@ parts:
       - python3-apt
       - python3-minimal
       - python3.10-minimal
+      - e2fsprogs
     build-attributes: [ enable-patchelf ]
     override-build: |
+      # Gather mkfs configuration for every series
+      ./collect-mkfs-confs.sh 
       ins_bin=$SNAPCRAFT_PART_INSTALL/bin/
       mkdir -p "$ins_bin"
       # Make ubuntu-image statically compiled to avoid libc deps.

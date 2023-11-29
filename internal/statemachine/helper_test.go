@@ -232,7 +232,9 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 // functions and setting invalid bs= arguments in dd
 func TestFailedCopyStructureContent(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
+	stateMachine := StateMachine{
+		series: "mantic",
+	}
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_tree",
 		"meta", "gadget.yaml")
@@ -294,6 +296,26 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error listing contents of volume")
 	osReadDir = os.ReadDir
+
+	// Set invalid value in MKE2FS_CONFIG_ENV
+	OLD_MKE2FS_CONFIG_ENV := MKE2FS_CONFIG_ENV
+	MKE2FS_CONFIG_ENV = "test="
+
+	err = os.Setenv("SNAP", "testdata/mkfs")
+	asserter.AssertErrNil(err, true)
+
+	OLD_MKE2FS_BASE_PATH := MKE2FS_BASE_PATH
+	MKE2FS_BASE_PATH = "base_path_test"
+
+	t.Cleanup(func() {
+		MKE2FS_BASE_PATH = OLD_MKE2FS_BASE_PATH
+	})
+
+	err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
+		filepath.Join("/tmp", uuid.NewString()+".img"))
+	asserter.AssertErrContains(err, "Error preparing env for mkfs")
+	MKE2FS_CONFIG_ENV = OLD_MKE2FS_CONFIG_ENV
+	MKE2FS_BASE_PATH = OLD_MKE2FS_BASE_PATH
 
 	// mock gadget.MkfsWithContent
 	mkfsMakeWithContent = mockMkfsWithContent
@@ -1270,6 +1292,109 @@ func TestStateMachine_setConfDefDir(t *testing.T) {
 			if tc.wantPath != stateMachine.ConfDefPath {
 				t.Errorf("Expected \"%s\" but got \"%s\"", tc.wantPath, stateMachine.ConfDefPath)
 			}
+		})
+	}
+}
+
+type mockEnvHolder struct {
+	env        map[string]string
+	mockGetenv bool // mock or use the real os.Getenv implementation
+	mockSetenv bool // mock or use the real os.Setenv implementation
+}
+
+func (m *mockEnvHolder) Getenv(key string) string {
+	if m.mockGetenv {
+		return m.env[key]
+	}
+	return os.Getenv(key)
+}
+
+func (m *mockEnvHolder) Setenv(key, value string) error {
+	if m.mockSetenv {
+		m.env[key] = value
+		return nil
+	}
+
+	return os.Setenv(key, value)
+}
+
+func TestStateMachine_setMk2fsConf(t *testing.T) {
+	type fields struct {
+		series string
+	}
+	tests := []struct {
+		name         string
+		fields       fields
+		mkfsBasePath string
+		envHolder    *mockEnvHolder
+		want         string
+	}{
+		{
+			name: "set env with sucess",
+			fields: fields{
+				series: "mantic",
+			},
+			mkfsBasePath: "base_path_test",
+			envHolder: &mockEnvHolder{
+				env:        map[string]string{"SNAP": "testdata/mkfs"},
+				mockGetenv: true,
+				mockSetenv: true,
+			},
+			want: "testdata/mkfs/base_path_test/mantic/mke2fs.conf",
+		},
+		{
+			name: "set env with sucess with current const values",
+			fields: fields{
+				series: "mantic",
+			},
+			mkfsBasePath: "base_path_test",
+			envHolder: &mockEnvHolder{
+				env:        map[string]string{"SNAP": "testdata/mkfs"},
+				mockGetenv: true,
+				mockSetenv: false,
+			},
+			want: "testdata/mkfs/base_path_test/mantic/mke2fs.conf",
+		},
+		{
+			name: "fail to set env to inexistent file",
+			fields: fields{
+				series: "mantic",
+			},
+			envHolder: &mockEnvHolder{
+				env:        map[string]string{"SNAP": "testdata/mkfs"},
+				mockGetenv: true,
+				mockSetenv: true,
+			},
+			mkfsBasePath: "inexistent",
+			want:         "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asserter := &helper.Asserter{T: t}
+
+			osGetenv = tt.envHolder.Getenv
+			osSetenv = tt.envHolder.Setenv
+			OLD_MKE2FS_BASE_PATH := MKE2FS_BASE_PATH
+			MKE2FS_BASE_PATH = tt.mkfsBasePath
+
+			t.Cleanup(func() {
+				osGetenv = os.Getenv
+				osSetenv = os.Setenv
+				MKE2FS_BASE_PATH = OLD_MKE2FS_BASE_PATH
+				os.Unsetenv(MKE2FS_CONFIG_ENV)
+			})
+
+			err := setMk2fsConf(tt.fields.series)
+			asserter.AssertErrNil(err, true)
+
+			var got string
+			if tt.envHolder.mockSetenv {
+				got = tt.envHolder.env[MKE2FS_CONFIG_ENV]
+			} else {
+				got = os.Getenv(MKE2FS_CONFIG_ENV)
+			}
+			asserter.AssertEqual(tt.want, got)
 		})
 	}
 }
