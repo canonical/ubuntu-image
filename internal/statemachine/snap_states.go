@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/snapcore/snapd/image"
+	"github.com/snapcore/snapd/interfaces/builtin"
 	"github.com/snapcore/snapd/seed/seedwriter"
 	"github.com/snapcore/snapd/snap"
 )
@@ -59,8 +60,8 @@ func (stateMachine *StateMachine) prepareImage() error {
 	customizations.Validation = stateMachine.commonFlags.Validation
 	imageOpts.Customizations = customizations
 
-	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
-	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+	// plug/slot sanitization needed by provider handling
+	snap.SanitizePlugsSlots = builtin.SanitizePlugsSlots
 
 	// image.Prepare automatically has some output that we only want for
 	// verbose or greater logging
