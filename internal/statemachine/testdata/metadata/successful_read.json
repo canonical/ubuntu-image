@@ -55,5 +55,13 @@
     ],
     "VolumeNames": {
         "pc": "pc.img"
-    }
+    },
+    "Packages": [
+        "nginx",
+        "apache2"
+    ],
+    "Snaps": [
+        "core",
+        "lxd"
+    ]
 }

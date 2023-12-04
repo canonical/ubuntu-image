@@ -386,6 +386,7 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.IsSeeded = partialStateMachine.IsSeeded
 	stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
 	stateMachine.SectorSize = partialStateMachine.SectorSize
+	stateMachine.VolumeNames = partialStateMachine.VolumeNames
 	stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
 	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
 	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
