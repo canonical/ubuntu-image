@@ -853,7 +853,9 @@ func TestStateMachine_readMetadata(t *testing.T) {
 				},
 				ImageSizes:  map[string]quantity.Size{"pc": 3155165184},
 				VolumeOrder: []string{"pc"},
-				VolumeNames: nil,
+				VolumeNames: map[string]string{"pc": "pc.img"},
+				Packages:    []string{"nginx", "apache2"},
+				Snaps:       []string{"core", "lxd"},
 				tempDirs: temporaryDirectories{
 					rootfs:  filepath.Join(testDataDir, "metadata", "root"),
 					unpack:  filepath.Join(testDataDir, "metadata", "unpack"),
