@@ -27,8 +27,8 @@ restore: |
         for l in `ls -d "$LOOP"p*`
         do 
             p=${l#"$LOOP"}
-            mount --make-rprivate $l 
-            umount --recursive $l 
+            mount --make-rprivate $l || true
+            umount --recursive $l || true
         done
 
         losetup -d "$LOOP"
