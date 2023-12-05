@@ -15,6 +15,7 @@ import (
 
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/image/preseed"
+	"github.com/snapcore/snapd/interfaces/builtin"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed/seedwriter"
 	"github.com/snapcore/snapd/snap"
@@ -726,8 +727,8 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 		imageOpts.Channel = stateMachine.commonFlags.Channel
 	}
 
-	// plug/slot sanitization not used by snap image.Prepare, make it no-op.
-	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+	// plug/slot sanitization needed by provider handling
+	snap.SanitizePlugsSlots = builtin.SanitizePlugsSlots
 
 	// check if the rootfs is already preseeded. This can happen when building from a
 	// rootfs tarball
