@@ -183,7 +183,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 		{
 			name:            "state_prebuilt_rootfs_extras",
 			imageDefinition: "test_prebuilt_rootfs_extras.yaml",
-			expectedStates:  []string{"add_extra_ppas", "install_extra_packages", "clean_extra_ppas", "install_extra_snaps"},
+			expectedStates:  []string{"add_extra_ppas", "install_packages", "clean_extra_ppas", "install_extra_snaps"},
 		},
 		{
 			name:            "state_ppa",
