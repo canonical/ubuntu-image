@@ -1,0 +1,4 @@
+summary: Build core 22 amd64 image
+execute: |
+    ubuntu-image snap --debug /home/ubuntu-image/models/ubuntu-core-22-amd64.model
+    test pc.img
