@@ -109,5 +109,7 @@ prepare: |
 suites:
   tests/:
     summary: Integration tests for ubuntu-image
+  tests/snap/:
+    summary: Integration tests for ubuntu-image building snap images
 
 kill-timeout: 30m
