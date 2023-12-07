@@ -46,6 +46,7 @@ parts:
       - make
       - kpartx
       - qemu-utils
+      - u-boot-tools
       - devscripts
       - grub-common
     build-attributes: [ enable-patchelf ]
