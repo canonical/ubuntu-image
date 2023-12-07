@@ -1156,9 +1156,11 @@ func (stateMachine *StateMachine) updateBootloader() error {
 // during the various preceding install steps
 func (stateMachine *StateMachine) cleanRootfs() error {
 	toClean := []string{
-		// machine-id
-		filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
 		filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
+	}
+
+	toTruncate := []string{
+		filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
 	}
 
 	// openssh default keys
@@ -1203,7 +1205,9 @@ func (stateMachine *StateMachine) cleanRootfs() error {
 		return fmt.Errorf("unable to list udev persistent rules: %s", err.Error())
 	}
 
-	for _, f := range udevRules {
+	toTruncate = append(toTruncate, udevRules...)
+
+	for _, f := range toTruncate {
 		err = osTruncate(f, 0)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error truncating %s: %s", f, err.Error())
