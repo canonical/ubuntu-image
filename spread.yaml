@@ -22,9 +22,9 @@ backends:
       # - ubuntu-18.04-64:
       #       storage: 12G
       #       workers: 1
-      - ubuntu-20.04-64:
-            storage: 18G
-            workers: 1
+      # - ubuntu-20.04-64:
+      #       storage: 18G
+      #       workers: 1
       - ubuntu-22.04-64:
             storage: 18G
             workers: 1
@@ -43,9 +43,9 @@ backends:
       # - ubuntu-18.04-64:
       #       username: ubuntu
       #       password: ubuntu
-      - ubuntu-20.04-64:
-            username: ubuntu
-            password: ubuntu
+      # - ubuntu-20.04-64:
+            # username: ubuntu
+            # password: ubuntu
       - ubuntu-22.04-64:
             username: ubuntu
             password: ubuntu
@@ -109,7 +109,5 @@ prepare: |
 suites:
   tests/:
     summary: Integration tests for ubuntu-image
-  tests/snap/:
-    summary: Integration tests for ubuntu-image building snap images
 
 kill-timeout: 30m
