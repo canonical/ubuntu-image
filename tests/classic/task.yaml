@@ -1,10 +1,10 @@
 summary: Build classic Ubuntu server image
 
 environment:
-    IMG_DEF_PATH/ubuntu-server-pc-amd64: /home/ubuntu-image/ubuntu-images/ubuntu-server-pc-amd64.yaml
-    IMG_DEF_PATH/ubuntu-server-pc-arm64: /home/ubuntu-image/ubuntu-images/ubuntu-server-pc-arm64.yaml
-    IMG_DEF_PATH/ubuntu-server-pi-arm64: /home/ubuntu-image/ubuntu-images/ubuntu-server-pi-arm64.yaml
-    IMG_DEF_PATH/ubuntu-pi-arm64: /home/ubuntu-image/ubuntu-images/ubuntu-pi-arm64.yaml
+    IMG_DEF_PATH/ubuntu_server_pc_amd64: /home/ubuntu-image/ubuntu-images/ubuntu-server-pc-amd64.yaml
+    IMG_DEF_PATH/ubuntu_server_pc_arm64: /home/ubuntu-image/ubuntu-images/ubuntu-server-pc-arm64.yaml
+    IMG_DEF_PATH/ubuntu_server_pi_arm64: /home/ubuntu-image/ubuntu-images/ubuntu-server-pi-arm64.yaml
+    IMG_DEF_PATH/ubuntu_pi_arm64: /home/ubuntu-image/ubuntu-images/ubuntu-pi-arm64.yaml
 
 execute: |
     ubuntu-image classic --debug --workdir /tmp/workdir $IMG_DEF_PATH

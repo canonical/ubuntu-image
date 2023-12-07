@@ -1,9 +1,9 @@
 summary: Build core amd64 image
 
 environment:
-    IMG_DEF_PATH/ubuntu-core-18-amd64: /home/ubuntu-image/models/ubuntu-core-18-amd64.model
-    IMG_DEF_PATH/ubuntu-core-20-amd64: /home/ubuntu-image/models/ubuntu-core-20-amd64.model
-    IMG_DEF_PATH/ubuntu-core-22-amd64: /home/ubuntu-image/models/ubuntu-core-22-amd64.model
+    IMG_DEF_PATH/ubuntu_core_18_amd64: /home/ubuntu-image/models/ubuntu-core-18-amd64.model
+    IMG_DEF_PATH/ubuntu_core_20_amd64: /home/ubuntu-image/models/ubuntu-core-20-amd64.model
+    IMG_DEF_PATH/ubuntu_core_22_amd64: /home/ubuntu-image/models/ubuntu-core-22-amd64.model
 
 execute: |
     ubuntu-image snap --debug $IMG_DEF_PATH 
