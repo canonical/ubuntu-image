@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -895,44 +894,6 @@ func manualAddUser(customizations []*imagedefinition.AddUser, targetDir string, 
 		}
 	}
 	return nil
-}
-
-// checkCustomizationSteps examines a struct and returns a slice
-// of state functions that need to be manually added. It expects
-// the image definition's customization struct to be passed in and
-// uses struct tags to identify which state must be added
-func checkCustomizationSteps(searchStruct interface{}, tag string) (extraStates []stateFunc) {
-	possibleStateFunc := map[string][]stateFunc{
-		"add_extra_ppas": {
-			{"add_extra_ppas", (*StateMachine).addExtraPPAs},
-			{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs},
-		},
-		"install_extra_packages": {
-			{"install_extra_packages", (*StateMachine).installPackages},
-		},
-		"install_extra_snaps": {
-			{"install_extra_snaps", (*StateMachine).prepareClassicImage},
-			{"preseed_extra_snaps", (*StateMachine).preseedClassicImage},
-		},
-	}
-	value := reflect.ValueOf(searchStruct)
-	elem := value.Elem()
-	for i := 0; i < elem.NumField(); i++ {
-		field := elem.Field(i)
-
-		if field.Kind() == reflect.String {
-			continue
-		}
-
-		if !field.IsNil() {
-			tags := elem.Type().Field(i).Tag
-			tagValue, hasTag := tags.Lookup(tag)
-			if hasTag {
-				extraStates = append(extraStates, possibleStateFunc[tagValue]...)
-			}
-		}
-	}
-	return extraStates
 }
 
 // getPreseedsnaps returns a slice of the snaps that were preseeded in a chroot
