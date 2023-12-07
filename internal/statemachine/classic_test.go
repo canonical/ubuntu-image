@@ -193,6 +193,11 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 		{
 			name:            "extract_rootfs_tar",
 			imageDefinition: "test_extract_rootfs_tar.yaml",
+			expectedStates:  []string{"extract_rootfs_tar", "install_packages"},
+		},
+		{
+			name:            "extract_rootfs_tar_no_customization",
+			imageDefinition: "test_extract_rootfs_tar_no_customization.yaml",
 			expectedStates:  []string{"extract_rootfs_tar"},
 		},
 		{
