@@ -2681,7 +2681,6 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 	// Check cleaned files were removed
 	cleaned := []string{
-		filepath.Join(mountDir, "etc", "machine-id"),
 		filepath.Join(mountDir, "var", "lib", "dbus", "machine-id"),
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key"),
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key.pub"),
@@ -2692,6 +2691,20 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		_, err := os.Stat(file)
 		if !os.IsNotExist(err) {
 			t.Errorf("File %s should not exist, but does", file)
+		}
+	}
+
+	truncated := []string{
+		filepath.Join(mountDir, "etc", "machine-id"),
+	}
+	for _, file := range truncated {
+		fileInfo, err := os.Stat(file)
+		if os.IsNotExist(err) {
+			t.Errorf("File %s should exist, but does not", file)
+		}
+
+		if fileInfo.Size() != 0 {
+			t.Errorf("File %s should be empty, but it is not. Size: %v", file, fileInfo.Size())
 		}
 	}
 
