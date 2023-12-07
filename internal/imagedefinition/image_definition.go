@@ -67,16 +67,14 @@ type Tarball struct {
 }
 
 // Customization defines the customization section of the image definition file.
-// The extra_step_prebuilt_rootfs struct tag denotes that an extra state will
-// need to be added for image builds with prebuilt root filesystems.
 type Customization struct {
 	Components    []string   `yaml:"components"     json:"Components,omitempty"   default:"main,restricted,universe"`
 	Pocket        string     `yaml:"pocket"         json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
 	Installer     *Installer `yaml:"installer"      json:"Installer,omitempty"`
 	CloudInit     *CloudInit `yaml:"cloud-init"     json:"CloudInit,omitempty"`
-	ExtraPPAs     []*PPA     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"     extra_step_prebuilt_rootfs:"add_extra_ppas"`
-	ExtraPackages []*Package `yaml:"extra-packages" json:"ExtraPackages,omitempty" extra_step_prebuilt_rootfs:"install_extra_packages"`
-	ExtraSnaps    []*Snap    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"    extra_step_prebuilt_rootfs:"install_extra_snaps"`
+	ExtraPPAs     []*PPA     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"`
+	ExtraPackages []*Package `yaml:"extra-packages" json:"ExtraPackages,omitempty"`
+	ExtraSnaps    []*Snap    `yaml:"extra-snaps"    json:"ExtraSnaps,omitempty"`
 	Fstab         []*Fstab   `yaml:"fstab"          json:"Fstab,omitempty"`
 	Manual        *Manual    `yaml:"manual"         json:"Manual,omitempty"`
 }
