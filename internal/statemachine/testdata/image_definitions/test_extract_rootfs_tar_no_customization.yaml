@@ -1,0 +1,20 @@
+name: ubuntu-server-raspi-arm64
+display-name: Ubuntu Server Raspberry Pi arm64
+revision: 2
+architecture: arm64
+series: jammy
+class: preinstalled
+kernel: linux-raspi
+gadget:
+  url: "https://github.com/snapcore/pi-gadget.git"
+  branch: classic
+  type: "git"
+rootfs:
+  tarball:
+    url: "https://testtar.com/test-tar.tar"
+artifacts:
+  img:
+    -
+      name: raspi.img
+  manifest:
+    name: raspi.manifest
