@@ -52,3 +52,4 @@ debug: |
     fi
     losetup -l
     cat /tmp/${IMG}/workdir/chroot/debootstrap/debootstrap.log
+    readelf -d /snap/ubuntu-image/current/usr/lib/x86_64-linux-gnu/libeatmydata.so

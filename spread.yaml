@@ -16,12 +16,12 @@ backends:
     location: snapd-spread/us-east1-b
     halt-timeout: 2h
     systems:
-      # - ubuntu-16.04-64:
-      #       workers: 1
-      #       storage: 12G
-      # - ubuntu-18.04-64:
-      #       storage: 12G
-      #       workers: 1
+      - ubuntu-16.04-64:
+            workers: 1
+            storage: 18G
+      - ubuntu-18.04-64:
+            storage: 18G
+            workers: 1
       - ubuntu-20.04-64:
             storage: 18G
             workers: 1
@@ -96,7 +96,7 @@ prepare: |
   fi
 
   apt update
-  apt install -y snapd libc6-dev gcc-multilib git
+  apt install -y snapd libc6-dev gcc-multilib git binfmt-support
   snap install core22 --channel=latest/edge
   snap install yq
   unset SHELL
