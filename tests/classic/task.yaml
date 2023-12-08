@@ -51,3 +51,4 @@ debug: |
         cat loop.txt
     fi
     losetup -l
+    cat /tmp/${IMG}/workdir/chroot/debootstrap/debootstrap.log

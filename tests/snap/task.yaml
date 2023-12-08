@@ -8,7 +8,7 @@ environment:
 execute: |
     mkdir -p /tmp/${IMG}/workdir
     IMG_DEF_PATH=/home/ubuntu-image/models/${IMG}.model
-    ubuntu-image snap --workdir /tmp/ --debug $IMG_DEF_PATH 
+    ubuntu-image snap --workdir /tmp/${IMG}/workdir --debug $IMG_DEF_PATH 
     test /tmp/${IMG}/workdir/pc.img
 
 debug: |
