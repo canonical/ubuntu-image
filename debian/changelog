@@ -5,6 +5,7 @@ ubuntu-image (3.2) UNRELEASED; urgency=medium
   * Clean and split tests to short/long ones to get a decent cover in ~10seconds
   * Fix resume feature. Resuming should now work from any state.
   * Update to last snapd version
+  * Keep but truncate /etc/machine-id
 
  -- Paul Mars <paul.mars@canonical.com>  Mon, 27 Nov 2023 18:03:07 +0100
 

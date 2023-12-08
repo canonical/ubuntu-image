@@ -2681,7 +2681,6 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 	// Check cleaned files were removed
 	cleaned := []string{
-		filepath.Join(mountDir, "etc", "machine-id"),
 		filepath.Join(mountDir, "var", "lib", "dbus", "machine-id"),
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key"),
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key.pub"),
@@ -2692,6 +2691,20 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		_, err := os.Stat(file)
 		if !os.IsNotExist(err) {
 			t.Errorf("File %s should not exist, but does", file)
+		}
+	}
+
+	truncated := []string{
+		filepath.Join(mountDir, "etc", "machine-id"),
+	}
+	for _, file := range truncated {
+		fileInfo, err := os.Stat(file)
+		if os.IsNotExist(err) {
+			t.Errorf("File %s should exist, but does not", file)
+		}
+
+		if fileInfo.Size() != 0 {
+			t.Errorf("File %s should be empty, but it is not. Size: %v", file, fileInfo.Size())
 		}
 	}
 
@@ -4721,7 +4734,6 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 
 	// Check cleaned files were removed
 	cleaned := []string{
-		filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
 		filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key"),
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key.pub"),
@@ -4732,6 +4744,20 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 		_, err := os.Stat(file)
 		if !os.IsNotExist(err) {
 			t.Errorf("File %s should not exist, but does", file)
+		}
+	}
+
+	truncated := []string{
+		filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
+	}
+	for _, file := range truncated {
+		fileInfo, err := os.Stat(file)
+		if os.IsNotExist(err) {
+			t.Errorf("File %s should exist, but does not", file)
+		}
+
+		if fileInfo.Size() != 0 {
+			t.Errorf("File %s should be empty, but it is not. Size: %v", file, fileInfo.Size())
 		}
 	}
 }
@@ -4758,6 +4784,7 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
 			},
 			wantRootfsContent: map[string]int64{
+				filepath.Join("etc", "machine-id"):                                    0,
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"):  0,
 				filepath.Join("etc", "udev", "rules.d", "test2-persistent-net.rules"): 0,
 			},
@@ -4805,6 +4832,7 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
 			},
 			wantRootfsContent: map[string]int64{
+				filepath.Join("etc", "machine-id"):                                   sampleSize,
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
 			},
 		},
