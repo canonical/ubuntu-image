@@ -562,7 +562,6 @@ func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec
 	seedSource := strings.Join(imageDefinition.Rootfs.Seed.SeedURLs, ",")
 
 	germinateCmd := execCommand(
-		"eatmydata",
 		"germinate",
 		"--mirror", imageDefinition.Rootfs.Mirror,
 		"--arch", imageDefinition.Architecture,
@@ -571,6 +570,11 @@ func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec
 		"--seed-dist", seedDist,
 		"--no-rdepends",
 	)
+
+	env := os.Environ()
+	ldLibraryPath, ldPreload := eatmydataEnv(env)
+
+	germinateCmd.Env = append(env, ldLibraryPath, ldPreload)
 
 	if *imageDefinition.Rootfs.Seed.Vcs {
 		germinateCmd.Args = append(germinateCmd.Args, "--vcs=auto")
@@ -609,11 +613,15 @@ func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir strin
 // generateDebootstrapCmd generates the debootstrap command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
 func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, targetDir string) *exec.Cmd {
-	debootstrapCmd := execCommand("eatmydata",
-		"debootstrap",
+	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
 	)
+
+	env := os.Environ()
+	ldLibraryPath, ldPreload := eatmydataEnv(env)
+
+	debootstrapCmd.Env = append(env, ldLibraryPath, ldPreload)
 
 	if imageDefinition.Customization != nil && len(imageDefinition.Customization.ExtraPPAs) > 0 {
 		// ca-certificates is needed to use PPAs
@@ -633,6 +641,38 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 	}...)
 
 	return debootstrapCmd
+}
+
+// eatmydataEnv returns env vars to set to use libeatmydata
+func eatmydataEnv(env []string) (string, string) {
+	var ldLibraryPathVal, ldPreloadVal string
+
+	ldLibraryPath := "LD_LIBRARY_PATH="
+	ldPreload := "LD_PRELOAD="
+
+	for _, e := range env {
+		if strings.HasPrefix(e, ldLibraryPath) {
+			ldLibraryPathVal = strings.TrimPrefix(e, ldLibraryPath)
+			ldLibraryPath = e
+		} else if strings.HasPrefix(e, ldPreload) {
+			ldPreloadVal = strings.TrimPrefix(e, ldPreload)
+			ldPreload = e
+		}
+	}
+
+	if len(ldLibraryPathVal) > 0 {
+		ldLibraryPath += ":"
+	}
+
+	ldLibraryPath += "/usr/lib/libeatmydata"
+
+	if len(ldPreloadVal) > 0 {
+		ldPreload += " "
+	}
+
+	ldPreload += "libeatmydata.so"
+
+	return ldLibraryPath, ldPreload
 }
 
 // generateAptCmd generates the apt command used to create a chroot

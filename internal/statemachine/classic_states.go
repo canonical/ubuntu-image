@@ -538,9 +538,6 @@ func (stateMachine *StateMachine) germinate() error {
 
 	germinateOutput := helper.SetCommandOutput(germinateCmd, classicStateMachine.commonFlags.Debug)
 
-	fmt.Printf("LD_LIBRARY_PATH: %v", os.Getenv("LD_LIBRARY_PATH"))
-	fmt.Printf("LD_PRELOAD: %v", os.Getenv("LD_PRELOAD"))
-
 	if err := germinateCmd.Run(); err != nil {
 		return fmt.Errorf("Error running germinate command \"%s\". Error is \"%s\". Output is: \n%s",
 			germinateCmd.String(), err.Error(), germinateOutput.String())
