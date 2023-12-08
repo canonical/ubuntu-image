@@ -104,7 +104,6 @@ prepare: |
   git clone https://github.com/snapcore/models
   
   snap install --classic --dangerous ./tests/ubuntu-image_*.snap
-  mkdir /tmp/workdir
 
 suites:
   tests/:

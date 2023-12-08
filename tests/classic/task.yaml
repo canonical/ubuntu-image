@@ -1,28 +1,29 @@
 summary: Build classic Ubuntu server image
 
 environment:
-    IMG_DEF_PATH/ubuntu_server_pc_amd64: /home/ubuntu-image/ubuntu-images/ubuntu-server-pc-amd64.yaml
-    IMG_DEF_PATH/ubuntu_server_pc_arm64: /home/ubuntu-image/ubuntu-images/ubuntu-server-pc-arm64.yaml
-    IMG_DEF_PATH/ubuntu_server_pi_arm64: /home/ubuntu-image/ubuntu-images/ubuntu-server-pi-arm64.yaml
-    IMG_DEF_PATH/ubuntu_pi_arm64: /home/ubuntu-image/ubuntu-images/ubuntu-pi-arm64.yaml
+    IMG/ubuntu_server_pc_amd64: ubuntu-server-pc-amd64
+    IMG/ubuntu_server_pc_arm64: ubuntu-server-pc-arm64
+    IMG/ubuntu_server_pi_arm64: ubuntu-server-pi-arm64
+    IMG/ubuntu_pi_arm64: ubuntu-pi-arm64
 
 execute: |
-    ubuntu-image classic --debug --workdir /tmp/workdir $IMG_DEF_PATH
+    mkdir -p /tmp/${IMG}/{workdir,mount}
+    IMG_DEF_PATH=/home/ubuntu-image/ubuntu-images/${IMG}.yaml
+    ubuntu-image classic --debug --workdir /tmp/${IMG}/workdir $IMG_DEF_PATH
 
     IMG_NAME=$(cat $IMG_DEF_PATH | yq '.artifacts.img.[0].name')
-    mkdir /tmp/loopback
-    losetup --find --show --partscan /tmp/workdir/$IMG_NAME
+    losetup --find --show --partscan /tmp/${IMG}/workdir/$IMG_NAME
     losetup -a | grep $IMG_NAME |cut -f1 -d: >> loop.txt
     LOOP="$(cat loop.txt)"
 
     for l in `ls -d "$LOOP"p*`
     do 
         p=${l#"$LOOP"}
-        mkdir /tmp/$p
-        mount $l /tmp/$p || true
+        mkdir /tmp/${IMG}/mount/$p
+        mount $l /tmp/${IMG}/mount/$p || true
     done
 
-    ls /tmp/p3/
+    ls /tmp/${IMG}/mount/p3/
 
 restore: |
     if [ -f loop.txt ]; then
@@ -31,8 +32,8 @@ restore: |
         for l in `ls -d "$LOOP"p*`
         do 
             p=${l#"$LOOP"}
-            mount --make-rprivate /tmp/$p || true
-            umount --recursive /tmp/$p || true
+            mount --make-rprivate /tmp/${IMG}/mount/$p || true
+            umount --recursive /tmp/${IMG}/mount/$p || true
         done
 
         losetup -d "$LOOP"
@@ -41,7 +42,7 @@ restore: |
         rm loop.txt
     fi
 
-    rm -rf /tmp/workdir /tmp/loopback
+    rm -rf /tmp/${IMG}/
 
 debug: |
     df -h

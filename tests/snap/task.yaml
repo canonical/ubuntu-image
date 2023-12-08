@@ -1,13 +1,15 @@
 summary: Build core amd64 image
 
 environment:
-    IMG_DEF_PATH/ubuntu_core_18_amd64: /home/ubuntu-image/models/ubuntu-core-18-amd64.model
-    IMG_DEF_PATH/ubuntu_core_20_amd64: /home/ubuntu-image/models/ubuntu-core-20-amd64.model
-    IMG_DEF_PATH/ubuntu_core_22_amd64: /home/ubuntu-image/models/ubuntu-core-22-amd64.model
+    IMG/ubuntu_core_18_amd64: ubuntu-core-18-amd64
+    IMG/ubuntu_core_20_amd64: ubuntu-core-20-amd64
+    IMG/ubuntu_core_22_amd64: ubuntu-core-22-amd64
 
 execute: |
-    ubuntu-image snap --debug $IMG_DEF_PATH 
-    test pc.img
+    mkdir -p /tmp/${IMG}/workdir
+    IMG_DEF_PATH=/home/ubuntu-image/models/${IMG}.model
+    ubuntu-image snap --workdir /tmp/ --debug $IMG_DEF_PATH 
+    test /tmp/${IMG}/workdir/pc.img
 
 debug: |
     df -h
