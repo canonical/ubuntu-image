@@ -16,9 +16,9 @@ backends:
     location: snapd-spread/us-east1-b
     halt-timeout: 2h
     systems:
-      - ubuntu-16.04-64:
-            workers: 1
-            storage: 18G
+      # - ubuntu-16.04-64:
+      #       workers: 1
+      #       storage: 18G
       - ubuntu-18.04-64:
             storage: 18G
             workers: 1
@@ -37,9 +37,9 @@ backends:
   qemu:
     memory: 4G
     systems:
-      - ubuntu-16.04-64:
-            username: ubuntu
-            password: ubuntu
+      # - ubuntu-16.04-64:
+      #       username: ubuntu
+      #       password: ubuntu
       - ubuntu-18.04-64:
             username: ubuntu
             password: ubuntu
