@@ -96,7 +96,7 @@ prepare: |
   fi
 
   apt update
-  apt install -y snapd libc6-dev gcc-multilib git binfmt-support
+  apt install -y snapd libc6-dev gcc-multilib git binfmt-support qemu-user-static
   snap install core22 --channel=latest/edge
   snap install yq
   unset SHELL

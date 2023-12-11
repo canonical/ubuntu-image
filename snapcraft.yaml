@@ -35,6 +35,7 @@ parts:
       - mtools
       - python3-docutils
     stage-packages:
+      - binfmt-support
       - fdisk
       - gdisk
       - fakeroot
@@ -45,6 +46,7 @@ parts:
       - mtools
       - make
       - kpartx
+      - qemu-user-static
       - qemu-utils
       - u-boot-tools
       - devscripts
