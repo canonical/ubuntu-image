@@ -1,5 +1,7 @@
 summary: Build classic Ubuntu server image
 
+kill-timeout: 1h
+
 environment:
     IMG/ubuntu_server_pc_amd64: ubuntu-server-pc-amd64
     IMG/ubuntu_server_pc_arm64: ubuntu-server-pc-arm64
@@ -51,5 +53,3 @@ debug: |
         cat loop.txt
     fi
     losetup -l
-    cat /tmp/${IMG}/workdir/chroot/debootstrap/debootstrap.log
-    readelf -d /snap/ubuntu-image/current/usr/lib/x86_64-linux-gnu/libeatmydata.so
