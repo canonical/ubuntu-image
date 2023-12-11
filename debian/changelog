@@ -6,6 +6,7 @@ ubuntu-image (3.2) UNRELEASED; urgency=medium
   * Fix resume feature. Resuming should now work from any state.
   * Update to last snapd version
   * Keep but truncate /etc/machine-id
+  * Do not remove extra-PPAs before packages intallation
 
  -- Paul Mars <paul.mars@canonical.com>  Mon, 27 Nov 2023 18:03:07 +0100
 
