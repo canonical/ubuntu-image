@@ -571,11 +571,6 @@ func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec
 		"--no-rdepends",
 	)
 
-	env := os.Environ()
-	ldLibraryPath, ldPreload := eatmydataEnv(env)
-
-	germinateCmd.Env = append(env, ldLibraryPath, ldPreload)
-
 	if *imageDefinition.Rootfs.Seed.Vcs {
 		germinateCmd.Args = append(germinateCmd.Args, "--vcs=auto")
 	}
@@ -617,11 +612,6 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
 	)
-
-	env := os.Environ()
-	ldLibraryPath, ldPreload := eatmydataEnv(env)
-
-	debootstrapCmd.Env = append(env, ldLibraryPath, ldPreload)
 
 	if imageDefinition.Customization != nil && len(imageDefinition.Customization.ExtraPPAs) > 0 {
 		// ca-certificates is needed to use PPAs
