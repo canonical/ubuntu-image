@@ -21,19 +21,19 @@ backends:
       #       workers: 1
       #       storage: 18G
       - ubuntu-18.04-64:
-            storage: 18G
+            storage: 24G
             workers: 1
       - ubuntu-20.04-64:
-            storage: 18G
+            storage: 24G
             workers: 1
       - ubuntu-22.04-64:
-            storage: 18G
+            storage: 24G
             workers: 1
       - ubuntu-23.04-64:
-            storage: 18G
+            storage: 24G
             workers: 1
       - ubuntu-23.10-64:
-            storage: 18G
+            storage: 24G
             workers: 1
   qemu:
     memory: 4G
