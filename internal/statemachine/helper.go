@@ -633,38 +633,6 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 	return debootstrapCmd
 }
 
-// eatmydataEnv returns env vars to set to use libeatmydata
-func eatmydataEnv(env []string) (string, string) {
-	var ldLibraryPathVal, ldPreloadVal string
-
-	ldLibraryPath := "LD_LIBRARY_PATH="
-	ldPreload := "LD_PRELOAD="
-
-	for _, e := range env {
-		if strings.HasPrefix(e, ldLibraryPath) {
-			ldLibraryPathVal = strings.TrimPrefix(e, ldLibraryPath)
-			ldLibraryPath = e
-		} else if strings.HasPrefix(e, ldPreload) {
-			ldPreloadVal = strings.TrimPrefix(e, ldPreload)
-			ldPreload = e
-		}
-	}
-
-	if len(ldLibraryPathVal) > 0 {
-		ldLibraryPath += ":"
-	}
-
-	ldLibraryPath += "/usr/lib/libeatmydata"
-
-	if len(ldPreloadVal) > 0 {
-		ldPreload += " "
-	}
-
-	ldPreload += "libeatmydata.so"
-
-	return ldLibraryPath, ldPreload
-}
-
 // generateAptCmd generates the apt command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
 func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
