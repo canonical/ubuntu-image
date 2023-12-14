@@ -163,8 +163,11 @@ type AddGroup struct {
 
 // AddUser allows users to add a user in the image that is being built
 type AddUser struct {
-	UserName string `yaml:"name" json:"UserName"`
-	UserID   string `yaml:"id"   json:"UserID,omitempty"`
+	UserName     string `yaml:"name"          json:"UserName"`
+	UserID       string `yaml:"id"            json:"UserID,omitempty"`
+	Password     string `yaml:"password"      json:"Password,omitempty"`
+	PasswordType string `yaml:"password-type" json:"PasswordType"        default:"hash" jsonschema:"enum=text,enum=hash"`
+	Expire       *bool  `yaml:"expire"        json:"Expire"              default:"true"`
 }
 
 // Artifact contains information about the files that are created

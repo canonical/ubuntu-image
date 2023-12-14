@@ -181,7 +181,11 @@ func TestImageDefinition_SetDefaults(t *testing.T) {
 			ExtraPackages: []*Package{{}},
 			ExtraSnaps:    []*Snap{{}},
 			Fstab:         []*Fstab{{}},
-			Manual:        &Manual{},
+			Manual: &Manual{
+				AddUser: []*AddUser{
+					{},
+				},
+			},
 		},
 		Artifacts: &Artifact{
 			Img:       &[]Img{{}},
@@ -223,7 +227,14 @@ func TestImageDefinition_SetDefaults(t *testing.T) {
 			Fstab: []*Fstab{{
 				MountOptions: "defaults",
 			}},
-			Manual: &Manual{},
+			Manual: &Manual{
+				AddUser: []*AddUser{
+					{
+						PasswordType: "hash",
+						Expire:       helper.BoolPtr(true),
+					},
+				},
+			},
 		},
 		Artifacts: &Artifact{
 			Img:       &[]Img{{}},
