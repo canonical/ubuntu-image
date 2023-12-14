@@ -258,6 +258,14 @@ The following specification defines what is supported in the YAML:
                name: <string>
                # The UID to assing to this new user
                id: <string> (optional)
+               # Password. This can be a plain text or a hashed value.
+               password: <string> (optional)
+               # Type of password submitted above. Defaults to "hash" 
+               password-type: text | hash (optional)
+               # Should the password immediately expire and force the user to 
+               # renew it at first login
+               # Defaults to true
+               expire: <boolean>
            add-group: (optional)
              -
                # The name of the group to create.

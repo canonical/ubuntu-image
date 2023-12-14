@@ -922,22 +922,54 @@ func manualAddGroup(customizations []*imagedefinition.AddGroup, targetDir string
 // manualAddUser adds users in the chroot
 func manualAddUser(customizations []*imagedefinition.AddUser, targetDir string, debug bool) error {
 	for _, c := range customizations {
-		addUserCmd := execCommand("chroot", targetDir, "useradd", c.UserName)
 		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", c.UserName)
+		var addUserCmds []*exec.Cmd
+
+		addUserCmd := execCommand("chroot", targetDir, "useradd", c.UserName)
 		if c.UserID != "" {
 			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", c.UserID}...)
 			debugStatement = fmt.Sprintf("%s with UID %s\n", strings.TrimSpace(debugStatement), c.UserID)
 		}
+
+		addUserCmds = append(addUserCmds, addUserCmd)
+
+		if c.Password != "" {
+			chPasswordCmd := execCommand("chroot", targetDir, "chpassword", c.UserName)
+
+			if c.PasswordType == "hash" {
+				chPasswordCmd.Args = append(chPasswordCmd.Args, "-e")
+			}
+			chPasswordCmd.Args = append(chPasswordCmd.Args, c.Password)
+
+			debugStatement = fmt.Sprintf("%s, setting a password\n", strings.TrimSpace(debugStatement))
+			addUserCmds = append(addUserCmds, chPasswordCmd)
+		}
+
+		if c.Expire == nil {
+			return imagedefinition.ErrExpireNil
+		}
+
+		if *c.Expire {
+			expireCmd := execCommand("chroot", targetDir, "passwd", "--expire", c.UserName)
+			debugStatement = fmt.Sprintf("%s, forcing reseting the password at first login\n", strings.TrimSpace(debugStatement))
+			addUserCmds = append(addUserCmds, expireCmd)
+		}
+
 		if debug {
 			fmt.Print(debugStatement)
 		}
-		addUserOutput := helper.SetCommandOutput(addUserCmd, debug)
-		err := addUserCmd.Run()
-		if err != nil {
-			return fmt.Errorf("Error adding user. Command used is \"%s\". Error is %s. Full output below:\n%s",
-				addUserCmd.String(), err.Error(), addUserOutput.String())
+
+		for _, cmd := range addUserCmds {
+			addUserOutput := helper.SetCommandOutput(cmd, debug)
+			err := cmd.Run()
+			if err != nil {
+				return fmt.Errorf("Error adding user. Command used is \"%s\". Error is %s. Full output below:\n%s",
+					cmd.String(), err.Error(), addUserOutput.String())
+			}
+
 		}
 	}
+
 	return nil
 }
 

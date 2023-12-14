@@ -811,6 +811,118 @@ func TestFailedManualAddGroup(t *testing.T) {
 	asserter.AssertErrContains(err, "Error adding group")
 }
 
+// Test_manualAddUser tests the manualAddUser function
+func Test_manualAddUser(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+
+	testCases := []struct {
+		name           string
+		addUsers       []*imagedefinition.AddUser
+		expectedOutput []string
+		expectedError  string
+	}{
+		{
+			name: "create one user",
+			addUsers: []*imagedefinition.AddUser{
+				{
+					UserName: "testuser",
+					UserID:   "123",
+					Expire:   helper.BoolPtr(false),
+				},
+			},
+			expectedOutput: []string{
+				`Adding user "testuser" with UID 123`,
+				"chroot fakedir useradd testuser --uid 123",
+			},
+		},
+		{
+			name: "create 3 users",
+			addUsers: []*imagedefinition.AddUser{
+				{
+					UserName: "testuser1",
+					UserID:   "123",
+					Expire:   helper.BoolPtr(false),
+				},
+				{
+					UserName: "testuser2",
+					UserID:   "456",
+					Expire:   helper.BoolPtr(false),
+				},
+				{
+					UserName:     "testuser3",
+					UserID:       "789",
+					Expire:       helper.BoolPtr(true),
+					Password:     "test",
+					PasswordType: "text",
+				},
+				{
+					UserName:     "testuser4",
+					UserID:       "0123",
+					Expire:       helper.BoolPtr(false),
+					Password:     "hash_value",
+					PasswordType: "hash",
+				},
+			},
+			expectedOutput: []string{
+				`Adding user "testuser1" with UID 123`,
+				"chroot fakedir useradd testuser1 --uid 123",
+				`Adding user "testuser2" with UID 456`,
+				"chroot fakedir useradd testuser2 --uid 456",
+				`Adding user "testuser3" with UID 789, setting a password, forcing reseting the password at first login`,
+				"chroot fakedir useradd testuser3 --uid 789",
+				"chroot fakedir chpassword testuser3 test",
+				"chroot fakedir passwd --expire testuser3",
+				`Adding user "testuser4" with UID 0123, setting a password`,
+				"chroot fakedir useradd testuser4 --uid 0123",
+				"chroot fakedir chpassword testuser4 -e hash_value",
+			},
+		},
+		{
+			name: "fail to create a user without Expire",
+			addUsers: []*imagedefinition.AddUser{
+				{
+					UserName: "testuser",
+					UserID:   "123",
+				},
+			},
+			expectedError: imagedefinition.ErrExpireNil.Error(),
+			expectedOutput: []string{
+				"",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
+			mockCmder := NewMockExecCommand()
+
+			execCommand = mockCmder.Command
+			t.Cleanup(func() { execCommand = exec.Command })
+
+			stdout, restoreStdout, _ := helper.CaptureStd(&os.Stdout)
+
+			t.Cleanup(func() { restoreStdout() })
+
+			err := manualAddUser(tc.addUsers, "fakedir", true)
+
+			restoreStdout()
+			readStdout, _ := io.ReadAll(stdout)
+
+			if len(tc.expectedError) == 0 {
+				asserter.AssertErrNil(err, true)
+			} else {
+				asserter.AssertErrContains(err, tc.expectedError)
+			}
+
+			gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
+			if len(tc.expectedOutput) != len(gotCmds) {
+				t.Fatalf("%v commands to be executed, expected %v", len(gotCmds), len(tc.expectedOutput))
+			}
+
+			asserter.AssertEqual(tc.expectedOutput, gotCmds)
+		})
+	}
+}
+
 // TestFailedManualAddUser tests the fail case of the manualAddUser function
 func TestFailedManualAddUser(t *testing.T) {
 	t.Parallel()
@@ -820,6 +932,7 @@ func TestFailedManualAddUser(t *testing.T) {
 		{
 			UserName: "testuser",
 			UserID:   "123",
+			Expire:   helper.BoolPtr(false),
 		},
 	}
 	err := manualAddUser(addUsers, "fakedir", true)
