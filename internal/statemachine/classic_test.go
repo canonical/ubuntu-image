@@ -651,7 +651,7 @@ func TestPrepareGadgetTree(t *testing.T) {
 	err = stateMachine.prepareGadgetTree()
 	asserter.AssertErrNil(err, true)
 
-	gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml"}
+	gadgetTreeFiles := []string{"grub.conf", "pc-boot.img", "meta/gadget.yaml", "install/grub.conf"}
 	for _, file := range gadgetTreeFiles {
 		_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
 		if err != nil {
@@ -695,6 +695,48 @@ func TestPrepareGadgetTreePrebuilt(t *testing.T) {
 	}
 }
 
+// TestPrepareGadgetTreeWithInstallDir runs prepareGadgetTree() and ensures a gadget tree already
+// containing a nested install directory is correctly handled
+func TestPrepareGadgetTreeWithInstallDir(t *testing.T) {
+	t.Parallel()
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: getHostArch(),
+		Series:       getHostSuite(),
+		Gadget:       &imagedefinition.Gadget{},
+	}
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// place a test gadget tree in the  scratch directory so we don't have to build one
+	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
+	err = os.MkdirAll(gadgetDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	gadgetSource := filepath.Join("testdata", "gadget_tree_with_install")
+	err = osutil.CopySpecialFile(gadgetSource, filepath.Join(gadgetDir, "install"))
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrNil(err, true)
+
+	gadgetTreeFiles := []string{"grub.conf", "meta/gadget.yaml", "install/test"}
+	for _, file := range gadgetTreeFiles {
+		_, err := os.Stat(filepath.Join(stateMachine.tempDirs.unpack, "gadget", file))
+		if err != nil {
+			t.Errorf("File %s should be in unpack, but is missing", file)
+		}
+	}
+}
+
 // TestFailedPrepareGadgetTree tests failures in the prepareGadgetTree function
 func TestFailedPrepareGadgetTree(t *testing.T) {
 	asserter := helper.Asserter{T: t}
@@ -712,7 +754,7 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	// place a test gadget tree in the  scratch directory so we don't have to build one
+	// place a test gadget tree in the scratch directory so we don't have to build one
 	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
 	err = os.MkdirAll(gadgetDir, 0755)
 	asserter.AssertErrNil(err, true)
@@ -729,6 +771,15 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 	err = stateMachine.prepareGadgetTree()
 	asserter.AssertErrContains(err, "Error creating unpack directory")
 	osMkdirAll = os.MkdirAll
+
+	// mock os.Symlink
+	osSymlink = mockSymlink
+	t.Cleanup(func() {
+		osSymlink = os.Symlink
+	})
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrContains(err, "Error creating a symlink to the gadget dir")
+	osSymlink = os.Symlink
 
 	// mock os.ReadDir
 	osReadDir = mockReadDir

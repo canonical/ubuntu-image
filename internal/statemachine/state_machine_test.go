@@ -118,6 +118,9 @@ func mockMkdirAll(string, os.FileMode) error {
 func mockMkdirTemp(string, string) (string, error) {
 	return "", fmt.Errorf("Test error")
 }
+func mockSymlink(oldname, newname string) error {
+	return fmt.Errorf("Test error")
+}
 func mockOpen(string) (*os.File, error) {
 	return nil, fmt.Errorf("Test error")
 }

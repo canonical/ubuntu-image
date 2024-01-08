@@ -112,6 +112,15 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 		}
 	} else {
 		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget", "install")
+		// Some gadget will reference files in the "install" folder. Create a symlink so these
+		// files are still found after being moved to the new gadget dir in the unpack dir.
+		gadgetInstallDir := filepath.Join(gadgetTree, "install")
+		if _, err := os.Stat(gadgetInstallDir); err != nil {
+			err = osSymlink(gadgetDir, gadgetInstallDir)
+			if err != nil {
+				return fmt.Errorf("Error creating a symlink to the gadget dir: %s", err.Error())
+			}
+		}
 	}
 	entries, err := osReadDir(gadgetTree)
 	if err != nil {

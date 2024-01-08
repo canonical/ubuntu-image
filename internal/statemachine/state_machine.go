@@ -51,6 +51,7 @@ var osWriteFile = os.WriteFile
 var osMkdir = os.Mkdir
 var osMkdirAll = os.MkdirAll
 var osMkdirTemp = os.MkdirTemp
+var osSymlink = os.Symlink
 var osOpen = os.Open
 var osOpenFile = os.OpenFile
 var osRemoveAll = os.RemoveAll
