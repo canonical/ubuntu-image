@@ -1,0 +1,20 @@
+summary: Build core amd64 image
+
+environment:
+    IMG/ubuntu_core_18_amd64: ubuntu-core-18-amd64
+    IMG/ubuntu_core_20_amd64: ubuntu-core-20-amd64
+    IMG/ubuntu_core_22_amd64: ubuntu-core-22-amd64
+
+execute: |
+    mkdir -p /tmp/${IMG}/workdir
+    IMG_DEF_PATH=/home/ubuntu-image/models/${IMG}.model
+    ubuntu-image snap --workdir /tmp/${IMG}/workdir --debug $IMG_DEF_PATH 
+    test /tmp/${IMG}/workdir/pc.img
+
+debug: |
+    df -h
+    mount  -l
+    if [ -f loop.txt ]; then
+        cat loop.txt
+    fi
+    losetup -l

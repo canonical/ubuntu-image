@@ -3,20 +3,147 @@ name: Run a spread test of the generated snap
 on: [pull_request]
 
 jobs:
-  spread:
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        system:
-          - ubuntu-18.04
-          - ubuntu-20.04
+  build:
+    runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Build snap
+        id: build-snap
+        uses: snapcore/action-build@v1
+
+      - name: Upload snap artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: snap
+          path: ${{ steps.build-snap.outputs.snap }}
+
+      - name: Verify snapcraft snap
+        run: |
+          sudo snap install --dangerous --classic ${{ steps.build-snap.outputs.snap }}
+
+  spread:
+    runs-on: self-hosted
+    needs: [build]
+
+    steps:
+      - name: Cleanup job workspace
+        id: cleanup-job-workspace
+        run: |
+            rm -rf "${{ github.workspace }}"
+            mkdir "${{ github.workspace }}"
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 2
-      - name: Download spread
-        run: curl -s https://storage.googleapis.com/snapd-spread-tests/spread/spread-amd64.tar.gz | tar -xz
-      - name: Init lxd
-        run: sudo lxd init --auto
+
+      - name: Download snap artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: snap
+          path: tests
+
+      - name: Get previous attempt
+        id: get-previous-attempt
+        run: |
+          echo "previous_attempt=$(( ${{ github.run_attempt }} - 1 ))" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Get previous cache
+        uses: actions/cache@v3
+        with:
+          path: "${{ github.workspace }}/.test-results"
+          key: "${{ github.job }}-results-${{ github.run_id }}-${{ steps.get-previous-attempt.outputs.previous_attempt }}"
+    
+      - name: Prepare test results env and vars
+        id: prepare-test-results-env
+        run: |
+            # Create test results directories and save vars
+            TEST_RESULTS_DIR="${{ github.workspace }}/.test-results"
+            echo "TEST_RESULTS_DIR=$TEST_RESULTS_DIR" >> $GITHUB_ENV
+  
+            # Save the var with the failed tests file
+            echo "FAILED_TESTS_FILE=$TEST_RESULTS_DIR/failed-tests" >> $GITHUB_ENV
+  
+            # Make sure the test results dirs are created
+            # This step has to be after the cache is restored
+            mkdir -p "$TEST_RESULTS_DIR"        
+  
+      - name: Check failed tests to run
+        if: "!contains(github.event.pull_request.labels.*.name, 'Run all')"
+        run: |
+            # Save previous failed test results in FAILED_TESTS env var
+            FAILED_TESTS=""
+            if [ -f "$FAILED_TESTS_FILE" ]; then
+                echo "Failed tests file found"
+                FAILED_TESTS="$(cat $FAILED_TESTS_FILE)"
+                if [ -n "$FAILED_TESTS" ]; then
+                    echo "Failed tests to run: $FAILED_TESTS"
+                    echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_ENV
+                fi
+            fi
+
       - name: Run spread tests
-        run: sudo ./spread lxd:${{ matrix.system }}
+        if: "!contains(github.event.pull_request.labels.*.name, 'Skip spread')"
+        run: |
+            # Register a problem matcher to highlight spread failures
+            echo "::add-matcher::.github/spread-problem-matcher.json"
+  
+            BACKEND=google
+            SPREAD=spread
+
+            # Save previous failed test results in FAILED_TESTS env var
+            RUN_TESTS="$BACKEND:tests/..."
+            if [ -n "$FAILED_TESTS" ]; then
+                RUN_TESTS="$FAILED_TESTS"
+            fi
+            # Run spread tests
+            # "pipefail" ensures that a non-zero status from the spread is
+            # propagated; and we use a subshell as this option could trigger
+            # undesired changes elsewhere
+            echo "Running command: $SPREAD $RUN_TESTS"
+            (set -o pipefail; $SPREAD $RUN_TESTS | tee spread.log)
+
+      - name: Discard spread workers
+        if: always()
+        run: |
+          shopt -s nullglob;
+          for r in .spread-reuse.*.yaml; do
+            spread -discard -reuse-pid="$(echo "$r" | grep -o -E '[0-9]+')";
+          done
+
+      - name: analyze spread test results
+        if: always()
+        run: |
+            if [ -f spread.log ]; then
+                echo "Running spread log parser"
+                ./tests/lib/external/snapd-testing-tools/utils/log-parser spread.log --output spread-results.json
+
+                BACKEND=google
+
+                echo "Determining which tests were executed"
+                RUN_TESTS="$BACKEND:tests/..."
+                if [ -n "$FAILED_TESTS" ]; then
+                    RUN_TESTS="$FAILED_TESTS"
+                fi
+
+                echo "Running spread log analyzer"
+                ./tests/lib/external/snapd-testing-tools/utils/log-analyzer list-reexecute-tasks "$RUN_TESTS" spread-results.json > "$FAILED_TESTS_FILE"
+
+                echo "List of failed tests saved"
+                cat "$FAILED_TESTS_FILE"
+            else
+                echo "No spread log found, saving empty list of failed tests"
+                touch "$FAILED_TESTS_FILE"
+            fi
+
+      - name: save spread test results to cache
+        if: always()
+        uses: actions/cache/save@v3
+        with:
+          path: "${{ github.workspace }}/.test-results"
+          key: "${{ github.job }}-results-${{ github.run_id }}-${{ github.run_attempt }}"
+

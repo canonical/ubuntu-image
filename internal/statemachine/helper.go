@@ -562,7 +562,6 @@ func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec
 	seedSource := strings.Join(imageDefinition.Rootfs.Seed.SeedURLs, ",")
 
 	germinateCmd := execCommand(
-		"eatmydata",
 		"germinate",
 		"--mirror", imageDefinition.Rootfs.Mirror,
 		"--arch", imageDefinition.Architecture,
@@ -609,8 +608,7 @@ func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir strin
 // generateDebootstrapCmd generates the debootstrap command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
 func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, targetDir string) *exec.Cmd {
-	debootstrapCmd := execCommand("eatmydata",
-		"debootstrap",
+	debootstrapCmd := execCommand("debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
 	)

@@ -35,17 +35,19 @@ parts:
       - mtools
       - python3-docutils
     stage-packages:
+      - binfmt-support
       - fdisk
       - gdisk
       - fakeroot
       - debootstrap
-      - eatmydata
       - gpg
       - germinate
       - mtools
       - make
       - kpartx
+      - qemu-user-static
       - qemu-utils
+      - u-boot-tools
       - devscripts
       - grub-common
     build-attributes: [ enable-patchelf ]
