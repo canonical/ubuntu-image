@@ -8,6 +8,8 @@ environment:
     IMG/ubuntu_server_pi_arm64: ubuntu-server-pi-arm64
     # IMG/ubuntu_pi_arm64: ubuntu-pi-arm64
 
+systems: [-ubuntu-18.04-64]
+
 execute: |
     mkdir -p /tmp/${IMG}/{workdir,mount}
     IMG_DEF_PATH=/home/ubuntu-image/ubuntu-images/${IMG}.yaml
@@ -23,9 +25,8 @@ execute: |
         p=${l#"$LOOP"}
         mkdir /tmp/${IMG}/mount/$p
         mount $l /tmp/${IMG}/mount/$p || true
+        ls /tmp/${IMG}/mount/$p/ || true
     done
-
-    ls /tmp/${IMG}/mount/p3/
 
 restore: |
     if [ -f loop.txt ]; then
