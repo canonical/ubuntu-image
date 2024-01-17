@@ -11,9 +11,9 @@ Generate a bootable disk image
     Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>,
     William 'jawn-smith' Wilson <william.wilson@canonical.com>,
     Paul Mars <paul.mars@canonical.com>
-:Date: 2023-11-27
-:Copyright: 2016-2023 Canonical Ltd.
-:Version: 3.1
+:Date: 2024-01-16
+:Copyright: 2016-2024 Canonical Ltd.
+:Version: 3.2
 :Manual section: 1
 
 
@@ -22,7 +22,7 @@ SYNOPSIS
 
 ubuntu-image snap [options] model.assertion
 
-ubuntu-image classic [options] GADGET_TREE_URI
+ubuntu-image classic [options] image_definition.yaml
 
 
 DESCRIPTION
@@ -56,10 +56,6 @@ in the meta directory and all the necessary bootloader gadget bits built.
 For instance a `gadget tree`_ can be easily prepared by fetching a specially
 tailored `gadget snap`_ source and running ``snapcraft prime`` on it, with the
 resulting tree ending up in the ``prime/`` directory.
-
-The actual rootfs for a classic image is created by ``live-build`` with
-arguments passed as per the optional arguments to ``ubuntu-image``.  The
-``livecd-rootfs`` configuration from the host system is used.
 
 
 OPTIONS
@@ -233,7 +229,7 @@ gadget.yaml
     https://github.com/snapcore/snapd/wiki/Gadget-snap#gadget.yaml
 
 model assertion
-    https://developer.ubuntu.com/en/snappy/guides/prepare-image/
+    https://ubuntu.com/core/docs/reference/assertions/model
 
 gadget tree (example)
     https://github.com/snapcore/pc-gadget
@@ -254,13 +250,6 @@ The following environment variables are recognized by ``ubuntu-image``.
     ``<workdir>/unpack`` directory after the ``snap prepare-image`` subcommand
     has run will be copied here.
 
-``UBUNTU_IMAGE_QEMU_USER_STATIC_PATH``
-    In case of classic image cross-compilation for a different architecture,
-    ``ubuntu-image`` will attempt to use the qemu-user-static emulator with
-    ``live-build``.  If set, ``ubuntu-image`` will use the selected path for
-    the cross-compilation.  Otherwise it will attempt to find a matching
-    emulator binary in the current ``$PATH``.
-
 There are a few other environment variables used for building and testing
 only.
 
@@ -269,7 +258,7 @@ STEPS
 =====
 
 The names of steps that can be used with --until and --thru for each image
-type are listed below
+type are listed below.
 
 Classic image steps
 -------------------
@@ -330,18 +319,6 @@ Sometimes, for various reasons, ``ubuntu-image`` may perform specific
 workarounds that might require some explanation to understand the reasoning
 behind them.
 
-Classic swapfile manual unsparsing
-----------------------------------
-
-When building a classic image, if ``ubuntu-image`` notices the existence of a
-``/swapfile`` on the image's rootfs, it will proactively attempt to unsparse
-it.  The reason for that is that ``ubuntu-image`` assumes that the ``/swapfile``
-file will be used as a swapfile on the target system, and due to undocumented
-behavior of ``mkfs.ext4 -d`` large empty files are converted into sparse files
-automatically during filesystem population.  This essentially makes such files
-unusable as swapfiles.  So just in case, ``ubuntu-image`` does an in-place
-``dd`` call of the hard-coded path swapfile to ensure it's no longer sparse.
-
 
 SEE ALSO
 ========
@@ -358,8 +335,6 @@ FOOTNOTES
 
 
 .. _snap: http://snapcraft.io/
-.. _YAML: https://developer.ubuntu.com/en/snappy/guides/prepare-image/
-.. _`gadget snap`: https://github.com/snapcore/snapd/wiki/Gadget-snap
+.. _`gadget snap`: https://snapcraft.io/docs/the-gadget-snap
 .. _`gadget tree`: Example: https://github.com/snapcore/pc-gadget
-.. _`gadget.yaml`: https://github.com/snapcore/snapd/wiki/Gadget-snap#gadget.yaml
 .. _`image_definition.yaml`: https://github.com/canonical/ubuntu-image/tree/main/internal/imagedefinition#readme
