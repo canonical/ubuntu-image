@@ -898,10 +898,12 @@ func manualCopyFile(customizations []*imagedefinition.CopyFile, confDefPath stri
 // manualExecute executes executable files in the chroot
 func manualExecute(customizations []*imagedefinition.Execute, targetDir string, debug bool) error {
 	for _, c := range customizations {
-		executeCmd := execCommand("chroot", targetDir, c.ExecutePath)
+		executeCmd := execCommand("chroot", append([]string{targetDir, c.ExecutePath}, c.ExecuteArgs...)...)
 		if debug {
 			fmt.Printf("Executing command \"%s\"\n", executeCmd.String())
 		}
+		executeCmd.Env = append(executeCmd.Env, c.Env...)
+
 		executeOutput := helper.SetCommandOutput(executeCmd, debug)
 		err := executeCmd.Run()
 		if err != nil {

@@ -121,14 +121,32 @@ func (m *mockRunCmd) runCmd(cmd *exec.Cmd, debug bool) error {
 	return nil
 }
 
-type mockExecCmd struct{}
-
 func NewMockExecCommand() *mockExecCmd {
 	return &mockExecCmd{}
 }
 
-func (m *mockExecCmd) Command(cmd string, args ...string) *exec.Cmd {
+type mockExecCmder struct {
+	cmds []*exec.Cmd
+}
+
+type mockExecCmd struct {
+	exec.Cmd
+	called bool
+}
+
+func (m *mockExecCmd) Run() error {
+	m.called = true
+	return m.Run()
+}
+
+func NewMockExecCommander() *mockExecCmder {
+	return &mockExecCmder{}
+}
+
+func (m *mockExecCmder) Command(name string, args ...string) *exec.Cmd {
 	// Replace the command with an echo of it
 	//nolint:gosec,G204
-	return exec.Command("echo", append([]string{cmd}, args...)...)
+	cmd := exec.Command("echo", append([]string{name}, args...)...)
+	m.cmds = append(m.cmds, cmd)
+	return cmd
 }
