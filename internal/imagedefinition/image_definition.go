@@ -146,9 +146,11 @@ type CopyFile struct {
 	Source string `yaml:"source"      json:"Source"`
 }
 
-// Execute allows users to execute a script in the rootfs of an image
+// Execute allows users to execute a script/command in the rootfs of an image
 type Execute struct {
-	ExecutePath string `yaml:"path" json:"ExecutePath"`
+	ExecutePath string   `yaml:"path" json:"ExecutePath"`
+	ExecuteArgs []string `yaml:"args" json:"ExecuteArgs,omitempty"`
+	Env         []string `yaml:"env"  json:"Env,omitempty"`
 }
 
 // TouchFile allows users to touch a file in the rootfs of an image

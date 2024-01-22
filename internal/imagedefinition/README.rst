@@ -258,6 +258,14 @@ The following specification defines what is supported in the YAML:
           -
             # Path inside the rootfs.
             path: <string>
+            # Arguments to give to the command
+            args: (optional)
+              - <string>
+              - <string>
+            # Environment variables to set before executing the command
+            env: (optional)
+              - <string>
+              - <string>
         # Any additional users to add in the rootfs
         # We recommend using cloud-init when possible and fallback
         # on this method if not possible (e.g performance issues)
