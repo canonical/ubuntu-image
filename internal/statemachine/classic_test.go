@@ -4253,7 +4253,7 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "sbin", "initctl"))
 	asserter.AssertErrNil(err, true)
 
-	mockCmder := NewMockExecCommand()
+	mockCmder := NewMockExecCommander()
 
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
@@ -4325,7 +4325,7 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	mockCmder := NewMockExecCommand()
+	mockCmder := NewMockExecCommander()
 
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })

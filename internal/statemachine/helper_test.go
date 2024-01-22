@@ -761,8 +761,123 @@ func TestFailedManualTouchFile(t *testing.T) {
 	asserter.AssertErrContains(err, "Error creating file")
 }
 
-// TestFailedManualExecute tests the fail case of the manualExecute function
-func TestFailedManualExecute(t *testing.T) {
+// TestStateMachine_manualExecute tests manualExecute
+func TestStateMachine_manualExecute(t *testing.T) {
+	type expectedCmd struct {
+		cmd   string
+		stdin string
+		env   []string
+	}
+
+	type args struct {
+		customizations []*imagedefinition.Execute
+		targetDir      string
+		debug          bool
+	}
+	testCases := []struct {
+		name         string
+		args         args
+		expectedCmds []expectedCmd
+	}{
+		{
+			name: "single simple command",
+			args: args{
+				customizations: []*imagedefinition.Execute{
+					{
+						ExecutePath: "/execute/path",
+						ExecuteArgs: []string{"arg1", "arg2"},
+						Env:         []string{"VAR1=value1", "VAR2=value2"},
+					},
+				},
+				targetDir: "test",
+				debug:     true,
+			},
+			expectedCmds: []expectedCmd{
+				{
+					cmd: "/usr/sbin/chroot test /execute/path arg1 arg2",
+					env: []string{
+						"VAR1=value1",
+						"VAR2=value2",
+					},
+				},
+			},
+		},
+		{
+			name: "3 commands",
+			args: args{
+				customizations: []*imagedefinition.Execute{
+					{
+						ExecutePath: "/execute/path1",
+						ExecuteArgs: []string{"arg1", "arg2"},
+						Env:         []string{"VAR1=value1", "VAR2=value2"},
+					},
+					{
+						ExecutePath: "/execute/path2",
+						ExecuteArgs: []string{"arg21", "arg22"},
+						Env:         []string{"VAR1=value21", "VAR2=value22"},
+					},
+					{
+						ExecutePath: "/execute/path3",
+						ExecuteArgs: []string{"arg31", "arg32"},
+						Env:         []string{"VAR1=value31", "VAR2=value32"},
+					},
+				},
+				targetDir: "test",
+				debug:     true,
+			},
+			expectedCmds: []expectedCmd{
+				{
+					cmd: "/usr/sbin/chroot test /execute/path1 arg1 arg2",
+					env: []string{
+						"VAR1=value1",
+						"VAR2=value2",
+					},
+				},
+				{
+					cmd: "/usr/sbin/chroot test /execute/path2 arg21 arg22",
+					env: []string{
+						"VAR1=value21",
+						"VAR2=value22",
+					},
+				},
+				{
+					cmd: "/usr/sbin/chroot test /execute/path3 arg31 arg32",
+					env: []string{
+						"VAR1=value31",
+						"VAR2=value32",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+
+			mockCmder := NewMockRunCommand()
+
+			runCmd = mockCmder.runCmd
+			t.Cleanup(func() { runCmd = helper.RunCmd })
+
+			err := manualExecute(tc.args.customizations, tc.args.targetDir, tc.args.debug)
+			asserter.AssertErrNil(err, true)
+
+			gotCmds := mockCmder.cmds
+
+			if len(tc.expectedCmds) != len(gotCmds) {
+				t.Fatalf("%v commands to be executed, expected %v", len(gotCmds), len(tc.expectedCmds))
+			}
+			for i, cmd := range gotCmds {
+				asserter.AssertEqual(tc.expectedCmds[i].cmd, cmd.String())
+				asserter.AssertEqual(tc.expectedCmds[i].env, cmd.Env)
+			}
+		})
+	}
+}
+
+// TestStateMachine_manualExecute_fail tests the fail case of the manualExecute function
+func TestStateMachine_manualExecute_fail(t *testing.T) {
 	t.Parallel()
 	asserter := helper.Asserter{T: t}
 
@@ -772,7 +887,7 @@ func TestFailedManualExecute(t *testing.T) {
 		},
 	}
 	err := manualExecute(executes, "fakedir", true)
-	asserter.AssertErrContains(err, "Error running script")
+	asserter.AssertErrContains(err, "Error running command")
 }
 
 // TestFailedManualAddGroup tests the fail case of the manualAddGroup function
@@ -883,7 +998,7 @@ func Test_manualAddUser(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			mockCmder := NewMockRunCommand()
 
 			runCmd = mockCmder.runCmd
@@ -1106,7 +1221,7 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	mockCmder := NewMockExecCommand()
+	mockCmder := NewMockExecCommander()
 
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
