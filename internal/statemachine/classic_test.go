@@ -1757,7 +1757,7 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 
 		// mock helper.BackupAndCopyResolvConf
-		helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConf
+		helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfFail
 		t.Cleanup(func() {
 			helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 		})
@@ -3741,6 +3741,132 @@ func TestFailedCreateChroot(t *testing.T) {
 	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
+// TestStateMachine_installPackages_checkcmds checks commands to install packages order is ok
+func TestStateMachine_installPackages_checkcmds(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.commonFlags.Debug = true
+	stateMachine.parent = &stateMachine
+	stateMachine.commonFlags.OutputDir = "/tmp"
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	mockCmder := NewMockExecCommand()
+
+	execCommand = mockCmder.Command
+	t.Cleanup(func() { execCommand = exec.Command })
+
+	stdout, restoreStdout, _ := helper.CaptureStd(&os.Stdout)
+	t.Cleanup(func() { restoreStdout() })
+
+	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfSuccess
+	t.Cleanup(func() {
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+	})
+
+	err = stateMachine.installPackages()
+	asserter.AssertErrNil(err, true)
+
+	restoreStdout()
+	readStdout, _ := io.ReadAll(stdout)
+
+	expectedCmds := []*regexp.Regexp{
+		regexp.MustCompile("mount --bind /dev /tmp.*/chroot/dev"),
+		regexp.MustCompile("mount --bind /proc /tmp.*/chroot/proc"),
+		regexp.MustCompile("mount --bind /sys /tmp.*/chroot/sys"),
+		regexp.MustCompile("mount --bind .*/scratch/run.* .*/chroot/run"),
+		regexp.MustCompile("chroot /tmp.*/chroot apt update"),
+		regexp.MustCompile("chroot /tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold"),
+		regexp.MustCompile("umount /tmp.*/chroot/run"),
+		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/sys"),
+		regexp.MustCompile("umount --recursive /tmp.*/chroot/sys"),
+		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/proc"),
+		regexp.MustCompile("umount --recursive /tmp.*/chroot/proc"),
+		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/dev"),
+		regexp.MustCompile("umount --recursive /tmp.*/chroot/dev"),
+	}
+
+	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
+	if len(expectedCmds) != len(gotCmds) {
+		t.Fatalf("%v commands to be executed, expected %v", len(gotCmds), len(expectedCmds))
+	}
+
+	for i, gotCmd := range gotCmds {
+		expected := expectedCmds[i]
+
+		if !expected.Match([]byte(gotCmd)) {
+			t.Errorf("Cmd \"%v\" not matching. Expected %v\n", gotCmd, expected.String())
+		}
+	}
+}
+
+// TestStateMachine_installPackages_checkcmds checks commands to install packages order is ok when failing
+func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.commonFlags.Debug = true
+	stateMachine.parent = &stateMachine
+	stateMachine.commonFlags.OutputDir = "/tmp"
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	mockCmder := NewMockExecCommand()
+
+	execCommand = mockCmder.Command
+	t.Cleanup(func() { execCommand = exec.Command })
+
+	stdout, restoreStdout, _ := helper.CaptureStd(&os.Stdout)
+	t.Cleanup(func() { restoreStdout() })
+
+	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfSuccess
+	t.Cleanup(func() {
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+	})
+
+	err = stateMachine.installPackages()
+	asserter.AssertErrNil(err, true)
+
+	restoreStdout()
+	readStdout, _ := io.ReadAll(stdout)
+
+	expectedCmds := []*regexp.Regexp{
+		regexp.MustCompile("mount --bind /dev /tmp.*/chroot/dev"),
+		regexp.MustCompile("mount --bind /proc /tmp.*/chroot/proc"),
+		regexp.MustCompile("mount --bind /sys /tmp.*/chroot/sys"),
+		regexp.MustCompile("mount --bind .*/scratch/run.* .*/chroot/run"),
+		regexp.MustCompile("chroot /tmp.*/chroot apt update"),
+		regexp.MustCompile("chroot /tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold"),
+		regexp.MustCompile("umount /tmp.*/chroot/run"),
+		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/sys"),
+		regexp.MustCompile("umount --recursive /tmp.*/chroot/sys"),
+		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/proc"),
+		regexp.MustCompile("umount --recursive /tmp.*/chroot/proc"),
+		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/dev"),
+		regexp.MustCompile("umount --recursive /tmp.*/chroot/dev"),
+	}
+
+	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
+	if len(expectedCmds) != len(gotCmds) {
+		t.Fatalf("%v commands to be executed, expected %v", len(gotCmds), len(expectedCmds))
+	}
+
+	for i, gotCmd := range gotCmds {
+		expected := expectedCmds[i]
+
+		if !expected.Match([]byte(gotCmd)) {
+			t.Errorf("Cmd \"%v\" not matching. Expected %v\n", gotCmd, expected.String())
+		}
+	}
+}
+
 // TestFailedInstallPackages tests failure cases in installPackages
 func TestFailedInstallPackages(t *testing.T) {
 	asserter := helper.Asserter{T: t}
@@ -3797,7 +3923,7 @@ func TestFailedInstallPackages(t *testing.T) {
 	err = os.Remove(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf.tmp"))
 	asserter.AssertErrNil(err, true)
 	// mock helper.BackupAndCopyResolvConf
-	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConf
+	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfFail
 	t.Cleanup(func() {
 		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 	})
