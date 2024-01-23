@@ -3844,6 +3844,7 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 		regexp.MustCompile("mount --bind .*/scratch/run.* .*/chroot/run"),
 		regexp.MustCompile("chroot /tmp.*/chroot apt update"),
 		regexp.MustCompile("chroot /tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold"),
+		regexp.MustCompile("udevadm settle"),
 		regexp.MustCompile("umount /tmp.*/chroot/run"),
 		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/sys"),
 		regexp.MustCompile("umount --recursive /tmp.*/chroot/sys"),

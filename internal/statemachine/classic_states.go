@@ -385,12 +385,14 @@ func (stateMachine *StateMachine) installPackages() error {
 					mount.dest,
 					err.Error(),
 				)
-
 			}
 		}
 		installPackagesCmds = append(installPackagesCmds, mountCmds...)
 		teardownCmds = append(umountCmds, teardownCmds...)
 	}
+	teardownCmds = append([]*exec.Cmd{
+		execCommand("udevadm", "settle"),
+	}, teardownCmds...)
 
 	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
 	installPackagesCmds = append(installPackagesCmds, aptCmds...)
