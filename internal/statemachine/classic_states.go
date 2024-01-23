@@ -320,7 +320,31 @@ func (stateMachine *StateMachine) installPackages() error {
 
 	// Slice used to store all the commands that need to be run
 	// to install the packages
+	// installPackagesCmds should be filled as a FIFO list
 	var installPackagesCmds []*exec.Cmd
+
+	// Slice used to store all the commands that need to be run
+	// to properly cleanup everything after the packages installation
+	// teardownCmds should be filled as a LIFO list (so new entries should added at the start of the slice)
+	var teardownCmds []*exec.Cmd
+
+	// This will take care of tearing down everything as much as possible
+	// It will be executed even if the function paniced and will continue if one of the command failed
+	// to left the system as clean as possible if something has gone wrong
+	defer func() {
+		for _, teardownCmd := range teardownCmds {
+			cmdOutput := helper.SetCommandOutput(teardownCmd, stateMachine.commonFlags.Debug)
+			tmpErr := teardownCmd.Run()
+			if tmpErr != nil {
+				if err != nil {
+					err = fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+						teardownCmd.String(), err.Error(), cmdOutput.String())
+				} else {
+					err = tmpErr
+				}
+			}
+		}
+	}()
 
 	// mount some necessary partitions from the host in the chroot
 	type mountPoint struct {
@@ -346,7 +370,6 @@ func (stateMachine *StateMachine) installPackages() error {
 		},
 	}
 
-	var umounts []*exec.Cmd
 	for _, mount := range mountPoints {
 		var mountCmds, umountCmds []*exec.Cmd
 		if mount.fromHost {
@@ -365,18 +388,12 @@ func (stateMachine *StateMachine) installPackages() error {
 
 			}
 		}
-		defer func(cmds []*exec.Cmd) {
-			_ = runAll(cmds)
-		}(umountCmds)
-
 		installPackagesCmds = append(installPackagesCmds, mountCmds...)
-		umounts = append(umounts, umountCmds...)
+		teardownCmds = append(umountCmds, teardownCmds...)
 	}
 
-	// generate the apt update/install commands and append them to the slice of commands
 	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
 	installPackagesCmds = append(installPackagesCmds, aptCmds...)
-	installPackagesCmds = append(installPackagesCmds, umounts...) // don't forget to unmount!
 
 	for _, cmd := range installPackagesCmds {
 		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
