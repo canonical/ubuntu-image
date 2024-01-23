@@ -1,12 +1,13 @@
 summary: Build classic Ubuntu server image
 
-kill-timeout: 1h
+kill-timeout: 3h
 
 environment:
     IMG/ubuntu_server_pc_amd64: ubuntu-server-pc-amd64
     # IMG/ubuntu_server_pc_arm64: ubuntu-server-pc-arm64
     IMG/ubuntu_server_pi_arm64: ubuntu-server-pi-arm64
     # IMG/ubuntu_pi_arm64: ubuntu-pi-arm64
+    IMG/edubuntu_pi_arm64: edubuntu-pi-arm64
 
 systems: [-ubuntu-18.04-64]
 

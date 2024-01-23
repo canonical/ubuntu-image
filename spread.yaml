@@ -101,7 +101,7 @@ prepare: |
   snap install core22 --channel=latest/edge
   snap install yq
   unset SHELL
-  git clone https://git.launchpad.net/ubuntu-images
+  git clone -b noble https://git.launchpad.net/ubuntu-images
   git clone https://github.com/snapcore/models
   
   snap install --classic --dangerous ./tests/ubuntu-image_*.snap
