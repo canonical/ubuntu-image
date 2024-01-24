@@ -763,28 +763,50 @@ func importPPAKeys(ppa *imagedefinition.PPA, tmpGPGDir, keyFilePath string, debu
 	return nil
 }
 
-// mountFromHost mounts mountpoints from the host system in the chroot
-// for certain operations that require this
-func mountFromHost(targetDir, mountpoint string) (mountCmds, umountCmds []*exec.Cmd) {
+type mountPoint struct {
+	src      string
+	relpath  string
+	typ      string
+	options  []string
+	fromHost bool // indicates if the mountpoint is mounting from the host, and is thus a bind mount
+}
+
+// getMountCmd returns mount/umount commands to mount the given mountpoint
+// If the mountpoint does not exist, it will be created.
+func getMountCmd(typ string, src string, targetDir string, mountpoint string, fromHost bool, options ...string) (mountCmds, umountCmds []*exec.Cmd, err error) {
+	if !fromHost && len(typ) > 0 {
+		return nil, nil, fmt.Errorf("invalid mount arguments. Cannot use --bind and -t at the same time.")
+	}
+
 	targetPath := filepath.Join(targetDir, mountpoint)
-	mountCmds = []*exec.Cmd{execCommand("mount", "--bind", mountpoint, targetPath)}
+	mountCmd := execCommand("mount")
+
+	if len(typ) > 0 {
+		mountCmd.Args = append(mountCmd.Args, "-t", typ)
+	}
+
+	if !fromHost {
+		mountCmd.Args = append(mountCmd.Args, "--bind")
+	}
+
+	mountCmd.Args = append(mountCmd.Args, src)
+	if len(options) > 0 {
+		mountCmd.Args = append(mountCmd.Args, "-o", strings.Join(options, ","))
+	}
+	mountCmd.Args = append(mountCmd.Args, targetPath)
+
+	if _, err := os.Stat(targetPath); err != nil {
+		err := osMkdirAll(targetPath, 0755)
+		if err != nil && !os.IsExist(err) {
+			return nil, nil, fmt.Errorf("Error creating mountpoint \"%s\": \"%s\"", targetPath, err.Error())
+		}
+	}
+
 	umountCmds = []*exec.Cmd{
 		execCommand("mount", "--make-rprivate", targetPath),
 		execCommand("umount", "--recursive", targetPath),
 	}
-	return mountCmds, umountCmds
-}
-
-// mountTempFS creates a temporary directory and mounts it at the specified location
-func mountTempFS(targetDir, scratchDir, mountpoint string) (mountCmds, umountCmds []*exec.Cmd, err error) {
-	tempDir, err := osMkdirTemp(scratchDir, strings.Trim(mountpoint, "/"))
-	if err != nil {
-		return nil, nil, err
-	}
-	targetPath := filepath.Join(targetDir, mountpoint)
-	mountCmds = []*exec.Cmd{execCommand("mount", "--bind", tempDir, targetPath)}
-	umountCmds = []*exec.Cmd{execCommand("umount", targetPath)}
-	return mountCmds, umountCmds, nil
+	return []*exec.Cmd{mountCmd}, umountCmds, nil
 }
 
 // manualMakeDirs creates a directory (and intermediate directories) into the chroot
@@ -927,16 +949,6 @@ func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error)
 	return seededSnaps, nil
 }
 
-func runAll(cmds []*exec.Cmd) error {
-	for _, cmd := range cmds {
-		err := cmd.Run()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // associateLoopDevice associates a file to a loop device and returns the loop device number
 // Also returns the command to detach the loop device during teardown
 func (stateMachine *StateMachine) associateLoopDevice(path string) (string, *exec.Cmd, error) {
@@ -1041,9 +1053,42 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	teardownCmds = append([]*exec.Cmd{execCommand("umount", mountDir)}, teardownCmds...)
 
 	// set up the mountpoints
-	mountPoints := []string{"/dev", "/proc", "/sys"}
-	for _, mountPoint := range mountPoints {
-		mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
+	mountPoints := []mountPoint{
+		{
+			relpath:  "/dev",
+			typ:      "devtmpfs",
+			src:      "devtmpfs-build",
+			fromHost: true,
+		},
+		{
+			relpath:  "/dev/pts",
+			typ:      "devpts",
+			src:      "devpts-build",
+			options:  []string{"nodev", "nosuid"},
+			fromHost: true,
+		},
+		{
+			relpath:  "/proc",
+			typ:      "proc",
+			src:      "proc-build",
+			fromHost: true,
+		},
+		{
+			relpath:  "/sys",
+			typ:      "sysfs",
+			src:      "sysfs-build",
+			fromHost: true,
+		},
+	}
+
+	for _, mp := range mountPoints {
+		mountCmds, umountCmds, err := getMountCmd(mp.typ, mp.src, mountDir, mp.relpath, mp.fromHost, mp.options...)
+		if err != nil {
+			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
+				mp.relpath,
+				err.Error(),
+			)
+		}
 		updateGrubCmds = append(updateGrubCmds, mountCmds...)
 		teardownCmds = append(umountCmds, teardownCmds...)
 	}

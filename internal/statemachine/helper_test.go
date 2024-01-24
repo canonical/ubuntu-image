@@ -1169,20 +1169,6 @@ func TestLP1981720(t *testing.T) {
 	}
 }
 
-// TestFailedMountTempFS tests failures in the mountTempFS function
-func TestFailedMountTempFS(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-
-	// mock os.MkdirTemp
-	osMkdirTemp = mockMkdirTemp
-	t.Cleanup(func() {
-		osMkdirTemp = os.MkdirTemp
-	})
-	_, _, err := mountTempFS("", "", "")
-	asserter.AssertErrContains(err, "Test error")
-	osMkdirTemp = os.MkdirTemp
-}
-
 // TestFailedGetPreseededSnaps tests various failure scenarios in the getPreseededSnaps function
 func TestFailedGetPreseededSnaps(t *testing.T) {
 	if testing.Short() {
@@ -1271,21 +1257,24 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 	readStdout, _ := io.ReadAll(stdout)
 
 	expectedCmds := []*regexp.Regexp{
-		regexp.MustCompile("mount .*p2 .*/scratch/loopback"),
-		regexp.MustCompile("mount --bind /dev .*/scratch/loopback/dev"),
-		regexp.MustCompile("mount --bind /proc .*/scratch/loopback/proc"),
-		regexp.MustCompile("mount --bind /sys .*/scratch/loopback/sys"),
-		regexp.MustCompile("chroot .*/scratch/loopback dpkg-divert"),
-		regexp.MustCompile("chroot .*/scratch/loopback update-grub"),
-		regexp.MustCompile("chroot .*/scratch/loopback dpkg-divert --remove"),
-		regexp.MustCompile("mount --make-rprivate .*/scratch/loopback/sys"),
-		regexp.MustCompile("umount --recursive .*scratch/loopback/sys"),
-		regexp.MustCompile("mount --make-rprivate .*/scratch/loopback/proc"),
-		regexp.MustCompile("umount --recursive .*scratch/loopback/proc"),
-		regexp.MustCompile("mount --make-rprivate .*/scratch/loopback/dev"),
-		regexp.MustCompile("umount --recursive .*scratch/loopback/dev"),
-		regexp.MustCompile("umount .*scratch/loopback"),
-		regexp.MustCompile("losetup --detach .* /tmp"),
+		regexp.MustCompile("^mount .*p2 .*/scratch/loopback$"),
+		regexp.MustCompile("^mount -t devtmpfs devtmpfs-build .*/scratch/loopback/dev$"),
+		regexp.MustCompile("^mount -t devpts devpts-build -o nodev,nosuid .*/scratch/loopback/dev/pts$"),
+		regexp.MustCompile("^mount -t proc proc-build .*/scratch/loopback/proc$"),
+		regexp.MustCompile("^mount -t sysfs sysfs-build .*/scratch/loopback/sys$"),
+		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert"),
+		regexp.MustCompile("^chroot .*/scratch/loopback update-grub$"),
+		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert --remove"),
+		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/sys$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/sys$"),
+		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/proc$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/proc$"),
+		regexp.MustCompile("^mount --make-rprivate .*scratch/loopback/dev/pts$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/dev/pts$"),
+		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/dev$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/dev$"),
+		regexp.MustCompile("^umount .*scratch/loopback$"),
+		regexp.MustCompile("^losetup --detach .* /tmp$"),
 	}
 
 	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")

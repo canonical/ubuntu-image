@@ -2860,9 +2860,41 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	)
 
 	// set up the mountpoints
-	mountPoints := []string{"/dev", "/proc", "/sys"}
-	for _, mountPoint := range mountPoints {
-		mountCmds, umountCmds := mountFromHost(mountDir, mountPoint)
+	mountPoints := []mountPoint{
+		{
+			relpath:  "/dev",
+			typ:      "devtmpfs",
+			src:      "devtmpfs-build",
+			fromHost: true,
+		},
+		{
+			relpath:  "/dev/pts",
+			typ:      "devpts",
+			src:      "devpts-build",
+			options:  []string{"nodev", "nosuid"},
+			fromHost: true,
+		},
+		{
+			relpath:  "/proc",
+			typ:      "proc",
+			src:      "proc-build",
+			fromHost: true,
+		},
+		{
+			relpath:  "/sys",
+			typ:      "sysfs",
+			src:      "sysfs-build",
+			fromHost: true,
+		},
+	}
+	for _, mp := range mountPoints {
+		mountCmds, umountCmds, err := getMountCmd(mp.typ, mp.src, mountDir, mp.relpath, mp.fromHost, mp.options...)
+		if err != nil {
+			t.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
+				mp.relpath,
+				err.Error(),
+			)
+		}
 		mountImageCmds = append(mountImageCmds, mountCmds...)
 		umountImageCmds = append(umountCmds, umountImageCmds...)
 	}
@@ -3752,6 +3784,8 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
+	err = os.MkdirAll(stateMachine.tempDirs.chroot, 0755)
+	asserter.AssertErrNil(err, true)
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
@@ -3775,19 +3809,24 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	readStdout, _ := io.ReadAll(stdout)
 
 	expectedCmds := []*regexp.Regexp{
-		regexp.MustCompile("mount --bind /dev /tmp.*/chroot/dev"),
-		regexp.MustCompile("mount --bind /proc /tmp.*/chroot/proc"),
-		regexp.MustCompile("mount --bind /sys /tmp.*/chroot/sys"),
-		regexp.MustCompile("mount --bind .*/scratch/run.* .*/chroot/run"),
-		regexp.MustCompile("chroot /tmp.*/chroot apt update"),
-		regexp.MustCompile("chroot /tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold"),
-		regexp.MustCompile("umount /tmp.*/chroot/run"),
-		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/sys"),
-		regexp.MustCompile("umount --recursive /tmp.*/chroot/sys"),
-		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/proc"),
-		regexp.MustCompile("umount --recursive /tmp.*/chroot/proc"),
-		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/dev"),
-		regexp.MustCompile("umount --recursive /tmp.*/chroot/dev"),
+		regexp.MustCompile("^mount -t devtmpfs devtmpfs-build /tmp.*/chroot/dev$"),
+		regexp.MustCompile("^mount -t devpts devpts-build -o nodev,nosuid /tmp.*/chroot/dev/pts$"),
+		regexp.MustCompile("^mount -t proc proc-build /tmp.*/chroot/proc$"),
+		regexp.MustCompile("^mount -t sysfs sysfs-build /tmp.*/chroot/sys$"),
+		regexp.MustCompile("^mount --bind .*/scratch/run.* .*/chroot/run$"),
+		regexp.MustCompile("^chroot /tmp.*/chroot apt update$"),
+		regexp.MustCompile("^chroot /tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold$"),
+		regexp.MustCompile("^udevadm settle$"),
+		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/run$"),
+		regexp.MustCompile("^umount --recursive /tmp.*/chroot/run$"),
+		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/sys$"),
+		regexp.MustCompile("^umount --recursive /tmp.*/chroot/sys$"),
+		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/proc$"),
+		regexp.MustCompile("^umount --recursive /tmp.*/chroot/proc$"),
+		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/dev/pts$"),
+		regexp.MustCompile("^umount --recursive /tmp.*/chroot/dev/pts$"),
+		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/dev$"),
+		regexp.MustCompile("^umount --recursive /tmp.*/chroot/dev$"),
 	}
 
 	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
@@ -3831,27 +3870,26 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 	})
 
+	osMkdirTemp = mockMkdirTemp
+	t.Cleanup(func() {
+		osMkdirTemp = os.MkdirTemp
+	})
+
 	err = stateMachine.installPackages()
-	asserter.AssertErrNil(err, true)
+	asserter.AssertErrContains(err, "Test error")
 
 	restoreStdout()
 	readStdout, _ := io.ReadAll(stdout)
 
 	expectedCmds := []*regexp.Regexp{
-		regexp.MustCompile("mount --bind /dev /tmp.*/chroot/dev"),
-		regexp.MustCompile("mount --bind /proc /tmp.*/chroot/proc"),
-		regexp.MustCompile("mount --bind /sys /tmp.*/chroot/sys"),
-		regexp.MustCompile("mount --bind .*/scratch/run.* .*/chroot/run"),
-		regexp.MustCompile("chroot /tmp.*/chroot apt update"),
-		regexp.MustCompile("chroot /tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold"),
-		regexp.MustCompile("udevadm settle"),
-		regexp.MustCompile("umount /tmp.*/chroot/run"),
-		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/sys"),
-		regexp.MustCompile("umount --recursive /tmp.*/chroot/sys"),
-		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/proc"),
-		regexp.MustCompile("umount --recursive /tmp.*/chroot/proc"),
-		regexp.MustCompile("mount --make-rprivate /tmp.*/chroot/dev"),
-		regexp.MustCompile("umount --recursive /tmp.*/chroot/dev"),
+		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/sys$"),
+		regexp.MustCompile("^umount --recursive /tmp.*/chroot/sys$"),
+		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/proc$"),
+		regexp.MustCompile("^umount --recursive /tmp.*/chroot/proc$"),
+		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/dev/pts$"),
+		regexp.MustCompile("^umount --recursive /tmp.*/chroot/dev/pts$"),
+		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/dev$"),
+		regexp.MustCompile("^umount --recursive /tmp.*/chroot/dev$"),
 	}
 
 	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
@@ -3868,8 +3906,8 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 	}
 }
 
-// TestFailedInstallPackages tests failure cases in installPackages
-func TestFailedInstallPackages(t *testing.T) {
+// TestStateMachine_installPackages_fail tests failure cases in installPackages
+func TestStateMachine_installPackages_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	restoreCWD := helper.SaveCWD()
 	defer restoreCWD()
@@ -3901,7 +3939,6 @@ func TestFailedInstallPackages(t *testing.T) {
 	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
 	asserter.AssertErrNil(err, true)
 
-	// mock os.MkdirTemp to cause a failure in mountTempFS
 	osMkdirTemp = mockMkdirTemp
 	t.Cleanup(func() {
 		osMkdirTemp = os.MkdirTemp
@@ -3911,7 +3948,7 @@ func TestFailedInstallPackages(t *testing.T) {
 	osMkdirTemp = os.MkdirTemp
 
 	// Setup the exec.Command mock
-	testCaseName = "TestFailedInstallPackages"
+	testCaseName = "TestStateMachine_installPackages_fail"
 	execCommand = fakeExecCommand
 	t.Cleanup(func() {
 		execCommand = exec.Command
