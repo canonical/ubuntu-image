@@ -240,7 +240,7 @@ func TestExecHelperProcess(t *testing.T) {
 		fallthrough
 	case "TestFailedCreateChroot":
 		fallthrough
-	case "TestFailedInstallPackages":
+	case "TestStateMachine_installPackages_fail":
 		fallthrough
 	case "TestFailedPrepareClassicImage":
 		fallthrough

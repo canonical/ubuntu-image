@@ -298,7 +298,6 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 func (stateMachine *StateMachine) installPackages() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// copy /etc/resolv.conf from the host system into the chroot
 	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
 	if err != nil {
 		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
@@ -318,8 +317,7 @@ func (stateMachine *StateMachine) installPackages() error {
 			classicStateMachine.ImageDef.Kernel)
 	}
 
-	// Slice used to store all the commands that need to be run
-	// to install the packages
+	// Slice used to store all the commands that need to be run to install the packages
 	// installPackagesCmds should be filled as a FIFO list
 	var installPackagesCmds []*exec.Cmd
 
@@ -346,47 +344,60 @@ func (stateMachine *StateMachine) installPackages() error {
 		}
 	}()
 
-	// mount some necessary partitions from the host in the chroot
-	type mountPoint struct {
-		dest     string
-		fromHost bool
-	}
+	// mount some necessary partitions in the chroot
 	mountPoints := []mountPoint{
 		{
-			dest:     "/dev",
+			relpath:  "/dev",
+			typ:      "devtmpfs",
+			src:      "devtmpfs-build",
 			fromHost: true,
 		},
 		{
-			dest:     "/proc",
+			relpath:  "/dev/pts",
+			typ:      "devpts",
+			src:      "devpts-build",
+			options:  []string{"nodev", "nosuid"},
 			fromHost: true,
 		},
 		{
-			dest:     "/sys",
+			relpath:  "/proc",
+			typ:      "proc",
+			src:      "proc-build",
 			fromHost: true,
 		},
 		{
-			dest:     "/run",
+			relpath:  "/sys",
+			typ:      "sysfs",
+			src:      "sysfs-build",
+			fromHost: true,
+		},
+		{
+			relpath:  "/run",
 			fromHost: false,
 		},
 	}
 
-	for _, mount := range mountPoints {
+	for _, mp := range mountPoints {
 		var mountCmds, umountCmds []*exec.Cmd
-		if mount.fromHost {
-			mountCmds, umountCmds = mountFromHost(stateMachine.tempDirs.chroot, mount.dest)
-		} else {
-			var err error
-			mountCmds, umountCmds, err = mountTempFS(stateMachine.tempDirs.chroot,
-				stateMachine.tempDirs.scratch,
-				mount.dest,
-			)
+		var err error
+		if !mp.fromHost {
+			mp.src, err = osMkdirTemp(stateMachine.tempDirs.scratch, strings.Trim(mp.relpath, "/"))
 			if err != nil {
 				return fmt.Errorf("Error mounting temporary directory for mountpoint \"%s\": \"%s\"",
-					mount.dest,
+					mp.relpath,
 					err.Error(),
 				)
 			}
 		}
+
+		mountCmds, umountCmds, err = getMountCmd(mp.typ, mp.src, stateMachine.tempDirs.chroot, mp.relpath, mp.fromHost, mp.options...)
+		if err != nil {
+			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
+				mp.relpath,
+				err.Error(),
+			)
+		}
+
 		installPackagesCmds = append(installPackagesCmds, mountCmds...)
 		teardownCmds = append(umountCmds, teardownCmds...)
 	}
@@ -863,46 +874,84 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 }
 
 // preseedClassicImage preseeds the snaps that have already been staged in the chroot
-func (stateMachine *StateMachine) preseedClassicImage() error {
+func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// create some directories in the chroot that we will bind mount from the
-	// host system. This is required or else the call to snap-preseed will fail
-	mkdirs := []string{
-		filepath.Join(stateMachine.tempDirs.chroot, "sys", "kernel", "security"),
-		filepath.Join(stateMachine.tempDirs.chroot, "sys", "fs", "cgroup"),
-	}
-	for _, mkdir := range mkdirs {
-		err := osMkdirAll(mkdir, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating mountpoint \"%s\": \"%s\"", mkdir, err.Error())
-		}
-	}
-
-	// slice to hold all of the commands to do the preseeding
+	// Slice to hold all of the commands to do the preseeding
+	// preseedCmds should be filled as a FIFO list
 	var preseedCmds []*exec.Cmd
+	// teardownCmds should be filled as a LIFO list to unmount first what was mounted last
+	var teardownCmds []*exec.Cmd
 
 	// set up the mount commands
-	mountPoints := []string{"/dev", "/proc", "/sys/kernel/security", "/sys/fs/cgroup"}
-	var mountCmds []*exec.Cmd
-	var umountCmds []*exec.Cmd
-	for _, mountPoint := range mountPoints {
-		thisMountCmds, thisUmountCmds := mountFromHost(stateMachine.tempDirs.chroot, mountPoint)
-		mountCmds = append(mountCmds, thisMountCmds...)
-		umountCmds = append(umountCmds, thisUmountCmds...)
+	mountPoints := []mountPoint{
+		{
+			relpath:  "/dev",
+			typ:      "devtmpfs",
+			src:      "devtmpfs-build",
+			fromHost: true,
+		},
+		{
+			relpath:  "/dev/pts",
+			typ:      "devpts",
+			src:      "devpts-build",
+			options:  []string{"nodev", "nosuid"},
+			fromHost: true,
+		},
+		{
+			relpath:  "/proc",
+			typ:      "proc",
+			src:      "proc-build",
+			fromHost: true,
+		},
+		{
+			relpath:  "/sys/kernel/security",
+			typ:      "securityfs",
+			src:      "none",
+			fromHost: true,
+		},
+		{
+			relpath:  "/sys/fs/cgroup",
+			typ:      "cgroup2",
+			src:      "none",
+			fromHost: true,
+		},
 	}
 
-	defer func(cmds []*exec.Cmd) {
-		_ = runAll(cmds)
-	}(umountCmds)
+	// This will take care of tearing down everything as much as possible
+	// It will be executed even if the function paniced and will continue if one of the command failed
+	// to left the system as clean as possible if something has gone wrong
+	defer func() {
+		for _, unmountCmd := range teardownCmds {
+			cmdOutput := helper.SetCommandOutput(unmountCmd, stateMachine.commonFlags.Debug)
+			tmpErr := unmountCmd.Run()
+			if tmpErr != nil {
+				if err != nil {
+					err = fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
+						unmountCmd.String(), err.Error(), cmdOutput.String())
+				} else {
+					err = tmpErr
+				}
+			}
+		}
+	}()
 
-	// assemble the commands in the correct order: mount, preseed, unmount
-	preseedCmds = append(preseedCmds, mountCmds...)
+	for _, mountPoint := range mountPoints {
+		mountCmds, umountCmds, err := getMountCmd(mountPoint.typ, mountPoint.src, stateMachine.tempDirs.chroot, mountPoint.relpath, mountPoint.fromHost, mountPoint.options...)
+		if err != nil {
+			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
+				mountPoint.relpath,
+				err.Error(),
+			)
+		}
+		preseedCmds = append(preseedCmds, mountCmds...)
+		teardownCmds = append(umountCmds, teardownCmds...)
+	}
+
 	preseedCmds = append(preseedCmds,
 		//nolint:gosec,G204
 		exec.Command("/usr/lib/snapd/snap-preseed", stateMachine.tempDirs.chroot),
 	)
-	preseedCmds = append(preseedCmds, umountCmds...)
 	for _, cmd := range preseedCmds {
 		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
 		err := cmd.Run()
