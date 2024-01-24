@@ -34,6 +34,7 @@ parts:
       - gdisk
       - mtools
       - python3-docutils
+      - ubuntu-dev-tools
     stage-packages:
       - binfmt-support
       - fdisk
@@ -44,14 +45,16 @@ parts:
       - germinate
       - mtools
       - make
-      - kpartx
       - qemu-user-static
       - qemu-utils
       - u-boot-tools
       - devscripts
       - grub-common
+      - e2fsprogs
     build-attributes: [ enable-patchelf ]
     override-build: |
+      # Gather mkfs configuration for every series
+      ./collect-mkfs-confs.sh 
       ins_bin=$SNAPCRAFT_PART_INSTALL/bin/
       mkdir -p "$ins_bin"
       # Make ubuntu-image statically compiled to avoid libc deps.
@@ -65,3 +68,4 @@ parts:
       # Create a symbolic link to /usr/lib/<arch> where libfakeroot will live
       cd $SNAPCRAFT_PART_INSTALL/usr/lib/
       ln -s ${SNAPCRAFT_ARCH_TRIPLET} lib-arch
+

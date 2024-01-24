@@ -1,0 +1,13 @@
+type: model
+authority-id: brand
+series: 16
+brand-id: brand
+core: test
+model: baz-3000
+architecture: armhf
+gadget: brand-gadget
+kernel: kernel
+timestamp: 2016-01-02T10:00:00-05:00
+sign-key-sha3-384: Jv8_JiHiIzJVcO9M55pPdqSDWUvuhfDIBJUS-3VW7F_idjix7Ffn5qMxB21ZQuij
+
+AXNpZw==

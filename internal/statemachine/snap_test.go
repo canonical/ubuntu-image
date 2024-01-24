@@ -15,9 +15,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/store"
 
+	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
@@ -45,6 +47,22 @@ func TestSnapStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
 
 	err = stateMachine.Setup()
 	asserter.AssertErrContains(err, "unable to determine the configuration definition directory")
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+}
+
+// TestSnapStateMachine_Setup_Fail_SetSeries tests a failure in the Setup() function when setting the Series.
+func TestSnapStateMachine_Setup_Fail_SetSeries(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine SnapStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Args.ModelAssertion = "/non-existent-path"
+
+	err := stateMachine.Setup()
+	asserter.AssertErrContains(err, "cannot read model assertion")
 	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
@@ -761,4 +779,60 @@ func TestPreseedFlag(t *testing.T) {
 
 	err = stateMachine.Teardown()
 	asserter.AssertErrNil(err, true)
+}
+
+func TestSnapStateMachine_decodeModelAssertion(t *testing.T) {
+	type fields struct {
+		Args commands.SnapArgs
+	}
+	tests := []struct {
+		name           string
+		fields         fields
+		modelAssertion string
+		want           *asserts.Model
+		expectedError  string
+		shouldPass     bool
+	}{
+		{
+			name:           "fail when missing file",
+			modelAssertion: "inexistent_file",
+			shouldPass:     false,
+			expectedError:  "cannot read model assertion",
+		},
+		{
+			name:           "fail to decode empty model assertion",
+			modelAssertion: filepath.Join("testdata", "modelAssertionEmpty"),
+			shouldPass:     false,
+			expectedError:  "cannot decode model assertion",
+		},
+		{
+			name:           "fail to decode invalid model assertion",
+			modelAssertion: filepath.Join("testdata", "modelAssertionNotOne"),
+			shouldPass:     false,
+			expectedError:  "is not a model assertion",
+		},
+		{
+			name:           "fail to decode model assertion with reserved",
+			modelAssertion: filepath.Join("testdata", "modelAssertionReserverdHeader"),
+			shouldPass:     false,
+			expectedError:  "model assertion cannot have reserved/unsupported header",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+
+			snapStateMachine := &SnapStateMachine{
+				Args: commands.SnapArgs{
+					ModelAssertion: tt.modelAssertion,
+				},
+			}
+			got, err := snapStateMachine.decodeModelAssertion()
+			if tt.shouldPass {
+				asserter.AssertEqual(tt.want, got)
+			} else {
+				asserter.AssertErrContains(err, tt.expectedError)
+			}
+		})
+	}
 }

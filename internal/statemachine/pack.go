@@ -53,3 +53,8 @@ func (packStateMachine *PackStateMachine) Setup() error {
 
 	return nil
 }
+
+// Placeholder method to satisfy the interface. This is not used when packing.
+func (packStateMachine *PackStateMachine) SetSeries() error {
+	return nil
+}

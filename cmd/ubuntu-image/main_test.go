@@ -47,6 +47,10 @@ func (mockSM *mockedStateMachine) Teardown() error {
 func (mockSM *mockedStateMachine) SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts) {
 }
 
+func (mockSM *mockedStateMachine) SetSeries() error {
+	return nil
+}
+
 // TestValidCommands tests that certain valid commands are parsed correctly
 func TestValidCommands(t *testing.T) {
 	t.Parallel()

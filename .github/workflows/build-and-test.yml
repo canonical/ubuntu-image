@@ -30,7 +30,7 @@ jobs:
         run: sudo apt update
 
       - name: install-test-dependencies
-        run: sudo apt install -y snapd germinate mtools debootstrap eatmydata fdisk gdisk qemu-system-aarch64 qemu-user-static ubuntu-dev-tools
+        run: sudo apt install -y snapd germinate e2fsprogs mtools debootstrap eatmydata fdisk gdisk qemu-system-aarch64 qemu-user-static ubuntu-dev-tools
 
       - name: short tests
         if: ${{ matrix.test-scenario == 'short' }}

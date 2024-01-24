@@ -27,6 +27,12 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
+var (
+	MKE2FS_CONFIG_ENV  = "MKE2FS_CONFIG"
+	MKE2FS_CONFIG_FILE = "mke2fs.conf"
+	MKE2FS_BASE_PATH   = "/etc/ubuntu-image/mkfs"
+)
+
 // validateInput ensures that command line flags for the state machine are valid. These
 // flags are applicable to all image types
 func (stateMachine *StateMachine) validateInput() error {
@@ -229,6 +235,13 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			return fmt.Errorf("Error listing contents of volume \"%s\": %s",
 				contentRoot, err.Error())
 		}
+
+		// select the mkfs.ext4 conf to use
+		err = stateMachine.setMk2fsConf()
+		if err != nil {
+			return fmt.Errorf("Error preparing env for mkfs: %s", err.Error())
+		}
+
 		// use mkfs functions from snapd to create the filesystems
 		if structure.Content != nil || len(contentFiles) > 0 {
 			err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
@@ -245,6 +258,19 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 		}
 	}
 	return nil
+}
+
+// The MKE2FS_BASE_PATH folder is setup to handle codename and release number as a series.
+func (stateMachine *StateMachine) setMk2fsConf() error {
+	mk2fsConfPath := strings.Join([]string{osGetenv("SNAP"), MKE2FS_BASE_PATH, stateMachine.series, MKE2FS_CONFIG_FILE}, "/")
+
+	_, err := os.Stat(mk2fsConfPath)
+	if err != nil {
+		fmt.Printf("WARNING: No mkfs configuration found for this series: %s. Will fallback on the default one.\n", stateMachine.series)
+		return nil
+	}
+
+	return osSetenv(MKE2FS_CONFIG_ENV, mk2fsConfPath)
 }
 
 // handleSecureBoot handles a special case where files need to be moved from /boot/ to
