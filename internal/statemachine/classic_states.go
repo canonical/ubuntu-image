@@ -317,31 +317,15 @@ func (stateMachine *StateMachine) installPackages() error {
 			classicStateMachine.ImageDef.Kernel)
 	}
 
-	// Slice used to store all the commands that need to be run to install the packages
 	// installPackagesCmds should be filled as a FIFO list
 	var installPackagesCmds []*exec.Cmd
 
-	// Slice used to store all the commands that need to be run
-	// to properly cleanup everything after the packages installation
-	// teardownCmds should be filled as a LIFO list (so new entries should added at the start of the slice)
+	// teardownCmds should be filled as a LIFO list
 	var teardownCmds []*exec.Cmd
 
-	// This will take care of tearing down everything as much as possible
-	// It will be executed even if the function paniced and will continue if one of the command failed
-	// to left the system as clean as possible if something has gone wrong
+	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
-		for _, teardownCmd := range teardownCmds {
-			cmdOutput := helper.SetCommandOutput(teardownCmd, stateMachine.commonFlags.Debug)
-			tmpErr := teardownCmd.Run()
-			if tmpErr != nil {
-				if err != nil {
-					err = fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-						teardownCmd.String(), err.Error(), cmdOutput.String())
-				} else {
-					err = tmpErr
-				}
-			}
-		}
+		err = execTeardown(teardownCmds, stateMachine.commonFlags.Debug, err)
 	}()
 
 	// mount some necessary partitions in the chroot
@@ -873,7 +857,6 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// Slice to hold all of the commands to do the preseeding
 	// preseedCmds should be filled as a FIFO list
 	var preseedCmds []*exec.Cmd
 	// teardownCmds should be filled as a LIFO list to unmount first what was mounted last
@@ -909,22 +892,9 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 		},
 	}
 
-	// This will take care of tearing down everything as much as possible
-	// It will be executed even if the function paniced and will continue if one of the command failed
-	// to left the system as clean as possible if something has gone wrong
+	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
-		for _, unmountCmd := range teardownCmds {
-			cmdOutput := helper.SetCommandOutput(unmountCmd, stateMachine.commonFlags.Debug)
-			tmpErr := unmountCmd.Run()
-			if tmpErr != nil {
-				if err != nil {
-					err = fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-						unmountCmd.String(), err.Error(), cmdOutput.String())
-				} else {
-					err = tmpErr
-				}
-			}
-		}
+		err = execTeardown(teardownCmds, stateMachine.commonFlags.Debug, err)
 	}()
 
 	for _, mountPoint := range mountPoints {
