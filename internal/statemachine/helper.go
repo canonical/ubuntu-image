@@ -764,17 +764,17 @@ func importPPAKeys(ppa *imagedefinition.PPA, tmpGPGDir, keyFilePath string, debu
 }
 
 type mountPoint struct {
-	src      string
-	relpath  string
-	typ      string
-	options  []string
-	fromHost bool // indicates if the mountpoint is mounting from the host, and is thus a bind mount
+	src     string
+	relpath string
+	typ     string
+	options []string
+	bind    bool
 }
 
 // getMountCmd returns mount/umount commands to mount the given mountpoint
 // If the mountpoint does not exist, it will be created.
-func getMountCmd(typ string, src string, targetDir string, mountpoint string, fromHost bool, options ...string) (mountCmds, umountCmds []*exec.Cmd, err error) {
-	if !fromHost && len(typ) > 0 {
+func getMountCmd(typ string, src string, targetDir string, mountpoint string, bind bool, options ...string) (mountCmds, umountCmds []*exec.Cmd, err error) {
+	if bind && len(typ) > 0 {
 		return nil, nil, fmt.Errorf("invalid mount arguments. Cannot use --bind and -t at the same time.")
 	}
 
@@ -785,7 +785,7 @@ func getMountCmd(typ string, src string, targetDir string, mountpoint string, fr
 		mountCmd.Args = append(mountCmd.Args, "-t", typ)
 	}
 
-	if !fromHost {
+	if bind {
 		mountCmd.Args = append(mountCmd.Args, "--bind")
 	}
 
@@ -1055,34 +1055,30 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	// set up the mountpoints
 	mountPoints := []mountPoint{
 		{
-			relpath:  "/dev",
-			typ:      "devtmpfs",
-			src:      "devtmpfs-build",
-			fromHost: true,
+			relpath: "/dev",
+			typ:     "devtmpfs",
+			src:     "devtmpfs-build",
 		},
 		{
-			relpath:  "/dev/pts",
-			typ:      "devpts",
-			src:      "devpts-build",
-			options:  []string{"nodev", "nosuid"},
-			fromHost: true,
+			relpath: "/dev/pts",
+			typ:     "devpts",
+			src:     "devpts-build",
+			options: []string{"nodev", "nosuid"},
 		},
 		{
-			relpath:  "/proc",
-			typ:      "proc",
-			src:      "proc-build",
-			fromHost: true,
+			relpath: "/proc",
+			typ:     "proc",
+			src:     "proc-build",
 		},
 		{
-			relpath:  "/sys",
-			typ:      "sysfs",
-			src:      "sysfs-build",
-			fromHost: true,
+			relpath: "/sys",
+			typ:     "sysfs",
+			src:     "sysfs-build",
 		},
 	}
 
 	for _, mp := range mountPoints {
-		mountCmds, umountCmds, err := getMountCmd(mp.typ, mp.src, mountDir, mp.relpath, mp.fromHost, mp.options...)
+		mountCmds, umountCmds, err := getMountCmd(mp.typ, mp.src, mountDir, mp.relpath, mp.bind, mp.options...)
 		if err != nil {
 			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mp.relpath,
