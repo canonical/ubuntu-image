@@ -347,40 +347,36 @@ func (stateMachine *StateMachine) installPackages() error {
 	// mount some necessary partitions in the chroot
 	mountPoints := []mountPoint{
 		{
-			relpath:  "/dev",
-			typ:      "devtmpfs",
-			src:      "devtmpfs-build",
-			fromHost: true,
+			relpath: "/dev",
+			typ:     "devtmpfs",
+			src:     "devtmpfs-build",
 		},
 		{
-			relpath:  "/dev/pts",
-			typ:      "devpts",
-			src:      "devpts-build",
-			options:  []string{"nodev", "nosuid"},
-			fromHost: true,
+			relpath: "/dev/pts",
+			typ:     "devpts",
+			src:     "devpts-build",
+			options: []string{"nodev", "nosuid"},
 		},
 		{
-			relpath:  "/proc",
-			typ:      "proc",
-			src:      "proc-build",
-			fromHost: true,
+			relpath: "/proc",
+			typ:     "proc",
+			src:     "proc-build",
 		},
 		{
-			relpath:  "/sys",
-			typ:      "sysfs",
-			src:      "sysfs-build",
-			fromHost: true,
+			relpath: "/sys",
+			typ:     "sysfs",
+			src:     "sysfs-build",
 		},
 		{
-			relpath:  "/run",
-			fromHost: false,
+			relpath: "/run",
+			bind:    true,
 		},
 	}
 
 	for _, mp := range mountPoints {
 		var mountCmds, umountCmds []*exec.Cmd
 		var err error
-		if !mp.fromHost {
+		if mp.bind {
 			mp.src, err = osMkdirTemp(stateMachine.tempDirs.scratch, strings.Trim(mp.relpath, "/"))
 			if err != nil {
 				return fmt.Errorf("Error mounting temporary directory for mountpoint \"%s\": \"%s\"",
@@ -390,7 +386,7 @@ func (stateMachine *StateMachine) installPackages() error {
 			}
 		}
 
-		mountCmds, umountCmds, err = getMountCmd(mp.typ, mp.src, stateMachine.tempDirs.chroot, mp.relpath, mp.fromHost, mp.options...)
+		mountCmds, umountCmds, err = getMountCmd(mp.typ, mp.src, stateMachine.tempDirs.chroot, mp.relpath, mp.bind, mp.options...)
 		if err != nil {
 			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mp.relpath,
@@ -886,35 +882,30 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	// set up the mount commands
 	mountPoints := []mountPoint{
 		{
-			relpath:  "/dev",
-			typ:      "devtmpfs",
-			src:      "devtmpfs-build",
-			fromHost: true,
+			relpath: "/dev",
+			typ:     "devtmpfs",
+			src:     "devtmpfs-build",
 		},
 		{
-			relpath:  "/dev/pts",
-			typ:      "devpts",
-			src:      "devpts-build",
-			options:  []string{"nodev", "nosuid"},
-			fromHost: true,
+			relpath: "/dev/pts",
+			typ:     "devpts",
+			src:     "devpts-build",
+			options: []string{"nodev", "nosuid"},
 		},
 		{
-			relpath:  "/proc",
-			typ:      "proc",
-			src:      "proc-build",
-			fromHost: true,
+			relpath: "/proc",
+			typ:     "proc",
+			src:     "proc-build",
 		},
 		{
-			relpath:  "/sys/kernel/security",
-			typ:      "securityfs",
-			src:      "none",
-			fromHost: true,
+			relpath: "/sys/kernel/security",
+			typ:     "securityfs",
+			src:     "none",
 		},
 		{
-			relpath:  "/sys/fs/cgroup",
-			typ:      "cgroup2",
-			src:      "none",
-			fromHost: true,
+			relpath: "/sys/fs/cgroup",
+			typ:     "cgroup2",
+			src:     "none",
 		},
 	}
 
@@ -937,7 +928,7 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	}()
 
 	for _, mountPoint := range mountPoints {
-		mountCmds, umountCmds, err := getMountCmd(mountPoint.typ, mountPoint.src, stateMachine.tempDirs.chroot, mountPoint.relpath, mountPoint.fromHost, mountPoint.options...)
+		mountCmds, umountCmds, err := getMountCmd(mountPoint.typ, mountPoint.src, stateMachine.tempDirs.chroot, mountPoint.relpath, mountPoint.bind, mountPoint.options...)
 		if err != nil {
 			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mountPoint.relpath,
