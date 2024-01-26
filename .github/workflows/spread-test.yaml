@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -16,7 +16,7 @@ jobs:
         uses: snapcore/action-build@v1
 
       - name: Upload snap artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: snap
           path: ${{ steps.build-snap.outputs.snap }}
@@ -36,12 +36,12 @@ jobs:
             rm -rf "${{ github.workspace }}"
             mkdir "${{ github.workspace }}"
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
       - name: Download snap artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: snap
           path: tests
@@ -53,7 +53,7 @@ jobs:
         shell: bash
 
       - name: Get previous cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: "${{ github.workspace }}/.test-results"
           key: "${{ github.job }}-results-${{ github.run_id }}-${{ steps.get-previous-attempt.outputs.previous_attempt }}"
@@ -142,7 +142,7 @@ jobs:
 
       - name: save spread test results to cache
         if: always()
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: "${{ github.workspace }}/.test-results"
           key: "${{ github.job }}-results-${{ github.run_id }}-${{ github.run_attempt }}"
