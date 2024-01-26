@@ -50,6 +50,7 @@ restore: |
 
 debug: |
     df -h
+    du -h -d 1 /tmp/
     mount  -l
     if [ -f loop.txt ]; then
         cat loop.txt
