@@ -15,6 +15,7 @@ type SnapOpts struct {
 	Snaps                     []string       `long:"snap" description:"Install extra snaps. These are passed through to \"snap prepare-image\". The snap argument can include additional information about the channel and/or risk with the following syntax: <snap>=<channel|risk>" value-name:"SNAP"`
 	CloudInit                 string         `long:"cloud-init" description:"cloud-config data to be copied to the image" value-name:"USER-DATA-FILE"`
 	Revisions                 map[string]int `long:"revision" description:"The revision of a specific snap to install in the image." value-name:"REVISION"`
+	ImportProxyAsserts        string         `long:"import-proxy-asserts" description:"Import proxy assertions from the given URL" value-name:"PROXY-URL"`
 }
 
 type SnapCommand struct {

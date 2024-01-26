@@ -1,8 +1,11 @@
 package statemachine
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -79,6 +82,55 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 	// set the gadget yaml location
 	snapStateMachine.YamlFilePath = filepath.Join(stateMachine.tempDirs.unpack, "gadget", gadgetYamlPathInTree)
+
+	// Append proxy assertions to model-etc
+	proxyURL := snapStateMachine.Opts.ImportProxyAsserts
+	if proxyURL != "" {
+		proxyEndpoint, err := url.JoinPath(proxyURL, "/v2/auth/store/assertions")
+		if err != nil {
+			return err
+		}
+
+		resp, err := http.Get(proxyEndpoint)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		buf := new(bytes.Buffer)
+
+		_, err = buf.ReadFrom(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		systemsDir := filepath.Join(stateMachine.tempDirs.unpack, "system-seed/systems")
+		entries, err := os.ReadDir(systemsDir)
+		if err != nil {
+			return err
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			modelEtc := filepath.Join(systemsDir, entry.Name(), "assertions/model-etc")
+
+			_, err := os.Stat(modelEtc)
+			if err != nil {
+				continue
+			}
+
+			fd, err := os.OpenFile(modelEtc, os.O_APPEND|os.O_WRONLY, 0666)
+			if err != nil {
+				continue
+			}
+			defer fd.Close()
+
+			fd.Write(buf.Bytes())
+		}
+	}
 
 	return nil
 }
