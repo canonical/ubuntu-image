@@ -19,6 +19,7 @@ var basicImageDef = imagedefinition.ImageDefinition{
 	Rootfs: &imagedefinition.Rootfs{
 		Archive:           "ubuntu",
 		SourcesListDeb822: helper.BoolPtr(false),
+		Mirror:            "http://archive.ubuntu.com/ubuntu/",
 	},
 	Customization: &imagedefinition.Customization{},
 }

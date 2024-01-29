@@ -585,32 +585,39 @@ func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir strin
 	return err
 }
 
-// generateDebootstrapCmd generates the debootstrap command used to create a chroot
+// generateMmdebstrapCmd generates the mmdebstrap command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, targetDir string) *exec.Cmd {
-	debootstrapCmd := execCommand("debootstrap",
+func generateMmdebstrapCmd(imageDefinition imagedefinition.ImageDefinition, targetDir string, debug bool) *exec.Cmd {
+	mmdebstrapCmd := execCommand("mmdebstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
+		"--mode=sudo",
+		"--include=apt",
+		"--format=dir",
 	)
+
+	if debug {
+		mmdebstrapCmd.Args = append(mmdebstrapCmd.Args, "--verbose")
+	}
 
 	if imageDefinition.Customization != nil && len(imageDefinition.Customization.ExtraPPAs) > 0 {
 		// ca-certificates is needed to use PPAs
-		debootstrapCmd.Args = append(debootstrapCmd.Args, "--include=ca-certificates")
+		mmdebstrapCmd.Args = append(mmdebstrapCmd.Args, "--include=ca-certificates")
 	}
 
 	if len(imageDefinition.Rootfs.Components) > 0 {
 		components := strings.Join(imageDefinition.Rootfs.Components, ",")
-		debootstrapCmd.Args = append(debootstrapCmd.Args, "--components="+components)
+		mmdebstrapCmd.Args = append(mmdebstrapCmd.Args, "--components="+components)
 	}
 
 	// add the SUITE TARGET and MIRROR arguments
-	debootstrapCmd.Args = append(debootstrapCmd.Args, []string{
+	mmdebstrapCmd.Args = append(mmdebstrapCmd.Args, []string{
 		imageDefinition.Series,
 		targetDir,
 		imageDefinition.Rootfs.Mirror,
 	}...)
 
-	return debootstrapCmd
+	return mmdebstrapCmd
 }
 
 // generateAptCmd generates the apt command used to create a chroot

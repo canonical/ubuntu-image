@@ -1369,3 +1369,59 @@ func TestStateMachine_setMk2fsConf(t *testing.T) {
 		})
 	}
 }
+
+func Test_generateMmdebstrapCmd(t *testing.T) {
+	type args struct {
+		imageDefinition imagedefinition.ImageDefinition
+		targetDir       string
+		debug           bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "simple case",
+			args: args{
+				imageDefinition: imagedefinition.ImageDefinition{
+					Architecture: "amd64",
+					Series:       "jammy",
+					Rootfs: &imagedefinition.Rootfs{
+						Mirror: "http://archive.ubuntu.com/ubuntu/",
+					},
+				},
+			},
+			want: "/usr/bin/mmdebstrap --arch amd64 --variant=minbase --mode=sudo --include=apt --format=dir jammy  http://archive.ubuntu.com/ubuntu/",
+		},
+		{
+			name: "complex case",
+			args: args{
+				imageDefinition: imagedefinition.ImageDefinition{
+					Architecture: "amd64",
+					Series:       "jammy",
+					Rootfs: &imagedefinition.Rootfs{
+						Mirror:     "http://archive.ubuntu.com/ubuntu/",
+						Components: []string{"main,restricted"},
+					},
+					Customization: &imagedefinition.Customization{
+						ExtraPPAs: []*imagedefinition.PPA{
+							{
+								Name: "test",
+							},
+						},
+					},
+				},
+				debug: true,
+			},
+			want: "/usr/bin/mmdebstrap --arch amd64 --variant=minbase --mode=sudo --include=apt --format=dir --verbose --include=ca-certificates --components=main,restricted jammy  http://archive.ubuntu.com/ubuntu/",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			got := generateMmdebstrapCmd(tt.args.imageDefinition, tt.args.targetDir, tt.args.debug)
+			asserter.AssertEqual(tt.want, got.String())
+		})
+	}
+}
