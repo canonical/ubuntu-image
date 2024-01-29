@@ -145,7 +145,7 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	return nil
 }
 
-// fixHostname set fresh hostname since debootstrap copies /etc/hostname from build environment
+// fixHostname set fresh hostname since mmdebstrap copies /etc/hostname from build environment
 func (stateMachine *StateMachine) fixHostname() error {
 	hostname := filepath.Join(stateMachine.tempDirs.chroot, "etc", "hostname")
 	hostnameFile, err := osOpenFile(hostname, os.O_TRUNC|os.O_WRONLY, 0644)
@@ -171,15 +171,16 @@ func (stateMachine *StateMachine) createChroot() error {
 		return fmt.Errorf("Failed to create chroot directory %s : %s", stateMachine.tempDirs.chroot, err.Error())
 	}
 
-	debootstrapCmd := generateDebootstrapCmd(classicStateMachine.ImageDef,
+	mmdebstrapCmd := generateMmdebstrapCmd(classicStateMachine.ImageDef,
 		stateMachine.tempDirs.chroot,
+		classicStateMachine.commonFlags.Debug,
 	)
 
-	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, classicStateMachine.commonFlags.Debug)
+	mmdebstrapOutput := helper.SetCommandOutput(mmdebstrapCmd, classicStateMachine.commonFlags.Debug)
 
-	if err := debootstrapCmd.Run(); err != nil {
-		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
-			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
+	if err := mmdebstrapCmd.Run(); err != nil {
+		return fmt.Errorf("Error running mmdebstrap command \"%s\". Error is \"%s\". Output is: \n%s",
+			mmdebstrapCmd.String(), err.Error(), mmdebstrapOutput.String())
 	}
 
 	err := stateMachine.fixHostname()
@@ -187,7 +188,7 @@ func (stateMachine *StateMachine) createChroot() error {
 		return err
 	}
 
-	// debootstrap also copies /etc/resolv.conf from build environment; truncate it
+	// mmdebstrap also copies /etc/resolv.conf from build environment; truncate it
 	// as to not leak the host files into the built image
 	resolvConf := filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf")
 	if err = osTruncate(resolvConf, 0); err != nil {

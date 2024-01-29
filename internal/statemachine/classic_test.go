@@ -4061,6 +4061,7 @@ func TestCreateChroot(t *testing.T) {
 		Rootfs: &imagedefinition.Rootfs{
 			Pocket:            "proposed",
 			SourcesListDeb822: helper.BoolPtr(true),
+			Mirror:            "http://archive.ubuntu.com/ubuntu/",
 		},
 	}
 
@@ -4174,6 +4175,7 @@ func TestFailedCreateChroot(t *testing.T) {
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			SourcesListDeb822: helper.BoolPtr(false),
+			Mirror:            "http://archive.ubuntu.com/ubuntu/",
 		},
 	}
 
@@ -4196,7 +4198,7 @@ func TestFailedCreateChroot(t *testing.T) {
 		execCommand = exec.Command
 	})
 	err = stateMachine.createChroot()
-	asserter.AssertErrContains(err, "Error running debootstrap command")
+	asserter.AssertErrContains(err, "Error running mmdebstrap command")
 	execCommand = exec.Command
 
 	// Check if failure of open hostname file is detected
@@ -4205,7 +4207,7 @@ func TestFailedCreateChroot(t *testing.T) {
 	err = stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
 
-	// Prepare a fallthrough debootstrap
+	// Prepare a fallthrough mmdebstrap
 	testCaseName = "TestFailedCreateChrootNoHostname"
 	execCommand = fakeExecCommand
 	t.Cleanup(func() {
@@ -4229,7 +4231,7 @@ func TestFailedCreateChroot(t *testing.T) {
 	err = stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
 
-	// Prepare a fallthrough debootstrap
+	// Prepare a fallthrough mmdebstrap
 	testCaseName = "TestFailedCreateChrootSkip"
 	osTruncate = mockTruncate
 	t.Cleanup(func() {
