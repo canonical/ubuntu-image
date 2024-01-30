@@ -3,7 +3,6 @@ package statemachine
 import (
 	"bytes"
 	"crypto/rand"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -624,7 +623,6 @@ func TestGenerateGerminateCmd(t *testing.T) {
 				},
 			}
 			germinateCmd := generateGerminateCmd(imageDef)
-			fmt.Print(germinateCmd)
 
 			if !strings.Contains(germinateCmd.String(), tc.mirror) {
 				t.Errorf("germinate command \"%s\" has incorrect mirror. Expected \"%s\"",
