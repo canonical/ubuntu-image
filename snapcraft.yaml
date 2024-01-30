@@ -40,6 +40,8 @@ parts:
       - fdisk
       - gdisk
       - fakeroot
+      - apt
+      - dpkg
       - mmdebstrap
       - gpg
       - germinate
