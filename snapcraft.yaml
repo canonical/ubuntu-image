@@ -29,11 +29,12 @@ parts:
     source: .
     source-type: git
     build-packages:
-      - golang-go
       - fdisk
       - gdisk
       - mtools
       - python3-docutils
+    build-snaps:
+      - go
     stage-packages:
       - binfmt-support
       - fdisk
