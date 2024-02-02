@@ -310,7 +310,7 @@ func (stateMachine *StateMachine) installPackages() error {
 		execCommand("udevadm", "settle"),
 	}, teardownCmds...)
 
-	policyRcDDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "usr", "sbin")
+	policyRcDDir := filepath.Join(classicStateMachine.tempDirs.chroot, "usr", "sbin")
 	policyRcDPath := filepath.Join(policyRcDDir, "policy-rc.d")
 
 	if osutil.FileExists(policyRcDPath) {
@@ -330,6 +330,9 @@ exit 101
 `
 
 	err = osMkdirAll(policyRcDDir, 0755)
+	if err != nil {
+		return fmt.Errorf("Error creating policy-rc.d dir: %s", err.Error())
+	}
 
 	err = osWriteFile(policyRcDPath, []byte(policyRcDDisableAll), 0755)
 	if err != nil {
