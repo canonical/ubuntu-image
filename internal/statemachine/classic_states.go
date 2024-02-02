@@ -247,39 +247,52 @@ func (stateMachine *StateMachine) installPackages() error {
 	// teardownCmds should be filled as a LIFO list
 	var teardownCmds []*exec.Cmd
 
+	mountPoints := []mountPoint{}
+
 	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
+		currentMountPoints, errList := listMounts(stateMachine.tempDirs.chroot)
+		if err != nil {
+			err = fmt.Errorf("%s\n%s", err, errList)
+		}
+		newMountPoints := getNewMountPoints(mountPoints, currentMountPoints)
+		if len(newMountPoints) > 0 {
+			for _, m := range newMountPoints {
+				teardownCmds = append(teardownCmds, getUnmountCmd(m.path)...)
+			}
+		}
+
 		err = execTeardown(teardownCmds, stateMachine.commonFlags.Debug, err)
 	}()
 
 	// mount some necessary partitions in the chroot
-	mountPoints := []mountPoint{
-		{
+	mountPoints = append(mountPoints,
+		mountPoint{
 			relpath: "/dev",
 			typ:     "devtmpfs",
 			src:     "devtmpfs-build",
 		},
-		{
+		mountPoint{
 			relpath: "/dev/pts",
 			typ:     "devpts",
 			src:     "devpts-build",
 			opts:    []string{"nodev", "nosuid"},
 		},
-		{
+		mountPoint{
 			relpath: "/proc",
 			typ:     "proc",
 			src:     "proc-build",
 		},
-		{
+		mountPoint{
 			relpath: "/sys",
 			typ:     "sysfs",
 			src:     "sysfs-build",
 		},
-		{
+		mountPoint{
 			relpath: "/run",
 			bind:    true,
 		},
-	}
+	)
 
 	for _, mp := range mountPoints {
 		var mountCmds, umountCmds []*exec.Cmd

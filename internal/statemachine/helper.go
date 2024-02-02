@@ -692,6 +692,13 @@ type mountPoint struct {
 	bind    bool
 }
 
+func getUnmountCmd(targetPath string) []*exec.Cmd {
+	return []*exec.Cmd{
+		execCommand("mount", "--make-rprivate", targetPath),
+		execCommand("umount", "--recursive", targetPath),
+	}
+}
+
 // getMountCmd returns mount/umount commands to mount the given mountpoint
 // If the mountpoint does not exist, it will be created.
 func getMountCmd(typ string, src string, targetDir string, mountpoint string, bind bool, options ...string) (mountCmds, umountCmds []*exec.Cmd, err error) {
@@ -723,11 +730,68 @@ func getMountCmd(typ string, src string, targetDir string, mountpoint string, bi
 		}
 	}
 
-	umountCmds = []*exec.Cmd{
-		execCommand("mount", "--make-rprivate", targetPath),
-		execCommand("umount", "--recursive", targetPath),
-	}
+	umountCmds = getUnmountCmd(targetPath)
+
 	return []*exec.Cmd{mountCmd}, umountCmds, nil
+}
+
+func getNewMountPoints(olds []mountPoint, currents []mountPoint) []mountPoint {
+	news := []mountPoint{}
+
+	for _, m := range currents {
+		found := false
+		for _, o := range olds {
+			if m.src == o.src {
+				found = true
+			}
+		}
+		if !found {
+			news = append(news, m)
+		}
+	}
+
+	return news
+}
+
+func listMounts(path string) ([]mountPoint, error) {
+	procMounts := "/proc/self/mounts"
+	f, err := osReadFile(procMounts)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseMounts(string(f), path)
+}
+
+// parseMounts list existing mounts and submounts in the current path
+// The returned splice is already inverted so unmount can be called on it
+// without further modification.
+func parseMounts(procMount string, path string) ([]mountPoint, error) {
+	mountPoints := []mountPoint{}
+	mountLines := strings.Split(procMount, "\n")
+
+	for _, line := range mountLines {
+		if line == "" {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		mountPath := fields[1]
+
+		if len(path) != 0 && !strings.HasPrefix(mountPath, path) {
+			continue
+		}
+
+		m := mountPoint{
+			src:  fields[0],
+			path: mountPath,
+			typ:  fields[2],
+			opts: strings.Split(fields[3], ","),
+		}
+		mountPoints = append([]mountPoint{m}, mountPoints...)
+	}
+
+	return mountPoints, nil
 }
 
 // execTeardown executes given commands and collects error to join them with an existing error.
