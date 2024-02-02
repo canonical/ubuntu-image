@@ -308,6 +308,19 @@ func RunCmd(cmd *exec.Cmd, debug bool) error {
 	return nil
 }
 
+// RunCmds runs a list of commands and returns the error
+// It stops at the first error
+func RunCmds(cmds []*exec.Cmd, debug bool) error {
+	for _, cmd := range cmds {
+		err := RunCmd(cmd, debug)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // SafeQuantitySubtraction subtracts quantities while checking for integer underflow
 func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 	if subtract > orig {
