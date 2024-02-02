@@ -218,12 +218,7 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 	return nil
 }
 
-// Install packages in the chroot environment. This is accomplished by
-// running commands to do the following:
-// 1. Mount /proc /sys /dev and /run in the chroot
-// 2. Run `apt update` in the chroot
-// 3. Run `apt install <package list>` in the chroot
-// 4. Unmount /proc /sys /dev and /run
+// Install packages in the chroot environment
 func (stateMachine *StateMachine) installPackages() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
@@ -246,8 +241,8 @@ func (stateMachine *StateMachine) installPackages() error {
 			classicStateMachine.ImageDef.Kernel)
 	}
 
-	// installPackagesCmds should be filled as a FIFO list
-	var installPackagesCmds []*exec.Cmd
+	// setupCmds should be filled as a FIFO list
+	var setupCmds []*exec.Cmd
 
 	// teardownCmds should be filled as a LIFO list
 	var teardownCmds []*exec.Cmd
@@ -307,23 +302,52 @@ func (stateMachine *StateMachine) installPackages() error {
 			)
 		}
 
-		installPackagesCmds = append(installPackagesCmds, mountCmds...)
+		setupCmds = append(setupCmds, mountCmds...)
 		teardownCmds = append(umountCmds, teardownCmds...)
 	}
+
 	teardownCmds = append([]*exec.Cmd{
 		execCommand("udevadm", "settle"),
 	}, teardownCmds...)
 
-	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
-	installPackagesCmds = append(installPackagesCmds, aptCmds...)
+	policyRcDDir := filepath.Join(classicStateMachine.tempDirs.rootfs, "usr", "sbin")
+	policyRcDPath := filepath.Join(policyRcDDir, "policy-rc.d")
 
-	for _, cmd := range installPackagesCmds {
-		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
-		err := cmd.Run()
-		if err != nil {
-			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-				cmd.String(), err.Error(), cmdOutput.String())
+	if osutil.FileExists(policyRcDPath) {
+		divertCmd, undivertCmd := divertPolicyRcD(stateMachine.tempDirs.chroot)
+		setupCmds = append(setupCmds, divertCmd)
+		teardownCmds = append([]*exec.Cmd{undivertCmd}, teardownCmds...)
+	}
+
+	err = helper.RunCmds(setupCmds, classicStateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
+	}
+
+	const policyRcDDisableAll = `#!/bin/sh
+echo "All runlevel operations denied by policy" >&2
+exit 101
+`
+
+	err = osMkdirAll(policyRcDDir, 0755)
+
+	err = osWriteFile(policyRcDPath, []byte(policyRcDDisableAll), 0755)
+	if err != nil {
+		return fmt.Errorf("Error writing to policy-rc.d: %s", err.Error())
+	}
+
+	defer func() {
+		tmpErr := osRemove(policyRcDPath)
+		if tmpErr != nil {
+			err = fmt.Errorf("%s\n%s", err, tmpErr)
 		}
+	}()
+
+	installPackagesCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+
+	err = helper.RunCmds(installPackagesCmds, classicStateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
 
 	return nil

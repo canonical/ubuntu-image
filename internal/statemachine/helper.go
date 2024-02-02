@@ -659,6 +659,30 @@ func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
 	return []*exec.Cmd{updateCmd, installCmd}
 }
 
+// divertPolicyRcD dpkg-diverts policy-rc.d to keep it if it already exists
+func divertPolicyRcD(targetDir string) (*exec.Cmd, *exec.Cmd) {
+	return dpkgDivert(targetDir, "/usr/sbin/policy-rc.d")
+}
+
+// dpkgDivert dpkg-diverts the given file in the given baseDir
+func dpkgDivert(baseDir string, target string) (*exec.Cmd, *exec.Cmd) {
+	dpkgDivert := "dpkg-divert"
+	targetDiverted := target + ".dpkg-divert"
+
+	commonArgs := []string{
+		"--local",
+		"--divert",
+		targetDiverted,
+		"--rename",
+		target,
+	}
+
+	divert := append([]string{baseDir, dpkgDivert}, commonArgs...)
+	undivert := append([]string{baseDir, dpkgDivert, "--remove"}, commonArgs...)
+
+	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
+}
+
 type mountPoint struct {
 	src     string
 	relpath string
@@ -929,20 +953,7 @@ func (stateMachine *StateMachine) associateLoopDevice(path string) (string, *exe
 // divertOSProber divert GRUB's os-prober as we don't want to scan for other OSes on
 // the build system
 func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
-	dpkgDivert := "dpkg-divert"
-
-	commonArgs := []string{
-		"--local",
-		"--divert",
-		"/etc/grub.d/30_os-prober.dpkg-divert",
-		"--rename",
-		"/etc/grub.d/30_os-prober",
-	}
-
-	divert := append([]string{mountDir, dpkgDivert}, commonArgs...)
-	undivert := append([]string{mountDir, dpkgDivert, "--remove"}, commonArgs...)
-
-	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
+	return dpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
 }
 
 // updateGrub mounts the resulting image and runs update-grub
