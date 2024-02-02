@@ -4038,6 +4038,12 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
+	// create an /usr/sbin/policy-rc.d in the chroot
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "usr", "sbin"), 0755)
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d"))
+	asserter.AssertErrNil(err, true)
+
 	mockCmder := NewMockExecCommand()
 
 	execCommand = mockCmder.Command
@@ -4063,8 +4069,10 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 		regexp.MustCompile("^mount -t proc proc-build /tmp.*/chroot/proc$"),
 		regexp.MustCompile("^mount -t sysfs sysfs-build /tmp.*/chroot/sys$"),
 		regexp.MustCompile("^mount --bind .*/scratch/run.* .*/chroot/run$"),
+		regexp.MustCompile("^chroot /tmp.*/chroot dpkg-divert"),
 		regexp.MustCompile("^chroot /tmp.*/chroot apt update$"),
 		regexp.MustCompile("^chroot /tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold$"),
+		regexp.MustCompile("^chroot /tmp.*/chroot dpkg-divert --remove"),
 		regexp.MustCompile("^udevadm settle$"),
 		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/run$"),
 		regexp.MustCompile("^umount --recursive /tmp.*/chroot/run$"),
@@ -4217,6 +4225,23 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	err = stateMachine.installPackages()
 	asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
 	helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
+		osMkdirAll = os.MkdirAll
+	})
+	err = stateMachine.installPackages()
+	asserter.AssertErrContains(err, "Error creating policy-rc.d dir")
+	osMkdirAll = os.MkdirAll
+
+	osWriteFile = mockWriteFile
+	t.Cleanup(func() {
+		osWriteFile = os.WriteFile
+	})
+	err = stateMachine.installPackages()
+	asserter.AssertErrContains(err, "Error writing to policy-rc.d")
+	osWriteFile = os.WriteFile
+
 }
 
 // TestCustomizeFstab tests functionality of the customizeFstab function
