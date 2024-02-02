@@ -662,8 +662,9 @@ func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
 type mountPoint struct {
 	src     string
 	relpath string
+	path    string
 	typ     string
-	options []string
+	opts    []string
 	bind    bool
 }
 
@@ -998,7 +999,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 			relpath: "/dev/pts",
 			typ:     "devpts",
 			src:     "devpts-build",
-			options: []string{"nodev", "nosuid"},
+			opts:    []string{"nodev", "nosuid"},
 		},
 		{
 			relpath: "/proc",
@@ -1013,7 +1014,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	}
 
 	for _, mp := range mountPoints {
-		mountCmds, umountCmds, err := getMountCmd(mp.typ, mp.src, mountDir, mp.relpath, mp.bind, mp.options...)
+		mountCmds, umountCmds, err := getMountCmd(mp.typ, mp.src, mountDir, mp.relpath, mp.bind, mp.opts...)
 		if err != nil {
 			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mp.relpath,
