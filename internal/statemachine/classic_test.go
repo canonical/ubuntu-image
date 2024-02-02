@@ -3100,6 +3100,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key.pub"),
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key"),
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
+		filepath.Join(mountDir, "usr", "sbin", "policy-rc.d"),
 	}
 	for _, file := range cleaned {
 		_, err := os.Stat(file)
