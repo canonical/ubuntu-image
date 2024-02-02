@@ -1039,14 +1039,9 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	)
 
 	// now run all the commands
-	for _, cmd := range updateGrubCmds {
-		cmdOutput := helper.SetCommandOutput(cmd, stateMachine.commonFlags.Debug)
-		err = cmd.Run()
-		if err != nil {
-			err = fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-				cmd.String(), err.Error(), cmdOutput.String())
-			return err
-		}
+	err = helper.RunCmds(updateGrubCmds, stateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
 
 	return nil

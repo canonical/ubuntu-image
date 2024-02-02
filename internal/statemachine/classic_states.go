@@ -842,14 +842,12 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 		//nolint:gosec,G204
 		exec.Command("/usr/lib/snapd/snap-preseed", stateMachine.tempDirs.chroot),
 	)
-	for _, cmd := range preseedCmds {
-		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
-		err := cmd.Run()
-		if err != nil {
-			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-				cmd.String(), err.Error(), cmdOutput.String())
-		}
+
+	err = helper.RunCmds(preseedCmds, classicStateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
+
 	return nil
 }
 
