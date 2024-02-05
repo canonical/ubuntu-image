@@ -794,17 +794,17 @@ func parseMounts(procMount string, path string) ([]mountPoint, error) {
 	return mountPoints, nil
 }
 
-// execTeardown executes given commands and collects error to join them with an existing error.
+// execTeardownCmds executes given commands and collects error to join them with an existing error.
 // Failure to execute one command will not stop from executing following ones.
-func execTeardown(teardownCmds []*exec.Cmd, debug bool, prevErr error) (err error) {
+func execTeardownCmds(teardownCmds []*exec.Cmd, debug bool, prevErr error) (err error) {
 	err = prevErr
 	errs := make([]string, 0)
-	for _, unmountCmd := range teardownCmds {
-		cmdOutput := helper.SetCommandOutput(unmountCmd, debug)
-		unmountErr := unmountCmd.Run()
-		if unmountErr != nil {
+	for _, teardownCmd := range teardownCmds {
+		cmdOutput := helper.SetCommandOutput(teardownCmd, debug)
+		teardownErr := teardownCmd.Run()
+		if teardownErr != nil {
 			errs = append(errs, fmt.Sprintf("teardown command  \"%s\" failed. Output: \n%s",
-				unmountCmd.String(), cmdOutput.String()))
+				teardownCmd.String(), cmdOutput.String()))
 		}
 	}
 
@@ -1039,7 +1039,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	var teardownCmds []*exec.Cmd
 
 	defer func() {
-		err = execTeardown(teardownCmds, stateMachine.commonFlags.Debug, err)
+		err = execTeardownCmds(teardownCmds, stateMachine.commonFlags.Debug, err)
 	}()
 
 	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
