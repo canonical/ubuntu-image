@@ -385,29 +385,33 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 	// set up the mountpoints
 	mountPoints := []mountPoint{
 		{
-			relpath: "/dev",
-			typ:     "devtmpfs",
-			src:     "devtmpfs-build",
+			src:      "devtmpfs-build",
+			basePath: mountDir,
+			relpath:  "/dev",
+			typ:      "devtmpfs",
 		},
 		{
-			relpath: "/dev/pts",
-			typ:     "devpts",
-			src:     "devpts-build",
-			opts:    []string{"nodev", "nosuid"},
+			src:      "devpts-build",
+			basePath: mountDir,
+			relpath:  "/dev/pts",
+			typ:      "devpts",
+			opts:     []string{"nodev", "nosuid"},
 		},
 		{
-			relpath: "/proc",
-			typ:     "proc",
-			src:     "proc-build",
+			src:      "proc-build",
+			basePath: mountDir,
+			relpath:  "/proc",
+			typ:      "proc",
 		},
 		{
-			relpath: "/sys",
-			typ:     "sysfs",
-			src:     "sysfs-build",
+			src:      "sysfs-build",
+			basePath: mountDir,
+			relpath:  "/sys",
+			typ:      "sysfs",
 		},
 	}
 	for _, mp := range mountPoints {
-		mountCmds, umountCmds, err := getMountCmd(mp.typ, mp.src, mountDir, mp.relpath, mp.bind, mp.opts...)
+		mountCmds, umountCmds, err := mp.getMountCmd()
 		if err != nil {
 			t.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mp.relpath,

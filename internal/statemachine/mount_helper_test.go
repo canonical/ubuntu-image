@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
@@ -18,19 +20,19 @@ func Test_getMountCmd(t *testing.T) {
 	}
 	tests := []struct {
 		name           string
-		args           args
+		mp             mountPoint
 		wantMountCmds  []string
 		wantUmountCmds []string
 		expectedError  string
 	}{
 		{
 			name: "happy path",
-			args: args{
-				typ:        "devtmps",
-				src:        "src",
-				targetDir:  "targetDir",
-				mountpoint: "mountpoint",
-				options:    []string{"nodev", "nosuid"},
+			mp: mountPoint{
+				src:      "src",
+				basePath: "targetDir",
+				relpath:  "mountpoint",
+				typ:      "devtmps",
+				opts:     []string{"nodev", "nosuid"},
 			},
 			wantMountCmds: []string{"/usr/bin/mount -t devtmps src -o nodev,nosuid targetDir/mountpoint"},
 			wantUmountCmds: []string{
@@ -40,11 +42,11 @@ func Test_getMountCmd(t *testing.T) {
 		},
 		{
 			name: "no type",
-			args: args{
-				typ:        "",
-				src:        "src",
-				targetDir:  "targetDir",
-				mountpoint: "mountpoint",
+			mp: mountPoint{
+				src:      "src",
+				basePath: "targetDir",
+				relpath:  "mountpoint",
+				typ:      "",
 			},
 			wantMountCmds: []string{"/usr/bin/mount src targetDir/mountpoint"},
 			wantUmountCmds: []string{
@@ -54,12 +56,12 @@ func Test_getMountCmd(t *testing.T) {
 		},
 		{
 			name: "bind mount",
-			args: args{
-				typ:        "",
-				src:        "src",
-				targetDir:  "targetDir",
-				mountpoint: "mountpoint",
-				bind:       true,
+			mp: mountPoint{
+				src:      "src",
+				basePath: "targetDir",
+				relpath:  "mountpoint",
+				typ:      "",
+				bind:     true,
 			},
 			wantMountCmds: []string{"/usr/bin/mount --bind src targetDir/mountpoint"},
 			wantUmountCmds: []string{
@@ -69,12 +71,12 @@ func Test_getMountCmd(t *testing.T) {
 		},
 		{
 			name: "fail with bind and type",
-			args: args{
-				typ:        "devtmps",
-				src:        "src",
-				targetDir:  "targetDir",
-				mountpoint: "mountpoint",
-				bind:       true,
+			mp: mountPoint{
+				src:      "src",
+				basePath: "targetDir",
+				relpath:  "mountpoint",
+				typ:      "devtmps",
+				bind:     true,
 			},
 			wantMountCmds:  []string{},
 			wantUmountCmds: []string{},
@@ -84,7 +86,7 @@ func Test_getMountCmd(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			gotMountCmds, gotUmountCmds, err := getMountCmd(tc.args.typ, tc.args.src, tc.args.targetDir, tc.args.mountpoint, tc.args.bind, tc.args.options...)
+			gotMountCmds, gotUmountCmds, err := tc.mp.getMountCmd()
 
 			if len(tc.expectedError) == 0 {
 				asserter.AssertErrNil(err, true)
@@ -117,12 +119,189 @@ func Test_getMountCmd_fail(t *testing.T) {
 	t.Cleanup(func() {
 		osMkdirAll = os.MkdirAll
 	})
-	gotMountCmds, gotUmountCmds, err := getMountCmd("devtmps", "src", "/tmp", "1234567", false)
+
+	mp := mountPoint{
+		typ:      "devtmps",
+		basePath: "/tmp",
+		relpath:  "1234567",
+		src:      "src",
+	}
+
+	gotMountCmds, gotUmountCmds, err := mp.getMountCmd()
 	asserter.AssertErrContains(err, "Error creating mountpoint")
 	if gotMountCmds != nil {
 		asserter.Errorf("gotMountCmds should be nil but is %s", gotMountCmds)
 	}
 	if gotUmountCmds != nil {
 		asserter.Errorf("gotUmountCmds should be nil but is %s", gotUmountCmds)
+	}
+}
+
+var (
+	mp1 = mountPoint{
+		src:      "srcmp1",
+		path:     "src1basePath/src1relpath",
+		basePath: "src1basePath",
+		relpath:  "src1relpath",
+		typ:      "devtmpfs",
+	}
+	mp2 = mountPoint{
+		src:      "srcmp2",
+		path:     "src2basePath/src2relpath",
+		basePath: "src2basePath",
+		relpath:  "src2relpath",
+		typ:      "devpts",
+	}
+	mp3 = mountPoint{
+		src:      "srcmp3",
+		path:     "src3basePath/src3relpath",
+		basePath: "src3basePath",
+		relpath:  "src3relpath",
+		typ:      "proc",
+	}
+	mp4 = mountPoint{
+		src:      "srcmp4",
+		path:     "src4basePath/src4relpath",
+		basePath: "src4basePath",
+		relpath:  "src4relpath",
+		typ:      "cgroup2",
+	}
+	mp11 = mountPoint{
+		src:      "srcmp12",
+		path:     "src1basePath/src1relpath",
+		basePath: "src1basePath",
+		relpath:  "src1relpath",
+		typ:      "devtmpfs",
+	}
+	mp21 = mountPoint{
+		src:      "srcmp2",
+		path:     "",
+		basePath: "src21basePath",
+		relpath:  "src2relpath",
+		typ:      "devpts",
+	}
+	mp31 = mountPoint{
+		src:      "srcmp3",
+		path:     "",
+		basePath: "src3basePath",
+		relpath:  "src31relpath",
+		typ:      "proc",
+	}
+	mp41 = mountPoint{
+		src:      "srcmp4",
+		path:     "src4basePath/src4relpath",
+		basePath: "src4basePath",
+		relpath:  "src4relpath",
+		typ:      "anotherType",
+	}
+)
+
+func Test_diffMountPoints(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	type args struct {
+		olds     []mountPoint
+		currents []mountPoint
+	}
+
+	cmpOpts := []cmp.Option{
+		cmp.AllowUnexported(
+			mountPoint{},
+		),
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want []mountPoint
+	}{
+		{
+			name: "same mounpoints, ignoring list order",
+			args: args{
+				olds: []mountPoint{
+					mp1,
+					mp2,
+					mp3,
+					mp4,
+				},
+				currents: []mountPoint{
+					mp4,
+					mp1,
+					mp3,
+					mp2,
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "add some",
+			args: args{
+				olds: []mountPoint{
+					mp1,
+					mp2,
+				},
+				currents: []mountPoint{
+					mp3,
+					mp4,
+				},
+			},
+			want: []mountPoint{
+				mp3,
+				mp4,
+			},
+		},
+		{
+			name: "no old ones",
+			args: args{
+				olds: nil,
+				currents: []mountPoint{
+					mp3,
+					mp4,
+				},
+			},
+			want: []mountPoint{
+				mp3,
+				mp4,
+			},
+		},
+		{
+			name: "no current ones",
+			args: args{
+				olds: []mountPoint{
+					mp1,
+					mp2,
+				},
+				currents: nil,
+			},
+			want: nil,
+		},
+		{
+			name: "same src but different",
+			args: args{
+				olds: []mountPoint{
+					mp1,
+					mp2,
+					mp3,
+					mp4,
+				},
+				currents: []mountPoint{
+					mp11,
+					mp21,
+					mp31,
+					mp41,
+				},
+			},
+			want: []mountPoint{
+				mp11,
+				mp21,
+				mp31,
+				mp41,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := diffMountPoints(tt.args.olds, tt.args.currents)
+			asserter.AssertEqual(tt.want, got, cmpOpts...)
+		})
 	}
 }

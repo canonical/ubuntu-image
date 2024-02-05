@@ -9,35 +9,36 @@ import (
 )
 
 type mountPoint struct {
-	src     string
-	relpath string
-	path    string
-	typ     string
-	opts    []string
-	bind    bool
+	src      string
+	path     string
+	basePath string // basePath + relpath = path
+	relpath  string
+	typ      string
+	opts     []string
+	bind     bool
 }
 
 // getMountCmd returns mount/umount commands to mount the given mountpoint
 // If the mountpoint does not exist, it will be created.
-func getMountCmd(typ string, src string, targetDir string, mountpoint string, bind bool, options ...string) (mountCmds, umountCmds []*exec.Cmd, err error) {
-	if bind && len(typ) > 0 {
+func (m *mountPoint) getMountCmd() (mountCmds, umountCmds []*exec.Cmd, err error) {
+	if m.bind && len(m.typ) > 0 {
 		return nil, nil, fmt.Errorf("invalid mount arguments. Cannot use --bind and -t at the same time.")
 	}
 
-	targetPath := filepath.Join(targetDir, mountpoint)
+	targetPath := filepath.Join(m.basePath, m.relpath)
 	mountCmd := execCommand("mount")
 
-	if len(typ) > 0 {
-		mountCmd.Args = append(mountCmd.Args, "-t", typ)
+	if len(m.typ) > 0 {
+		mountCmd.Args = append(mountCmd.Args, "-t", m.typ)
 	}
 
-	if bind {
+	if m.bind {
 		mountCmd.Args = append(mountCmd.Args, "--bind")
 	}
 
-	mountCmd.Args = append(mountCmd.Args, src)
-	if len(options) > 0 {
-		mountCmd.Args = append(mountCmd.Args, "-o", strings.Join(options, ","))
+	mountCmd.Args = append(mountCmd.Args, m.src)
+	if len(m.opts) > 0 {
+		mountCmd.Args = append(mountCmd.Args, "-o", strings.Join(m.opts, ","))
 	}
 	mountCmd.Args = append(mountCmd.Args, targetPath)
 
@@ -94,7 +95,7 @@ func diffMountPoints(olds []mountPoint, currents []mountPoint) (added []mountPoi
 	for _, m := range currents {
 		found := false
 		for _, o := range olds {
-			if m.src == o.src {
+			if equalMountPoints(m, o) {
 				found = true
 			}
 		}
@@ -104,6 +105,20 @@ func diffMountPoints(olds []mountPoint, currents []mountPoint) (added []mountPoi
 	}
 
 	return added
+}
+
+// equalMountPoints compare 2 mountpoints. Since mountPoints go object can be either
+// created by hand or parsed from /proc/self/mount, we need to compare strictly on the fields
+// useful to identify a unique mountpoint from the point of view of the OS.
+func equalMountPoints(a, b mountPoint) bool {
+	if len(a.path) == 0 {
+		a.path = filepath.Join(a.basePath, a.relpath)
+	}
+	if len(b.path) == 0 {
+		b.path = filepath.Join(b.basePath, b.relpath)
+	}
+
+	return a.src == b.src && a.path == b.path && a.typ == b.typ
 }
 
 // listMounts returns mountpoints matching the given path from /proc/self/mounts
