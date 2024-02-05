@@ -251,18 +251,7 @@ func (stateMachine *StateMachine) installPackages() error {
 
 	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
-		currentMountPoints, errListMounts := listMounts(stateMachine.tempDirs.chroot)
-		if err != nil {
-			err = fmt.Errorf("%s\n%s", err, errListMounts)
-		}
-		newMountPoints := diffMountPoints(mountPoints, currentMountPoints)
-		if len(newMountPoints) > 0 {
-			for _, m := range newMountPoints {
-				teardownCmds = append(teardownCmds, getUnmountCmd(m.path)...)
-			}
-		}
-
-		err = execTeardown(teardownCmds, stateMachine.commonFlags.Debug, err)
+		err = teardownMount(stateMachine.tempDirs.chroot, mountPoints, teardownCmds, err, stateMachine.commonFlags.Debug)
 	}()
 
 	// mount some necessary partitions in the chroot
@@ -863,7 +852,7 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 
 	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
-		err = execTeardown(teardownCmds, stateMachine.commonFlags.Debug, err)
+		err = teardownMount(stateMachine.tempDirs.chroot, mountPoints, teardownCmds, err, stateMachine.commonFlags.Debug)
 	}()
 
 	for _, mountPoint := range mountPoints {

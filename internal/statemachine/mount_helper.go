@@ -61,6 +61,34 @@ func getUnmountCmd(targetPath string) []*exec.Cmd {
 	}
 }
 
+// teardownMount executed teardown commands after making sure every mountpoints matching the given path
+// are listed and will be properly unmounted
+func teardownMount(path string, mountPoints []mountPoint, teardownCmds []*exec.Cmd, err error, debug bool) error {
+	addedUmountCmds, errAddedUmount := umountAddedMountPointsCmds(path, mountPoints)
+	if errAddedUmount != nil {
+		err = fmt.Errorf("%s\n%s", err, errAddedUmount)
+	}
+	teardownCmds = append(teardownCmds, addedUmountCmds...)
+
+	return execTeardownCmds(teardownCmds, debug, err)
+}
+
+// umountAddedMountPointsCmds generates umount commands for newly added mountpoints
+func umountAddedMountPointsCmds(path string, mountPoints []mountPoint) (umountCmds []*exec.Cmd, err error) {
+	currentMountPoints, err := listMounts(path)
+	if err != nil {
+		return nil, err
+	}
+	newMountPoints := diffMountPoints(mountPoints, currentMountPoints)
+	if len(newMountPoints) > 0 {
+		for _, m := range newMountPoints {
+			umountCmds = append(umountCmds, getUnmountCmd(m.path)...)
+		}
+	}
+
+	return umountCmds, nil
+}
+
 // diffMountPoints compares 2 lists of mountpoint and returns the added ones
 func diffMountPoints(olds []mountPoint, currents []mountPoint) (added []mountPoint) {
 	for _, m := range currents {
