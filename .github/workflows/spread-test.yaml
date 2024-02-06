@@ -26,7 +26,7 @@ jobs:
           sudo snap install --dangerous --classic ${{ steps.build-snap.outputs.snap }}
 
   spread:
-    runs-on: self-hosted
+    runs-on: [self-hosted, ubuntu-image]
     needs: [build]
     strategy:
       fail-fast: false
