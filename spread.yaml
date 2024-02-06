@@ -112,7 +112,11 @@ prepare: |
   fi
 
   apt update
-  apt install -y snapd libc6-dev gcc-multilib git binfmt-support qemu-user-static
+  apt install -y snapd libc6-dev git
+  if [[ ! "$SPREAD_BACKEND" == *-arm ]]; then
+      apt install -y gcc-multilib binfmt-support qemu-user-static
+  fi
+  
   snap install core22 --channel=latest/edge
   snap install yq
   unset SHELL
