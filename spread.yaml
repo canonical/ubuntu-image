@@ -21,20 +21,35 @@ backends:
       #       workers: 1
       #       storage: 45G
       - ubuntu-18.04-64:
-            storage: 45G
-            workers: 1
+          storage: 45G
+          workers: 1
       - ubuntu-20.04-64:
-            storage: 45G
-            workers: 1
+          storage: 45G
+          workers: 1
       - ubuntu-22.04-64:
-            storage: 45G
-            workers: 1
+          storage: 45G
+          workers: 1
       - ubuntu-23.04-64:
-            storage: 45G
-            workers: 1
+          storage: 45G
+          workers: 1
       - ubuntu-23.10-64:
-            storage: 45G
-            workers: 1
+          storage: 45G
+          workers: 1
+  google-arm:
+    type: google
+    key: '$(HOST: echo "$SPREAD_GOOGLE_KEY")'
+    location: snapd-spread/us-central1-a
+    plan: t2a-standard-1
+    halt-timeout: 2h
+    systems:
+      - ubuntu-20.04-arm-64:
+          image: ubuntu-os-cloud/ubuntu-2004-lts-arm64
+          workers: 1
+          storage: 45G
+      - ubuntu-22.04-arm-64:
+          image: ubuntu-os-cloud/ubuntu-2204-lts-arm64
+          workers: 1
+          storage: 45G
   qemu:
     memory: 4G
     systems:
@@ -107,7 +122,20 @@ prepare: |
   snap install --classic --dangerous ./tests/ubuntu-image_*.snap
 
 suites:
-  tests/:
-    summary: Integration tests for ubuntu-image
+  tests/commons/:
+    summary: Common integration tests for ubuntu-image
+  tests/amd64/:
+    summary: Integration tests for ubuntu-image on amd64
+    backends: [google]
+    environment:
+      IMG/ubuntu_server_pc_amd64: ubuntu-server-pc-amd64
+      # IMG/ubuntu_server_pc_arm64: ubuntu-server-pc-arm64
+      # IMG/ubuntu_pi_arm64: ubuntu-pi-arm64
+  tests/arm64/:
+    summary: Integration tests for ubuntu-image on arm64
+    backends: [google-arm]
+    environment:
+      IMG/ubuntu_server_pi_arm64: ubuntu-server-pi-arm64
+      IMG/edubuntu_pi_arm64: edubuntu-pi-arm64
 
 kill-timeout: 30m
