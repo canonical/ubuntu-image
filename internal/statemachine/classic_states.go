@@ -339,6 +339,28 @@ func (stateMachine *StateMachine) installPackages() error {
 		err = unsetDenyingPolicyRcD(err)
 	}()
 
+	restoreStartStopDaemon, err := backupReplaceStartStopDaemon(classicStateMachine.tempDirs.chroot)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		err = restoreStartStopDaemon(err)
+	}()
+
+	initctlPath := filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "initctl")
+
+	if osutil.FileExists(initctlPath) {
+		restoreInitctl, err := backupReplaceInitctl(classicStateMachine.tempDirs.chroot)
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			err = restoreInitctl(err)
+		}()
+	}
+
 	installPackagesCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
 
 	err = helper.RunCmds(installPackagesCmds, classicStateMachine.commonFlags.Debug)
