@@ -28,7 +28,14 @@ jobs:
   spread:
     runs-on: self-hosted
     needs: [build]
-
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: ubuntu-arm
+            systems: 'ubuntu-20.04-arm-64 ubuntu-22.04-arm-64'
+          - group: ubuntu
+            systems: 'ubuntu-18.04-64 ubuntu-20.04-64 ubuntu-22.04-64 ubuntu-23.04-64 ubuntu-23.10-64'
     steps:
       - name: Cleanup job workspace
         id: cleanup-job-workspace
@@ -95,10 +102,19 @@ jobs:
             BACKEND=google
             SPREAD=spread
 
+            if [[ "${{ matrix.systems }}" =~ -arm- ]]; then
+              BACKEND=google-arm
+              SPREAD=spread-arm
+            fi
+            
+            RUN_TESTS=""
             # Save previous failed test results in FAILED_TESTS env var
-            RUN_TESTS="$BACKEND:tests/..."
             if [ -n "$FAILED_TESTS" ]; then
                 RUN_TESTS="$FAILED_TESTS"
+            else
+                for SYSTEM in ${{ matrix.systems }}; do
+                    RUN_TESTS="$RUN_TESTS $BACKEND:$SYSTEM:tests/..."
+                done
             fi
             # Run spread tests
             # "pipefail" ensures that a non-zero status from the spread is
@@ -123,9 +139,15 @@ jobs:
                 ./tests/lib/external/snapd-testing-tools/utils/log-parser spread.log --output spread-results.json
 
                 BACKEND=google
-
+                if [[ "${{ matrix.systems }}" =~ -arm- ]]; then
+                  BACKEND=google-arm
+                fi
+            
                 echo "Determining which tests were executed"
-                RUN_TESTS="$BACKEND:tests/..."
+                RUN_TESTS=""
+                for SYSTEM in ${{ matrix.systems }}; do
+                    RUN_TESTS="$RUN_TESTS $BACKEND:$SYSTEM:tests/..."
+                done
                 if [ -n "$FAILED_TESTS" ]; then
                     RUN_TESTS="$FAILED_TESTS"
                 fi
