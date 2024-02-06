@@ -480,22 +480,23 @@ func BackupAndCopyResolvConf(chroot string) error {
 // RestoreResolvConf restores the resolv.conf in the chroot from the
 // version that was backed up by BackupAndCopyResolvConf
 func RestoreResolvConf(chroot string) error {
-	if osutil.FileExists(filepath.Join(chroot, "etc", "resolv.conf.tmp")) {
-		if osutil.IsSymlink(filepath.Join(chroot, "etc", "resolv.conf")) {
-			// As per what live-build does, handle the case where some package
-			// in the install_packages phase converts resolv.conf into a
-			// symlink. In such case we don't restore our backup but instead
-			// remove it, leaving the symlink around.
-			backup := filepath.Join(chroot, "etc", "resolv.conf.tmp")
-			if err := osRemove(backup); err != nil {
-				return fmt.Errorf("Error removing file \"%s\": %s", backup, err.Error())
-			}
-		} else {
-			src := filepath.Join(chroot, "etc", "resolv.conf.tmp")
-			dest := filepath.Join(chroot, "etc", "resolv.conf")
-			if err := osRename(src, dest); err != nil {
-				return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
-			}
+	if !osutil.FileExists(filepath.Join(chroot, "etc", "resolv.conf.tmp")) {
+		return nil
+	}
+	if osutil.IsSymlink(filepath.Join(chroot, "etc", "resolv.conf")) {
+		// As per what live-build does, handle the case where some package
+		// in the install_packages phase converts resolv.conf into a
+		// symlink. In such case we don't restore our backup but instead
+		// remove it, leaving the symlink around.
+		backup := filepath.Join(chroot, "etc", "resolv.conf.tmp")
+		if err := osRemove(backup); err != nil {
+			return fmt.Errorf("Error removing file \"%s\": %s", backup, err.Error())
+		}
+	} else {
+		src := filepath.Join(chroot, "etc", "resolv.conf.tmp")
+		dest := filepath.Join(chroot, "etc", "resolv.conf")
+		if err := osRename(src, dest); err != nil {
+			return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
 		}
 	}
 	return nil
