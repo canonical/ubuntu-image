@@ -317,8 +317,7 @@ func (stateMachine *StateMachine) installPackages() error {
 		execCommand("udevadm", "settle"),
 	}, teardownCmds...)
 
-	policyRcDDir := filepath.Join(classicStateMachine.tempDirs.chroot, "usr", "sbin")
-	policyRcDPath := filepath.Join(policyRcDDir, "policy-rc.d")
+	policyRcDPath := filepath.Join(classicStateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d")
 
 	if osutil.FileExists(policyRcDPath) {
 		divertCmd, undivertCmd := divertPolicyRcD(stateMachine.tempDirs.chroot)
@@ -331,26 +330,13 @@ func (stateMachine *StateMachine) installPackages() error {
 		return err
 	}
 
-	const policyRcDDisableAll = `#!/bin/sh
-echo "All runlevel operations denied by policy" >&2
-exit 101
-`
-
-	err = osMkdirAll(policyRcDDir, 0755)
+	unsetDenyingPolicyRcD, err := setDenyingPolicyRcD(policyRcDPath)
 	if err != nil {
-		return fmt.Errorf("Error creating policy-rc.d dir: %s", err.Error())
-	}
-
-	err = osWriteFile(policyRcDPath, []byte(policyRcDDisableAll), 0755)
-	if err != nil {
-		return fmt.Errorf("Error writing to policy-rc.d: %s", err.Error())
+		return err
 	}
 
 	defer func() {
-		tmpErr := osRemove(policyRcDPath)
-		if tmpErr != nil {
-			err = fmt.Errorf("%s\n%s", err, tmpErr)
-		}
+		err = unsetDenyingPolicyRcD(err)
 	}()
 
 	installPackagesCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)

@@ -659,6 +659,30 @@ func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
 	return []*exec.Cmd{updateCmd, installCmd}
 }
 
+func setDenyingPolicyRcD(path string) (func(error) error, error) {
+	const policyRcDDisableAll = `#!/bin/sh
+echo "All runlevel operations denied by policy" >&2
+exit 101
+`
+	err := osMkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating policy-rc.d dir: %s", err.Error())
+	}
+
+	err = osWriteFile(path, []byte(policyRcDDisableAll), 0755)
+	if err != nil {
+		return nil, fmt.Errorf("Error writing to policy-rc.d: %s", err.Error())
+	}
+
+	return func(err error) error {
+		tmpErr := osRemove(path)
+		if tmpErr != nil {
+			err = fmt.Errorf("%s\n%s", err, tmpErr)
+		}
+		return err
+	}, nil
+}
+
 // divertPolicyRcD dpkg-diverts policy-rc.d to keep it if it already exists
 func divertPolicyRcD(targetDir string) (*exec.Cmd, *exec.Cmd) {
 	return dpkgDivert(targetDir, "/usr/sbin/policy-rc.d")
