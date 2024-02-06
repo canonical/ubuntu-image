@@ -63,7 +63,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: "${{ github.workspace }}/.test-results"
-          key: "${{ github.job }}-results-${{ github.run_id }}-${{ steps.get-previous-attempt.outputs.previous_attempt }}"
+          key: "${{ github.job }}-results-${{ github.run_id }}-${{ matrix.group }}-${{ steps.get-previous-attempt.outputs.previous_attempt }}"
     
       - name: Prepare test results env and vars
         id: prepare-test-results-env
@@ -167,5 +167,5 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: "${{ github.workspace }}/.test-results"
-          key: "${{ github.job }}-results-${{ github.run_id }}-${{ github.run_attempt }}"
+          key: "${{ github.job }}-results-${{ github.run_id }}-${{ matrix.group }}-${{ github.run_attempt }}"
 
