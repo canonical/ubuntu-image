@@ -707,20 +707,29 @@ func dpkgDivert(baseDir string, target string) (*exec.Cmd, *exec.Cmd) {
 	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
 }
 
-type mountPoint struct {
-	src     string
-	relpath string
-	path    string
-	typ     string
-	opts    []string
-	bind    bool
+// backupReplaceStartStopDaemon backup start-stop-daemon and replace it with a fake one
+// Returns a restore function to put the original one in place
+func backupReplaceStartStopDaemon(baseDir string) (func(error) error, error) {
+	const startStopDaemonContent = `#!/bin/sh
+echo
+echo "Warning: Fake start-stop-daemon called, doing nothing"
+`
+
+	startStopDaemon := filepath.Join(baseDir, "sbin", "start-stop-daemon")
+	return helper.BackupReplace(startStopDaemon, startStopDaemonContent)
 }
 
-func getUnmountCmd(targetPath string) []*exec.Cmd {
-	return []*exec.Cmd{
-		execCommand("mount", "--make-rprivate", targetPath),
-		execCommand("umount", "--recursive", targetPath),
-	}
+// backupReplaceInitctl backup initctl and replace it with a fake one
+// Returns a restore function to put the original one in place
+func backupReplaceInitctl(baseDir string) (func(error) error, error) {
+	const initctlContent = `#!/bin/sh
+if [ "$1" = version ]; then exec /sbin/initctl.REAL "$@"; fi
+echo
+echo "Warning: Fake initctl called, doing nothing"
+`
+
+	initctl := filepath.Join(baseDir, "sbin", "initctl")
+	return helper.BackupReplace(initctl, initctlContent)
 }
 
 // getMountCmd returns mount/umount commands to mount the given mountpoint
@@ -775,47 +784,6 @@ func getNewMountPoints(olds []mountPoint, currents []mountPoint) []mountPoint {
 	}
 
 	return news
-}
-
-func listMounts(path string) ([]mountPoint, error) {
-	procMounts := "/proc/self/mounts"
-	f, err := osReadFile(procMounts)
-	if err != nil {
-		return nil, err
-	}
-
-	return parseMounts(string(f), path)
-}
-
-// parseMounts list existing mounts and submounts in the current path
-// The returned splice is already inverted so unmount can be called on it
-// without further modification.
-func parseMounts(procMount string, path string) ([]mountPoint, error) {
-	mountPoints := []mountPoint{}
-	mountLines := strings.Split(procMount, "\n")
-
-	for _, line := range mountLines {
-		if line == "" {
-			continue
-		}
-
-		fields := strings.Fields(line)
-		mountPath := fields[1]
-
-		if len(path) != 0 && !strings.HasPrefix(mountPath, path) {
-			continue
-		}
-
-		m := mountPoint{
-			src:  fields[0],
-			path: mountPath,
-			typ:  fields[2],
-			opts: strings.Split(fields[3], ","),
-		}
-		mountPoints = append([]mountPoint{m}, mountPoints...)
-	}
-
-	return mountPoints, nil
 }
 
 // execTeardownCmds executes given commands and collects error to join them with an existing error.

@@ -20,8 +20,12 @@ import (
 )
 
 // define some functions that can be mocked by test cases
-var osRename = os.Rename
-var osRemove = os.Remove
+var (
+	osRename         = os.Rename
+	osRemove         = os.Remove
+	osWriteFile      = os.WriteFile
+	osutilFileExists = osutil.FileExists
+)
 
 func BoolPtr(b bool) *bool {
 	return &b
@@ -500,4 +504,43 @@ func RestoreResolvConf(chroot string) error {
 		}
 	}
 	return nil
+}
+
+const backupExt = ".REAL"
+
+// BackupReplace backup the target file and replace it with the given content
+// Returns the restore function.
+func BackupReplace(target string, content string) (func(error) error, error) {
+	backup := target + backupExt
+	if osutilFileExists(backup) {
+		// already backed up so do nothing
+		return nil, nil
+	}
+
+	if err := osRename(target, backup); err != nil {
+		return nil, fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", target, backup, err.Error())
+	}
+
+	if err := osWriteFile(target, []byte(content), 0755); err != nil {
+		return nil, fmt.Errorf("Error writing to %s : %s", target, err.Error())
+	}
+
+	return genRestoreFile(target), nil
+}
+
+// genRestoreFile returns the function to be called to restore the backuped file
+func genRestoreFile(target string) func(err error) error {
+	return func(err error) error {
+		src := target + backupExt
+		if !osutilFileExists(src) {
+			return err
+		}
+
+		if tmpErr := osRename(src, target); tmpErr != nil {
+			tmpErr = fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, target, tmpErr.Error())
+			return fmt.Errorf("%s\n%s", err, tmpErr)
+		}
+
+		return err
+	}
 }
