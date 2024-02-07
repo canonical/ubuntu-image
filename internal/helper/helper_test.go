@@ -19,6 +19,9 @@ func mockRemove(string) error {
 func mockRename(string, string) error {
 	return fmt.Errorf("Test Error")
 }
+func mockWriteFile(name string, data []byte, perm os.FileMode) error {
+	return fmt.Errorf("WriteFile Error")
+}
 
 // TestRestoreResolvConf tests if resolv.conf is restored correctly
 func TestRestoreResolvConf(t *testing.T) {
@@ -334,4 +337,112 @@ func TestCheckEmptyFields(t *testing.T) {
 			}
 		})
 	}
+}
+
+func prepareMainFileToBackup(workDir string) (string, error) {
+	err := os.MkdirAll(filepath.Join(workDir, "sbin"), 0755)
+	if err != nil {
+		return "", err
+	}
+	mainTargetPath := filepath.Join(workDir, "sbin", "target")
+	mainConf, err := os.Create(mainTargetPath)
+	if err != nil {
+		return "", err
+	}
+	mainContent := []byte("Main")
+	_, err = mainConf.Write(mainContent)
+	if err != nil {
+		return "", err
+	}
+	mainConf.Close()
+
+	return mainTargetPath, nil
+}
+
+func prepareBackupFile(workDir string, content string, mainTargetPath string) (string, error) {
+	backupPath := mainTargetPath + backupExt
+	mainConf, err := os.Create(backupPath)
+	if err != nil {
+		return "", err
+	}
+	_, err = mainConf.Write([]byte(content))
+	if err != nil {
+		return "", err
+	}
+	mainConf.Close()
+
+	return backupPath, nil
+}
+
+func TestBackupReplace(t *testing.T) {
+	asserter := Asserter{T: t}
+	// Prepare temporary directory
+	workDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+
+	// Create test environment
+	mainTargetPath, err := prepareMainFileToBackup(workDir)
+	asserter.AssertErrNil(err, true)
+	backupContent := "Backup"
+
+	// Test backup file exists
+	backupPath, err := prepareBackupFile(workDir, backupContent, mainTargetPath)
+	asserter.AssertErrNil(err, true)
+	restoreFunc, err := BackupReplace(mainTargetPath, backupContent)
+	asserter.AssertErrNil(err, true)
+	asserter.AssertEqual(nil, restoreFunc)
+	err = os.Remove(backupPath)
+	asserter.AssertErrNil(err, true)
+
+	// Mock the os.Rename failure
+	osRename = mockRename
+	t.Cleanup(func() {
+		osRename = os.Rename
+	})
+	restoreFunc, err = BackupReplace(mainTargetPath, backupContent)
+	asserter.AssertErrContains(err, "Error moving file")
+	asserter.AssertEqual(nil, restoreFunc)
+	osRename = os.Rename
+
+	// Mock the os.WriteFile failure
+	osWriteFile = mockWriteFile
+	t.Cleanup(func() {
+		osWriteFile = os.WriteFile
+	})
+	restoreFunc, err = BackupReplace(mainTargetPath, backupContent)
+	asserter.AssertErrContains(err, "Error writing to")
+	asserter.AssertEqual(nil, restoreFunc)
+	osWriteFile = os.WriteFile
+	err = os.Remove(backupPath)
+	asserter.AssertErrNil(err, true)
+
+	// Test genRestoreFile
+	mainTargetPath, err = prepareMainFileToBackup(workDir)
+	asserter.AssertErrNil(err, true)
+
+	restoreFunc, err = BackupReplace(mainTargetPath, backupContent)
+	asserter.AssertErrNil(err, true)
+
+	// Test no backup file anymore
+	err = os.Remove(backupPath)
+	asserter.AssertErrNil(err, true)
+
+	err = restoreFunc(nil)
+	asserter.AssertErrNil(err, true)
+
+	// Mock the os.Rename failure
+	_, err = prepareBackupFile(workDir, backupContent, mainTargetPath)
+	asserter.AssertErrNil(err, true)
+
+	osRename = mockRename
+	t.Cleanup(func() {
+		osRename = os.Rename
+	})
+	err = restoreFunc(nil)
+	asserter.AssertErrContains(err, "Error moving file")
+
+	osRename = os.Rename
+
 }
