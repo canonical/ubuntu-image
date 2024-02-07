@@ -3105,6 +3105,8 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key"),
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
 		filepath.Join(mountDir, "usr", "sbin", "policy-rc.d"),
+		filepath.Join(mountDir, "sbin", "start-stop-daemon.REAL"),
+		filepath.Join(mountDir, "sbin", "initctl.REAL"),
 	}
 	for _, file := range cleaned {
 		_, err := os.Stat(file)
@@ -4048,6 +4050,16 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d"))
 	asserter.AssertErrNil(err, true)
 
+	// create an /sbin/start-stop-daemon in the chroot
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "sbin"), 0755)
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "sbin", "start-stop-daemon"))
+	asserter.AssertErrNil(err, true)
+
+	// create an /sbin/initctl in the chroot
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "sbin", "initctl"))
+	asserter.AssertErrNil(err, true)
+
 	mockCmder := NewMockExecCommand()
 
 	execCommand = mockCmder.Command
@@ -4245,6 +4257,14 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	err = stateMachine.installPackages()
 	asserter.AssertErrContains(err, "Error writing to policy-rc.d")
 	osWriteFile = os.WriteFile
+
+	osRename = mockRename
+	t.Cleanup(func() {
+		osRename = os.Rename
+	})
+	err = stateMachine.installPackages()
+	asserter.AssertErrContains(err, "Error moving file ")
+	osRename = os.Rename
 
 }
 
