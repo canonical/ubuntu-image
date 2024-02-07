@@ -123,7 +123,8 @@ prepare: |
   git clone -b noble https://git.launchpad.net/ubuntu-images
   git clone https://github.com/snapcore/models
   
-  snap install --classic --dangerous ./tests/ubuntu-image_*.snap
+  snapcraft
+  snap install --classic --dangerous ubuntu-image_*.snap
 
 suites:
   tests/commons/:
