@@ -470,6 +470,7 @@ func (stateMachine *StateMachine) Run() error {
 			break
 		}
 	}
+	fmt.Println("Build successful")
 	return nil
 }
 

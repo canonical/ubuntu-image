@@ -301,7 +301,6 @@ is as follows:
 #. populate_prepare_partitions
 #. make_disk
 #. generate_package_manifest
-#. finish
 
 To check the steps that are going to be used for a specific image
 definition file, use the ``--print-states`` flag.
@@ -319,7 +318,6 @@ Snap image steps
 #. populate_prepare_partitions
 #. make_disk
 #. generate_snap_manifest
-#. finish
 
 NOTES
 =====

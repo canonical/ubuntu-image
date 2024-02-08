@@ -18,7 +18,6 @@ var snapStates = []stateFunc{
 	populatePreparePartitionsState,
 	makeDiskState,
 	generateSnapManifestState,
-	finishState,
 }
 
 // SnapStateMachine embeds StateMachine and adds the command line flags specific to snap images

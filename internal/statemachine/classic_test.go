@@ -196,7 +196,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"generate_manifest",
-				"finish",
 			},
 		},
 		{
@@ -223,7 +222,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"generate_manifest",
-				"finish",
 			},
 		},
 		{
@@ -251,7 +249,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"generate_manifest",
-				"finish",
 			},
 		},
 		{
@@ -283,7 +280,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_qcow2_image",
 				"generate_manifest",
 				"generate_filelist",
-				"finish",
 			},
 		},
 		{
@@ -307,7 +303,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"generate_manifest",
-				"finish",
 			},
 		},
 		{
@@ -329,7 +324,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"generate_manifest",
-				"finish",
 			},
 		},
 		{
@@ -356,7 +350,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"generate_manifest",
-				"finish",
 			},
 		},
 		{
@@ -379,7 +372,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"generate_manifest",
-				"finish",
 			},
 		},
 		{
@@ -409,7 +401,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"generate_manifest",
-				"finish",
 			},
 		},
 		{
@@ -438,7 +429,6 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"make_qcow2_image",
-				"finish",
 			},
 		},
 	}
@@ -550,7 +540,6 @@ func TestPrintStates(t *testing.T) {
 [19] make_disk
 [20] update_bootloader
 [21] generate_package_manifest
-[22] finish
 `
 	if !strings.Contains(string(readStdout), expectedStates) {
 		t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
