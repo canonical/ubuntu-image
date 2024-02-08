@@ -434,10 +434,3 @@ func (stateMachine *StateMachine) makeDisk() error {
 	}
 	return nil
 }
-
-var finishState = stateFunc{"finish", (*StateMachine).finish}
-
-// Finish step to show that the build was successful
-func (stateMachine *StateMachine) finish() error {
-	return nil
-}

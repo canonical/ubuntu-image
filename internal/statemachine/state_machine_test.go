@@ -50,7 +50,6 @@ var allTestStates = []stateFunc{
 	{populatePreparePartitionsState.name, func(statemachine *StateMachine) error { return nil }},
 	{makeDiskState.name, func(statemachine *StateMachine) error { return nil }},
 	{generatePackageManifestState.name, func(statemachine *StateMachine) error { return nil }},
-	finishState,
 }
 
 func ptrToOffset(offset quantity.Offset) *quantity.Offset {

@@ -353,9 +353,6 @@ func (s *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates, generateRootfsTarballState)
 	}
 
-	// add the no-op "finish" state
-	rootfsCreationStates = append(rootfsCreationStates, finishState)
-
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	s.states = append(s.states, rootfsCreationStates...)
 
