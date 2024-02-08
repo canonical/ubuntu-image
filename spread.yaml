@@ -120,6 +120,7 @@ prepare: |
   snap install core22 --channel=latest/edge
   snap install yq
   snap install snapcraft --classic
+  snap install lxd
   lxd init --auto
   snapcraft
   snap install --classic --dangerous ubuntu-image_*.snap
@@ -127,7 +128,9 @@ prepare: |
   unset SHELL
   git clone -b noble https://git.launchpad.net/ubuntu-images
   git clone https://github.com/snapcore/models
-  
+
+debug: |
+  cat /root/.local/state/snapcraft/log/snapcraft-*.log
 
 suites:
   tests/commons/:
