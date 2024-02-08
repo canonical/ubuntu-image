@@ -17,6 +17,8 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
+var makeTemporaryDirectoriesState = stateFunc{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories}
+
 // generate work directory file structure
 func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	// if no workdir was specified, open a /tmp dir
@@ -50,6 +52,8 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	return nil
 }
 
+var determineOutputDirectoryState = stateFunc{"determine_output_directory", (*StateMachine).determineOutputDirectory}
+
 // determineOutputDirectory sets the directory in which to place artifacts
 // and creates it if it doesn't already exist
 func (stateMachine *StateMachine) determineOutputDirectory() error {
@@ -68,6 +72,8 @@ func (stateMachine *StateMachine) determineOutputDirectory() error {
 	return nil
 }
 
+var setArtifactNamesState = stateFunc{"set_artifact_names", (*StateMachine).setArtifactNames}
+
 // for snap/core image builds, the image name is always <volume-name>.img for
 // each volume in the gadget. This function stores that info in the struct
 func (stateMachine *StateMachine) setArtifactNames() error {
@@ -77,6 +83,8 @@ func (stateMachine *StateMachine) setArtifactNames() error {
 	}
 	return nil
 }
+
+var loadGadgetYamlState = stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml}
 
 // Load gadget.yaml, do some validation, and store the relevant info in the StateMachine struct
 func (stateMachine *StateMachine) loadGadgetYaml() error {
@@ -132,6 +140,8 @@ The gadget.yaml file is expected to be located in a "meta" subdirectory of the p
 	return nil
 }
 
+var generateDiskInfoState = stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo}
+
 // If --disk-info was used, copy the provided file to the correct location
 func (stateMachine *StateMachine) generateDiskInfo() error {
 	if stateMachine.commonFlags.DiskInfo != "" {
@@ -147,6 +157,8 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 	}
 	return nil
 }
+
+var calculateRootfsSizeState = stateFunc{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize}
 
 // Calculate the size of the root filesystem
 // on a 100MiB filesystem, ext4 takes a little over 7MiB for the
@@ -234,6 +246,8 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	return nil
 }
 
+var populateBootfsContentsState = stateFunc{"populate_bootfs_contents", (*StateMachine).populateBootfsContents}
+
 // Populate the Bootfs Contents by using snapd's MountedFilesystemWriter
 func (stateMachine *StateMachine) populateBootfsContents() error {
 	var preserve []string
@@ -296,6 +310,8 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 	return nil
 }
 
+var populatePreparePartitionsState = stateFunc{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions}
+
 // Populate and prepare the partitions. For partitions without filesystem: specified in
 // gadget.yaml, this involves using dd to copy the content blobs into a .img file. For
 // partitions that do have filesystem: specified, we use the Mkfs functions from snapd.
@@ -333,6 +349,8 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 	}
 	return nil
 }
+
+var makeDiskState = stateFunc{"make_disk", (*StateMachine).makeDisk}
 
 // Make the disk
 func (stateMachine *StateMachine) makeDisk() error {
@@ -416,6 +434,8 @@ func (stateMachine *StateMachine) makeDisk() error {
 	}
 	return nil
 }
+
+var finishState = stateFunc{"finish", (*StateMachine).finish}
 
 // Finish step to show that the build was successful
 func (stateMachine *StateMachine) finish() error {

@@ -39,20 +39,18 @@ var testStates = []stateFunc{
 
 // for tests where we want to run all the states
 var allTestStates = []stateFunc{
-	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
-	{"prepare_gadget_tree", func(statemachine *StateMachine) error { return nil }},
-	{"prepare_image", func(statemachine *StateMachine) error { return nil }},
-	{"load_gadget_yaml", func(statemachine *StateMachine) error { return nil }},
-	{"populate_rootfs_contents", func(statemachine *StateMachine) error { return nil }},
-	{"populate_rootfs_contents_hooks", func(statemachine *StateMachine) error { return nil }},
-	{"generate_disk_info", func(statemachine *StateMachine) error { return nil }},
-	{"calculate_rootfs_size", func(statemachine *StateMachine) error { return nil }},
-	{"prepopulate_bootfs_contents", func(statemachine *StateMachine) error { return nil }},
-	{"populate_bootfs_contents", func(statemachine *StateMachine) error { return nil }},
-	{"populate_prepare_partitions", func(statemachine *StateMachine) error { return nil }},
-	{"make_disk", func(statemachine *StateMachine) error { return nil }},
-	{"generate_manifest", func(statemachine *StateMachine) error { return nil }},
-	{"finish", (*StateMachine).finish},
+	makeTemporaryDirectoriesState,
+	{prepareGadgetTreeState.name, func(statemachine *StateMachine) error { return nil }},
+	{prepareClassicImageState.name, func(statemachine *StateMachine) error { return nil }},
+	{loadGadgetYamlState.name, func(statemachine *StateMachine) error { return nil }},
+	{populateClassicRootfsContentsState.name, func(statemachine *StateMachine) error { return nil }},
+	{generateDiskInfoState.name, func(statemachine *StateMachine) error { return nil }},
+	{calculateRootfsSizeState.name, func(statemachine *StateMachine) error { return nil }},
+	{populateBootfsContentsState.name, func(statemachine *StateMachine) error { return nil }},
+	{populatePreparePartitionsState.name, func(statemachine *StateMachine) error { return nil }},
+	{makeDiskState.name, func(statemachine *StateMachine) error { return nil }},
+	{generatePackageManifestState.name, func(statemachine *StateMachine) error { return nil }},
+	finishState,
 }
 
 func ptrToOffset(offset quantity.Offset) *quantity.Offset {
@@ -382,7 +380,7 @@ func TestFunctionErrors(t *testing.T) {
 		newStateFunc  stateFunc
 	}{
 		{"error_state_func", 0, stateFunc{"test_error_state_func", func(stateMachine *StateMachine) error { return fmt.Errorf("Test Error") }}},
-		{"error_write_metadata", 13, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
+		{"error_write_metadata", 12, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 			return nil
 		}}},
