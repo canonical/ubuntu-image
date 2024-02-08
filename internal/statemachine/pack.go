@@ -7,17 +7,17 @@ import (
 )
 
 var packStates = []stateFunc{
-	{"prepare_pack", (*StateMachine).preparePack},
-	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
-	{"populate_temporary_directories", (*StateMachine).populateTemporaryDirectories},
-	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
-	{"set_artifact_names", (*StateMachine).setArtifactNames},
-	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
-	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
-	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
-	{"make_disk", (*StateMachine).makeDisk},
-	{"update_bootloader", (*StateMachine).updateBootloader},
-	{"finish", (*StateMachine).finish},
+	preparePackState,
+	makeTemporaryDirectoriesState,
+	populateTemporaryDirectoriesState,
+	loadGadgetYamlState,
+	setArtifactNamesState,
+	calculateRootfsSizeState,
+	populateBootfsContentsState,
+	populatePreparePartitionsState,
+	makeDiskState,
+	updateBootloaderState,
+	finishState,
 }
 
 // PackStateMachine embeds StateMachine and adds the command line flags specific to pack images

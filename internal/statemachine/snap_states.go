@@ -12,6 +12,8 @@ import (
 	"github.com/snapcore/snapd/snap"
 )
 
+var prepareImageState = stateFunc{"prepare_image", (*StateMachine).prepareImage}
+
 // Prepare the image
 func (stateMachine *StateMachine) prepareImage() error {
 	snapStateMachine := stateMachine.parent.(*SnapStateMachine)
@@ -84,6 +86,8 @@ func (stateMachine *StateMachine) prepareImage() error {
 	return nil
 }
 
+var populateSnapRootfsContentsState = stateFunc{"populate_rootfs_contents", (*StateMachine).populateSnapRootfsContents}
+
 // populateSnapRootfsContents uses a NewMountedFileSystemWriter to populate the rootfs
 func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 	var src, dst string
@@ -122,6 +126,8 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 
 	return nil
 }
+
+var generateSnapManifestState = stateFunc{"generate_snap_manifest", (*StateMachine).generateSnapManifest}
 
 // Generate the manifest
 func (stateMachine *StateMachine) generateSnapManifest() error {

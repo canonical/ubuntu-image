@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 )
 
+var preparePackState = stateFunc{"prepare_pack", (*StateMachine).preparePack}
+
 // preparePack prepare the packStateMachine
 // This step must be run first
 func (stateMachine *StateMachine) preparePack() error {
@@ -15,6 +17,8 @@ func (stateMachine *StateMachine) preparePack() error {
 
 	return nil
 }
+
+var populateTemporaryDirectoriesState = stateFunc{"populate_temporary_directories", (*StateMachine).populateTemporaryDirectories}
 
 // populateTemporaryDirectories fills tempDirs with dirs given as Opts
 func (stateMachine *StateMachine) populateTemporaryDirectories() error {

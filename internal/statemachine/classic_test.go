@@ -549,7 +549,7 @@ func TestPrintStates(t *testing.T) {
 [18] populate_prepare_partitions
 [19] make_disk
 [20] update_bootloader
-[21] generate_manifest
+[21] generate_package_manifest
 [22] finish
 `
 	if !strings.Contains(string(readStdout), expectedStates) {
@@ -2207,7 +2207,7 @@ func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 		osReadDir = os.ReadDir
 	})
 	err = stateMachine.populateClassicRootfsContents()
-	asserter.AssertErrContains(err, "Error reading unpack/chroot dir")
+	asserter.AssertErrContains(err, "Error reading chroot dir")
 	osReadDir = os.ReadDir
 
 	// mock osutil.CopySpecialFile

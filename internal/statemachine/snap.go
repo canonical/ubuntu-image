@@ -6,19 +6,19 @@ import (
 
 // snapStates are the names and function variables to be executed by the state machine for snap images
 var snapStates = []stateFunc{
-	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
-	{"determine_output_directory", (*StateMachine).determineOutputDirectory},
-	{"prepare_image", (*StateMachine).prepareImage},
-	{"load_gadget_yaml", (*StateMachine).loadGadgetYaml},
-	{"set_artifact_names", (*StateMachine).setArtifactNames},
-	{"populate_rootfs_contents", (*StateMachine).populateSnapRootfsContents},
-	{"generate_disk_info", (*StateMachine).generateDiskInfo},
-	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
-	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
-	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
-	{"make_disk", (*StateMachine).makeDisk},
-	{"generate_manifest", (*StateMachine).generateSnapManifest},
-	{"finish", (*StateMachine).finish},
+	makeTemporaryDirectoriesState,
+	determineOutputDirectoryState,
+	prepareImageState,
+	loadGadgetYamlState,
+	setArtifactNamesState,
+	populateSnapRootfsContentsState,
+	generateDiskInfoState,
+	calculateRootfsSizeState,
+	populateBootfsContentsState,
+	populatePreparePartitionsState,
+	makeDiskState,
+	generateSnapManifestState,
+	finishState,
 }
 
 // SnapStateMachine embeds StateMachine and adds the command line flags specific to snap images

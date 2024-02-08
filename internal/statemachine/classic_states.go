@@ -31,6 +31,8 @@ var (
 	localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
 )
 
+var buildGadgetTreeState = stateFunc{"build_gadget_tree", (*StateMachine).buildGadgetTree}
+
 // Build the gadget tree
 func (stateMachine *StateMachine) buildGadgetTree() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -96,6 +98,8 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	return nil
 }
 
+var prepareGadgetTreeState = stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree}
+
 // Prepare the gadget tree
 func (stateMachine *StateMachine) prepareGadgetTree() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -145,6 +149,8 @@ func (stateMachine *StateMachine) fixHostname() error {
 	return nil
 }
 
+var createChrootState = stateFunc{"create_chroot", (*StateMachine).createChroot}
+
 // Bootstrap a chroot environment to install packages in. It will eventually
 // become the rootfs of the image
 func (stateMachine *StateMachine) createChroot() error {
@@ -188,6 +194,8 @@ func (stateMachine *StateMachine) createChroot() error {
 	return stateMachine.setLegacySourcesList(classicStateMachine.ImageDef.LegacyBuildSourcesList())
 }
 
+var addExtraPPAsState = stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs}
+
 // addExtraPPAs adds PPAs to the /etc/apt/sources.list.d directory
 func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -203,6 +211,8 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 	return nil
 }
 
+var cleanExtraPPAsState = stateFunc{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs}
+
 // cleanExtraPPAs cleans previously added PPA to the source list
 func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -217,6 +227,8 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 
 	return nil
 }
+
+var installPackagesState = stateFunc{"install_packages", (*StateMachine).installPackages}
 
 // Install packages in the chroot environment
 func (stateMachine *StateMachine) installPackages() error {
@@ -371,6 +383,8 @@ func (stateMachine *StateMachine) installPackages() error {
 	return nil
 }
 
+var verifyArtifactNamesState = stateFunc{"verify_artifact_names", (*StateMachine).verifyArtifactNames}
+
 // Verify artifact names have volumes listed for multi-volume gadgets and set
 // the volume names in the struct
 func (stateMachine *StateMachine) verifyArtifactNames() error {
@@ -461,11 +475,15 @@ func (stateMachine *StateMachine) verifyArtifactNames() error {
 	return nil
 }
 
+var buildRootfsFromTasksState = stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks}
+
 // Build a rootfs from a list of archive tasks
 func (stateMachine *StateMachine) buildRootfsFromTasks() error {
 	// currently a no-op pending implementation of the classic image redesign
 	return nil
 }
+
+var extractRootfsTarState = stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar}
 
 // Extract the rootfs from a tar archive
 func (stateMachine *StateMachine) extractRootfsTar() error {
@@ -501,6 +519,8 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	return helper.ExtractTarArchive(tarPath, stateMachine.tempDirs.chroot,
 		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
 }
+
+var germinateState = stateFunc{"germinate", (*StateMachine).germinate}
 
 // germinate runs the germinate binary and parses the output to create
 // a list of packages from the seed section of the image definition
@@ -573,6 +593,8 @@ func customizeCloudInitFile(customData string, seedPath string, fileName string,
 	return nil
 }
 
+var customizeCloudInitState = stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit}
+
 // Customize Cloud init with the values in the image definition YAML
 func (stateMachine *StateMachine) customizeCloudInit() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -614,6 +636,8 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 	return err
 }
 
+var customizeFstabState = stateFunc{"customize_fstab", (*StateMachine).customizeFstab}
+
 // Customize /etc/fstab based on values in the image definition
 func (stateMachine *StateMachine) customizeFstab() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -649,6 +673,8 @@ func (stateMachine *StateMachine) customizeFstab() error {
 
 	return err
 }
+
+var manualCustomizationState = stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization}
 
 // Handle any manual customizations specified in the image definition
 func (stateMachine *StateMachine) manualCustomization() error {
@@ -692,6 +718,8 @@ func (stateMachine *StateMachine) manualCustomization() error {
 
 	return nil
 }
+
+var prepareClassicImageState = stateFunc{"prepare_image", (*StateMachine).prepareClassicImage}
 
 // prepareClassicImage calls image.Prepare to stage snaps in classic images
 func (stateMachine *StateMachine) prepareClassicImage() error {
@@ -824,6 +852,8 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	return nil
 }
 
+var preseedClassicImageState = stateFunc{"preseed_image", (*StateMachine).preseedClassicImage}
+
 // preseedClassicImage preseeds the snaps that have already been staged in the chroot
 func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -898,6 +928,8 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	return nil
 }
 
+var populateClassicRootfsContentsState = stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents}
+
 // populateClassicRootfsContents copies over the staged rootfs
 // to rootfs. It also changes fstab and handles the --cloud-init flag
 func (stateMachine *StateMachine) populateClassicRootfsContents() error {
@@ -911,7 +943,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 
 	files, err := osReadDir(stateMachine.tempDirs.chroot)
 	if err != nil {
-		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
+		return fmt.Errorf("Error reading chroot dir: %s", err.Error())
 	}
 
 	for _, srcFile := range files {
@@ -927,6 +959,8 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 
 	return classicStateMachine.fixFstab()
 }
+
+var customizeSourcesListState = stateFunc{"customize_sources_list", (*StateMachine).customizeSourcesList}
 
 // customizeSourcesList customize the /etc/apt/sources.list file for the
 // resulting image. This state must be executed once packages installation
@@ -1044,6 +1078,8 @@ func (stateMachine *StateMachine) fixFstab() error {
 	return nil
 }
 
+var setDefaultLocaleState = stateFunc{"set_default_locale", (*StateMachine).setDefaultLocale}
+
 // Set a default locale if one is not configured beforehand by other customizations
 func (stateMachine *StateMachine) setDefaultLocale() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -1066,6 +1102,8 @@ func (stateMachine *StateMachine) setDefaultLocale() error {
 	}
 	return nil
 }
+
+var generatePackageManifestState = stateFunc{"generate_package_manifest", (*StateMachine).generatePackageManifest}
 
 // Generate the manifest
 func (stateMachine *StateMachine) generatePackageManifest() error {
@@ -1096,6 +1134,8 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	return nil
 }
 
+var generateFilelistState = stateFunc{"generate_filelist", (*StateMachine).generateFilelist}
+
 // Generate the manifest
 func (stateMachine *StateMachine) generateFilelist() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -1125,6 +1165,8 @@ func (stateMachine *StateMachine) generateFilelist() error {
 	return nil
 }
 
+var generateRootfsTarballState = stateFunc{"generate_rootfs_tarball", (*StateMachine).generateRootfsTarball}
+
 // Generate the rootfs tarball
 func (stateMachine *StateMachine) generateRootfsTarball() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -1137,6 +1179,8 @@ func (stateMachine *StateMachine) generateRootfsTarball() error {
 		classicStateMachine.ImageDef.Artifacts.RootfsTar.Compression,
 		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
 }
+
+var makeQcow2ImgState = stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img}
 
 // makeQcow2Img converts raw .img artifacts into qcow2 artifacts
 func (stateMachine *StateMachine) makeQcow2Img() error {
@@ -1165,6 +1209,8 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 	return nil
 }
 
+var updateBootloaderState = stateFunc{"update_bootloader", (*StateMachine).updateBootloader}
+
 // updateBootloader determines the bootloader for each volume
 // and runs the correct helper function to update the bootloader
 func (stateMachine *StateMachine) updateBootloader() error {
@@ -1185,6 +1231,8 @@ func (stateMachine *StateMachine) updateBootloader() error {
 	}
 	return nil
 }
+
+var cleanRootfsState = stateFunc{"clean_rootfs", (*StateMachine).cleanRootfs}
 
 // cleanRootfs cleans the created chroot from secrets/values generated
 // during the various preceding install steps

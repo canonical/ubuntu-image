@@ -300,7 +300,7 @@ is as follows:
 #. populate_bootfs_contents
 #. populate_prepare_partitions
 #. make_disk
-#. generate_manifest
+#. generate_package_manifest
 #. finish
 
 To check the steps that are going to be used for a specific image
@@ -313,13 +313,12 @@ Snap image steps
 #. prepare_image
 #. load_gadget_yaml
 #. populate_rootfs_contents
-#. populate_rootfs_contents_hooks
 #. generate_disk_info
 #. calculate_rootfs_size
 #. populate_bootfs_contents
 #. populate_prepare_partitions
 #. make_disk
-#. generate_manifest
+#. generate_snap_manifest
 #. finish
 
 NOTES

@@ -16,19 +16,19 @@ import (
 
 // classicStates are the names and function variables to be executed by the state machine for classic images
 var startingClassicStates = []stateFunc{
-	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
-	{"determine_output_directory", (*StateMachine).determineOutputDirectory},
+	makeTemporaryDirectoriesState,
+	determineOutputDirectoryState,
 }
 
 var rootfsSeedStates = []stateFunc{
-	{"germinate", (*StateMachine).germinate},
-	{"create_chroot", (*StateMachine).createChroot},
+	germinateState,
+	createChrootState,
 }
 
 var imageCreationStates = []stateFunc{
-	{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize},
-	{"populate_bootfs_contents", (*StateMachine).populateBootfsContents},
-	{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions},
+	calculateRootfsSizeState,
+	populateBootfsContentsState,
+	populatePreparePartitionsState,
 }
 
 // ClassicStateMachine embeds StateMachine and adds the command line flags specific to classic images
@@ -278,9 +278,9 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	return nil
 }
 
-// State responsible for dynamically calculating all the remaining states
+// calculateStates dynamically calculates all the states
 // needed to build the image, as defined by the image-definition file
-// that was loaded in the previous 'state'.
+// that was loaded previously.
 // If a new possible state is added to the classic build state machine, it
 // should be added here (usually basing on contents of the image definition)
 func (s *StateMachine) calculateStates() error {
@@ -298,8 +298,7 @@ func (s *StateMachine) calculateStates() error {
 		return fmt.Errorf("Error checking struct tags for Artifacts: \"%s\"", err.Error())
 	}
 	if diskUsed != "" {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"verify_artifact_names", (*StateMachine).verifyArtifactNames})
+		rootfsCreationStates = append(rootfsCreationStates, verifyArtifactNamesState)
 	}
 
 	// determine the states needed for preparing the rootfs.
@@ -312,33 +311,27 @@ func (s *StateMachine) calculateStates() error {
 	} else if c.ImageDef.Rootfs.Seed != nil {
 		s.addRootfsFromSeedStates(&rootfsCreationStates)
 	} else {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks})
+		rootfsCreationStates = append(rootfsCreationStates, buildRootfsFromTasksState)
 	}
 
 	// Before customization, make sure we clean unwanted secrets/values that
 	// are supposed to be unique per machine
-	rootfsCreationStates = append(rootfsCreationStates,
-		stateFunc{"clean_rootfs", (*StateMachine).cleanRootfs})
+	rootfsCreationStates = append(rootfsCreationStates, cleanRootfsState)
 
-	rootfsCreationStates = append(rootfsCreationStates,
-		stateFunc{"customize_sources_list", (*StateMachine).customizeSourcesList})
+	rootfsCreationStates = append(rootfsCreationStates, customizeSourcesListState)
 
 	if c.ImageDef.Customization != nil {
 		s.addCustomizationStates(&rootfsCreationStates)
 	}
 
 	// Make sure that the rootfs has the correct locale set
-	rootfsCreationStates = append(rootfsCreationStates,
-		stateFunc{"set_default_locale", (*StateMachine).setDefaultLocale})
+	rootfsCreationStates = append(rootfsCreationStates, setDefaultLocaleState)
 
 	// The rootfs is laid out in a staging area, now populate it in the correct location
-	rootfsCreationStates = append(rootfsCreationStates,
-		stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents})
+	rootfsCreationStates = append(rootfsCreationStates, populateClassicRootfsContentsState)
 
 	if s.commonFlags.DiskInfo != "" {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo})
+		rootfsCreationStates = append(rootfsCreationStates, generateDiskInfoState)
 	}
 
 	if c.ImageDef.Gadget != nil {
@@ -350,23 +343,19 @@ func (s *StateMachine) calculateStates() error {
 	}
 
 	if c.ImageDef.Artifacts.Manifest != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"generate_manifest", (*StateMachine).generatePackageManifest})
+		rootfsCreationStates = append(rootfsCreationStates, generatePackageManifestState)
 	}
 
 	if c.ImageDef.Artifacts.Filelist != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"generate_filelist", (*StateMachine).generateFilelist})
+		rootfsCreationStates = append(rootfsCreationStates, generateFilelistState)
 	}
 
 	if c.ImageDef.Artifacts.RootfsTar != nil {
-		rootfsCreationStates = append(rootfsCreationStates,
-			stateFunc{"generate_rootfs_tarball", (*StateMachine).generateRootfsTarball})
+		rootfsCreationStates = append(rootfsCreationStates, generateRootfsTarballState)
 	}
 
 	// add the no-op "finish" state
-	rootfsCreationStates = append(rootfsCreationStates,
-		stateFunc{"finish", (*StateMachine).finish})
+	rootfsCreationStates = append(rootfsCreationStates, finishState)
 
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	s.states = append(s.states, rootfsCreationStates...)
@@ -382,24 +371,20 @@ func (s *StateMachine) addGadgetStates(states *[]stateFunc) {
 	// determine the states needed for preparing the gadget
 	switch c.ImageDef.Gadget.GadgetType {
 	case "git", "directory":
-		*states = append(*states,
-			stateFunc{"build_gadget_tree", (*StateMachine).buildGadgetTree})
+		*states = append(*states, buildGadgetTreeState)
 		fallthrough
 	case "prebuilt":
-		*states = append(*states,
-			stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree})
+		*states = append(*states, prepareGadgetTreeState)
 	}
 
 	// Load the gadget yaml after the gadget is built
-	*states = append(*states,
-		stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml})
+	*states = append(*states, loadGadgetYamlState)
 }
 
 func (s *StateMachine) addRootfsFromTarballStates(states *[]stateFunc) {
 	c := s.parent.(*ClassicStateMachine)
 
-	*states = append(*states,
-		stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar})
+	*states = append(*states, extractRootfsTarState)
 	if c.ImageDef.Customization == nil {
 		return
 	}
@@ -407,21 +392,19 @@ func (s *StateMachine) addRootfsFromTarballStates(states *[]stateFunc) {
 	if len(c.ImageDef.Customization.ExtraPPAs) > 0 {
 		*states = append(*states,
 			[]stateFunc{
-				{"add_extra_ppas", (*StateMachine).addExtraPPAs},
-				{"install_packages", (*StateMachine).installPackages},
-				{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs},
+				addExtraPPAsState,
+				installPackagesState,
+				cleanExtraPPAsState,
 			}...)
 	} else if len(c.ImageDef.Customization.ExtraPackages) > 0 {
-		*states = append(*states,
-			stateFunc{"install_packages", (*StateMachine).installPackages},
-		)
+		*states = append(*states, installPackagesState)
 	}
 
 	if len(c.ImageDef.Customization.ExtraSnaps) > 0 {
 		*states = append(*states,
 			[]stateFunc{
-				{"install_extra_snaps", (*StateMachine).prepareClassicImage},
-				{"preseed_extra_snaps", (*StateMachine).preseedClassicImage},
+				prepareClassicImageState,
+				preseedClassicImageState,
 			}...)
 	}
 }
@@ -432,26 +415,22 @@ func (s *StateMachine) addRootfsFromSeedStates(states *[]stateFunc) {
 	*states = append(*states, rootfsSeedStates...)
 
 	if c.ImageDef.Customization == nil {
-		*states = append(*states,
-			stateFunc{"install_packages", (*StateMachine).installPackages},
-		)
+		*states = append(*states, installPackagesState)
 	} else if len(c.ImageDef.Customization.ExtraPPAs) > 0 {
 		*states = append(*states,
 			[]stateFunc{
-				{"add_extra_ppas", (*StateMachine).addExtraPPAs},
-				{"install_packages", (*StateMachine).installPackages},
-				{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs},
+				addExtraPPAsState,
+				installPackagesState,
+				cleanExtraPPAsState,
 			}...)
 	} else {
-		*states = append(*states,
-			stateFunc{"install_packages", (*StateMachine).installPackages},
-		)
+		*states = append(*states, installPackagesState)
 	}
 
 	*states = append(*states,
 		[]stateFunc{
-			{"prepare_image", (*StateMachine).prepareClassicImage},
-			{"preseed_image", (*StateMachine).preseedClassicImage},
+			prepareClassicImageState,
+			preseedClassicImageState,
 		}...,
 	)
 }
@@ -463,16 +442,13 @@ func (s *StateMachine) addCustomizationStates(states *[]stateFunc) {
 	c := s.parent.(*ClassicStateMachine)
 
 	if c.ImageDef.Customization.CloudInit != nil {
-		*states = append(*states,
-			stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit})
+		*states = append(*states, customizeCloudInitState)
 	}
 	if len(c.ImageDef.Customization.Fstab) > 0 {
-		*states = append(*states,
-			stateFunc{"customize_fstab", (*StateMachine).customizeFstab})
+		*states = append(*states, customizeFstabState)
 	}
 	if c.ImageDef.Customization.Manual != nil {
-		*states = append(*states,
-			stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization})
+		*states = append(*states, manualCustomizationState)
 	}
 }
 
@@ -485,8 +461,8 @@ func (s *StateMachine) addImgStates(states *[]stateFunc) {
 	}
 
 	*states = append(*states,
-		stateFunc{"make_disk", (*StateMachine).makeDisk},
-		stateFunc{"update_bootloader", (*StateMachine).updateBootloader},
+		makeDiskState,
+		updateBootloaderState,
 	)
 }
 
@@ -494,18 +470,17 @@ func (s *StateMachine) addQcow2States(states *[]stateFunc) {
 	// Only run make_disk once
 	found := false
 	for _, stateFunc := range *states {
-		if stateFunc.name == "make_disk" {
+		if stateFunc.name == makeDiskState.name {
 			found = true
 		}
 	}
 	if !found {
 		*states = append(*states,
-			stateFunc{"make_disk", (*StateMachine).makeDisk},
-			stateFunc{"update_bootloader", (*StateMachine).updateBootloader},
+			makeDiskState,
+			updateBootloaderState,
 		)
 	}
-	*states = append(*states,
-		stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img})
+	*states = append(*states, makeQcow2ImgState)
 }
 
 // displayStates print the calculated states
