@@ -28,5 +28,6 @@ type StateMachineOpts struct {
 type UbuntuImageCommand struct {
 	Snap    SnapCommand    `command:"snap"`
 	Classic ClassicCommand `command:"classic"`
+	Rootfs  RootfsCommand  `command:"rootfs"`
 	Pack    PackCommand    `command:"pack" hidden:"true"`
 }
