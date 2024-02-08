@@ -35,7 +35,6 @@ func initStateMachine(imageType string, commonOpts *commands.CommonOpts, stateMa
 		}
 	case "classic":
 		stateMachine = &statemachine.ClassicStateMachine{
-			Opts: ubuntuImageCommand.Classic.ClassicOptsPassed,
 			Args: ubuntuImageCommand.Classic.ClassicArgsPassed,
 		}
 	case "pack":
