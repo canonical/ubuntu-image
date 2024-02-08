@@ -35,7 +35,6 @@ var imageCreationStates = []stateFunc{
 type ClassicStateMachine struct {
 	StateMachine
 	ImageDef imagedefinition.ImageDefinition
-	Opts     commands.ClassicOpts
 	Args     commands.ClassicArgs
 }
 
