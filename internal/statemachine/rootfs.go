@@ -13,5 +13,7 @@ func (s *RootfsStateMachine) SetCommonOpts(commonOpts *commands.CommonOpts,
 	stateMachineOpts *commands.StateMachineOpts) {
 	s.StateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
 
+	// Make sure to stop the ClassicStateMachine at a specific state
 	s.StateMachine.stateMachineFlags.Thru = preseedClassicImageState.name
+	s.StateMachine.stateMachineFlags.Until = ""
 }
