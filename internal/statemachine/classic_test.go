@@ -1676,7 +1676,6 @@ func TestStateMachine_manualCustomization(t *testing.T) {
 					{
 						UserName: "testuser",
 						UserID:   "123456",
-						Expire:   helper.BoolPtr(true),
 					},
 				},
 				AddGroup: []*imagedefinition.AddGroup{
@@ -1837,7 +1836,6 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 					{
 						UserName: "root",
 						UserID:   "0",
-						Expire:   helper.BoolPtr(true),
 					},
 				},
 			},
