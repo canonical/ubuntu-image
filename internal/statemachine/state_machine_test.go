@@ -379,7 +379,7 @@ func TestFunctionErrors(t *testing.T) {
 		newStateFunc  stateFunc
 	}{
 		{"error_state_func", 0, stateFunc{"test_error_state_func", func(stateMachine *StateMachine) error { return fmt.Errorf("Test Error") }}},
-		{"error_write_metadata", 12, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
+		{"error_write_metadata", 10, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 			return nil
 		}}},

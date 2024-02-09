@@ -119,7 +119,7 @@ func TestInvalidCommands(t *testing.T) {
 		flags         []string
 		expectedError string
 	}{
-		{"invalid_command", []string{"test"}, nil, "Unknown command `test'. Please specify one command of: classic or snap"},
+		{"invalid_command", []string{"test"}, nil, "Unknown command `test'. Please specify one command of: classic, rootfs or snap"},
 		{"no_model_assertion", []string{"snap"}, nil, "the required argument `model_assertion` was not provided"},
 		{"no_gadget_tree", []string{"classic"}, nil, "the required argument `image_definition` was not provided"},
 		{"invalid_flag", []string{"classic"}, []string{"--nonexistent"}, "unknown flag `nonexistent'"},
