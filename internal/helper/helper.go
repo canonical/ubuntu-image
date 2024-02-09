@@ -298,6 +298,16 @@ func SetCommandOutput(cmd *exec.Cmd, liveOutput bool) (cmdOutput *bytes.Buffer) 
 	return cmdOutput
 }
 
+func RunCmd(cmd *exec.Cmd, debug bool) error {
+	output := SetCommandOutput(cmd, debug)
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("Error running command \"%s\". Error: %s. Output:\n%s",
+			cmd.String(), err.Error(), output.String())
+	}
+	return nil
+}
+
 // SafeQuantitySubtraction subtracts quantities while checking for integer underflow
 func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 	if subtract > orig {
