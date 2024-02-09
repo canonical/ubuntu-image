@@ -24,12 +24,14 @@ ubuntu-image snap [options] model.assertion
 
 ubuntu-image classic [options] image_definition.yaml
 
+ubuntu-image rootfs [options] image_definition.yaml
+
 
 DESCRIPTION
 ===========
 
 ``ubuntu-image`` is a program for generating a variety of bootable disk
-images.  It currently supports building snap_-based and classic preinstalled
+images. It currently supports building snap_-based and classic preinstalled
 Ubuntu images.
 
 Snap-based images are built from a *model assertion*, which is a YAML_ file
@@ -118,12 +120,20 @@ Classic command options
 -----------------------
 
 These are the options for defining the contents of classic preinstalled Ubuntu
-images.  They can only be used when the ``ubuntu-image classic`` command is used.
+images. They can only be used when the ``ubuntu-image classic`` command is used.
 
 image_definition
     Path to the image-definition file. This file defines all of the
     customization required when building the image. This positional
     argument must be given for this mode of operation.
+
+
+Rootfs command options
+-----------------------
+
+This command support the same options as the ``classic`` one. Note that some
+options (``--until`` and ``--thru``) will be ignored. So this mode cannot be 
+interrupted and resumed.
 
 
 Common options
