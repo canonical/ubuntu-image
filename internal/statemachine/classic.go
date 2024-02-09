@@ -73,6 +73,8 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 		return err
 	}
 
+	classicStateMachine.displayStates()
+
 	return nil
 }
 
@@ -356,8 +358,6 @@ func (s *StateMachine) calculateStates() error {
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	s.states = append(s.states, rootfsCreationStates...)
 
-	s.displayCalculatedStates()
-
 	return nil
 }
 
@@ -477,16 +477,4 @@ func (s *StateMachine) addQcow2States(states *[]stateFunc) {
 		)
 	}
 	*states = append(*states, makeQcow2ImgState)
-}
-
-// displayStates print the calculated states
-func (s *StateMachine) displayCalculatedStates() {
-	if !s.commonFlags.Debug {
-		return
-	}
-	fmt.Println("\nThe calculated states are as follows:")
-	for i, state := range s.states {
-		fmt.Printf("[%d] %s\n", i, state.name)
-	}
-	fmt.Println("\n\nContinuing")
 }

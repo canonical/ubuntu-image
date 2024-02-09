@@ -55,5 +55,7 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 		return err
 	}
 
+	snapStateMachine.displayStates()
+
 	return nil
 }

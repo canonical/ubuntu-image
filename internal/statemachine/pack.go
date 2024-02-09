@@ -50,5 +50,7 @@ func (packStateMachine *PackStateMachine) Setup() error {
 		return err
 	}
 
+	packStateMachine.displayStates()
+
 	return nil
 }

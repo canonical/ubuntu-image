@@ -343,6 +343,8 @@ func TestDebug(t *testing.T) {
 		t.Errorf("Failed to create temporary directory %s\n", workDir)
 	}
 
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+
 	var stateMachine testStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.stateMachineFlags.WorkDir = workDir
@@ -367,8 +369,6 @@ func TestDebug(t *testing.T) {
 	if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
 		t.Errorf("Expected state name \"%s\" to appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
 	}
-	// clean up
-	os.RemoveAll(workDir)
 }
 
 // TestFunction replaces some of the stateFuncs to test various error scenarios
@@ -391,6 +391,8 @@ func TestFunctionErrors(t *testing.T) {
 			err := os.Mkdir(workDir, 0755)
 			asserter.AssertErrNil(err, true)
 
+			t.Cleanup(func() { os.RemoveAll(workDir) })
+
 			var stateMachine testStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.stateMachineFlags.WorkDir = workDir
@@ -408,9 +410,6 @@ func TestFunctionErrors(t *testing.T) {
 					t.Errorf("Expected an error but there was none")
 				}
 			}
-
-			// clean up the workdir
-			os.RemoveAll(workDir)
 		})
 	}
 }

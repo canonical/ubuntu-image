@@ -195,7 +195,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"populate_prepare_partitions",
 				"make_disk",
 				"update_bootloader",
-				"generate_manifest",
+				"generate_package_manifest",
 			},
 		},
 		{
@@ -221,7 +221,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"populate_prepare_partitions",
 				"make_disk",
 				"update_bootloader",
-				"generate_manifest",
+				"generate_package_manifest",
 			},
 		},
 		{
@@ -236,8 +236,8 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"add_extra_ppas",
 				"install_packages",
 				"clean_extra_ppas",
-				"install_extra_snaps",
-				"preseed_extra_snaps",
+				"prepare_image",
+				"preseed_image",
 				"clean_rootfs",
 				"customize_sources_list",
 				"customize_cloud_init",
@@ -248,7 +248,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"populate_prepare_partitions",
 				"make_disk",
 				"update_bootloader",
-				"generate_manifest",
+				"generate_package_manifest",
 			},
 		},
 		{
@@ -278,7 +278,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_disk",
 				"update_bootloader",
 				"make_qcow2_image",
-				"generate_manifest",
+				"generate_package_manifest",
 				"generate_filelist",
 			},
 		},
@@ -302,7 +302,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"populate_prepare_partitions",
 				"make_disk",
 				"update_bootloader",
-				"generate_manifest",
+				"generate_package_manifest",
 			},
 		},
 		{
@@ -323,7 +323,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"populate_prepare_partitions",
 				"make_disk",
 				"update_bootloader",
-				"generate_manifest",
+				"generate_package_manifest",
 			},
 		},
 		{
@@ -349,7 +349,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"populate_prepare_partitions",
 				"make_disk",
 				"update_bootloader",
-				"generate_manifest",
+				"generate_package_manifest",
 			},
 		},
 		{
@@ -371,7 +371,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"populate_prepare_partitions",
 				"make_disk",
 				"update_bootloader",
-				"generate_manifest",
+				"generate_package_manifest",
 			},
 		},
 		{
@@ -400,7 +400,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"populate_prepare_partitions",
 				"make_disk",
 				"update_bootloader",
-				"generate_manifest",
+				"generate_package_manifest",
 			},
 		},
 		{
@@ -512,12 +512,15 @@ func TestPrintStates(t *testing.T) {
 	err = stateMachine.calculateStates()
 	asserter.AssertErrNil(err, true)
 
+	stateMachine.displayStates()
+	asserter.AssertErrNil(err, true)
+
 	// restore stdout and examine what was printed
 	restoreStdout()
 	readStdout, err := io.ReadAll(stdout)
 	asserter.AssertErrNil(err, true)
 
-	expectedStates := `The calculated states are as follows:
+	expectedStates := `Following states will be executed:
 [0] build_gadget_tree
 [1] prepare_gadget_tree
 [2] load_gadget_yaml
