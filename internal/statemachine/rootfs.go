@@ -2,7 +2,8 @@ package statemachine
 
 import "github.com/canonical/ubuntu-image/internal/commands"
 
-// RootfsStateMachine embeds ClassicStateMachine
+// RootfsStateMachine embeds ClassicStateMachine and enable re-implementing
+// SetCommonOpts to stop the Classic workflow once the rootfs is ready
 type RootfsStateMachine struct {
 	ClassicStateMachine
 }
