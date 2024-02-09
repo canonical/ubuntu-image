@@ -416,16 +416,107 @@ func TestFunctionErrors(t *testing.T) {
 
 // TestSetCommonOpts ensures that the function actually sets the correct values in the struct
 func TestSetCommonOpts(t *testing.T) {
-	commonOpts := new(commands.CommonOpts)
-	stateMachineOpts := new(commands.StateMachineOpts)
-	commonOpts.Debug = true
-	stateMachineOpts.WorkDir = testDir
+	asserter := helper.Asserter{T: t}
+	type args struct {
+		stateMachine     SmInterface
+		commonOpts       *commands.CommonOpts
+		stateMachineOpts *commands.StateMachineOpts
+	}
 
-	var stateMachine testStateMachine
-	stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
+	cmpOpts := []cmp.Option{
+		cmp.AllowUnexported(
+			StateMachine{},
+			temporaryDirectories{},
+		),
+		cmpopts.IgnoreUnexported(
+			gadget.Info{},
+		),
+	}
 
-	if !stateMachine.commonFlags.Debug || stateMachine.stateMachineFlags.WorkDir != testDir {
-		t.Error("SetCommonOpts failed to set the correct options")
+	tests := []struct {
+		name        string
+		args        args
+		want        SmInterface
+		expectedErr string
+	}{
+		{
+			name: "set options on a snap state machine",
+			args: args{
+				stateMachine: &SnapStateMachine{},
+				commonOpts: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineOpts: &commands.StateMachineOpts{
+					WorkDir: "workdir",
+				},
+			},
+			want: &SnapStateMachine{
+				StateMachine: StateMachine{
+					commonFlags: &commands.CommonOpts{
+						Debug: true,
+					},
+					stateMachineFlags: &commands.StateMachineOpts{
+						WorkDir: "workdir",
+					},
+				},
+			},
+		},
+		{
+			name: "set options on a classic state machine",
+			args: args{
+				stateMachine: &ClassicStateMachine{},
+				commonOpts: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineOpts: &commands.StateMachineOpts{
+					WorkDir: "workdir",
+				},
+			},
+			want: &ClassicStateMachine{
+				StateMachine: StateMachine{
+					commonFlags: &commands.CommonOpts{
+						Debug: true,
+					},
+					stateMachineFlags: &commands.StateMachineOpts{
+						WorkDir: "workdir",
+					},
+				},
+			},
+		},
+		{
+			name: "set options on a rootfs state machine",
+			args: args{
+				stateMachine: &RootfsStateMachine{},
+				commonOpts: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineOpts: &commands.StateMachineOpts{
+					WorkDir: "workdir",
+					Until:   "will_be_overidden",
+					Thru:    "will_be_overidden",
+				},
+			},
+			want: &RootfsStateMachine{
+				ClassicStateMachine: ClassicStateMachine{
+					StateMachine: StateMachine{
+						commonFlags: &commands.CommonOpts{
+							Debug: true,
+						},
+						stateMachineFlags: &commands.StateMachineOpts{
+							WorkDir: "workdir",
+							Thru:    preseedClassicImageState.name,
+							Until:   "",
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.args.stateMachine.SetCommonOpts(tc.args.commonOpts, tc.args.stateMachineOpts)
+			asserter.AssertEqual(tc.want, tc.args.stateMachine, cmpOpts...)
+		})
 	}
 }
 
