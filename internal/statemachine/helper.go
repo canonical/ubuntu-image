@@ -27,6 +27,8 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
+var runCmd = helper.RunCmd
+
 // validateInput ensures that command line flags for the state machine are valid. These
 // flags are applicable to all image types
 func (stateMachine *StateMachine) validateInput() error {
@@ -934,39 +936,32 @@ func manualAddUser(customizations []*imagedefinition.AddUser, targetDir string, 
 		addUserCmds = append(addUserCmds, addUserCmd)
 
 		if c.Password != "" {
-			chPasswordCmd := execCommand("chroot", targetDir, "chpassword", c.UserName)
+			chPasswordCmd := execCommand("chroot", targetDir, "chpasswd")
 
 			if c.PasswordType == "hash" {
 				chPasswordCmd.Args = append(chPasswordCmd.Args, "-e")
 			}
-			chPasswordCmd.Args = append(chPasswordCmd.Args, c.Password)
+
+			chPasswordCmd.Stdin = strings.NewReader(fmt.Sprintf("%s:%s", c.UserName, c.Password))
 
 			debugStatement = fmt.Sprintf("%s, setting a password\n", strings.TrimSpace(debugStatement))
 			addUserCmds = append(addUserCmds, chPasswordCmd)
 		}
 
-		if c.Expire == nil {
-			return imagedefinition.ErrExpireNil
-		}
-
-		if *c.Expire {
-			expireCmd := execCommand("chroot", targetDir, "passwd", "--expire", c.UserName)
-			debugStatement = fmt.Sprintf("%s, forcing reseting the password at first login\n", strings.TrimSpace(debugStatement))
-			addUserCmds = append(addUserCmds, expireCmd)
-		}
+		debugStatement = fmt.Sprintf("%s, forcing reseting the password at first login\n", strings.TrimSpace(debugStatement))
+		addUserCmds = append(addUserCmds,
+			execCommand("chroot", targetDir, "passwd", "--expire", c.UserName),
+		)
 
 		if debug {
 			fmt.Print(debugStatement)
 		}
 
 		for _, cmd := range addUserCmds {
-			addUserOutput := helper.SetCommandOutput(cmd, debug)
-			err := cmd.Run()
+			err := runCmd(cmd, debug)
 			if err != nil {
-				return fmt.Errorf("Error adding user. Command used is \"%s\". Error is %s. Full output below:\n%s",
-					cmd.String(), err.Error(), addUserOutput.String())
+				return err
 			}
-
 		}
 	}
 

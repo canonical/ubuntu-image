@@ -167,7 +167,6 @@ type AddUser struct {
 	UserID       string `yaml:"id"            json:"UserID,omitempty"`
 	Password     string `yaml:"password"      json:"Password,omitempty"`
 	PasswordType string `yaml:"password-type" json:"PasswordType"        default:"hash" jsonschema:"enum=text,enum=hash"`
-	Expire       *bool  `yaml:"expire"        json:"Expire"              default:"true"`
 }
 
 // Artifact contains information about the files that are created

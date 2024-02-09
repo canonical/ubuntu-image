@@ -231,7 +231,6 @@ func TestImageDefinition_SetDefaults(t *testing.T) {
 				AddUser: []*AddUser{
 					{
 						PasswordType: "hash",
-						Expire:       helper.BoolPtr(true),
 					},
 				},
 			},
