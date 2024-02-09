@@ -179,6 +179,19 @@ func NewOSMock(conf *osMockConf) *osMock {
 	return &osMock{conf: conf}
 }
 
+type mockRunCmd struct {
+	cmds []*exec.Cmd
+}
+
+func NewMockRunCommand() *mockRunCmd {
+	return &mockRunCmd{}
+}
+
+func (m *mockRunCmd) runCmd(cmd *exec.Cmd, debug bool) error {
+	m.cmds = append(m.cmds, cmd)
+	return nil
+}
+
 type mockExecCmd struct{}
 
 func NewMockExecCommand() *mockExecCmd {
