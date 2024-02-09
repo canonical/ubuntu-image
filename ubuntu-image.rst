@@ -104,6 +104,15 @@ model_assertion
     both a revision and channel are provided, the revision specified will be
     installed in the image, and updates will come from the specified channel
 
+--preseed
+    Preseed the image (UC20+ only).
+
+--preseed-sign-key=<key> 
+    Name of the key to use to sign preseed assertion, otherwise use the default key
+
+--sysfs-overlay=<path to folder contains sysfs overlay>
+    specify folder contains sysfsoverlay directory. This options also requires --presseding options and --preseed-sign-key option.
+
 Classic command options
 -----------------------
 
