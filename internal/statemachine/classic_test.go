@@ -3,6 +3,7 @@
 package statemachine
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -2915,6 +2916,38 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			t.Errorf("Directory \"%s\" should exist, but does not", addedDir)
 		}
 	}
+
+	// test addUser customization
+	shadowPath := filepath.Join(mountDir, "etc", "shadow")
+	shadowFile, err := os.Open(shadowPath)
+	asserter.AssertErrNil(err, true)
+	defer shadowFile.Close()
+	ubuntu2Found := false
+	ubuntu2Line := ""
+
+	scanner := bufio.NewScanner(shadowFile)
+
+	for scanner.Scan() {
+		if strings.HasPrefix(scanner.Text(), "ubuntu2") {
+			ubuntu2Line = scanner.Text()
+			ubuntu2Found = true
+			break
+		}
+	}
+
+	if !ubuntu2Found {
+		t.Error("ubuntu2 user not created")
+	}
+
+	expire := strings.Split(ubuntu2Line, ":")[2]
+
+	if expire != "0" {
+		t.Error("ubuntu2 user password should be expired")
+	}
+
+	// search for ubuntu2
+	// check expiration split by :, check 0 in 3rd field
+	//
 
 	grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
 	_, err = os.Stat(grubCfg)
