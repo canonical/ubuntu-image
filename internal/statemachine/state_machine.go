@@ -397,6 +397,25 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	return nil
 }
 
+// displayStates print the calculated states
+func (s *StateMachine) displayStates() {
+	if !s.commonFlags.Debug {
+		return
+	}
+	fmt.Println("\nFollowing states will be executed:")
+	for i, state := range s.states {
+		if state.name == s.stateMachineFlags.Until {
+			break
+		}
+		fmt.Printf("[%d] %s\n", i, state.name)
+
+		if state.name == s.stateMachineFlags.Thru {
+			break
+		}
+	}
+	fmt.Println("\nContinuing")
+}
+
 // writeMetadata writes the state machine info to disk, encoded as JSON. This will be used when resuming a
 // partial state machine run
 func (stateMachine *StateMachine) writeMetadata(metadataFile string) error {
