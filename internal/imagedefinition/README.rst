@@ -252,7 +252,8 @@ The following specification defines what is supported in the YAML:
                # Path inside the rootfs.
                path: <string>
            # Any additional users to add in the rootfs
-           # 
+           # We recommend using cloud-init when possible and fallback
+           # on this method if not possible (e.g performance issues)
            add-user: (optional)
              -
                # The name for the user
