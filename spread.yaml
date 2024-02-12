@@ -123,8 +123,14 @@ prepare: |
   snap install core22 --channel=latest/edge
   snap install yq
   snap install snapcraft --classic
+  
+  # Setup lxd
+  # Make sure we use the snap version 
+  apt remove -y lxd
   snap install lxd
   lxd init --auto
+  
+  # Build and install the snap
   snapcraft
   snap install --classic --dangerous ubuntu-image_*.snap
   
