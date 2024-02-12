@@ -1,14 +1,17 @@
 project: ubuntu-image
 
 environment:
-    # On some distros the default GOPROXY setting is 'direct' (eg. Fedora).
-    # Some of the external go packages may get removed or could be temporary
-    # offline (as happened with maze.io/x/crypt), and then the sources are
-    # only available through the proxy cache. Play it safe and enable the
-    # proxy to allow for least CI interruptions.
-    GOPROXY: https://proxy.golang.org,direct
-    LANG: "C.UTF-8"
-    LANGUAGE: "en"
+  # On some distros the default GOPROXY setting is 'direct' (eg. Fedora).
+  # Some of the external go packages may get removed or could be temporary
+  # offline (as happened with maze.io/x/crypt), and then the sources are
+  # only available through the proxy cache. Play it safe and enable the
+  # proxy to allow for least CI interruptions.
+  GOPROXY: https://proxy.golang.org,direct
+  LANG: "C.UTF-8"
+  LANGUAGE: "en"
+  # build the snap with lxd
+  SNAPCRAFT_BUILD_ENVIRONMENT: lxd
+
 
 backends:
   google:
