@@ -92,10 +92,18 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return err
 	}
 
+	if imageDefinition.Rootfs.SourcesListDeb822 == nil {
+		fmt.Print("WARNING: rootfs.sources-list-deb822 was not set. Please explicitely set the format desired for sources list in your image definition.\n")
+	}
+
 	// populate the default values for imageDefinition if they were not provided in
 	// the image definition YAML file
 	if err := helperSetDefaults(&imageDefinition); err != nil {
 		return err
+	}
+
+	if !*imageDefinition.Rootfs.SourcesListDeb822 {
+		fmt.Print("WARNING: rootfs.sources-list-deb822 is set to false. The deprecated format will be used to manage sources list. Please if possible adopt the new format.\n")
 	}
 
 	// The official standard for YAML schemas states that they are an extension of

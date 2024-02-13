@@ -2264,42 +2264,55 @@ func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 // TestSateMachine_customizeSourcesList tests functionality of the customizeSourcesList state function
 func TestSateMachine_customizeSourcesList(t *testing.T) {
 	testCases := []struct {
-		name                string
-		existingSourcesList string
-		customization       *imagedefinition.Customization
-		mockFuncs           func() func()
-		expectedErr         string
-		expectedSourcesList string
+		name                      string
+		deb822Format              bool
+		existingSourcesList       string
+		existingDeb822SourcesList string
+		customization             *imagedefinition.Customization
+		mockFuncs                 func() func()
+		expectedErr               string
+		expectedSourcesList       string
+		expectedDeb822SourcesList string
 	}{
 		{
-			name:                "set default",
+			name:                "set default sources.list",
+			deb822Format:        false,
 			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
 			customization:       &imagedefinition.Customization{},
-			expectedSourcesList: `deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
+			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
 `,
 		},
 		{
-			name:                "set less components",
+			name:                "set less components sources.list",
+			deb822Format:        false,
 			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
 			customization: &imagedefinition.Customization{
 				Components: []string{"main"},
 			},
-			expectedSourcesList: `deb http://archive.ubuntu.com/ubuntu/ jammy main
+			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+deb http://archive.ubuntu.com/ubuntu/ jammy main
 `,
 		},
 		{
-			name:                "set components and pocket",
+			name:                "set components and pocket sources.list",
+			deb822Format:        false,
 			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
 			customization: &imagedefinition.Customization{
 				Components: []string{"main"},
 				Pocket:     "security",
 			},
-			expectedSourcesList: `deb http://archive.ubuntu.com/ubuntu/ jammy main
+			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+deb http://archive.ubuntu.com/ubuntu/ jammy main
 deb http://security.ubuntu.com/ubuntu/ jammy-security main
 `,
 		},
 		{
 			name:                "fail to write sources.list",
+			deb822Format:        false,
 			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
 			customization: &imagedefinition.Customization{
 				Components: []string{"main"},
@@ -2318,6 +2331,123 @@ deb http://security.ubuntu.com/ubuntu/ jammy-security main
 				return func() { osOpenFile = os.OpenFile }
 			},
 		},
+		{
+			name:                "set default ubuntu.sources and commented sources.list",
+			deb822Format:        true,
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			existingDeb822SourcesList: `Types: deb
+URIs: http://archive.ubuntu.com/
+Suites: jammy
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+`,
+			customization:       &imagedefinition.Customization{},
+			expectedSourcesList: imagedefinition.LegacySourcesListComment,
+			expectedDeb822SourcesList: `## Ubuntu distribution repository
+##
+## The following settings can be adjusted to configure which packages to use from Ubuntu.
+## Mirror your choices (except for URIs and Suites) in the security section below to
+## ensure timely security updates.
+##
+## Types: Append deb-src to enable the fetching of source package.
+## URIs: A URL to the repository (you may add multiple URLs)
+## Suites: The following additional suites can be configured
+##   <name>-updates   - Major bug fix updates produced after the final release of the
+##                      distribution.
+##   <name>-backports - software from this repository may not have been tested as
+##                      extensively as that contained in the main release, although it includes
+##                      newer versions of some applications which may provide useful features.
+##                      Also, please note that software in backports WILL NOT receive any review
+##                      or updates from the Ubuntu security team.
+## Components: Aside from main, the following components can be added to the list
+##   restricted  - Software that may not be under a free license, or protected by patents.
+##   universe    - Community maintained packages.
+##                 Software from this repository is only maintained and supported by Canonical
+##                 for machines with Ubuntu Pro subscriptions. Without Ubuntu Pro, the Ubuntu
+##                 community provides best-effort security maintenance.
+##   multiverse  - Community maintained of restricted. Software from this repository is
+##                 ENTIRELY UNSUPPORTED by the Ubuntu team, and may not be under a free
+##                 licence. Please satisfy yourself as to your rights to use the software.
+##                 Also, please note that software in multiverse WILL NOT receive any
+##                 review or updates from the Ubuntu security team.
+##
+## See the sources.list(5) manual page for further settings.
+Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: jammy
+Components: main restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+## Ubuntu security updates. Aside from URIs and Suites,
+## this should mirror your choices in the previous section.
+Types: deb
+URIs: http://security.ubuntu.com/ubuntu/
+Suites: jammy
+Components: main restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+`,
+		},
+		{
+			name:                "fail to write ubuntu.sources and commented sources.list",
+			deb822Format:        true,
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			existingDeb822SourcesList: `Types: deb
+URIs: http://archive.ubuntu.com/
+Suites: jammy
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+`,
+			customization:       &imagedefinition.Customization{},
+			expectedSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			expectedDeb822SourcesList: `Types: deb
+URIs: http://archive.ubuntu.com/
+Suites: jammy
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+`,
+			expectedErr: "unable to open ubuntu.sources file",
+			mockFuncs: func() func() {
+				mock := NewOSMock(
+					&osMockConf{
+						OpenFileThreshold: 0,
+					},
+				)
+
+				osOpenFile = mock.OpenFile
+				return func() { osOpenFile = os.OpenFile }
+			},
+		},
+		{
+			name:                "fail to create sources.list.d",
+			deb822Format:        true,
+			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			existingDeb822SourcesList: `Types: deb
+URIs: http://archive.ubuntu.com/
+Suites: jammy
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+`,
+			customization:       &imagedefinition.Customization{},
+			expectedSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
+			expectedDeb822SourcesList: `Types: deb
+URIs: http://archive.ubuntu.com/
+Suites: jammy
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+`,
+			expectedErr: "Error /etc/apt/sources.list.d directory",
+			mockFuncs: func() func() {
+				mock := NewOSMock(
+					&osMockConf{
+						MkdirAllThreshold: 0,
+					},
+				)
+
+				osMkdirAll = mock.MkdirAll
+				return func() { osMkdirAll = os.MkdirAll }
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2330,9 +2460,11 @@ deb http://security.ubuntu.com/ubuntu/ jammy-security main
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
-				Architecture:  getHostArch(),
-				Series:        getHostSuite(),
-				Rootfs:        &imagedefinition.Rootfs{},
+				Architecture: getHostArch(),
+				Series:       getHostSuite(),
+				Rootfs: &imagedefinition.Rootfs{
+					SourcesListDeb822: helper.BoolPtr(tc.deb822Format),
+				},
 				Customization: tc.customization,
 			}
 
@@ -2344,12 +2476,16 @@ deb http://security.ubuntu.com/ubuntu/ jammy-security main
 
 			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt"), 0644)
+			err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d"), 0644)
 			asserter.AssertErrNil(err, true)
 
 			sourcesListPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
+			deb822SourcesListPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d", "ubuntu.sources")
 
 			err = osWriteFile(sourcesListPath, []byte(tc.existingSourcesList), 0644)
+			asserter.AssertErrNil(err, true)
+
+			err = osWriteFile(deb822SourcesListPath, []byte(tc.existingDeb822SourcesList), 0644)
 			asserter.AssertErrNil(err, true)
 
 			if tc.mockFuncs != nil {
@@ -2365,10 +2501,13 @@ deb http://security.ubuntu.com/ubuntu/ jammy-security main
 			sourcesListBytes, err := os.ReadFile(sourcesListPath)
 			asserter.AssertErrNil(err, true)
 
-			if string(sourcesListBytes) != tc.expectedSourcesList {
-				t.Errorf("Expected sources.list content \"%s\", but got \"%s\"",
-					tc.expectedSourcesList, string(sourcesListBytes))
-			}
+			asserter.AssertEqual(tc.expectedSourcesList, string(sourcesListBytes))
+
+			deb822SourcesListBytes, err := os.ReadFile(deb822SourcesListPath)
+			asserter.AssertErrNil(err, true)
+
+			asserter.AssertEqual(tc.expectedDeb822SourcesList, string(deb822SourcesListBytes))
+
 		})
 	}
 }
@@ -2994,15 +3133,59 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		t.Errorf("Expected LANG=C.UTF-8 in %s, but got %s", localeFile, string(localeBytes))
 	}
 
+	// check if components and pocket correctly setup in /etc/apt/sources.list.d/ubuntu.sources
+	aptDeb822SourcesListBytes, err := os.ReadFile(filepath.Join(mountDir, "etc", "apt", "sources.list.d", "ubuntu.sources"))
+	asserter.AssertErrNil(err, true)
+	wantAptDeb822SourcesList := `## Ubuntu distribution repository
+##
+## The following settings can be adjusted to configure which packages to use from Ubuntu.
+## Mirror your choices (except for URIs and Suites) in the security section below to
+## ensure timely security updates.
+##
+## Types: Append deb-src to enable the fetching of source package.
+## URIs: A URL to the repository (you may add multiple URLs)
+## Suites: The following additional suites can be configured
+##   <name>-updates   - Major bug fix updates produced after the final release of the
+##                      distribution.
+##   <name>-backports - software from this repository may not have been tested as
+##                      extensively as that contained in the main release, although it includes
+##                      newer versions of some applications which may provide useful features.
+##                      Also, please note that software in backports WILL NOT receive any review
+##                      or updates from the Ubuntu security team.
+## Components: Aside from main, the following components can be added to the list
+##   restricted  - Software that may not be under a free license, or protected by patents.
+##   universe    - Community maintained packages.
+##                 Software from this repository is only maintained and supported by Canonical
+##                 for machines with Ubuntu Pro subscriptions. Without Ubuntu Pro, the Ubuntu
+##                 community provides best-effort security maintenance.
+##   multiverse  - Community maintained of restricted. Software from this repository is
+##                 ENTIRELY UNSUPPORTED by the Ubuntu team, and may not be under a free
+##                 licence. Please satisfy yourself as to your rights to use the software.
+##                 Also, please note that software in multiverse WILL NOT receive any
+##                 review or updates from the Ubuntu security team.
+##
+## See the sources.list(5) manual page for further settings.
+Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: jammy jammy-updates jammy-proposed
+Components: main universe restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+## Ubuntu security updates. Aside from URIs and Suites,
+## this should mirror your choices in the previous section.
+Types: deb
+URIs: http://security.ubuntu.com/ubuntu/
+Suites: jammy jammy-updates jammy-proposed
+Components: main universe restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+`
+	asserter.AssertEqual(wantAptDeb822SourcesList, string(aptDeb822SourcesListBytes))
+
 	// check if components and pocket correctly setup in /etc/apt/sources.list
 	aptSourcesListBytes, err := os.ReadFile(filepath.Join(mountDir, "etc", "apt", "sources.list"))
 	asserter.AssertErrNil(err, true)
-	wantAptSourcesList := `deb http://archive.ubuntu.com/ubuntu/ jammy main universe restricted multiverse
-deb http://security.ubuntu.com/ubuntu/ jammy-security main universe restricted multiverse
-deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe restricted multiverse
-deb http://archive.ubuntu.com/ubuntu/ jammy-proposed main universe restricted multiverse
-`
-	asserter.AssertEqual(wantAptSourcesList, string(aptSourcesListBytes))
+	asserter.AssertEqual(imagedefinition.LegacySourcesListComment, string(aptSourcesListBytes))
 
 }
 
@@ -3656,11 +3839,15 @@ func TestCreateChroot(t *testing.T) {
 		Architecture: getHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
-			Pocket: "proposed",
+			Pocket:            "proposed",
+			SourcesListDeb822: helper.BoolPtr(true),
 		},
 	}
 
-	err := stateMachine.makeTemporaryDirectories()
+	err := helper.SetDefaults(&stateMachine.ImageDef)
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
@@ -3700,22 +3887,55 @@ func TestCreateChroot(t *testing.T) {
 		t.Errorf("Expected resolv.conf to be empty, but is \"%s\"", string(resolvConfData))
 	}
 
-	// check that security, updates, and proposed were added to /etc/apt/sources.list
-	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
-	sourcesListData, err := os.ReadFile(sourcesList)
+	// check if components and pocket correctly setup in /etc/apt/sources.list.d/ubuntu.sources
+	aptDeb822SourcesListBytes, err := os.ReadFile(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d", "ubuntu.sources"))
 	asserter.AssertErrNil(err, true)
+	wantAptDeb822SourcesList := `## Ubuntu distribution repository
+##
+## The following settings can be adjusted to configure which packages to use from Ubuntu.
+## Mirror your choices (except for URIs and Suites) in the security section below to
+## ensure timely security updates.
+##
+## Types: Append deb-src to enable the fetching of source package.
+## URIs: A URL to the repository (you may add multiple URLs)
+## Suites: The following additional suites can be configured
+##   <name>-updates   - Major bug fix updates produced after the final release of the
+##                      distribution.
+##   <name>-backports - software from this repository may not have been tested as
+##                      extensively as that contained in the main release, although it includes
+##                      newer versions of some applications which may provide useful features.
+##                      Also, please note that software in backports WILL NOT receive any review
+##                      or updates from the Ubuntu security team.
+## Components: Aside from main, the following components can be added to the list
+##   restricted  - Software that may not be under a free license, or protected by patents.
+##   universe    - Community maintained packages.
+##                 Software from this repository is only maintained and supported by Canonical
+##                 for machines with Ubuntu Pro subscriptions. Without Ubuntu Pro, the Ubuntu
+##                 community provides best-effort security maintenance.
+##   multiverse  - Community maintained of restricted. Software from this repository is
+##                 ENTIRELY UNSUPPORTED by the Ubuntu team, and may not be under a free
+##                 licence. Please satisfy yourself as to your rights to use the software.
+##                 Also, please note that software in multiverse WILL NOT receive any
+##                 review or updates from the Ubuntu security team.
+##
+## See the sources.list(5) manual page for further settings.
+Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: jammy jammy-updates jammy-proposed
+Components: main restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
-	pockets := []string{
-		fmt.Sprintf("%s-security", stateMachine.ImageDef.Series),
-		fmt.Sprintf("%s-updates", stateMachine.ImageDef.Series),
-		fmt.Sprintf("%s-proposed", stateMachine.ImageDef.Series),
-	}
+## Ubuntu security updates. Aside from URIs and Suites,
+## this should mirror your choices in the previous section.
+Types: deb
+URIs: http://security.ubuntu.com/ubuntu/
+Suites: jammy jammy-updates jammy-proposed
+Components: main restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
-	for _, pocket := range pockets {
-		if !strings.Contains(string(sourcesListData), pocket) {
-			t.Errorf("%s is not present in /etc/apt/sources.list", pocket)
-		}
-	}
+`
+	asserter.AssertEqual(wantAptDeb822SourcesList, string(aptDeb822SourcesListBytes))
+
 }
 
 // TestFailedCreateChroot tests failure cases in createChroot
@@ -3733,7 +3953,9 @@ func TestFailedCreateChroot(t *testing.T) {
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
 		Architecture: getHostArch(),
 		Series:       getHostSuite(),
-		Rootfs:       &imagedefinition.Rootfs{},
+		Rootfs: &imagedefinition.Rootfs{
+			SourcesListDeb822: helper.BoolPtr(false),
+		},
 	}
 
 	err := stateMachine.makeTemporaryDirectories()

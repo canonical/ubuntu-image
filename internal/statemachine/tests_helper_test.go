@@ -19,7 +19,8 @@ var basicImageDef = imagedefinition.ImageDefinition{
 	Architecture: getHostArch(),
 	Series:       getHostSuite(),
 	Rootfs: &imagedefinition.Rootfs{
-		Archive: "ubuntu",
+		Archive:           "ubuntu",
+		SourcesListDeb822: helper.BoolPtr(false),
 	},
 	Customization: &imagedefinition.Customization{},
 }
@@ -115,6 +116,7 @@ type osMockConf struct {
 	RemoveThreshold                uint
 	TruncateThreshold              uint
 	OpenFileThreshold              uint
+	MkdirAllThreshold              uint
 }
 
 // osMock holds methods to easily mock functions from os and snapd/osutil packages
@@ -128,6 +130,7 @@ type osMock struct {
 	beforeRemoveFail                uint
 	beforeTruncateFail              uint
 	beforeOpenFileFail              uint
+	beforeMkdirAllFail              uint
 }
 
 func (o *osMock) CopySpecialFile(path, dest string) error {
@@ -173,6 +176,15 @@ func (o *osMock) OpenFile(name string, flag int, perm os.FileMode) (*os.File, er
 	o.beforeOpenFileFail++
 
 	return &os.File{}, nil
+}
+
+func (o *osMock) MkdirAll(path string, perm os.FileMode) error {
+	if o.beforeOpenFileFail >= o.conf.OpenFileThreshold {
+		return fmt.Errorf("OpenFile fail")
+	}
+	o.beforeMkdirAllFail++
+
+	return nil
 }
 
 func NewOSMock(conf *osMockConf) *osMock {
