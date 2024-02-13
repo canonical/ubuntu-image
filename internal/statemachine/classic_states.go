@@ -176,8 +176,15 @@ func (stateMachine *StateMachine) createChroot() error {
 		return fmt.Errorf("Error truncating resolv.conf: %s", err.Error())
 	}
 
-	// add any extra apt sources to /etc/apt/sources.list
-	return stateMachine.overwriteSourcesList(classicStateMachine.ImageDef.BuildPocketList())
+	if *classicStateMachine.ImageDef.Rootfs.SourcesListDeb822 {
+		err := stateMachine.setDeb822SourcesList(classicStateMachine.ImageDef.Deb822BuildSourcesList())
+		if err != nil {
+			return err
+		}
+		return stateMachine.setLegacySourcesList(imagedefinition.LegacySourcesListComment)
+	}
+
+	return stateMachine.setLegacySourcesList(classicStateMachine.ImageDef.LegacyBuildSourcesList())
 }
 
 // add PPAs to the apt sources list
@@ -959,24 +966,55 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 // is done, and before other manual customization to let users modify it.
 func (stateMachine *StateMachine) customizeSourcesList() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
-	return stateMachine.overwriteSourcesList(classicStateMachine.ImageDef.TargetPocketList())
+
+	if *classicStateMachine.ImageDef.Rootfs.SourcesListDeb822 {
+		err := stateMachine.setDeb822SourcesList(classicStateMachine.ImageDef.Deb822TargetSourcesList())
+		if err != nil {
+			return err
+		}
+		return stateMachine.setLegacySourcesList(imagedefinition.LegacySourcesListComment)
+	}
+
+	return stateMachine.setLegacySourcesList(classicStateMachine.ImageDef.LegacyTargetSourcesList())
 }
 
-// overwriteSourcesList replaces /etc/apt/sources.list with the given list of entries
+// setLegacySourcesList replaces /etc/apt/sources.list with the given list of entries
 // This function will truncate the existing file.
-func (stateMachine *StateMachine) overwriteSourcesList(aptSources []string) error {
+func (stateMachine *StateMachine) setLegacySourcesList(aptSources string) error {
 	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
 	sourcesListFile, err := osOpenFile(sourcesList, os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("unable to open sources.list file: %w", err)
 	}
 	defer sourcesListFile.Close()
-	for _, aptSource := range aptSources {
-		_, err = sourcesListFile.WriteString(aptSource)
-		if err != nil {
-			return fmt.Errorf("unable to write apt sources: %w", err)
-		}
+	_, err = sourcesListFile.WriteString(aptSources)
+	if err != nil {
+		return fmt.Errorf("unable to write apt sources: %w", err)
 	}
+	return nil
+}
+
+// setDeb822SourcesList replaces /etc/apt/sources.list.d/ubuntu.sources with the given content
+// This function will truncate the existing file if any
+func (stateMachine *StateMachine) setDeb822SourcesList(sourcesListContent string) error {
+	sourcesListDir := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
+	err := osMkdirAll(sourcesListDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error /etc/apt/sources.list.d directory: %s", err.Error())
+	}
+
+	sourcesList := filepath.Join(sourcesListDir, "ubuntu.sources")
+	f, err := osOpenFile(sourcesList, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open ubuntu.sources file: %w", err)
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(sourcesListContent)
+	if err != nil {
+		return fmt.Errorf("unable to write apt sources: %w", err)
+	}
+
 	return nil
 }
 

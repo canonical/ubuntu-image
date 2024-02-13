@@ -111,6 +111,13 @@ The following specification defines what is supported in the YAML:
              # An alternative branch to use while retrieving seeds
              # from a git or bzr source.
              branch: <string> (optional)
+          # Whether to write the sources list as Deb822 formatted entries in 
+          # /etc/apt/sources.list.d/ubuntu.sources or not (and thus use the legacy format
+          # in /etc/apt/sources.list)
+          # Default to "false" for now to not break existing builds but a warning will be
+          # displayed and this default will switch at some point in the future.
+          # A warning is also displayed if no value was explicitely set for this field.
+          sources-list-deb822: <boolean> (optional)
          # Used for pre-built root filesystems rather than germinating
          # from a seed or using a list of archive-tasks. Must be an
          # an uncompressed tar archive or a tar archive with one of the

@@ -12,6 +12,7 @@ import (
 
 func TestGeneratePocketList(t *testing.T) {
 	t.Parallel()
+	asserter := helper.Asserter{T: t}
 	type args struct {
 		series         string
 		components     []string
@@ -21,10 +22,10 @@ func TestGeneratePocketList(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		imageDef        ImageDefinition
-		args            args
-		expectedPockets []string
+		name                string
+		imageDef            ImageDefinition
+		args                args
+		expectedSourcesList string
 	}{
 		{
 			name: "release",
@@ -35,7 +36,10 @@ func TestGeneratePocketList(t *testing.T) {
 				securityMirror: "http://security.ubuntu.com/ubuntu/",
 				pocket:         "release",
 			},
-			expectedPockets: []string{"deb http://archive.ubuntu.com/ubuntu/ jammy main universe\n"},
+			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+deb http://archive.ubuntu.com/ubuntu/ jammy main universe
+`,
 		},
 		{
 			name: "security",
@@ -46,10 +50,11 @@ func TestGeneratePocketList(t *testing.T) {
 				pocket:         "security",
 				securityMirror: "http://security.ubuntu.com/ubuntu/",
 			},
-			expectedPockets: []string{
-				"deb http://archive.ubuntu.com/ubuntu/ jammy main\n",
-				"deb http://security.ubuntu.com/ubuntu/ jammy-security main\n",
-			},
+			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+deb http://archive.ubuntu.com/ubuntu/ jammy main
+deb http://security.ubuntu.com/ubuntu/ jammy-security main
+`,
 		},
 		{
 			name: "updates",
@@ -60,11 +65,14 @@ func TestGeneratePocketList(t *testing.T) {
 				securityMirror: "http://ports.ubuntu.com/",
 				pocket:         "updates",
 			},
-			expectedPockets: []string{
-				"deb http://ports.ubuntu.com/ jammy main universe multiverse\n",
-				"deb http://ports.ubuntu.com/ jammy-security main universe multiverse\n",
-				"deb http://ports.ubuntu.com/ jammy-updates main universe multiverse\n",
-			},
+			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+deb http://ports.ubuntu.com/ jammy main universe multiverse
+deb http://ports.ubuntu.com/ jammy-security main universe multiverse
+## Major bug fix updates produced after the final release of the
+## distribution.
+deb http://ports.ubuntu.com/ jammy-updates main universe multiverse
+`,
 		},
 		{
 			name: "proposed",
@@ -75,34 +83,28 @@ func TestGeneratePocketList(t *testing.T) {
 				securityMirror: "http://security.ubuntu.com/ubuntu/",
 				pocket:         "proposed",
 			},
-			expectedPockets: []string{
-				"deb http://archive.ubuntu.com/ubuntu/ jammy main universe multiverse restricted\n",
-				"deb http://security.ubuntu.com/ubuntu/ jammy-security main universe multiverse restricted\n",
-				"deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe multiverse restricted\n",
-				"deb http://archive.ubuntu.com/ubuntu/ jammy-proposed main universe multiverse restricted\n",
-			},
+			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+deb http://archive.ubuntu.com/ubuntu/ jammy main universe multiverse restricted
+deb http://security.ubuntu.com/ubuntu/ jammy-security main universe multiverse restricted
+## Major bug fix updates produced after the final release of the
+## distribution.
+deb http://archive.ubuntu.com/ubuntu/ jammy-updates main universe multiverse restricted
+deb http://archive.ubuntu.com/ubuntu/ jammy-proposed main universe multiverse restricted
+`,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pocketList := generatePocketList(
+			gotSourcesList := generateLegacySourcesList(
 				tc.args.series,
 				tc.args.components,
 				tc.args.mirror,
 				tc.args.securityMirror,
 				tc.args.pocket,
 			)
-			for _, expectedPocket := range tc.expectedPockets {
-				found := false
-				for _, pocket := range pocketList {
-					if pocket == expectedPocket {
-						found = true
-					}
-				}
-				if !found {
-					t.Errorf("Expected %s in pockets list %s, but it was not", expectedPocket, pocketList)
-				}
-			}
+
+			asserter.AssertEqual(tc.expectedSourcesList, gotSourcesList)
 		})
 	}
 }
@@ -204,12 +206,13 @@ func TestImageDefinition_SetDefaults(t *testing.T) {
 			Seed: &Seed{
 				Vcs: helper.BoolPtr(true),
 			},
-			Tarball:    &Tarball{},
-			Components: []string{"main", "restricted"},
-			Archive:    "ubuntu",
-			Flavor:     "ubuntu",
-			Mirror:     "http://archive.ubuntu.com/ubuntu/",
-			Pocket:     "release",
+			Tarball:           &Tarball{},
+			Components:        []string{"main", "restricted"},
+			Archive:           "ubuntu",
+			Flavor:            "ubuntu",
+			Mirror:            "http://archive.ubuntu.com/ubuntu/",
+			Pocket:            "release",
+			SourcesListDeb822: helper.BoolPtr(false),
 		},
 		Customization: &Customization{
 			Components: []string{"main", "restricted", "universe"},
@@ -313,6 +316,108 @@ func TestImageDefinition_securityMirror(t *testing.T) {
 			if got := imageDef.securityMirror(); got != tt.want {
 				t.Errorf("ImageDefinition.securityMirror() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func Test_generateDeb822Section(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	type args struct {
+		mirror     string
+		series     string
+		components []string
+		pocket     string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "release",
+			args: args{
+				mirror:     "http://archive.ubuntu.com/ubuntu/",
+				series:     "jammy",
+				components: []string{"main", "restricted"},
+				pocket:     "release",
+			},
+			want: `Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: jammy
+Components: main restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+`,
+		},
+		{
+			name: "security",
+			args: args{
+				mirror:     "http://security.ubuntu.com/ubuntu/",
+				series:     "jammy",
+				components: []string{"main", "restricted"},
+				pocket:     "security",
+			},
+			want: `Types: deb
+URIs: http://security.ubuntu.com/ubuntu/
+Suites: jammy-security
+Components: main restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+`,
+		},
+		{
+			name: "proposed",
+			args: args{
+				mirror:     "http://archive.ubuntu.com/ubuntu/",
+				series:     "jammy",
+				components: []string{"main", "restricted"},
+				pocket:     "proposed",
+			},
+			want: `Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: jammy jammy-updates jammy-proposed
+Components: main restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+`,
+		},
+		{
+			name: "updates",
+			args: args{
+				mirror:     "http://archive.ubuntu.com/ubuntu/",
+				series:     "jammy",
+				components: []string{"main", "restricted"},
+				pocket:     "updates",
+			},
+			want: `Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: jammy jammy-updates
+Components: main restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+`,
+		},
+		{
+			name: "no pocket",
+			args: args{
+				mirror:     "http://archive.ubuntu.com/ubuntu/",
+				series:     "jammy",
+				components: []string{"main", "restricted"},
+				pocket:     "",
+			},
+			want: `Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: 
+Components: main restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := generateDeb822Section(tc.args.mirror, tc.args.series, tc.args.components, tc.args.pocket)
+			asserter.AssertEqual(tc.want, got)
 		})
 	}
 }

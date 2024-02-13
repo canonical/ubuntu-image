@@ -39,14 +39,15 @@ type Gadget struct {
 
 // Rootfs defines the rootfs section of the image definition file
 type Rootfs struct {
-	Components   []string `yaml:"components"    json:"Components,omitempty"   default:"main,restricted"`
-	Archive      string   `yaml:"archive"       json:"Archive"                default:"ubuntu"`
-	Flavor       string   `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
-	Mirror       string   `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
-	Pocket       string   `yaml:"pocket"        json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
-	Seed         *Seed    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
-	Tarball      *Tarball `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
-	ArchiveTasks []string `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
+	Components        []string `yaml:"components"    json:"Components,omitempty"   default:"main,restricted"`
+	Archive           string   `yaml:"archive"       json:"Archive"                default:"ubuntu"`
+	Flavor            string   `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
+	Mirror            string   `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
+	Pocket            string   `yaml:"pocket"        json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
+	Seed              *Seed    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
+	Tarball           *Tarball `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
+	ArchiveTasks      []string `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
+	SourcesListDeb822 *bool    `yaml:"sources-list-deb822" json:"SourcesListDeb822" default:"false"`
 }
 
 // Seed defines the seed section of rootfs, which is used to
@@ -307,57 +308,184 @@ type DependentKeyError struct {
 	gojsonschema.ResultErrorFields
 }
 
-func (imageDef ImageDefinition) securityMirror() string {
-	if imageDef.Architecture == "amd64" || imageDef.Architecture == "i386" {
+func (i ImageDefinition) securityMirror() string {
+	if i.Architecture == "amd64" || i.Architecture == "i386" {
 		return "http://security.ubuntu.com/ubuntu/"
 	}
-	return imageDef.Rootfs.Mirror
+	return i.Rootfs.Mirror
 }
 
-func generatePocketList(series string, components []string, mirror string, securityMirror string, pocket string) []string {
-	baseList := fmt.Sprintf("deb %%s %s%%s %s\n", series, strings.Join(components, " "))
+// generateLegacySourcesList returns the content to write to the sources.list file
+// under the legacy format.
+func generateLegacySourcesList(series string, components []string, mirror string, securityMirror string, pocket string) string {
+	baseList := fmt.Sprintf("deb %%s %s%%s %s", series, strings.Join(components, " "))
 
-	releaseList := fmt.Sprintf(baseList, mirror, "")
-	securityList := fmt.Sprintf(baseList, securityMirror, "-security")
-	updatesList := fmt.Sprintf(baseList, mirror, "-updates")
-	proposedList := fmt.Sprintf(baseList, mirror, "-proposed")
+	releaseSourceComment := `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+`
+	updatesSourceComment := `## Major bug fix updates produced after the final release of the
+## distribution.
+`
 
-	pocketList := make([]string, 0)
+	releaseSource := releaseSourceComment + fmt.Sprintf(baseList, mirror, "")
+	securitySource := fmt.Sprintf(baseList, securityMirror, "-security")
+	updatesSource := updatesSourceComment + fmt.Sprintf(baseList, mirror, "-updates")
+	proposedSource := fmt.Sprintf(baseList, mirror, "-proposed")
+
+	sourcesList := make([]string, 0)
 
 	switch pocket {
 	case "release":
-		pocketList = append(pocketList, releaseList)
+		sourcesList = append(sourcesList, releaseSource)
 	case "security":
-		pocketList = append(pocketList, releaseList, securityList)
+		sourcesList = append(sourcesList, releaseSource, securitySource)
 	case "updates":
-		pocketList = append(pocketList, releaseList, securityList, updatesList)
+		sourcesList = append(sourcesList, releaseSource, securitySource, updatesSource)
 	case "proposed":
-		pocketList = append(pocketList, releaseList, securityList, updatesList, proposedList)
+		sourcesList = append(sourcesList, releaseSource, securitySource, updatesSource, proposedSource)
 	}
 
-	return pocketList
+	return strings.Join(sourcesList, "\n") + "\n"
 }
 
-// BuildPocketList returns a slice of strings that need to be added to
-// /etc/apt/sources.list in the chroot to build the image, based on the value of "pocket"
-// in the rootfs section of the image definition
-func (imageDef ImageDefinition) BuildPocketList() []string {
-	return generatePocketList(
-		imageDef.Series,
-		imageDef.Rootfs.Components,
-		imageDef.Rootfs.Mirror,
-		imageDef.securityMirror(),
-		strings.ToLower(imageDef.Rootfs.Pocket))
+// LegacyBuildSourcesList returns the content of the /etc/apt/sources.list to be used
+// during the build process
+func (i *ImageDefinition) LegacyBuildSourcesList() string {
+	return i.legacySourcesList(false)
 }
 
-// TargetPocketList returns a slice of strings that need to be added to
-// /etc/apt/sources.list in the chroot for the target image, based on the value of "pocket"
-// in the customization section of the image definition
-func (imageDef ImageDefinition) TargetPocketList() []string {
-	return generatePocketList(
-		imageDef.Series,
-		imageDef.Customization.Components,
-		imageDef.Rootfs.Mirror,
-		imageDef.securityMirror(),
-		strings.ToLower(imageDef.Customization.Pocket))
+// LegacyTargetSourcesList returns the content of the /etc/apt/sources.list for the target
+// image
+func (i *ImageDefinition) LegacyTargetSourcesList() string {
+	return i.legacySourcesList(true)
+}
+
+// legacySourcesList returns the content of the /etc/apt/sources.list file in the
+// legacy format (not deb822).
+func (i *ImageDefinition) legacySourcesList(target bool) string {
+	pocket := i.Rootfs.Pocket
+	if target {
+		pocket = i.Customization.Pocket
+	}
+
+	return generateLegacySourcesList(
+		i.Series,
+		i.Customization.Components,
+		i.Rootfs.Mirror,
+		i.securityMirror(),
+		strings.ToLower(pocket))
+}
+
+// generateDeb822Section returns a deb822 section/paragraph to be used in a sources list file
+// This function is tailored to what is expected in an official ubuntu image and should not be
+// used as is to generate arbitrary deb822 sections.
+func generateDeb822Section(mirror string, series string, components []string, pocket string) string {
+	sectionTmpl := `Types: deb
+URIs: %s
+Suites: %s
+Components: %s
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+`
+
+	suites := make([]string, 0)
+
+	switch pocket {
+	case "security":
+		suites = []string{series + "-security"}
+	case "proposed":
+		suites = append([]string{series + "-proposed"}, suites...)
+		fallthrough
+	case "updates":
+		suites = append([]string{series + "-updates"}, suites...)
+		fallthrough
+	case "release":
+		suites = append([]string{series}, suites...)
+	}
+
+	return fmt.Sprintf(sectionTmpl,
+		mirror,
+		strings.Join(suites, " "),
+		strings.Join(components, " "),
+	)
+}
+
+var LegacySourcesListComment = `# Ubuntu sources have moved to the /etc/apt/sources.list.d/ubuntu.sources
+# file, which uses the deb822 format. Use deb822-formatted .sources files
+# to manage package sources in the /etc/apt/sources.list.d/ directory.
+# See the sources.list(5) manual page for details.
+`
+
+var ubuntuSourceHeader = `## Ubuntu distribution repository
+##
+## The following settings can be adjusted to configure which packages to use from Ubuntu.
+## Mirror your choices (except for URIs and Suites) in the security section below to
+## ensure timely security updates.
+##
+## Types: Append deb-src to enable the fetching of source package.
+## URIs: A URL to the repository (you may add multiple URLs)
+## Suites: The following additional suites can be configured
+##   <name>-updates   - Major bug fix updates produced after the final release of the
+##                      distribution.
+##   <name>-backports - software from this repository may not have been tested as
+##                      extensively as that contained in the main release, although it includes
+##                      newer versions of some applications which may provide useful features.
+##                      Also, please note that software in backports WILL NOT receive any review
+##                      or updates from the Ubuntu security team.
+## Components: Aside from main, the following components can be added to the list
+##   restricted  - Software that may not be under a free license, or protected by patents.
+##   universe    - Community maintained packages.
+##                 Software from this repository is only maintained and supported by Canonical
+##                 for machines with Ubuntu Pro subscriptions. Without Ubuntu Pro, the Ubuntu
+##                 community provides best-effort security maintenance.
+##   multiverse  - Community maintained of restricted. Software from this repository is
+##                 ENTIRELY UNSUPPORTED by the Ubuntu team, and may not be under a free
+##                 licence. Please satisfy yourself as to your rights to use the software.
+##                 Also, please note that software in multiverse WILL NOT receive any
+##                 review or updates from the Ubuntu security team.
+##
+## See the sources.list(5) manual page for further settings.
+`
+
+var ubuntuSourceSecurityHeader = `## Ubuntu security updates. Aside from URIs and Suites,
+## this should mirror your choices in the previous section.
+`
+
+// deb822SourcesList returns the content of /etc/apt/sources.list.d/ubuntu.sources
+// to be used during the build process
+func (i *ImageDefinition) Deb822BuildSourcesList() string {
+	return i.deb822SourcesList(false)
+}
+
+// deb822SourcesList returns the content of /etc/apt/sources.list.d/ubuntu.sources
+// for the target image
+func (i *ImageDefinition) Deb822TargetSourcesList() string {
+	return i.deb822SourcesList(true)
+}
+
+// deb822SourcesList returns the content of /etc/apt/sources.list.d/ubuntu.sources
+// in the deb822 format.
+// The target param defines if the generated sources list will be used in the target image.
+func (i *ImageDefinition) deb822SourcesList(target bool) string {
+	pocket := i.Rootfs.Pocket
+	if target {
+		pocket = i.Customization.Pocket
+	}
+	pocket = strings.ToLower(pocket)
+
+	ubuntuSources := ubuntuSourceHeader + generateDeb822Section(
+		i.Rootfs.Mirror,
+		i.Series,
+		i.Rootfs.Components,
+		pocket,
+	)
+
+	ubuntuSources += ubuntuSourceSecurityHeader + generateDeb822Section(
+		i.securityMirror(),
+		i.Series,
+		i.Rootfs.Components,
+		pocket,
+	)
+
+	return ubuntuSources
 }
