@@ -174,11 +174,11 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 
 	if imageDefinition.Customization != nil {
 		// do custom validation for private PPAs requiring fingerprint
-		for _, ppa := range imageDefinition.Customization.ExtraPPAs {
-			if ppa.Auth != "" && ppa.Fingerprint == "" {
+		for _, p := range imageDefinition.Customization.ExtraPPAs {
+			if p.Auth != "" && p.Fingerprint == "" {
 				jsonContext := gojsonschema.NewJsonContext("ppa_validation", nil)
 				errDetail := gojsonschema.ErrorDetails{
-					"ppaName": ppa.PPAName,
+					"ppaName": p.Name,
 				}
 				result.AddError(
 					imagedefinition.NewInvalidPPAError(

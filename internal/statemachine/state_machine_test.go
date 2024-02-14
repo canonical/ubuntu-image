@@ -3,7 +3,6 @@ package statemachine
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -159,9 +158,6 @@ func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
 }
 func mockImagePrepare(*image.Options) error {
 	return fmt.Errorf("Test Error")
-}
-func mockGet(string) (*http.Response, error) {
-	return nil, fmt.Errorf("Test Error")
 }
 func mockUnmarshal([]byte, any) error {
 	return fmt.Errorf("Test Error")
@@ -929,6 +925,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 
 			err := gotStateMachine.readMetadata(tc.args.metadataFile)
 			if tc.shouldPass {
+				asserter.AssertErrNil(err, true)
 				asserter.AssertEqual(tc.wantStateMachine, gotStateMachine, cmpOpts...)
 			} else {
 				asserter.AssertErrContains(err, tc.expectedError)

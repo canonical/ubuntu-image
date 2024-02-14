@@ -6,8 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,7 +42,6 @@ var helperCheckEmptyFields = helper.CheckEmptyFields
 var helperCheckTags = helper.CheckTags
 var helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 var helperRestoreResolvConf = helper.RestoreResolvConf
-var ioReadAll = io.ReadAll
 var osReadDir = os.ReadDir
 var osReadFile = os.ReadFile
 var osWriteFile = os.WriteFile
@@ -67,8 +64,6 @@ var diskfsCreate = diskfs.Create
 var randRead = rand.Read
 var seedOpen = seed.Open
 var imagePrepare = image.Prepare
-var httpGet = http.Get
-var jsonUnmarshal = json.Unmarshal
 var gojsonschemaValidate = gojsonschema.Validate
 var filepathRel = filepath.Rel
 

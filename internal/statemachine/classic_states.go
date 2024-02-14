@@ -23,6 +23,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/ppa"
 )
 
 var (
@@ -187,73 +188,16 @@ func (stateMachine *StateMachine) createChroot() error {
 	return stateMachine.setLegacySourcesList(classicStateMachine.ImageDef.LegacyBuildSourcesList())
 }
 
-// add PPAs to the apt sources list
+// addExtraPPAs adds PPAs to the /etc/apt/sources.list.d directory
 func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// create /etc/apt/sources.list.d in the chroot if it doesn't already exist
-	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
-	err = osMkdir(sourcesListD, 0755)
-	if err != nil && !os.IsExist(err) {
-		err = fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
-		return err
-	}
-
-	// now create the ppa sources.list files
-	tmpGPGDir, err := osMkdirTemp("/tmp", "ubuntu-image-gpg")
-	if err != nil {
-		err = fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
-		return err
-	}
-	defer func() {
-		tmpErr := osRemoveAll(tmpGPGDir)
-		if tmpErr != nil {
-			if err != nil {
-				err = fmt.Errorf("%s after previous error: %w", tmpErr.Error(), err)
-			} else {
-				err = tmpErr
-			}
-		}
-	}()
-
-	trustedGPGD := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d")
-
-	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
-		ppaFileName, ppaFileContents := createPPAInfo(ppa,
-			classicStateMachine.ImageDef.Series)
-
-		var ppaIO *os.File
-		ppaFile := filepath.Join(sourcesListD, ppaFileName)
-		ppaIO, err = osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+	for _, extraPPA := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		p := ppa.New(extraPPA, *classicStateMachine.ImageDef.Rootfs.SourcesListDeb822, classicStateMachine.ImageDef.Series)
+		err := p.Add(classicStateMachine.tempDirs.chroot, classicStateMachine.commonFlags.Debug)
 		if err != nil {
-			err = fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
 			return err
 		}
-		defer ppaIO.Close()
-		_, err = ppaIO.Write([]byte(ppaFileContents))
-		if err != nil {
-			err = fmt.Errorf("unable to write ppa file %s: %w", ppaFile, err)
-			return err
-		}
-
-		// Import keys either from the specified fingerprint or via the Launchpad API
-		/* TODO: this is the logic for deb822 sources. When other projects
-		(software-properties, ubuntu-release-upgrader) are ready, update
-		to this logic instead.
-		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
-		*/
-		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
-		keyFilePath := filepath.Join(trustedGPGD, keyFileName)
-		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, stateMachine.commonFlags.Debug)
-		if err != nil {
-			err = fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
-				ppa.PPAName, err.Error())
-			return err
-		}
-	}
-	if err = osRemoveAll(tmpGPGDir); err != nil {
-		err = fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
-		return err
 	}
 
 	return nil
@@ -263,32 +207,10 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
-
-	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
-		if ppa.KeepEnabled == nil {
-			return imagedefinition.ErrKeepEnabledNil
-		}
-
-		if *ppa.KeepEnabled {
-			continue
-		}
-
-		ppaFileName, _ := createPPAInfo(ppa, classicStateMachine.ImageDef.Series)
-
-		ppaFile := filepath.Join(sourcesListD, ppaFileName)
-		err = osRemove(ppaFile)
+	for _, extraPPA := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		p := ppa.New(extraPPA, *classicStateMachine.ImageDef.Rootfs.SourcesListDeb822, classicStateMachine.ImageDef.Series)
+		err := p.Remove(stateMachine.tempDirs.chroot)
 		if err != nil {
-			err = fmt.Errorf("Error removing %s: %s", ppaFile, err.Error())
-			return err
-		}
-
-		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
-		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
-			"etc", "apt", "trusted.gpg.d", keyFileName)
-		err = osRemove(keyFilePath)
-		if err != nil {
-			err = fmt.Errorf("Error removing %s: %s", keyFilePath, err.Error())
 			return err
 		}
 	}

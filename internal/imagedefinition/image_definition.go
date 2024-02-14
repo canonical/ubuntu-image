@@ -95,7 +95,7 @@ type CloudInit struct {
 
 // PPA contains information about a public or private PPA
 type PPA struct {
-	PPAName     string `yaml:"name"         json:"PPAName"               jsonschema:"pattern=^[a-zA-Z0-9_.+-]+/[a-zA-Z0-9_.+-]+$"`
+	Name        string `yaml:"name"         json:"PPAName"               jsonschema:"pattern=^[a-zA-Z0-9_.+-]+/[a-zA-Z0-9_.+-]+$"`
 	Auth        string `yaml:"auth"         json:"Auth,omitempty"        jsonschema:"pattern=^[a-zA-Z0-9_.+-]+:[a-zA-Z0-9]+$"`
 	Fingerprint string `yaml:"fingerprint"  json:"Fingerprint,omitempty"`
 	KeepEnabled *bool  `yaml:"keep-enabled" json:"KeepEnabled"           default:"true"`
