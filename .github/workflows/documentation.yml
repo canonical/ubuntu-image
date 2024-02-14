@@ -29,10 +29,12 @@ jobs:
         if: steps.changed-files-image-def.outputs.any_changed == 'true'
         run: |
           echo "Struct has changed"
+          
       - name: test struct README
         if: steps.changed-files-image-def-readme.outputs.any_changed != 'true'
         run: |
           echo "README has not changed"
+          
       - name: Fail if image definition README has not been updated
         if: steps.changed-files-image-def.outputs.any_changed == 'true' && steps.changed-files-image-def-readme.outputs.any_changed != 'true'
         run: |
@@ -46,8 +48,15 @@ jobs:
           files: |
             internal/commands/*
 
+      - name: Get info on if manpage was updated
+        id: changed-files-manpage
+        uses: tj-actions/changed-files@v39
+        with:
+          files: |
+            ubuntu-image.rst
+            
       - name: Fail if command line args have changed but manpage has not been updated
-        if: steps.changed-files-flags.outputs.any_changed == 'true' && contains(steps.changed-files-flags.outputs.changed_files, 'ubuntu-image.rst') != 'true'
+        if: steps.changed-files-flags.outputs.any_changed == 'true' && steps.changed-files-manpage.outputs.any_changed != 'true'
         run: |
           echo "Command line flags have been updated but the manpage has not"
           exit 1
