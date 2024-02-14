@@ -12,6 +12,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 func TestPack_Setup(t *testing.T) {
@@ -143,9 +144,9 @@ func TestPack_populateTemporaryDirectories(t *testing.T) {
 				GadgetDir: filepath.Join("testdata", "gadget_dir"),
 			},
 			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{
-						osutilCopySpecialFileThreshold: 1,
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{
+						OsutilCopySpecialFileThreshold: 1,
 					},
 				)
 
@@ -161,8 +162,8 @@ func TestPack_populateTemporaryDirectories(t *testing.T) {
 				GadgetDir: filepath.Join("testdata", "gadget_dir"),
 			},
 			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{
 						ReadDirThreshold: 1,
 					},
 				)
@@ -179,9 +180,9 @@ func TestPack_populateTemporaryDirectories(t *testing.T) {
 				GadgetDir: filepath.Join("testdata", "gadget_dir"),
 			},
 			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{
-						osutilCopySpecialFileThreshold: 2,
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{
+						OsutilCopySpecialFileThreshold: 2,
 					},
 				)
 

@@ -29,6 +29,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 var yamlMarshal = yaml.Marshal
@@ -2321,8 +2322,8 @@ deb http://security.ubuntu.com/ubuntu/ jammy-security main
 			expectedSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
 			expectedErr:         "unable to open sources.list file",
 			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{
 						OpenFileThreshold: 0,
 					},
 				)
@@ -2408,8 +2409,8 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 `,
 			expectedErr: "unable to open ubuntu.sources file",
 			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{
 						OpenFileThreshold: 0,
 					},
 				)
@@ -2438,8 +2439,8 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 `,
 			expectedErr: "Error /etc/apt/sources.list.d directory",
 			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{
 						MkdirAllThreshold: 0,
 					},
 				)
@@ -3083,10 +3084,6 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	if expire != "0" {
 		t.Error("ubuntu2 user password should be expired")
 	}
-
-	// search for ubuntu2
-	// check expiration split by :, check 0 in 3rd field
-	//
 
 	grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
 	_, err = os.Stat(grubCfg)
@@ -4221,315 +4218,6 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 }
 
-// TestFailedAddExtraPPAs tests failure cases in addExtraPPAs
-func TestFailedAddExtraPPAs(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
-	defer restoreCWD()
-
-	validPPA := &imagedefinition.PPA{
-		PPAName: "canonical-foundations/ubuntu-image",
-	}
-	invalidPPA := &imagedefinition.PPA{
-		PPAName:     "canonical-foundations/ubuntu-image",
-		Fingerprint: "TEST FINGERPRINT",
-	}
-	var stateMachine ClassicStateMachine
-	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-	stateMachine.parent = &stateMachine
-	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
-		Series:       getHostSuite(),
-		Rootfs:       &imagedefinition.Rootfs{},
-		Customization: &imagedefinition.Customization{
-			ExtraPPAs: []*imagedefinition.PPA{
-				validPPA,
-			},
-		},
-	}
-
-	err := stateMachine.makeTemporaryDirectories()
-	asserter.AssertErrNil(err, true)
-
-	// create the /etc/apt/ dir in workdir
-	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d"), 0755)
-	asserter.AssertErrNil(err, true)
-
-	// mock os.Mkdir
-	osMkdir = mockMkdir
-	defer func() {
-		osMkdir = os.Mkdir
-	}()
-	err = stateMachine.addExtraPPAs()
-	asserter.AssertErrContains(err, "Failed to create apt sources.list.d")
-	osMkdir = os.Mkdir
-
-	// mock os.MkdirTemp
-	osMkdirTemp = mockMkdirTemp
-	defer func() {
-		osMkdirTemp = os.MkdirTemp
-	}()
-	err = stateMachine.addExtraPPAs()
-	asserter.AssertErrContains(err, "Error creating temp dir for gpg")
-	osMkdirTemp = os.MkdirTemp
-
-	// mock os.OpenFile
-	osOpenFile = mockOpenFile
-	defer func() {
-		osOpenFile = os.OpenFile
-	}()
-	err = stateMachine.addExtraPPAs()
-	asserter.AssertErrContains(err, "Error creating")
-	osOpenFile = os.OpenFile
-
-	// Use an invalid PPA to trigger a failure in importPPAKeys
-	stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{invalidPPA}
-	err = stateMachine.addExtraPPAs()
-	asserter.AssertErrContains(err, "Error retrieving signing key")
-	stateMachine.ImageDef.Customization.ExtraPPAs = []*imagedefinition.PPA{validPPA}
-
-	// mock os.RemoveAll
-	osRemoveAll = mockRemoveAll
-	defer func() {
-		osRemoveAll = os.RemoveAll
-	}()
-	err = stateMachine.addExtraPPAs()
-	asserter.AssertErrContains(err, "Error removing temporary gpg directory")
-	osRemoveAll = os.RemoveAll
-
-	// Test failing osRemoveAll in defered function
-	// mock os.RemoveAll
-	osRemoveAll = mockRemoveAll
-	defer func() {
-		osRemoveAll = os.RemoveAll
-	}()
-	// mock os.OpenFile
-	osOpenFile = mockOpenFile
-	defer func() {
-		osOpenFile = os.OpenFile
-	}()
-	err = stateMachine.addExtraPPAs()
-	asserter.AssertErrContains(err, "Error creating")
-	asserter.AssertErrContains(err, "after previous error")
-	osRemoveAll = os.RemoveAll
-	osOpenFile = os.OpenFile
-
-	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-}
-
-func TestStatemachine_cleanExtraPPAs(t *testing.T) {
-	series := getHostSuite()
-
-	testCases := []struct {
-		name          string
-		mockFuncs     func() func()
-		expectedErr   string
-		ppas          []*imagedefinition.PPA
-		remainingPPAs []string
-		remainingGPGs []string
-	}{
-		{
-			name: "keep one PPA, remove one PPA",
-			ppas: []*imagedefinition.PPA{
-				{
-					PPAName:     "canonical-foundations/ubuntu-image",
-					KeepEnabled: helper.BoolPtr(true),
-				},
-				{
-					PPAName:     "canonical-foundations/ubuntu-image-private-test",
-					Auth:        "sil2100:vVg74j6SM8WVltwpxDRJ",
-					Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
-					KeepEnabled: helper.BoolPtr(false),
-				},
-			},
-			remainingPPAs: []string{
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.list", series),
-			},
-			remainingGPGs: []string{
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.gpg", series),
-			},
-		},
-		{
-			name: "fail to remove PPA file",
-			ppas: []*imagedefinition.PPA{
-				{
-					PPAName:     "canonical-foundations/ubuntu-image",
-					KeepEnabled: helper.BoolPtr(true),
-				},
-				{
-					PPAName:     "canonical-foundations/ubuntu-image-private-test",
-					Auth:        "sil2100:vVg74j6SM8WVltwpxDRJ",
-					Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
-					KeepEnabled: helper.BoolPtr(false),
-				},
-			},
-			remainingPPAs: []string{
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.list", series),
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-private-test-%s.list", series),
-			},
-			remainingGPGs: []string{
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.gpg", series),
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-private-test-%s.gpg", series),
-			},
-			expectedErr: "Error removing",
-			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{
-						RemoveThreshold: 0,
-					},
-				)
-
-				osRemove = mock.Remove
-				return func() { osRemove = os.Remove }
-			},
-		},
-		{
-			name: "fail to remove GPG file",
-			ppas: []*imagedefinition.PPA{
-				{
-					PPAName:     "canonical-foundations/ubuntu-image",
-					KeepEnabled: helper.BoolPtr(true),
-				},
-				{
-					PPAName:     "canonical-foundations/ubuntu-image-private-test",
-					Auth:        "sil2100:vVg74j6SM8WVltwpxDRJ",
-					Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
-					KeepEnabled: helper.BoolPtr(false),
-				},
-			},
-			remainingPPAs: []string{
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.list", series),
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-private-test-%s.list", series),
-			},
-			remainingGPGs: []string{
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.gpg", series),
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-private-test-%s.gpg", series),
-			},
-			expectedErr: "Error removing",
-			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{
-						RemoveThreshold: 1,
-					},
-				)
-
-				osRemove = mock.Remove
-				return func() { osRemove = os.Remove }
-			},
-		},
-		{
-			name: "fail to handle invalid image definition",
-			ppas: []*imagedefinition.PPA{
-				{
-					PPAName:     "canonical-foundations/ubuntu-image",
-					KeepEnabled: nil,
-				},
-			},
-			remainingPPAs: []string{
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.list", series),
-			},
-			remainingGPGs: []string{
-				fmt.Sprintf("canonical-foundations-ubuntu-ubuntu-image-%s.gpg", series),
-			},
-			expectedErr: imagedefinition.ErrKeepEnabledNil.Error(),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
-			defer restoreCWD()
-
-			var stateMachine ClassicStateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.parent = &stateMachine
-			stateMachine.ImageDef = imagedefinition.ImageDefinition{
-				Architecture: getHostArch(),
-				Series:       series,
-				Rootfs:       &imagedefinition.Rootfs{},
-				Customization: &imagedefinition.Customization{
-					ExtraPPAs: tc.ppas,
-				},
-			}
-
-			err := stateMachine.makeTemporaryDirectories()
-			asserter.AssertErrNil(err, true)
-
-			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
-
-			// create the /etc/apt/ dir in workdir
-			gpgDir := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d")
-			err = os.MkdirAll(gpgDir, 0755)
-			asserter.AssertErrNil(err, true)
-
-			err = stateMachine.addExtraPPAs()
-			asserter.AssertErrNil(err, true)
-
-			if tc.mockFuncs != nil {
-				restoreMock := tc.mockFuncs()
-				t.Cleanup(restoreMock)
-			}
-
-			err = stateMachine.cleanExtraPPAs()
-			if err != nil || len(tc.expectedErr) != 0 {
-				asserter.AssertErrContains(err, tc.expectedErr)
-			}
-
-			// check ppa files
-			sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
-			ppaFiles, err := osReadDir(sourcesListD)
-			asserter.AssertErrNil(err, true)
-			foundRemainingPPAs := map[string]bool{}
-
-			for _, f := range ppaFiles {
-				found := false
-				for _, p := range tc.remainingPPAs {
-					if f.Name() == p {
-						found = true
-						foundRemainingPPAs[p] = true
-					}
-				}
-
-				if !found {
-					t.Errorf("the ppa %s was left in place but should have been removed", f)
-				}
-			}
-
-			for _, p := range tc.remainingPPAs {
-				if !foundRemainingPPAs[p] {
-					t.Errorf("the ppa %s was removed but should have been kept", p)
-				}
-			}
-
-			// Check gpg dir
-			gpgFiles, err := osReadDir(gpgDir)
-			asserter.AssertErrNil(err, true)
-			foundRemainingGPGs := map[string]bool{}
-
-			for _, f := range gpgFiles {
-				found := false
-				for _, p := range tc.remainingGPGs {
-					if f.Name() == p {
-						found = true
-						foundRemainingGPGs[p] = true
-					}
-				}
-
-				if !found {
-					t.Errorf("the keyfile %s was left in place but should have been removed", f)
-				}
-			}
-
-			for _, p := range tc.remainingGPGs {
-				if !foundRemainingGPGs[p] {
-					t.Errorf("the keyfile %s was removed but should have been kept", p)
-				}
-			}
-		})
-	}
-}
-
 // TestCustomizeFstab tests functionality of the customizeFstab function
 func TestCustomizeFstab(t *testing.T) {
 	testCases := []struct {
@@ -5424,8 +5112,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 		{
 			name: "fail to clean files",
 			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{},
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{},
 				)
 
 				osRemove = mock.Remove
@@ -5450,8 +5138,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 		{
 			name: "fail to truncate files",
 			mockFuncs: func() func() {
-				mock := NewOSMock(
-					&osMockConf{},
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{},
 				)
 
 				osTruncate = mock.Truncate
