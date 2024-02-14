@@ -1158,3 +1158,144 @@ func TestMinSize(t *testing.T) {
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrNil(err, false)
 }
+
+func TestStateMachine_displayStates(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	type fields struct {
+		commonFlags       *commands.CommonOpts
+		stateMachineFlags *commands.StateMachineOpts
+		states            []stateFunc
+	}
+	tests := []struct {
+		name       string
+		fields     fields
+		wantOutput string
+	}{
+		{
+			name: "simple case with 2 states",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+				},
+			},
+			wantOutput: `
+Following states will be executed:
+[0] stateFunc1
+[1] stateFunc2
+
+Continuing
+`,
+		},
+		{
+			name: "3 states with until",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{
+					Until: "stateFunc3",
+				},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+					{
+						name: "stateFunc3",
+					},
+				},
+			},
+			wantOutput: `
+Following states will be executed:
+[0] stateFunc1
+[1] stateFunc2
+
+Continuing
+`,
+		},
+		{
+			name: "3 states with thru",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{
+					Thru: "stateFunc2",
+				},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+					{
+						name: "stateFunc3",
+					},
+				},
+			},
+			wantOutput: `
+Following states will be executed:
+[0] stateFunc1
+[1] stateFunc2
+
+Continuing
+`,
+		},
+		{
+			name: "3 states without debug",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug: false,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{
+					Thru: "stateFunc2",
+				},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+					{
+						name: "stateFunc3",
+					},
+				},
+			},
+			wantOutput: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// capture stdout, calculate the states, and ensure they were printed
+			stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+			defer restoreStdout()
+			asserter.AssertErrNil(err, true)
+
+			s := &StateMachine{
+				commonFlags:       tt.fields.commonFlags,
+				stateMachineFlags: tt.fields.stateMachineFlags,
+				states:            tt.fields.states,
+			}
+			s.displayStates()
+
+			restoreStdout()
+			readStdout, err := io.ReadAll(stdout)
+			asserter.AssertErrNil(err, true)
+
+			asserter.AssertEqual(tt.wantOutput, string(readStdout))
+		})
+	}
+}
