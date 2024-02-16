@@ -77,9 +77,6 @@ backends:
 
 path: /home/ubuntu-image
 
-exclude:
-    - .git
-
 prepare: |
   # NOTE: This part of the code needs to be in spread.yaml as it runs before
   # the rest of the source code (including the tests/lib directory) is
