@@ -12,9 +12,8 @@ files, but it will be generalized to build more (eventually all) Ubuntu images.
 
 # Requirements
 
-Ubuntu 18.04 (Bionic Beaver) is the minimum platform requirement, but Ubuntu
-20.04 (Focal Fossa) or newer is recommended. All required third party packages are available in the
-Ubuntu archive.
+Ubuntu 22.04 (Jammy Jellyfish) is the minimum platform requirement. All
+required third party packages are available in the Ubuntu archive.
 
 If you want to run the test suite locally, you should install all the build
 dependencies named in the `debian/control` file.  The easiest way to do that
