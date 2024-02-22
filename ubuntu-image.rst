@@ -29,7 +29,7 @@ DESCRIPTION
 ===========
 
 ``ubuntu-image`` is a program for generating a variety of bootable disk
-images.  It currently supports building snap_ based and classic preinstalled
+images.  It currently supports building snap_-based and classic preinstalled
 Ubuntu images.
 
 Snap-based images are built from a *model assertion*, which is a YAML_ file
@@ -40,39 +40,39 @@ device for which the image is built.
 
 As part of the model assertion, a `gadget snap`_ is specified.  The gadget
 contains a `gadget.yaml`_ file which contains the exact description of the
-disk image's contents, in YAML format.  The ``gadget.yaml`` file describes
+disk-image contents in the YAML format.  The ``gadget.yaml`` file describes
 such things as the names of all the volumes to be produced [#]_, the
 structures [#]_ within the volume, whether the volume contains a bootloader
 and if so what kind of bootloader, etc.
 
-Note that ``ubuntu-image`` communicates with the snap store using the ``snap
-prepare-image`` subcommand.  The model assertion file is passed to ``snap
-prepare-image`` which handles downloading the appropriate gadget and any extra
-snaps.  See that command's documentation for additional details.
+Note that ``ubuntu-image`` communicates with the Snap Store using the ``snap
+prepare-image`` subcommand.  The model-assertion file is passed to ``snap
+prepare-image``, which handles downloading the appropriate gadget and any extra
+snaps.  See that command documentation for additional details.
 
 Classic images are built from a local `gadget tree`_ path.  The `gadget tree`_
-is nothing more than a primed `gadget snap`_, containing a `gadget.yaml`_ file
-in the meta directory and all the necessary bootloader gadget bits built.
-For instance a `gadget tree`_ can be easily prepared by fetching a specially
+is nothing more than a primed `gadget snap`_ containing a `gadget.yaml`_ file
+in the ``meta`` directory and all the necessary bootloader gadget bits built.
+For instance, a `gadget tree`_ can be prepared by fetching a specially
 tailored `gadget snap`_ source and running ``snapcraft prime`` on it, with the
-resulting tree ending up in the ``prime/`` directory.
+resulting tree being stored in the ``prime/`` directory.
 
 
 OPTIONS
 =======
 
 -h, --help
-    Show the program's message and exit.
+    Show the help message and exit.
 
 --version
-    Show the program's version number and exit.
+    Show the program version number and exit.
 
 
 Snap command options
 --------------------
 
-These are the options for defining the contents of snap-based images.  Can only
-be used when the ``ubuntu-image snap`` command is used.
+These are the options for defining the contents of snap-based images.  They
+can only be used when the ``ubuntu-image snap`` command is used.
 
 model_assertion
     Path to the model assertion file.  This positional argument must be given
@@ -95,33 +95,34 @@ model_assertion
     The snap argument can include additional information about the channel
     and/or risk with the following syntax: ``<snap>=<channel|risk>``. Note
     that this flag will cause an error if the model assertion has a grade
-    higher than dangerous
+    higher than dangerous.
 
 --revision SNAP_NAME:REVISION
-    Install a specific revision of a snap, rather than the latest available
-    in a particular channel. The snap specified with SNAP_NAME must be
-    included either in the model assertion or as an argument to --snap. If
+    Install a specific revision of a snap rather than the latest available
+    in a particular channel. The snap specified with ``SNAP_NAME`` must be
+    included either in the model assertion or as an argument to ``--snap``. If
     both a revision and channel are provided, the revision specified will be
-    installed in the image, and updates will come from the specified channel
+    installed in the image, and updates will come from the specified channel.
 
 --preseed
     Preseed the image (UC20+ only).
 
---preseed-sign-key=<key> 
-    Name of the key to use to sign preseed assertion, otherwise use the default key
+--preseed-sign-key=<key>
+    Name of the key to use to sign the preseed assertion, otherwise use the default key.
 
---sysfs-overlay=<path to folder contains sysfs overlay>
-    specify folder contains sysfsoverlay directory. This options also requires --presseding options and --preseed-sign-key option.
+--sysfs-overlay=<path to directory that contains sysfs overlay>
+    Specify the directory that contains the sysfs overlay. This options
+    also requires the ``--preseed`` and ``--preseed-sign-key`` options.
 
 Classic command options
 -----------------------
 
 These are the options for defining the contents of classic preinstalled Ubuntu
-images.  Can only be used when the ``ubuntu-image classic`` command is used.
+images.  They can only be used when the ``ubuntu-image classic`` command is used.
 
 image_definition
-    Path to the image definition file. This file defines all of the
-    customization required when building your image. This positional
+    Path to the image-definition file. This file defines all of the
+    customization required when building the image. This positional
     argument must be given for this mode of operation.
 
 
@@ -129,12 +130,12 @@ Common options
 --------------
 
 There are two general operational modes to ``ubuntu-image``.  The usual mode
-is to run the script giving the required model assertion file as a required
+is to run the script giving the required model-assertion file as a required
 positional argument, generating a disk image file.  These options are useful
 in this mode of operation.
 
 The second mode of operation is provided for debugging and testing purposes.
-It allows you to run the internal state machine step by step, and is described
+It allows you to run the internal state machine step by step and is described
 in more detail below.
 
 -d, --debug
@@ -147,49 +148,49 @@ in more detail below.
     Only print error messages. Suppress all other output.
 
 -O DIRECTORY, --output-dir DIRECTORY
-    Write generated disk image files to this directory.  The files will be
-    named after the ``gadget.yaml`` volume names, with ``.img`` suffix
-    appended.  If not given, the value of the --workdir flag is used if
-    --workdir is specified.  If neither --output-dir or --workdir is used,
+    Write generated disk-image files to this directory.  The files will be
+    named after the ``gadget.yaml`` volume names, with the ``.img`` suffix
+    appended.  If not given, the value of the ``--workdir`` flag is used if
+    specified.  If neither ``--output-dir`` nor ``--workdir`` is used,
     the image(s) will be placed in the current working directory.  This
     option replaces, and cannot be used with, the deprecated ``--output``
     option.
 
 -i SIZE, --image-size SIZE
-    The size of the generated disk image files.  If this size is smaller than
-    the minimum calculated size of the volume, a warning will be issued and
-    ``--image-size`` will be ignored.  The value is the size in bytes, with
-    allowable suffixes 'M' for MiB and 'G' for GiB.
+    The size of the generated disk-image files.  If this size is smaller than
+    the minimum calculated size of the volume, a warning is issued and
+    ``--image-size`` is ignored.  The value is the size in bytes, with
+    allowable suffixes ``M`` for MiB and ``G`` for GiB.
 
-    An extended syntax is supported for gadget.yaml files which specify
+    An extended syntax is supported for ``gadget.yaml`` files that specify
     multiple volumes (i.e. disk images).  In that case, a single ``SIZE``
-    argument will be used for all the defined volumes, with the same rules for
-    ignoring values which are too small.  You can specify the image size for a
+    argument is used for all the defined volumes, with the same rules for
+    ignoring values that are too small.  You can specify the image size for a
     single volume using an indexing prefix on the ``SIZE`` parameter, where
     the index is either a volume name or an integer index starting at zero.
     For example, to set the image size only on the second volume, which might
-    be called ``sdcard`` in the gadget.yaml, you could use: ``--image-size
-    1:8G`` since the 1-th index names the second volume (volumes are
-    0-indexed).  Or you could use ``--image-size sdcard:8G``.
+    be called ``sdcard`` in ``gadget.yaml``, use: ``--image-size 1:8G``
+    (the 1st index names the second volume; volumes are 0-indexed).
+    Or use ``--image-size sdcard:8G``.
 
     You can also specify multiple volume sizes by separating them with commas,
-    and you can mix and match integer indexes and volume name indexes.  Thus,
-    if the gadget.yaml named three volumes, and you wanted to set all three to
-    different sizes, you could use ``--image-size 0:2G,sdcard:8G,eMMC:4G``.
+    and you can mix and match integer indices and volume-name indices.  Thus,
+    if ``gadget.yaml`` names three volumes, and you want to set all three to
+    different sizes, you can use ``--image-size 0:2G,sdcard:8G,eMMC:4G``.
 
     In the case of ambiguities, the size hint is ignored and the calculated
-    size for the volume will be used instead.
+    size for the volume is used instead.
 
 --disk-info DISK-INFO-CONTENTS
-    File to be used as .disk/info on the image's rootfs.  This file can
-    contain useful information about the target image, like image
-    identification data, system name, build timestamp etc.
+    File to be used as ``.disk/info`` on the rootfs of the image.  This file can
+    contain useful information about the target image, such as image
+    identification data, system name, build timestamp, etc.
 
 -c CHANNEL, --channel CHANNEL
     The default snap channel to use while preseeding the image.
 
 --sector-size SIZE
-    When creating the disk image file, use the given sector size.  This
+    When creating the disk-image file, use the given sector size.  This
     can be either 512 or 4096 (4k sector size), defaulting to 512.
 
 
@@ -198,7 +199,7 @@ State machine options
 
 .. caution:: The options described here are primarily for debugging and
    testing purposes and should not be considered part of the stable, public
-   API.  State machine step numbers and names can change between releases.
+   API.  State-machine step numbers and names can change between releases.
 
 ``ubuntu-image`` internally runs a state machine to create the disk image.
 These are some options for controlling this state machine.  Other than
@@ -218,12 +219,12 @@ but ``--workdir`` must be given in that case since the state is saved in a
 
 -u STEP, --until STEP
     Run the state machine until the given ``STEP``, non-inclusively.  ``STEP``
-    is the name of a state machine method. The list of all steps can be
+    is the name of a state-machine method. The list of all steps can be
     found in the STEPS section of this document.
 
 -t STEP, --thru STEP
     Run the state machine through the given ``STEP``, inclusively.  ``STEP``
-    is the name of a state machine method. The list of all steps can be
+    is the name of a state-machine method. The list of all steps can be
     found in the STEPS section of this document.
 
 -r, --resume
@@ -257,7 +258,7 @@ The following environment variables are recognized by ``ubuntu-image``.
     unpacked gadget contents.  The directory must exist, and an ``unpack``
     directory will be created under this directory.  The full contents of the
     ``<workdir>/unpack`` directory after the ``snap prepare-image`` subcommand
-    has run will be copied here.
+    has run is copied here.
 
 There are a few other environment variables used for building and testing
 only.
@@ -266,13 +267,13 @@ only.
 STEPS
 =====
 
-The names of steps that can be used with --until and --thru for each image
+The names of steps that can be used with ``--until`` and ``--thru`` for each image
 type are listed below.
 
-Classic image steps
+Classic-image steps
 -------------------
 
-State machines are dynamically created for classic image builds based on
+State machines are dynamically created for classic-image builds based on
 the contents of the image definition. The list of all possible states
 is as follows:
 
