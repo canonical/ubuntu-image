@@ -28,11 +28,6 @@ parts:
     plugin: nil
     source: .
     source-type: git
-    build-packages:
-      - fdisk
-      - gdisk
-      - mtools
-      - python3-docutils
     build-snaps:
       - go
     stage-packages:
