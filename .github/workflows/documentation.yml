@@ -13,14 +13,14 @@ jobs:
       
       - name: Get info on if image definition has changed
         id: changed-files-image-def
-        uses: tj-actions/changed-files@v39
+        uses: tj-actions/changed-files@v42.0.4
         with:
           files: |
             internal/imagedefinition/image_definition.go
 
       - name: Get info on if image definition README was updated
         id: changed-files-image-def-readme
-        uses: tj-actions/changed-files@v39
+        uses: tj-actions/changed-files@v42.0.4
         with:
           files: |
             internal/imagedefinition/README.rst
@@ -41,7 +41,7 @@ jobs:
 
       - name: Get info on if command options or flags have changed
         id: changed-files-flags
-        uses: tj-actions/changed-files@v39
+        uses: tj-actions/changed-files@v42.0.4
         with:
           files: |
             internal/commands/*
