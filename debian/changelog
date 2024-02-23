@@ -8,6 +8,7 @@ ubuntu-image (3.2) UNRELEASED; urgency=medium
   * Improve ARM spread tests
   * Support deb822 format in sources list
   * Unmount more reliably after executing commands in the chroot
+  * Support deb822 format for PPAs
 
  -- Masahiro nakagawa <masahiro.nakagawa@canonical.com> Thu, 8 Feb 2024 13:56:00 +0900
 
