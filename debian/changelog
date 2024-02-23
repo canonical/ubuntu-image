@@ -4,6 +4,11 @@ ubuntu-image (3.2) UNRELEASED; urgency=medium
   * Add sysfs-overlay option used with --presseed option.
   * This option is required to generate a preseeding image which enhances the initial boot time of Ubuntu Core 20+.
 
+  [ Paul Mars ]
+  * Improve ARM spread tests
+  * Support deb822 format in sources list
+  * Unmount more reliably after executing commands in the chroot
+
  -- Masahiro nakagawa <masahiro.nakagawa@canonical.com> Thu, 8 Feb 2024 13:56:00 +0900
 
 ubuntu-image (3.2) UNRELEASED; urgency=medium
