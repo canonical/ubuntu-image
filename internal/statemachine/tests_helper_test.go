@@ -121,22 +121,8 @@ func (m *mockRunCmd) runCmd(cmd *exec.Cmd, debug bool) error {
 	return nil
 }
 
-func NewMockExecCommand() *mockExecCmd {
-	return &mockExecCmd{}
-}
-
 type mockExecCmder struct {
 	cmds []*exec.Cmd
-}
-
-type mockExecCmd struct {
-	exec.Cmd
-	called bool
-}
-
-func (m *mockExecCmd) Run() error {
-	m.called = true
-	return m.Run()
 }
 
 func NewMockExecCommander() *mockExecCmder {

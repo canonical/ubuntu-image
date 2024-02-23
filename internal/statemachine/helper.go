@@ -904,11 +904,9 @@ func manualExecute(customizations []*imagedefinition.Execute, targetDir string, 
 		}
 		executeCmd.Env = append(executeCmd.Env, c.Env...)
 
-		executeOutput := helper.SetCommandOutput(executeCmd, debug)
-		err := executeCmd.Run()
+		err := runCmd(executeCmd, debug)
 		if err != nil {
-			return fmt.Errorf("Error running script \"%s\". Error is %s. Full output below:\n%s",
-				executeCmd.String(), err.Error(), executeOutput.String())
+			return err
 		}
 	}
 	return nil

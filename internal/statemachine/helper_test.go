@@ -781,9 +781,10 @@ func TestFailedManualTouchFile(t *testing.T) {
 
 // TestStateMachine_manualExecute tests manualExecute
 func TestStateMachine_manualExecute(t *testing.T) {
-	type cmdMatcher struct {
-		cmdRegex *regexp.Regexp
-		env      []string
+	type expectedCmd struct {
+		cmd   string
+		stdin string
+		env   []string
 	}
 
 	type args struct {
@@ -792,10 +793,9 @@ func TestStateMachine_manualExecute(t *testing.T) {
 		debug          bool
 	}
 	testCases := []struct {
-		name        string
-		args        args
-		expected    []cmdMatcher
-		expectedErr string
+		name         string
+		args         args
+		expectedCmds []expectedCmd
 	}{
 		{
 			name: "single simple command",
@@ -810,14 +810,12 @@ func TestStateMachine_manualExecute(t *testing.T) {
 				targetDir: "test",
 				debug:     true,
 			},
-			expected: []cmdMatcher{
+			expectedCmds: []expectedCmd{
 				{
-					cmdRegex: regexp.MustCompile("Executing command .*"),
-				},
-				{
-					cmdRegex: regexp.MustCompile("chroot test /execute/path arg1 arg2"),
+					cmd: "/usr/sbin/chroot test /execute/path arg1 arg2",
 					env: []string{
-						"",
+						"VAR1=value1",
+						"VAR2=value2",
 					},
 				},
 			},
@@ -845,14 +843,26 @@ func TestStateMachine_manualExecute(t *testing.T) {
 				targetDir: "test",
 				debug:     true,
 			},
-			expected: []cmdMatcher{
+			expectedCmds: []expectedCmd{
 				{
-					cmdRegex: regexp.MustCompile("Executing command .*"),
+					cmd: "/usr/sbin/chroot test /execute/path1 arg1 arg2",
+					env: []string{
+						"VAR1=value1",
+						"VAR2=value2",
+					},
 				},
 				{
-					cmdRegex: regexp.MustCompile("chroot test /execute/path arg1 arg2"),
+					cmd: "/usr/sbin/chroot test /execute/path2 arg21 arg22",
 					env: []string{
-						"",
+						"VAR1=value21",
+						"VAR2=value22",
+					},
+				},
+				{
+					cmd: "/usr/sbin/chroot test /execute/path3 arg31 arg32",
+					env: []string{
+						"VAR1=value31",
+						"VAR2=value32",
 					},
 				},
 			},
@@ -861,45 +871,31 @@ func TestStateMachine_manualExecute(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			asserter := helper.Asserter{T: t}
 
-			mockCmder := NewMockExecCommander()
+			mockCmder := NewMockRunCommand()
 
-			execCommand = mockCmder.Command
-			t.Cleanup(func() { execCommand = exec.Command })
-
-			stdout, restoreStdout, _ := helper.CaptureStd(&os.Stdout)
-			t.Cleanup(func() { restoreStdout() })
+			runCmd = mockCmder.runCmd
+			t.Cleanup(func() { runCmd = helper.RunCmd })
 
 			err := manualExecute(tc.args.customizations, tc.args.targetDir, tc.args.debug)
 			asserter.AssertErrNil(err, true)
 
-			restoreStdout()
-			readStdout, _ := io.ReadAll(stdout)
+			gotCmds := mockCmder.cmds
 
-			gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
-			if len(tc.expected) != len(gotCmds) {
-				t.Fatalf("%v commands to be executed, expected %v", len(gotCmds), len(tc.expected))
+			if len(tc.expectedCmds) != len(gotCmds) {
+				t.Fatalf("%v commands to be executed, expected %v", len(gotCmds), len(tc.expectedCmds))
 			}
-
-			for i, gotCmd := range gotCmds {
-				expectedCmd := tc.expected[i].cmdRegex
-				if !expectedCmd.Match([]byte(gotCmd)) {
-					t.Errorf("Cmd \"%v\" not matching. Expected %v\n", gotCmd, expectedCmd.String())
-				}
-			}
-
-			for i, gotCmd := range mockCmder.cmds {
-				expectedEnv := tc.args.customizations[i].Env
-				asserter.AssertEqual(expectedEnv, gotCmd.Env)
+			for i, cmd := range gotCmds {
+				asserter.AssertEqual(tc.expectedCmds[i].cmd, cmd.String())
+				asserter.AssertEqual(tc.expectedCmds[i].env, cmd.Env)
 			}
 		})
 	}
 }
 
-// TestFailedManualExecute tests the fail case of the manualExecute function
-func TestFailedManualExecute(t *testing.T) {
+// TestStateMachine_manualExecute_fail tests the fail case of the manualExecute function
+func TestStateMachine_manualExecute_fail(t *testing.T) {
 	t.Parallel()
 	asserter := helper.Asserter{T: t}
 
@@ -909,7 +905,7 @@ func TestFailedManualExecute(t *testing.T) {
 		},
 	}
 	err := manualExecute(executes, "fakedir", true)
-	asserter.AssertErrContains(err, "Error running script")
+	asserter.AssertErrContains(err, "Error running command")
 }
 
 // TestFailedManualAddGroup tests the fail case of the manualAddGroup function
@@ -1020,7 +1016,7 @@ func Test_manualAddUser(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			mockCmder := NewMockRunCommand()
 
 			runCmd = mockCmder.runCmd
