@@ -41,7 +41,6 @@ parts:
       - germinate
       - mtools
       - make
-      - kpartx
       - qemu-user-static
       - qemu-utils
       - u-boot-tools
