@@ -123,7 +123,7 @@ func TestInvalidCommands(t *testing.T) {
 		flags         []string
 		expectedError string
 	}{
-		{"invalid_command", []string{"test"}, nil, "Unknown command `test'. Please specify one command of: classic, rootfs or snap"},
+		{"invalid_command", []string{"test"}, nil, "Unknown command `test'. Please specify one command of: classic or snap"},
 		{"no_model_assertion", []string{"snap"}, nil, "the required argument `model_assertion` was not provided"},
 		{"no_gadget_tree", []string{"classic"}, nil, "the required argument `image_definition` was not provided"},
 		{"invalid_flag", []string{"classic"}, []string{"--nonexistent"}, "unknown flag `nonexistent'"},
@@ -405,24 +405,6 @@ func Test_initStateMachine(t *testing.T) {
 			},
 			want: &statemachine.ClassicStateMachine{
 				Args: commands.ClassicArgs{},
-			},
-		},
-		{
-			name: "init a rootfs state machine",
-			args: args{
-				imageType:        "rootfs",
-				commonOpts:       &commands.CommonOpts{},
-				stateMachineOpts: &commands.StateMachineOpts{},
-				ubuntuImageCommand: &commands.UbuntuImageCommand{
-					Classic: commands.ClassicCommand{
-						ClassicArgsPassed: commands.ClassicArgs{},
-					},
-				},
-			},
-			want: &statemachine.RootfsStateMachine{
-				ClassicStateMachine: statemachine.ClassicStateMachine{
-					Args: commands.ClassicArgs{},
-				},
 			},
 		},
 		{

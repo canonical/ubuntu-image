@@ -483,34 +483,6 @@ func TestSetCommonOpts(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "set options on a rootfs state machine",
-			args: args{
-				stateMachine: &RootfsStateMachine{},
-				commonOpts: &commands.CommonOpts{
-					Debug: true,
-				},
-				stateMachineOpts: &commands.StateMachineOpts{
-					WorkDir: "workdir",
-					Until:   "will_be_overidden",
-					Thru:    "will_be_overidden",
-				},
-			},
-			want: &RootfsStateMachine{
-				ClassicStateMachine: ClassicStateMachine{
-					StateMachine: StateMachine{
-						commonFlags: &commands.CommonOpts{
-							Debug: true,
-						},
-						stateMachineFlags: &commands.StateMachineOpts{
-							WorkDir: "workdir",
-							Thru:    preseedClassicImageState.name,
-							Until:   "",
-						},
-					},
-				},
-			},
-		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

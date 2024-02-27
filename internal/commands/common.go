@@ -19,8 +19,8 @@ type CommonOpts struct {
 // StateMachineOpts stores the options that are related to the state machine
 type StateMachineOpts struct {
 	WorkDir string `short:"w" long:"workdir" description:"The working directory in which to download and unpack all the source files for the image. This directory can exist or not, and it is not removed after this program exits. If not given, a temporary working directory is used instead, which *is* deleted after this program exits. Use -w if you want to be able to resume a partial state machine run." value-name:"DIRECTORY" group:"State Machine Options" default:""`
-	Until   string `short:"u" long:"until" description:"Run the state machine until the given STEP, non-inclusively. STEP must be the name of the step. This option may be ignored in some mode of operation." value-name:"STEP" default:""`
-	Thru    string `short:"t" long:"thru" description:"Run the state machine through the given STEP, inclusively. STEP must be the name of the step. This option may be ignored in some mode of operation." value-name:"STEP" default:""`
+	Until   string `short:"u" long:"until" description:"Run the state machine until the given STEP, non-inclusively. STEP must be the name of the step." value-name:"STEP" default:""`
+	Thru    string `short:"t" long:"thru" description:"Run the state machine through the given STEP, inclusively. STEP must be the name of the step." value-name:"STEP" default:""`
 	Resume  bool   `short:"r" long:"resume" description:"Continue the state machine from the previously saved state. It is an error if there is no previous state."`
 }
 
@@ -28,6 +28,5 @@ type StateMachineOpts struct {
 type UbuntuImageCommand struct {
 	Snap    SnapCommand    `command:"snap"`
 	Classic ClassicCommand `command:"classic"`
-	Rootfs  RootfsCommand  `command:"rootfs"`
 	Pack    PackCommand    `command:"pack" hidden:"true"`
 }
