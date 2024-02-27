@@ -41,12 +41,6 @@ func initStateMachine(imageType string, commonOpts *commands.CommonOpts, stateMa
 		stateMachine = &statemachine.PackStateMachine{
 			Opts: ubuntuImageCommand.Pack.PackOptsPassed,
 		}
-	case "rootfs":
-		stateMachine = &statemachine.RootfsStateMachine{
-			ClassicStateMachine: statemachine.ClassicStateMachine{
-				Args: ubuntuImageCommand.Rootfs.RootfsArgsPassed,
-			},
-		}
 	default:
 		return nil, fmt.Errorf("unsupported command\n")
 	}

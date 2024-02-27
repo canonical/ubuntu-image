@@ -24,8 +24,6 @@ ubuntu-image snap [options] model.assertion
 
 ubuntu-image classic [options] image_definition.yaml
 
-ubuntu-image rootfs [options] image_definition.yaml
-
 
 DESCRIPTION
 ===========
@@ -126,14 +124,6 @@ image_definition
     Path to the image-definition file. This file defines all of the
     customization required when building the image. This positional
     argument must be given for this mode of operation.
-
-
-Rootfs command options
------------------------
-
-This command support the same options as the ``classic`` one. Note that some
-options (``--until`` and ``--thru``) will be ignored. So this mode cannot be 
-interrupted and resumed.
 
 
 Common options
