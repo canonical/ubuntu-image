@@ -11,9 +11,9 @@ Generate a bootable disk image
     Łukasz 'sil2100' Zemczak <lukasz.zemczak@ubuntu.com>,
     William 'jawn-smith' Wilson <william.wilson@canonical.com>,
     Paul Mars <paul.mars@canonical.com>
-:Date: 2024-01-16
+:Date: 2024-03-01
 :Copyright: 2016-2024 Canonical Ltd.
-:Version: 3.2
+:Version: 3.3
 :Manual section: 1
 
 

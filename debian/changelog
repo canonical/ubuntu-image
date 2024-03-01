@@ -1,8 +1,9 @@
-ubuntu-image (3.2) UNRELEASED; urgency=medium
+ubuntu-image (3.3) UNRELEASED; urgency=medium
 
-  [Masahiro Nakagawa]
+  [ Masahiro Nakagawa ]
   * Add sysfs-overlay option used with --presseed option.
-  * This option is required to generate a preseeding image which enhances the initial boot time of Ubuntu Core 20+.
+  * This option is required to generate a preseeding image which enhances
+    the initial boot time of Ubuntu Core 20+.
 
   [ Paul Mars ]
   * Improve ARM spread tests
