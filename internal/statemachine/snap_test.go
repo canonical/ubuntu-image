@@ -708,6 +708,73 @@ func TestGadgetEdgeCases(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 }
 
+// TestAutoAssert ensures that auto-import.assert is populated to final image
+// This is accomplished by creating mock auto-import.assert file and make sure the assertion exists at
+// /tmp/ubuntu-image-xxxx/unpack/system-seed/systems/<date>/auto-import.assert
+func TestAutoAssertFlag(t *testing.T) {
+
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+	var stateMachine SnapStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
+	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	//create a mock auto-import assert
+	mock := filepath.Join(workDir, "auto-import.assert")
+	mf, err := os.Create(mock)
+	asserter.AssertErrNil(err, true)
+	defer mf.Close()
+
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.stateMachineFlags.Thru = "prepare_image"
+	stateMachine.commonFlags.Validation = "enforce"
+	stateMachine.Opts.AutoImport = mock
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+	//Make sure unpack folder exits
+	_, err = os.Stat(stateMachine.tempDirs.unpack)
+	if err != nil {
+		t.Errorf("unpack folder does not exit")
+	}
+	asserter.AssertErrNil(err, true)
+
+	//Make sure systems folder exits
+	dest := filepath.Join(stateMachine.tempDirs.unpack, "system-seed/systems")
+	_, err = os.Stat(dest)
+
+	if err != nil {
+		t.Errorf("%s does not exit", dest)
+	}
+	asserter.AssertErrNil(err, true)
+
+	//Make sure systems/<date>/auto-import.assert exits
+	entries, err := os.ReadDir(dest)
+	if err != nil {
+		t.Errorf("Failed to open folder %s", dest)
+	}
+	asserter.AssertErrNil(err, true)
+	//Go thourgh dest and look for auto-import.assert
+	for _, e := range entries {
+		//create complete path
+		dest = filepath.Join(dest, e.Name())
+		dest = filepath.Join(dest, "auto-import.assert")
+		_, err = os.Stat(dest)
+		if err != nil {
+			t.Errorf("Assertion file does not exists at %s ", dest)
+		}
+		asserter.AssertErrNil(err, true)
+	}
+
+	err = stateMachine.Teardown()
+	asserter.AssertErrNil(err, true)
+}
+
 func TestPreseedFlag(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	restoreCWD := helper.SaveCWD()
