@@ -114,6 +114,9 @@ model_assertion
     Specify the directory that contains the sysfs overlay. This options
     also requires the ``--preseed`` and ``--preseed-sign-key`` options.
 
+--auto-import=<path>
+    Allows to embedd auto-import.asserta specified by <path>  into generated image. Only works with dangerous grade image 
+
 Classic command options
 -----------------------
 
