@@ -1,5 +1,12 @@
 ubuntu-image (3.3) UNRELEASED; urgency=medium
 
+  [Masahiro Nakagawa]
+  * Add auto-import option. This option allows to create image with auto-immport.assert and generates system-user account. Works only with dangerous grade image
+
+ -- Masahiro nakagawa <masahiro.nakagawa@canonical.com> Wed, 28 Feb 2024 18:01:00
+
+ubuntu-image (3.3) UNRELEASED; urgency=medium
+
   [ Masahiro Nakagawa ]
   * Add sysfs-overlay option used with --presseed option.
   * This option is required to generate a preseeding image which enhances
