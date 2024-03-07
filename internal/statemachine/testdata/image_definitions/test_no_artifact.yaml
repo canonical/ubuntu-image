@@ -14,6 +14,7 @@ rootfs:
     - main
     - universe
     - restricted
+  sources-list-deb822: true
   seed:
     urls:
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
@@ -25,6 +26,20 @@ rootfs:
       - standard
       - cloud-image
 customization:
+  manual:
+    make-dirs:
+      - path: /etc/foo/bar
+        permissions: 0755
+    add-user:
+      - name: ubuntu2
+        password: ubuntu2
+        password-type: text
+  components:
+    - main
+    - universe
+    - restricted
+    - multiverse
+  pocket: proposed
   cloud-init:
     user-data: |
       #cloud-config
@@ -38,6 +53,10 @@ customization:
     -
       name: hello
       channel: candidate
+    -
+      name: core
+    -
+      name: core20
   extra-ppas:
     -
       name: "canonical-foundations/ubuntu-image"
