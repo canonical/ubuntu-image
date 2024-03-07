@@ -28,9 +28,8 @@ Alternatively, install the packages named in the `Build-Depends` field.
 * Project home: https://github.com/Canonical/ubuntu-image
 * Report bugs at: https://bugs.launchpad.net/ubuntu-image
 * Git clone: https://github.com/Canonical/ubuntu-image.git
-* Manual page: [`man ubuntu-image`](https://github.com/Canonical/ubuntu-image/blob/main/ubuntu-image.rst)
-
-The `gadget.yaml` specification has moved to [the snapcraft forum](https://forum.snapcraft.io/t/gadget-snaps).
+* Reference page: [`ubuntu-image` syntax and options](https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/ubuntu-image.html)
+* `gadget.yaml` specification: [Gadget snaps](https://forum.snapcraft.io/t/gadget-snaps)
 
 
 ## Build instructions

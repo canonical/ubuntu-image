@@ -47,16 +47,3 @@ jobs:
         with:
           files: |
             internal/commands/*
-
-      - name: Get info on if manpage was updated
-        id: changed-files-manpage
-        uses: tj-actions/changed-files@v39
-        with:
-          files: |
-            ubuntu-image.rst
-            
-      - name: Fail if command line args have changed but manpage has not been updated
-        if: steps.changed-files-flags.outputs.any_changed == 'true' && steps.changed-files-manpage.outputs.any_changed != 'true'
-        run: |
-          echo "Command line flags have been updated but the manpage has not"
-          exit 1
