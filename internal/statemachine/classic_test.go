@@ -448,6 +448,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"clean_rootfs",
 				"customize_sources_list",
 				"customize_cloud_init",
+				"perform_manual_customization",
 				"set_default_locale",
 				"populate_rootfs_contents",
 			},
@@ -3203,7 +3204,88 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 	aptSourcesListBytes, err := os.ReadFile(filepath.Join(mountDir, "etc", "apt", "sources.list"))
 	asserter.AssertErrNil(err, true)
 	asserter.AssertEqual(imagedefinition.LegacySourcesListComment, string(aptSourcesListBytes))
+}
 
+// TestSuccessfulClassicRunNoArtifact runs through a full classic state machine run without artifact
+func TestSuccessfulClassicRunNoArtifact(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	t.Cleanup(restoreCWD)
+
+	// We need the output directory set for this
+	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(outputDir) })
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.commonFlags.Debug = true
+	stateMachine.commonFlags.Size = "5G"
+	stateMachine.commonFlags.OutputDir = outputDir
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_no_artifact.yaml")
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() {
+		err = stateMachine.Teardown()
+		asserter.AssertErrNil(err, true)
+	})
+
+	// make sure packages were successfully installed from public and private ppas
+	files := []string{
+		filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-public"),
+		filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-private"),
+	}
+	for _, file := range files {
+		_, err = os.Stat(file)
+		asserter.AssertErrNil(err, true)
+	}
+
+	// make sure snaps from the correct channel were installed
+	type snapList struct {
+		Snaps []struct {
+			Name    string `yaml:"name"`
+			Channel string `yaml:"channel"`
+		} `yaml:"snaps"`
+	}
+
+	seedYaml := filepath.Join(stateMachine.tempDirs.chroot,
+		"var", "lib", "snapd", "seed", "seed.yaml")
+
+	seedFile, err := os.Open(seedYaml)
+	asserter.AssertErrNil(err, true)
+	defer seedFile.Close()
+
+	var seededSnaps snapList
+	err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
+	asserter.AssertErrNil(err, true)
+
+	expectedSnapChannels := map[string]string{
+		"hello":  "candidate",
+		"core20": "stable",
+	}
+
+	for _, seededSnap := range seededSnaps.Snaps {
+		channel, found := expectedSnapChannels[seededSnap.Name]
+		if found {
+			if channel != seededSnap.Channel {
+				t.Errorf("Expected snap %s to be pre-seeded with channel %s, but got %s",
+					seededSnap.Name, channel, seededSnap.Channel)
+			}
+		}
+	}
 }
 
 func TestSuccessfulRootfsGeneration(t *testing.T) {
