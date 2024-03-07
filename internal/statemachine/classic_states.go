@@ -392,6 +392,10 @@ func (stateMachine *StateMachine) verifyArtifactNames() error {
 
 	stateMachine.VolumeNames = make(map[string]string)
 
+	if classicStateMachine.ImageDef.Artifacts == nil {
+		return nil
+	}
+
 	if len(stateMachine.GadgetInfo.Volumes) > 1 {
 		// first handle .img files if they are specified
 		if classicStateMachine.ImageDef.Artifacts.Img != nil {

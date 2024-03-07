@@ -279,9 +279,6 @@ The following specification defines what is supported in the YAML:
             name: <string>
             # The GID to assign to this group.
             gid: <string> (optional)
-        # ubuntu-image will support creating many different types of
-        # artifacts, including the actual images, manifest files,
-        # changelogs, and a list of files in the rootfs.
       # Set a custom fstab. The existing one (if any) will be truncated.
       fstab: (optional)
         -
@@ -297,7 +294,10 @@ The following specification defines what is supported in the YAML:
           dump: <bool> (optional)
           # the order to fsck the filesystem
           fsck-order: <int>
-    artifacts:
+    # Define the types of artifacts to create, including the actual images,
+    # manifest files, changelogs, and a list of files in the rootfs.
+    # If this is not set, only the rootfs will be created.
+    artifacts: (optional)
       # Used to specify that ubuntu-image should create a .img file.
       img: (optional)
         -

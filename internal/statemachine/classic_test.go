@@ -431,6 +431,27 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"make_qcow2_image",
 			},
 		},
+		{
+			name:            "no artifact",
+			imageDefinition: "test_no_artifact.yaml",
+			expectedStates: []string{
+				"build_gadget_tree",
+				"prepare_gadget_tree",
+				"load_gadget_yaml",
+				"germinate",
+				"create_chroot",
+				"add_extra_ppas",
+				"install_packages",
+				"clean_extra_ppas",
+				"prepare_image",
+				"preseed_image",
+				"clean_rootfs",
+				"customize_sources_list",
+				"customize_cloud_init",
+				"set_default_locale",
+				"populate_rootfs_contents",
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
