@@ -169,92 +169,129 @@ func TestCustomErrors(t *testing.T) {
 // with a default value (because we cannot properly apply the default value)
 func TestImageDefinition_SetDefaults(t *testing.T) {
 	t.Parallel()
-	asserter := helper.Asserter{T: t}
-	imageDef := &ImageDefinition{
-		Gadget: &Gadget{},
-		Rootfs: &Rootfs{
-			Seed:    &Seed{},
-			Tarball: &Tarball{},
-		},
-		Customization: &Customization{
-			Installer:     &Installer{},
-			CloudInit:     &CloudInit{},
-			ExtraPPAs:     []*PPA{{}},
-			ExtraPackages: []*Package{{}},
-			ExtraSnaps:    []*Snap{{}},
-			Fstab:         []*Fstab{{}},
-			Manual: &Manual{
-				AddUser: []*AddUser{
-					{},
+
+	tests := []struct {
+		name     string
+		imageDef *ImageDefinition
+		want     *ImageDefinition
+	}{
+		{
+			name: "full",
+			imageDef: &ImageDefinition{
+				Gadget: &Gadget{},
+				Rootfs: &Rootfs{
+					Seed:    &Seed{},
+					Tarball: &Tarball{},
+				},
+				Customization: &Customization{
+					Installer:     &Installer{},
+					CloudInit:     &CloudInit{},
+					ExtraPPAs:     []*PPA{{}},
+					ExtraPackages: []*Package{{}},
+					ExtraSnaps:    []*Snap{{}},
+					Fstab:         []*Fstab{{}},
+					Manual: &Manual{
+						AddUser: []*AddUser{
+							{},
+						},
+					},
+				},
+				Artifacts: &Artifact{
+					Img:       &[]Img{{}},
+					Iso:       &[]Iso{{}},
+					Qcow2:     &[]Qcow2{{}},
+					Manifest:  &Manifest{},
+					Filelist:  &Filelist{},
+					Changelog: &Changelog{},
+					RootfsTar: &RootfsTar{},
 				},
 			},
-		},
-		Artifacts: &Artifact{
-			Img:       &[]Img{{}},
-			Iso:       &[]Iso{{}},
-			Qcow2:     &[]Qcow2{{}},
-			Manifest:  &Manifest{},
-			Filelist:  &Filelist{},
-			Changelog: &Changelog{},
-			RootfsTar: &RootfsTar{},
-		},
-	}
-
-	want := &ImageDefinition{
-		Gadget: &Gadget{},
-		Rootfs: &Rootfs{
-			Seed: &Seed{
-				Vcs: helper.BoolPtr(true),
-			},
-			Tarball:           &Tarball{},
-			Components:        []string{"main", "restricted"},
-			Archive:           "ubuntu",
-			Flavor:            "ubuntu",
-			Mirror:            "http://archive.ubuntu.com/ubuntu/",
-			Pocket:            "release",
-			SourcesListDeb822: helper.BoolPtr(false),
-		},
-		Customization: &Customization{
-			Components: []string{"main", "restricted", "universe"},
-			Pocket:     "release",
-			Installer:  &Installer{},
-			CloudInit:  &CloudInit{},
-			ExtraPPAs: []*PPA{{
-				KeepEnabled: helper.BoolPtr(true),
-			}},
-			ExtraPackages: []*Package{{}},
-			ExtraSnaps: []*Snap{{
-				Store:   "canonical",
-				Channel: "stable",
-			}},
-			Fstab: []*Fstab{{
-				MountOptions: "defaults",
-			}},
-			Manual: &Manual{
-				AddUser: []*AddUser{
-					{
-						PasswordType: "hash",
+			want: &ImageDefinition{
+				Gadget: &Gadget{},
+				Rootfs: &Rootfs{
+					Seed: &Seed{
+						Vcs: helper.BoolPtr(true),
+					},
+					Tarball:           &Tarball{},
+					Components:        []string{"main", "restricted"},
+					Archive:           "ubuntu",
+					Flavor:            "ubuntu",
+					Mirror:            "http://archive.ubuntu.com/ubuntu/",
+					Pocket:            "release",
+					SourcesListDeb822: helper.BoolPtr(false),
+				},
+				Customization: &Customization{
+					Components: []string{"main", "restricted", "universe"},
+					Pocket:     "release",
+					Installer:  &Installer{},
+					CloudInit:  &CloudInit{},
+					ExtraPPAs: []*PPA{{
+						KeepEnabled: helper.BoolPtr(true),
+					}},
+					ExtraPackages: []*Package{{}},
+					ExtraSnaps: []*Snap{{
+						Store:   "canonical",
+						Channel: "stable",
+					}},
+					Fstab: []*Fstab{{
+						MountOptions: "defaults",
+					}},
+					Manual: &Manual{
+						AddUser: []*AddUser{
+							{
+								PasswordType: "hash",
+							},
+						},
+					},
+				},
+				Artifacts: &Artifact{
+					Img:       &[]Img{{}},
+					Iso:       &[]Iso{{}},
+					Qcow2:     &[]Qcow2{{}},
+					Manifest:  &Manifest{},
+					Filelist:  &Filelist{},
+					Changelog: &Changelog{},
+					RootfsTar: &RootfsTar{
+						Compression: "uncompressed",
 					},
 				},
 			},
 		},
-		Artifacts: &Artifact{
-			Img:       &[]Img{{}},
-			Iso:       &[]Iso{{}},
-			Qcow2:     &[]Qcow2{{}},
-			Manifest:  &Manifest{},
-			Filelist:  &Filelist{},
-			Changelog: &Changelog{},
-			RootfsTar: &RootfsTar{
-				Compression: "uncompressed",
+		{
+			name: "minimal conf",
+			imageDef: &ImageDefinition{
+				Gadget: &Gadget{},
+				Rootfs: &Rootfs{
+					Seed:    &Seed{},
+					Tarball: &Tarball{},
+				},
+			},
+			want: &ImageDefinition{
+				Gadget: &Gadget{},
+				Rootfs: &Rootfs{
+					Seed: &Seed{
+						Vcs: helper.BoolPtr(true),
+					},
+					Tarball:           &Tarball{},
+					Components:        []string{"main", "restricted"},
+					Archive:           "ubuntu",
+					Flavor:            "ubuntu",
+					Mirror:            "http://archive.ubuntu.com/ubuntu/",
+					Pocket:            "release",
+					SourcesListDeb822: helper.BoolPtr(false),
+				},
 			},
 		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			err := helper.SetDefaults(tt.imageDef)
+			asserter.AssertErrNil(err, true)
 
-	err := helper.SetDefaults(imageDef)
-	asserter.AssertErrNil(err, true)
-
-	asserter.AssertEqual(want, imageDef, cmp.AllowUnexported(ImageDefinition{}))
+			asserter.AssertEqual(tt.want, tt.imageDef, cmp.AllowUnexported(ImageDefinition{}))
+		})
+	}
 }
 
 func TestImageDefinition_securityMirror(t *testing.T) {

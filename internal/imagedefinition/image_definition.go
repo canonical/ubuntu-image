@@ -24,7 +24,7 @@ type ImageDefinition struct {
 	ModelAssertion string         `yaml:"model-assertion" json:"ModelAssertion,omitempty" jsonschema:"type=string,format=uri"`
 	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *Customization `yaml:"customization"   json:"Customization,omitempty"`
-	Artifacts      *Artifact      `yaml:"artifacts"       json:"Artifacts"`
+	Artifacts      *Artifact      `yaml:"artifacts"       json:"Artifacts,omitempty"`
 	Class          string         `yaml:"class"           json:"Class"                    jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
 }
 

@@ -293,13 +293,15 @@ func (s *StateMachine) calculateStates() error {
 		s.addGadgetStates(&rootfsCreationStates)
 	}
 
-	// if artifacts are specified, verify the correctness and store them in the struct
-	diskUsed, err := helperCheckTags(c.ImageDef.Artifacts, "is_disk")
-	if err != nil {
-		return fmt.Errorf("Error checking struct tags for Artifacts: \"%s\"", err.Error())
-	}
-	if diskUsed != "" {
-		rootfsCreationStates = append(rootfsCreationStates, verifyArtifactNamesState)
+	if c.ImageDef.Artifacts != nil {
+		// if artifacts are specified, verify the correctness and store them in the struct
+		diskUsed, err := helperCheckTags(c.ImageDef.Artifacts, "is_disk")
+		if err != nil {
+			return fmt.Errorf("Error checking struct tags for Artifacts: \"%s\"", err.Error())
+		}
+		if diskUsed != "" {
+			rootfsCreationStates = append(rootfsCreationStates, verifyArtifactNamesState)
+		}
 	}
 
 	// determine the states needed for preparing the rootfs.
@@ -335,24 +337,26 @@ func (s *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates, generateDiskInfoState)
 	}
 
-	if c.ImageDef.Gadget != nil {
-		s.addImgStates(&rootfsCreationStates)
-	}
+	if c.ImageDef.Artifacts != nil {
+		if c.ImageDef.Gadget != nil {
+			s.addImgStates(&rootfsCreationStates)
+		}
 
-	if c.ImageDef.Artifacts.Qcow2 != nil {
-		s.addQcow2States(&rootfsCreationStates)
-	}
+		if c.ImageDef.Artifacts.Qcow2 != nil {
+			s.addQcow2States(&rootfsCreationStates)
+		}
 
-	if c.ImageDef.Artifacts.Manifest != nil {
-		rootfsCreationStates = append(rootfsCreationStates, generatePackageManifestState)
-	}
+		if c.ImageDef.Artifacts.Manifest != nil {
+			rootfsCreationStates = append(rootfsCreationStates, generatePackageManifestState)
+		}
 
-	if c.ImageDef.Artifacts.Filelist != nil {
-		rootfsCreationStates = append(rootfsCreationStates, generateFilelistState)
-	}
+		if c.ImageDef.Artifacts.Filelist != nil {
+			rootfsCreationStates = append(rootfsCreationStates, generateFilelistState)
+		}
 
-	if c.ImageDef.Artifacts.RootfsTar != nil {
-		rootfsCreationStates = append(rootfsCreationStates, generateRootfsTarballState)
+		if c.ImageDef.Artifacts.RootfsTar != nil {
+			rootfsCreationStates = append(rootfsCreationStates, generateRootfsTarballState)
+		}
 	}
 
 	// Append the newly calculated states to the slice of funcs in the parent struct
