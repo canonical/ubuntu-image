@@ -390,11 +390,11 @@ var verifyArtifactNamesState = stateFunc{"verify_artifact_names", (*StateMachine
 func (stateMachine *StateMachine) verifyArtifactNames() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	stateMachine.VolumeNames = make(map[string]string)
-
 	if classicStateMachine.ImageDef.Artifacts == nil {
 		return nil
 	}
+
+	stateMachine.VolumeNames = make(map[string]string)
 
 	if len(stateMachine.GadgetInfo.Volumes) > 1 {
 		// first handle .img files if they are specified

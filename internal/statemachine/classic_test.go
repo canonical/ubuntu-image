@@ -771,311 +771,335 @@ func TestVerifyArtifactNames(t *testing.T) {
 	testCases := []struct {
 		name             string
 		gadgetYAML       string
+		artifacts        *imagedefinition.Artifact
 		img              *[]imagedefinition.Img
 		qcow2            *[]imagedefinition.Qcow2
 		expectedVolNames map[string]string
 		shouldPass       bool
 	}{
 		{
-			"single_volume_specified",
-			"gadget_tree/meta/gadget.yaml",
-			&[]imagedefinition.Img{
-				{
-					ImgName:   "test1.img",
-					ImgVolume: "pc",
+			name:             "no artifact ",
+			gadgetYAML:       "gadget_tree/meta/gadget.yaml",
+			artifacts:        nil,
+			expectedVolNames: nil,
+			shouldPass:       true,
+		},
+		{
+			name:       "single_volume_specified",
+			gadgetYAML: "gadget_tree/meta/gadget.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Img: &[]imagedefinition.Img{
+					{
+						ImgName:   "test1.img",
+						ImgVolume: "pc",
+					},
 				},
 			},
-			nil,
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"pc": "test1.img",
 			},
-			true,
+			shouldPass: true,
 		},
 		{
-			"single_volume_not_specified",
-			"gadget_tree/meta/gadget.yaml",
-			&[]imagedefinition.Img{
-				{
-					ImgName: "test-single.img",
+			name:       "single_volume_not_specified",
+			gadgetYAML: "gadget_tree/meta/gadget.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Img: &[]imagedefinition.Img{
+					{
+						ImgName: "test-single.img",
+					},
 				},
 			},
-			nil,
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"pc": "test-single.img",
 			},
-			true,
+			shouldPass: true,
 		},
 		{
-			"mutli_volume_specified",
-			"gadget-multi.yaml",
-			&[]imagedefinition.Img{
-				{
-					ImgName:   "test1.img",
-					ImgVolume: "first",
-				},
-				{
-					ImgName:   "test2.img",
-					ImgVolume: "second",
-				},
-				{
-					ImgName:   "test3.img",
-					ImgVolume: "third",
-				},
-				{
-					ImgName:   "test4.img",
-					ImgVolume: "fourth",
+			name:       "mutli_volume_specified",
+			gadgetYAML: "gadget-multi.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Img: &[]imagedefinition.Img{
+					{
+						ImgName:   "test1.img",
+						ImgVolume: "first",
+					},
+					{
+						ImgName:   "test2.img",
+						ImgVolume: "second",
+					},
+					{
+						ImgName:   "test3.img",
+						ImgVolume: "third",
+					},
+					{
+						ImgName:   "test4.img",
+						ImgVolume: "fourth",
+					},
 				},
 			},
-			nil,
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"first":  "test1.img",
 				"second": "test2.img",
 				"third":  "test3.img",
 				"fourth": "test4.img",
 			},
-			true,
+			shouldPass: true,
 		},
 		{
-			"mutli_volume_not_specified",
-			"gadget-multi.yaml",
-			&[]imagedefinition.Img{
-				{
-					ImgName: "test1.img",
-				},
-				{
-					ImgName: "test2.img",
-				},
-				{
-					ImgName: "test3.img",
-				},
-				{
-					ImgName: "test4.img",
+			name:       "mutli_volume_not_specified",
+			gadgetYAML: "gadget-multi.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Img: &[]imagedefinition.Img{
+					{
+						ImgName: "test1.img",
+					},
+					{
+						ImgName: "test2.img",
+					},
+					{
+						ImgName: "test3.img",
+					},
+					{
+						ImgName: "test4.img",
+					},
 				},
 			},
-			nil,
-			map[string]string{},
-			false,
+			expectedVolNames: map[string]string{},
+			shouldPass:       false,
 		},
 		{
-			"mutli_volume_some_specified",
-			"gadget-multi.yaml",
-			&[]imagedefinition.Img{
-				{
-					ImgName:   "test1.img",
-					ImgVolume: "first",
-				},
-				{
-					ImgName:   "test2.img",
-					ImgVolume: "second",
-				},
-				{
-					ImgName: "test3.img",
-				},
-				{
-					ImgName: "test4.img",
+			name:       "mutli_volume_some_specified",
+			gadgetYAML: "gadget-multi.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Img: &[]imagedefinition.Img{
+					{
+						ImgName:   "test1.img",
+						ImgVolume: "first",
+					},
+					{
+						ImgName:   "test2.img",
+						ImgVolume: "second",
+					},
+					{
+						ImgName: "test3.img",
+					},
+					{
+						ImgName: "test4.img",
+					},
 				},
 			},
-			nil,
-			map[string]string{},
-			false,
+			expectedVolNames: map[string]string{},
+			shouldPass:       false,
 		},
 		{
-			"mutli_volume_only_create_some_images",
-			"gadget-multi.yaml",
-			&[]imagedefinition.Img{
-				{
-					ImgName:   "test1.img",
-					ImgVolume: "first",
-				},
-				{
-					ImgName:   "test2.img",
-					ImgVolume: "second",
+			name:       "mutli_volume_only_create_some_images",
+			gadgetYAML: "gadget-multi.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Img: &[]imagedefinition.Img{
+					{
+						ImgName:   "test1.img",
+						ImgVolume: "first",
+					},
+					{
+						ImgName:   "test2.img",
+						ImgVolume: "second",
+					},
 				},
 			},
-			nil,
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"first":  "test1.img",
 				"second": "test2.img",
 			},
-			true,
+			shouldPass: true,
 		},
 		{
-			"qcow2_single_volume_no_img",
-			"gadget_tree/meta/gadget.yaml",
-			nil,
-			&[]imagedefinition.Qcow2{
-				{
-					Qcow2Name:   "test1.qcow2",
-					Qcow2Volume: "pc",
+			name:       "qcow2_single_volume_no_img",
+			gadgetYAML: "gadget_tree/meta/gadget.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Qcow2: &[]imagedefinition.Qcow2{
+					{
+						Qcow2Name:   "test1.qcow2",
+						Qcow2Volume: "pc",
+					},
 				},
 			},
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"pc": "test1.qcow2.img",
 			},
-			true,
+			shouldPass: true,
 		},
 		{
-			"qcow2_single_volume_not_specified_no_img",
-			"gadget_tree/meta/gadget.yaml",
-			nil,
-			&[]imagedefinition.Qcow2{
-				{
-					Qcow2Name: "test1.qcow2",
+			name:       "qcow2_single_volume_not_specified_no_img",
+			gadgetYAML: "gadget_tree/meta/gadget.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Qcow2: &[]imagedefinition.Qcow2{
+					{
+						Qcow2Name: "test1.qcow2",
+					},
 				},
 			},
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"pc": "test1.qcow2.img",
 			},
-			true,
+			shouldPass: true,
 		},
 		{
-			"qcow2_single_volume_yes_img",
-			"gadget_tree/meta/gadget.yaml",
-			&[]imagedefinition.Img{
-				{
-					ImgName:   "test1.img",
-					ImgVolume: "pc",
+			name:       "qcow2_single_volume_yes_img",
+			gadgetYAML: "gadget_tree/meta/gadget.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Img: &[]imagedefinition.Img{
+					{
+						ImgName:   "test1.img",
+						ImgVolume: "pc",
+					},
+				},
+				Qcow2: &[]imagedefinition.Qcow2{
+					{
+						Qcow2Name:   "test1.img",
+						Qcow2Volume: "pc",
+					},
 				},
 			},
-			&[]imagedefinition.Qcow2{
-				{
-					Qcow2Name:   "test1.img",
-					Qcow2Volume: "pc",
-				},
-			},
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"pc": "test1.img",
 			},
-			true,
+			shouldPass: true,
 		},
 		{
-			"qcow2_mutli_volume_not_specified",
-			"gadget-multi.yaml",
-			nil,
-			&[]imagedefinition.Qcow2{
-				{
-					Qcow2Name: "test1.img",
-				},
-				{
-					Qcow2Name: "test2.img",
-				},
-				{
-					Qcow2Name: "test3.img",
-				},
-				{
-					Qcow2Name: "test4.img",
+			name:       "qcow2_mutli_volume_not_specified",
+			gadgetYAML: "gadget-multi.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Qcow2: &[]imagedefinition.Qcow2{
+					{
+						Qcow2Name: "test1.img",
+					},
+					{
+						Qcow2Name: "test2.img",
+					},
+					{
+						Qcow2Name: "test3.img",
+					},
+					{
+						Qcow2Name: "test4.img",
+					},
 				},
 			},
-			map[string]string{},
-			false,
+			expectedVolNames: map[string]string{},
+			shouldPass:       false,
 		},
 		{
-			"qcow2_mutli_volume_no_img",
-			"gadget-multi.yaml",
-			nil,
-			&[]imagedefinition.Qcow2{
-				{
-					Qcow2Name:   "test1.qcow2",
-					Qcow2Volume: "first",
-				},
-				{
-					Qcow2Name:   "test2.qcow2",
-					Qcow2Volume: "second",
-				},
-				{
-					Qcow2Name:   "test3.qcow2",
-					Qcow2Volume: "third",
-				},
-				{
-					Qcow2Name:   "test4.qcow2",
-					Qcow2Volume: "fourth",
+			name:       "qcow2_mutli_volume_no_img",
+			gadgetYAML: "gadget-multi.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Qcow2: &[]imagedefinition.Qcow2{
+					{
+						Qcow2Name:   "test1.qcow2",
+						Qcow2Volume: "first",
+					},
+					{
+						Qcow2Name:   "test2.qcow2",
+						Qcow2Volume: "second",
+					},
+					{
+						Qcow2Name:   "test3.qcow2",
+						Qcow2Volume: "third",
+					},
+					{
+						Qcow2Name:   "test4.qcow2",
+						Qcow2Volume: "fourth",
+					},
 				},
 			},
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"first":  "test1.qcow2.img",
 				"second": "test2.qcow2.img",
 				"third":  "test3.qcow2.img",
 				"fourth": "test4.qcow2.img",
 			},
-			true,
+			shouldPass: true,
 		},
 		{
-			"qcow2_mutli_volume_yes_img",
-			"gadget-multi.yaml",
-			&[]imagedefinition.Img{
-				{
-					ImgName:   "test1.img",
-					ImgVolume: "first",
+			name:       "qcow2_mutli_volume_yes_img",
+			gadgetYAML: "gadget-multi.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Img: &[]imagedefinition.Img{
+					{
+						ImgName:   "test1.img",
+						ImgVolume: "first",
+					},
+					{
+						ImgName:   "test2.img",
+						ImgVolume: "second",
+					},
+					{
+						ImgName:   "test3.img",
+						ImgVolume: "third",
+					},
+					{
+						ImgName:   "test4.img",
+						ImgVolume: "fourth",
+					},
 				},
-				{
-					ImgName:   "test2.img",
-					ImgVolume: "second",
-				},
-				{
-					ImgName:   "test3.img",
-					ImgVolume: "third",
-				},
-				{
-					ImgName:   "test4.img",
-					ImgVolume: "fourth",
+				Qcow2: &[]imagedefinition.Qcow2{
+					{
+						Qcow2Name:   "test1.img",
+						Qcow2Volume: "first",
+					},
+					{
+						Qcow2Name:   "test2.img",
+						Qcow2Volume: "second",
+					},
+					{
+						Qcow2Name:   "test3.img",
+						Qcow2Volume: "third",
+					},
+					{
+						Qcow2Name:   "test4.img",
+						Qcow2Volume: "fourth",
+					},
 				},
 			},
-			&[]imagedefinition.Qcow2{
-				{
-					Qcow2Name:   "test1.img",
-					Qcow2Volume: "first",
-				},
-				{
-					Qcow2Name:   "test2.img",
-					Qcow2Volume: "second",
-				},
-				{
-					Qcow2Name:   "test3.img",
-					Qcow2Volume: "third",
-				},
-				{
-					Qcow2Name:   "test4.img",
-					Qcow2Volume: "fourth",
-				},
-			},
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"first":  "test1.img",
 				"second": "test2.img",
 				"third":  "test3.img",
 				"fourth": "test4.img",
 			},
-			true,
+			shouldPass: true,
 		},
 		{
-			"qcow2_mutli_volume_img_for_different_volume",
-			"gadget-multi.yaml",
-			&[]imagedefinition.Img{
-				{
-					ImgName:   "test1.img",
-					ImgVolume: "first",
+			name:       "qcow2_mutli_volume_img_for_different_volume",
+			gadgetYAML: "gadget-multi.yaml",
+			artifacts: &imagedefinition.Artifact{
+				Img: &[]imagedefinition.Img{
+					{
+						ImgName:   "test1.img",
+						ImgVolume: "first",
+					},
+					{
+						ImgName:   "test2.img",
+						ImgVolume: "second",
+					},
 				},
-				{
-					ImgName:   "test2.img",
-					ImgVolume: "second",
+				Qcow2: &[]imagedefinition.Qcow2{
+					{
+						Qcow2Name:   "test3.qcow2",
+						Qcow2Volume: "third",
+					},
+					{
+						Qcow2Name:   "test4.qcow2",
+						Qcow2Volume: "fourth",
+					},
 				},
 			},
-			&[]imagedefinition.Qcow2{
-				{
-					Qcow2Name:   "test3.qcow2",
-					Qcow2Volume: "third",
-				},
-				{
-					Qcow2Name:   "test4.qcow2",
-					Qcow2Volume: "fourth",
-				},
-			},
-			map[string]string{
+			expectedVolNames: map[string]string{
 				"first":  "test1.img",
 				"second": "test2.img",
 				"third":  "test3.qcow2.img",
 				"fourth": "test4.qcow2.img",
 			},
-			true,
+			shouldPass: true,
 		},
 	}
 	for _, tc := range testCases {
@@ -1096,10 +1120,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 					Archive: "ubuntu",
 				},
 				Customization: &imagedefinition.Customization{},
-				Artifacts: &imagedefinition.Artifact{
-					Img:   tc.img,
-					Qcow2: tc.qcow2,
-				},
+				Artifacts:     tc.artifacts,
 			}
 
 			err := stateMachine.makeTemporaryDirectories()
