@@ -70,6 +70,21 @@ func Test_getMountCmd(t *testing.T) {
 			},
 		},
 		{
+			name: "no src",
+			mp: mountPoint{
+				src:      "",
+				basePath: "targetDir",
+				relpath:  "mountpoint",
+				typ:      "",
+				bind:     true,
+			},
+			wantMountCmds: []string{"/usr/bin/mount --bind  targetDir/mountpoint"},
+			wantUmountCmds: []string{
+				"/usr/bin/mount --make-rprivate targetDir/mountpoint",
+				"/usr/bin/umount --recursive targetDir/mountpoint",
+			},
+		},
+		{
 			name: "fail with bind and type",
 			mp: mountPoint{
 				src:      "src",
