@@ -199,8 +199,8 @@ var (
 func Test_diffMountPoints(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	type args struct {
-		olds     []mountPoint
-		currents []mountPoint
+		olds     []*mountPoint
+		currents []*mountPoint
 	}
 
 	cmpOpts := []cmp.Option{
@@ -212,22 +212,22 @@ func Test_diffMountPoints(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want []mountPoint
+		want []*mountPoint
 	}{
 		{
 			name: "same mounpoints, ignoring list order",
 			args: args{
-				olds: []mountPoint{
-					mp1,
-					mp2,
-					mp3,
-					mp4,
+				olds: []*mountPoint{
+					&mp1,
+					&mp2,
+					&mp3,
+					&mp4,
 				},
-				currents: []mountPoint{
-					mp4,
-					mp1,
-					mp3,
-					mp2,
+				currents: []*mountPoint{
+					&mp4,
+					&mp1,
+					&mp3,
+					&mp2,
 				},
 			},
 			want: nil,
@@ -235,66 +235,66 @@ func Test_diffMountPoints(t *testing.T) {
 		{
 			name: "add some",
 			args: args{
-				olds: []mountPoint{
-					mp1,
-					mp2,
+				olds: []*mountPoint{
+					&mp1,
+					&mp2,
 				},
-				currents: []mountPoint{
-					mp3,
-					mp4,
+				currents: []*mountPoint{
+					&mp3,
+					&mp4,
 				},
 			},
-			want: []mountPoint{
-				mp3,
-				mp4,
+			want: []*mountPoint{
+				&mp3,
+				&mp4,
 			},
 		},
 		{
 			name: "no old ones",
 			args: args{
 				olds: nil,
-				currents: []mountPoint{
-					mp3,
-					mp4,
+				currents: []*mountPoint{
+					&mp3,
+					&mp4,
 				},
 			},
-			want: []mountPoint{
-				mp3,
-				mp4,
+			want: []*mountPoint{
+				&mp3,
+				&mp4,
 			},
 		},
 		{
 			name: "no current ones",
 			args: args{
-				olds: []mountPoint{
-					mp1,
-					mp2,
+				olds: []*mountPoint{
+					&mp1,
+					&mp2,
 				},
 				currents: nil,
 			},
 			want: nil,
 		},
 		{
-			name: "same src but different",
+			name: "difference in src, relpath, basepath and typ",
 			args: args{
-				olds: []mountPoint{
-					mp1,
-					mp2,
-					mp3,
-					mp4,
+				olds: []*mountPoint{
+					&mp1,
+					&mp2,
+					&mp3,
+					&mp4,
 				},
-				currents: []mountPoint{
-					mp11,
-					mp21,
-					mp31,
-					mp41,
+				currents: []*mountPoint{
+					&mp11,
+					&mp21,
+					&mp31,
+					&mp41,
 				},
 			},
-			want: []mountPoint{
-				mp11,
-				mp21,
-				mp31,
-				mp41,
+			want: []*mountPoint{
+				&mp11,
+				&mp21,
+				&mp31,
+				&mp41,
 			},
 		},
 	}

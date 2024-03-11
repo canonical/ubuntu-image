@@ -64,7 +64,7 @@ func getUnmountCmd(targetPath string) []*exec.Cmd {
 
 // teardownMount executed teardown commands after making sure every mountpoints matching the given path
 // are listed and will be properly unmounted
-func teardownMount(path string, mountPoints []mountPoint, teardownCmds []*exec.Cmd, err error, debug bool) error {
+func teardownMount(path string, mountPoints []*mountPoint, teardownCmds []*exec.Cmd, err error, debug bool) error {
 	addedUmountCmds, errAddedUmount := umountAddedMountPointsCmds(path, mountPoints)
 	if errAddedUmount != nil {
 		err = fmt.Errorf("%s\n%s", err, errAddedUmount)
@@ -75,7 +75,7 @@ func teardownMount(path string, mountPoints []mountPoint, teardownCmds []*exec.C
 }
 
 // umountAddedMountPointsCmds generates umount commands for newly added mountpoints
-func umountAddedMountPointsCmds(path string, mountPoints []mountPoint) (umountCmds []*exec.Cmd, err error) {
+func umountAddedMountPointsCmds(path string, mountPoints []*mountPoint) (umountCmds []*exec.Cmd, err error) {
 	currentMountPoints, err := listMounts(path)
 	if err != nil {
 		return nil, err
@@ -91,11 +91,11 @@ func umountAddedMountPointsCmds(path string, mountPoints []mountPoint) (umountCm
 }
 
 // diffMountPoints compares 2 lists of mountpoint and returns the added ones
-func diffMountPoints(olds []mountPoint, currents []mountPoint) (added []mountPoint) {
+func diffMountPoints(olds []*mountPoint, currents []*mountPoint) (added []*mountPoint) {
 	for _, m := range currents {
 		found := false
 		for _, o := range olds {
-			if equalMountPoints(m, o) {
+			if equalMountPoints(*m, *o) {
 				found = true
 			}
 		}
@@ -122,7 +122,7 @@ func equalMountPoints(a, b mountPoint) bool {
 }
 
 // listMounts returns mountpoints matching the given path from /proc/self/mounts
-func listMounts(path string) ([]mountPoint, error) {
+func listMounts(path string) ([]*mountPoint, error) {
 	procMounts := "/proc/self/mounts"
 	f, err := osReadFile(procMounts)
 	if err != nil {
@@ -135,8 +135,8 @@ func listMounts(path string) ([]mountPoint, error) {
 // parseMounts list existing mounts and submounts in the current path
 // The returned splice is already inverted so unmount can be called on it
 // without further modification.
-func parseMounts(procMount string, path string) ([]mountPoint, error) {
-	mountPoints := []mountPoint{}
+func parseMounts(procMount string, path string) ([]*mountPoint, error) {
+	mountPoints := []*mountPoint{}
 	mountLines := strings.Split(procMount, "\n")
 
 	for _, line := range mountLines {
@@ -151,13 +151,13 @@ func parseMounts(procMount string, path string) ([]mountPoint, error) {
 			continue
 		}
 
-		m := mountPoint{
+		m := &mountPoint{
 			src:  fields[0],
 			path: mountPath,
 			typ:  fields[2],
 			opts: strings.Split(fields[3], ","),
 		}
-		mountPoints = append([]mountPoint{m}, mountPoints...)
+		mountPoints = append([]*mountPoint{m}, mountPoints...)
 	}
 
 	return mountPoints, nil
