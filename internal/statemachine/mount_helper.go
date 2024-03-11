@@ -69,7 +69,7 @@ func teardownMount(path string, mountPoints []*mountPoint, teardownCmds []*exec.
 	if errAddedUmount != nil {
 		err = fmt.Errorf("%s\n%s", err, errAddedUmount)
 	}
-	teardownCmds = append(teardownCmds, addedUmountCmds...)
+	teardownCmds = append(addedUmountCmds, teardownCmds...)
 
 	return execTeardownCmds(teardownCmds, debug, err)
 }
