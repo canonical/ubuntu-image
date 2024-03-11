@@ -259,7 +259,7 @@ func (stateMachine *StateMachine) installPackages() error {
 	// teardownCmds should be filled as a LIFO list
 	var teardownCmds []*exec.Cmd
 
-	mountPoints := []mountPoint{}
+	mountPoints := []*mountPoint{}
 
 	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
@@ -268,32 +268,32 @@ func (stateMachine *StateMachine) installPackages() error {
 
 	// mount some necessary partitions in the chroot
 	mountPoints = append(mountPoints,
-		mountPoint{
+		&mountPoint{
 			src:      "devtmpfs-build",
 			basePath: stateMachine.tempDirs.chroot,
 			relpath:  "/dev",
 			typ:      "devtmpfs",
 		},
-		mountPoint{
+		&mountPoint{
 			src:      "devpts-build",
 			basePath: stateMachine.tempDirs.chroot,
 			relpath:  "/dev/pts",
 			typ:      "devpts",
 			opts:     []string{"nodev", "nosuid"},
 		},
-		mountPoint{
+		&mountPoint{
 			src:      "proc-build",
 			basePath: stateMachine.tempDirs.chroot,
 			relpath:  "/proc",
 			typ:      "proc",
 		},
-		mountPoint{
+		&mountPoint{
 			src:      "sysfs-build",
 			basePath: stateMachine.tempDirs.chroot,
 			relpath:  "/sys",
 			typ:      "sysfs",
 		},
-		mountPoint{
+		&mountPoint{
 			basePath: stateMachine.tempDirs.chroot,
 			relpath:  "/run",
 			bind:     true,
@@ -868,7 +868,7 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	var teardownCmds []*exec.Cmd
 
 	// set up the mount commands
-	mountPoints := []mountPoint{
+	mountPoints := []*mountPoint{
 		{
 			src:      "devtmpfs-build",
 			basePath: stateMachine.tempDirs.chroot,
