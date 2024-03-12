@@ -14,12 +14,6 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
-// classicStates are the names and function variables to be executed by the state machine for classic images
-var startingClassicStates = []stateFunc{
-	makeTemporaryDirectoriesState,
-	determineOutputDirectoryState,
-}
-
 var rootfsSeedStates = []stateFunc{
 	germinateState,
 	createChrootState,
@@ -43,8 +37,7 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 	// set the parent pointer of the embedded struct
 	classicStateMachine.parent = classicStateMachine
 
-	// set the beginning states that will be used by all classic image builds
-	classicStateMachine.states = startingClassicStates
+	classicStateMachine.states = make([]stateFunc, 0)
 
 	if err := classicStateMachine.setConfDefDir(classicStateMachine.parent.(*ClassicStateMachine).Args.ImageDefinition); err != nil {
 		return err
@@ -70,6 +63,14 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 
 	// if --resume was passed, figure out where to start
 	if err := classicStateMachine.readMetadata(metadataStateFile); err != nil {
+		return err
+	}
+
+	if err := classicStateMachine.makeTemporaryDirectories(); err != nil {
+		return err
+	}
+
+	if err := classicStateMachine.determineOutputDirectory(); err != nil {
 		return err
 	}
 

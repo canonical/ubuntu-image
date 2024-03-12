@@ -8,7 +8,6 @@ import (
 
 var packStates = []stateFunc{
 	preparePackState,
-	makeTemporaryDirectoriesState,
 	populateTemporaryDirectoriesState,
 	loadGadgetYamlState,
 	setArtifactNamesState,
@@ -47,6 +46,10 @@ func (packStateMachine *PackStateMachine) Setup() error {
 
 	// if --resume was passed, figure out where to start
 	if err := packStateMachine.readMetadata(metadataStateFile); err != nil {
+		return err
+	}
+
+	if err := packStateMachine.makeTemporaryDirectories(); err != nil {
 		return err
 	}
 
