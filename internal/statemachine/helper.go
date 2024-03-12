@@ -27,6 +27,16 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
+const (
+	// schemaMBR identifies a Master Boot Record partitioning schema, or an
+	// MBR like role
+	schemaMBR = "mbr"
+	// schemaGPT identifies a GUID Partition Table partitioning schema
+	schemaGPT = "gpt"
+
+	bareStructure = "bare"
+)
+
 var runCmd = helper.RunCmd
 var blockSize string = "1"
 
@@ -274,6 +284,26 @@ func hasContent(structure gadget.VolumeStructure, contentRoot string) (bool, err
 	return structure.Content != nil || len(contentFiles) > 0, nil
 }
 
+func fixDiskIDOnMBR(imgName string) error {
+	var existingDiskIds [][]byte
+	randomBytes, err := generateUniqueDiskID(&existingDiskIds)
+	if err != nil {
+		return fmt.Errorf("Error generating disk ID: %s", err.Error())
+	}
+	diskFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
+	if err != nil {
+		return fmt.Errorf("Error opening disk to write MBR disk identifier: %s",
+			err.Error())
+	}
+	defer diskFile.Close()
+	_, err = diskFile.WriteAt(randomBytes, 440)
+	if err != nil {
+		return fmt.Errorf("Error writing MBR disk identifier: %s", err.Error())
+	}
+
+	return nil
+}
+
 // handleSecureBoot handles a special case where files need to be moved from /boot/ to
 // /EFI/ubuntu/ so that SecureBoot can still be used
 func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, targetDir string) error {
@@ -378,14 +408,14 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 
 // createPartitionTable creates a disk image file and writes the partition table to it,
 // returning the partition table and the partition number of the root partition.
-func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, int) {
+func createPartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, int) {
 	var gptPartitions = make([]*gpt.Partition, 0)
 	var mbrPartitions = make([]*mbr.Partition, 0)
 	var partitionTable partition.Table
 	partitionNumber, rootfsPartitionNumber := 1, -1
 
 	for _, structure := range volume.Structure {
-		if structure.Role == "mbr" || structure.Type == "bare" ||
+		if structure.Role == schemaMBR || structure.Type == bareStructure ||
 			shouldSkipStructure(structure, isSeeded) {
 			continue
 		}
@@ -401,7 +431,7 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 		// Check for hybrid MBR/GPT
 		if strings.Contains(structure.Type, ",") {
 			types := strings.Split(structure.Type, ",")
-			if volume.Schema == "gpt" {
+			if volume.Schema == schemaGPT {
 				structureType = types[1]
 			} else {
 				structureType = types[0]
@@ -410,7 +440,7 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 			structureType = structure.Type
 		}
 
-		if volume.Schema == "mbr" {
+		if volume.Schema == schemaMBR {
 			bootable := false
 			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
 				bootable = true
@@ -427,7 +457,7 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 			mbrPartitions = append(mbrPartitions, mbrPartition)
 		} else {
 			var partitionName string
-			if structure.Role == "system-data" && structure.Name == "" {
+			if structure.Role == gadget.SystemData && structure.Name == "" {
 				partitionName = "writable"
 			} else {
 				partitionName = structure.Name
@@ -446,21 +476,19 @@ func createPartitionTable(volumeName string, volume *gadget.Volume, sectorSize u
 		partitionNumber++
 	}
 
-	if volume.Schema == "mbr" {
-		mbrTable := &mbr.Table{
+	if volume.Schema == schemaMBR {
+		partitionTable = &mbr.Table{
 			Partitions:         mbrPartitions,
 			LogicalSectorSize:  int(sectorSize),
 			PhysicalSectorSize: int(sectorSize),
 		}
-		partitionTable = mbrTable
 	} else {
-		gptTable := &gpt.Table{
+		partitionTable = &gpt.Table{
 			Partitions:         gptPartitions,
 			LogicalSectorSize:  int(sectorSize),
 			PhysicalSectorSize: int(sectorSize),
 			ProtectiveMBR:      true,
 		}
-		partitionTable = gptTable
 	}
 
 	return &partitionTable, rootfsPartitionNumber
