@@ -1038,7 +1038,7 @@ func (stateMachine *StateMachine) associateLoopDevice(path string) (string, *exe
 		"--show",
 		"--partscan",
 		"--sector-size",
-		stateMachine.commonFlags.SectorSize,
+		stateMachine.SectorSize.String(),
 		path,
 	)
 	var losetupOutput []byte
