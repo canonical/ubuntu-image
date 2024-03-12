@@ -236,11 +236,11 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	// we have already saved the rootfs size in the state machine struct, but we
 	// should also set it in the gadget.Structure that represents the rootfs
 	for _, volume := range stateMachine.GadgetInfo.Volumes {
-		for structureNumber, structure := range volume.Structure {
+		for structIndex, structure := range volume.Structure {
 			if structure.Size == 0 {
 				structure.Size = stateMachine.RootfsSize
 			}
-			volume.Structure[structureNumber] = structure
+			volume.Structure[structIndex] = structure
 		}
 	}
 	return nil
@@ -312,24 +312,23 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 
 var populatePreparePartitionsState = stateFunc{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions}
 
-// Populate and prepare the partitions. For partitions without filesystem: specified in
+// Populate and prepare the partitions. For partitions without "filesystem:" specified in
 // gadget.yaml, this involves using dd to copy the content blobs into a .img file. For
-// partitions that do have filesystem: specified, we use the Mkfs functions from snapd.
+// partitions that do have "filesystem:" specified, we use the Mkfs functions from snapd.
 // Throughout this process, the offset is tracked to ensure partitions are not overlapping.
 func (stateMachine *StateMachine) populatePreparePartitions() error {
-	// iterate through all the volumes
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
 		if err := stateMachine.handleLkBootloader(volume); err != nil {
 			return err
 		}
-		for structureNumber, structure := range volume.Structure {
+		for structIndex, structure := range volume.Structure {
 			var contentRoot string
 			if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
 				contentRoot = stateMachine.tempDirs.rootfs
 			} else {
 				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
-					"part"+strconv.Itoa(structureNumber))
+					"part"+strconv.Itoa(structIndex))
 			}
 			if shouldSkipStructure(structure, stateMachine.IsSeeded) {
 				continue
@@ -337,9 +336,9 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 
 			// copy the data
 			partImg := filepath.Join(stateMachine.tempDirs.volumes, volumeName,
-				"part"+strconv.Itoa(structureNumber)+".img")
+				"part"+strconv.Itoa(structIndex)+".img")
 			if err := stateMachine.copyStructureContent(volume, structure,
-				structureNumber, contentRoot, partImg); err != nil {
+				structIndex, contentRoot, partImg); err != nil {
 				return err
 			}
 		}
