@@ -265,14 +265,14 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	helperCopyBlob = helper.CopyBlob
 
 	// set an invalid blocksize to mock the binary copy blob
-	mockableBlockSize = "0"
+	blockSize = "0"
 	defer func() {
-		mockableBlockSize = "1"
+		blockSize = "1"
 	}()
 	err = stateMachine.copyStructureContent(volume, mbrStruct, 0, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error copying image blob")
-	mockableBlockSize = "1"
+	blockSize = "1"
 
 	// mock helper.CopyBlob and test with filesystem: vfat
 	helperCopyBlob = mockCopyBlob

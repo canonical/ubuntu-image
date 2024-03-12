@@ -67,8 +67,6 @@ var imagePrepare = image.Prepare
 var gojsonschemaValidate = gojsonschema.Validate
 var filepathRel = filepath.Rel
 
-var mockableBlockSize string = "1" //used for mocking dd calls
-
 // SmInterface allows different image types to implement their own setup/run/teardown functions
 type SmInterface interface {
 	Setup() error
@@ -140,10 +138,8 @@ func (stateMachine *StateMachine) SetCommonOpts(commonOpts *commands.CommonOpts,
 // <volumeName>:<volumeSize>,<volumeName2>:<volumeSize2>. It can also be in the
 // format <volumeSize> to signify one size to rule them all
 func (stateMachine *StateMachine) parseImageSizes() error {
-	// initialize the size map
 	stateMachine.ImageSizes = make(map[string]quantity.Size)
 
-	// If --image-size was not used, simply return
 	if stateMachine.commonFlags.Size == "" {
 		return nil
 	}
@@ -372,21 +368,25 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
 
 	stateMachine.CurrentStep = partialStateMachine.CurrentStep
-	stateMachine.Packages = partialStateMachine.Packages
-	stateMachine.Snaps = partialStateMachine.Snaps
-	stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
 	stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
-	stateMachine.ImageSizes = partialStateMachine.ImageSizes
-	stateMachine.RootfsSize = partialStateMachine.RootfsSize
 	stateMachine.IsSeeded = partialStateMachine.IsSeeded
-	stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
+
 	stateMachine.SectorSize = partialStateMachine.SectorSize
-	stateMachine.VolumeNames = partialStateMachine.VolumeNames
+	stateMachine.RootfsSize = partialStateMachine.RootfsSize
+
 	stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
 	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
 	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
 	stateMachine.tempDirs.chroot = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "chroot")
 	stateMachine.tempDirs.scratch = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "scratch")
+
+	stateMachine.GadgetInfo = partialStateMachine.GadgetInfo
+	stateMachine.ImageSizes = partialStateMachine.ImageSizes
+	stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
+	stateMachine.VolumeNames = partialStateMachine.VolumeNames
+
+	stateMachine.Packages = partialStateMachine.Packages
+	stateMachine.Snaps = partialStateMachine.Snaps
 
 	// due to https://github.com/golang/go/issues/10415 we need to set back the volume
 	// structs we reset before encoding (see writeMetadata())

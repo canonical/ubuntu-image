@@ -28,6 +28,7 @@ import (
 )
 
 var runCmd = helper.RunCmd
+var blockSize string = "1"
 
 // validateInput ensures that command line flags for the state machine are valid. These
 // flags are applicable to all image types
@@ -156,97 +157,121 @@ func shouldSkipStructure(structure gadget.VolumeStructure, isSeeded bool) bool {
 
 // copyStructureContent handles copying raw blobs or creating formatted filesystems
 func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
-	structure gadget.VolumeStructure, structureNumber int,
+	structure gadget.VolumeStructure, structIndex int,
 	contentRoot, partImg string) error {
+
 	if structure.Filesystem == "" {
-		// copy the contents to the new location
-		// first zero it out. Structures without filesystem specified in the gadget
-		// yaml must have the size specified, so the bs= argument below is valid
-		ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
-			"bs=" + strconv.FormatUint(uint64(structure.Size), 10),
-			"seek=1"}
-		if err := helperCopyBlob(ddArgs); err != nil {
-			return fmt.Errorf("Error zeroing partition: %s",
-				err.Error())
-		}
-		var runningOffset quantity.Offset = 0
-		for _, content := range structure.Content {
-			if content.Offset != nil {
-				runningOffset = *content.Offset
-			}
-			// now copy the raw content file specified in gadget.yaml
-			inFile := filepath.Join(stateMachine.tempDirs.unpack,
-				"gadget", content.Image)
-			ddArgs = []string{"if=" + inFile, "of=" + partImg, "bs=" + mockableBlockSize,
-				"seek=" + strconv.FormatUint(uint64(runningOffset), 10),
-				"conv=sparse,notrunc"}
-			if err := helperCopyBlob(ddArgs); err != nil {
-				return fmt.Errorf("Error copying image blob: %s",
-					err.Error())
-			}
-			runningOffset += quantity.Offset(content.Size)
+		err := copyStructureNoFS(stateMachine.tempDirs.unpack, structure, partImg)
+		if err != nil {
+			return err
 		}
 	} else {
-		var blockSize quantity.Size
-		if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
-			// system-data and system-seed structures are not required to have
-			// an explicit size set in the yaml file
-			if structure.Size < stateMachine.RootfsSize {
-				if !stateMachine.commonFlags.Quiet {
-					fmt.Printf("WARNING: rootfs structure size %s smaller "+
-						"than actual rootfs contents %s\n",
-						structure.Size.IECString(),
-						stateMachine.RootfsSize.IECString())
-				}
-				blockSize = stateMachine.RootfsSize
-				structure.Size = stateMachine.RootfsSize
-				volume.Structure[structureNumber] = structure
-			} else {
-				blockSize = structure.Size
-			}
-		} else {
-			blockSize = structure.Size
-		}
-		if structure.Role == gadget.SystemData {
-			_, err := os.Create(partImg)
-			if err != nil {
-				return fmt.Errorf("unable to create partImg file: %w", err)
-			}
-			err = os.Truncate(partImg, int64(stateMachine.RootfsSize))
-			if err != nil {
-				return fmt.Errorf("unable to truncate partImg file: %w", err)
-			}
-		} else {
-			// zero out the .img file
-			ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
-				"bs=" + strconv.FormatUint(uint64(blockSize), 10), "seek=1"}
-			if err := helperCopyBlob(ddArgs); err != nil {
-				return fmt.Errorf("Error zeroing image file %s: %s",
-					partImg, err.Error())
-			}
-		}
-		// check if any content exists in unpack
-		contentFiles, err := osReadDir(contentRoot)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("Error listing contents of volume \"%s\": %s",
-				contentRoot, err.Error())
-		}
-		// use mkfs functions from snapd to create the filesystems
-		if structure.Content != nil || len(contentFiles) > 0 {
-			err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
-				contentRoot, structure.Size, stateMachine.SectorSize)
-			if err != nil {
-				return fmt.Errorf("Error running mkfs with content: %s", err.Error())
-			}
-		} else {
-			err := mkfsMake(structure.Filesystem, partImg, structure.Label,
-				structure.Size, stateMachine.SectorSize)
-			if err != nil {
-				return fmt.Errorf("Error running mkfs: %s", err.Error())
-			}
+		err := stateMachine.createFS(volume, structure, structIndex, contentRoot, partImg)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// copyStructureNoFS copies the contents to the new location.
+// It first zero it out. Structures without filesystem specified in the gadget
+// yaml must have the size specified, so the bs= argument below is valid
+func copyStructureNoFS(unpackDir string, structure gadget.VolumeStructure, partImg string) error {
+	ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
+		"bs=" + strconv.FormatUint(uint64(structure.Size), 10),
+		"seek=1"}
+	if err := helperCopyBlob(ddArgs); err != nil {
+		return fmt.Errorf("Error zeroing partition: %s",
+			err.Error())
+	}
+	var runningOffset quantity.Offset = 0
+	for _, content := range structure.Content {
+		if content.Offset != nil {
+			runningOffset = *content.Offset
+		}
+		// now copy the raw content file specified in gadget.yaml
+		inFile := filepath.Join(unpackDir, "gadget", content.Image)
+		ddArgs = []string{"if=" + inFile, "of=" + partImg, "bs=" + blockSize,
+			"seek=" + strconv.FormatUint(uint64(runningOffset), 10),
+			"conv=sparse,notrunc"}
+		if err := helperCopyBlob(ddArgs); err != nil {
+			return fmt.Errorf("Error copying image blob: %s",
+				err.Error())
+		}
+		runningOffset += quantity.Offset(content.Size)
+	}
+
+	return nil
+}
+
+// createFS creates a filesystem for the given structure
+func (stateMachine *StateMachine) createFS(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int, contentRoot, partImg string) error {
+	blockSize := structure.Size
+	if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Size < stateMachine.RootfsSize {
+		// system-data and system-seed structures are not required to have
+		// an explicit size set in the yaml file
+		if !stateMachine.commonFlags.Quiet {
+			fmt.Printf("WARNING: rootfs structure size %s smaller "+
+				"than actual rootfs contents %s\n",
+				structure.Size.IECString(),
+				stateMachine.RootfsSize.IECString())
+		}
+		blockSize = stateMachine.RootfsSize
+		structure.Size = stateMachine.RootfsSize
+		volume.Structure[structIndex] = structure
+	}
+
+	if structure.Role == gadget.SystemData {
+		_, err := os.Create(partImg)
+		if err != nil {
+			return fmt.Errorf("unable to create partImg file: %w", err)
+		}
+		err = os.Truncate(partImg, int64(stateMachine.RootfsSize))
+		if err != nil {
+			return fmt.Errorf("unable to truncate partImg file: %w", err)
+		}
+	} else {
+		// zero out the .img file
+		ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
+			"bs=" + strconv.FormatUint(uint64(blockSize), 10), "seek=1"}
+		if err := helperCopyBlob(ddArgs); err != nil {
+			return fmt.Errorf("Error zeroing image file %s: %s",
+				partImg, err.Error())
+		}
+	}
+
+	hasC, err := hasContent(structure, contentRoot)
+	if err != nil {
+		return err
+	}
+
+	// Create the filesystem
+	if hasC {
+		err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
+			contentRoot, structure.Size, stateMachine.SectorSize)
+		if err != nil {
+			return fmt.Errorf("Error running mkfs with content: %s", err.Error())
+		}
+	} else {
+		err := mkfsMake(structure.Filesystem, partImg, structure.Label,
+			structure.Size, stateMachine.SectorSize)
+		if err != nil {
+			return fmt.Errorf("Error running mkfs: %s", err.Error())
+		}
+	}
+	return nil
+}
+
+// hasContent checks if the structure or the contentRoot dir contains anything
+func hasContent(structure gadget.VolumeStructure, contentRoot string) (bool, error) {
+	contentFiles, err := osReadDir(contentRoot)
+	if err != nil && !os.IsNotExist(err) {
+		return false, fmt.Errorf("Error listing contents of volume \"%s\": %s",
+			contentRoot, err.Error())
+	}
+
+	return structure.Content != nil || len(contentFiles) > 0, nil
 }
 
 // handleSecureBoot handles a special case where files need to be moved from /boot/ to
