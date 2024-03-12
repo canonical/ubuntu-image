@@ -353,8 +353,6 @@ var makeDiskState = stateFunc{"make_disk", (*StateMachine).makeDisk}
 
 // Make the disk
 func (stateMachine *StateMachine) makeDisk() error {
-	// TODO: this is only temporarily needed until go-diskfs is fixed - see below
-	var existingDiskIds [][]byte
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		_, found := stateMachine.VolumeNames[volumeName]
 		if !found {
@@ -387,8 +385,8 @@ func (stateMachine *StateMachine) makeDisk() error {
 				err.Error())
 		}
 
-		// set up the partitions on the device
-		partitionTable, rootfsPartitionNumber := createPartitionTable(volumeName, volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
+		// set up the partition table on the device
+		partitionTable, rootfsPartitionNumber := createPartitionTable(volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
 
 		// Save the rootfs partition number, if found, for later use
 		if rootfsPartitionNumber != -1 {
@@ -404,21 +402,10 @@ func (stateMachine *StateMachine) makeDisk() error {
 		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
 		// this function is a temporary workaround, but we should change upstream go-diskfs
 		if volume.Schema == "mbr" {
-			randomBytes, err := generateUniqueDiskID(&existingDiskIds)
+			err = fixDiskIDOnMBR(imgName)
 			if err != nil {
-				return fmt.Errorf("Error generating disk ID: %s", err.Error())
+				return err
 			}
-			diskFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
-			if err != nil {
-				return fmt.Errorf("Error opening disk to write MBR disk identifier: %s",
-					err.Error())
-			}
-			defer diskFile.Close()
-			_, err = diskFile.WriteAt(randomBytes, 440)
-			if err != nil {
-				return fmt.Errorf("Error writing MBR disk identifier: %s", err.Error())
-			}
-			diskFile.Close()
 		}
 
 		// After the partitions have been created, copy the data into the correct locations
