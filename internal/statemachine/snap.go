@@ -6,8 +6,6 @@ import (
 
 // snapStates are the names and function variables to be executed by the state machine for snap images
 var snapStates = []stateFunc{
-	makeTemporaryDirectoriesState,
-	determineOutputDirectoryState,
 	prepareImageState,
 	loadGadgetYamlState,
 	setArtifactNamesState,
@@ -52,6 +50,14 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 
 	// if --resume was passed, figure out where to start
 	if err := snapStateMachine.readMetadata(metadataStateFile); err != nil {
+		return err
+	}
+
+	if err := snapStateMachine.makeTemporaryDirectories(); err != nil {
+		return err
+	}
+
+	if err := snapStateMachine.determineOutputDirectory(); err != nil {
 		return err
 	}
 

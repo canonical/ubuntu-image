@@ -39,7 +39,6 @@ var testStates = []stateFunc{
 
 // for tests where we want to run all the states
 var allTestStates = []stateFunc{
-	makeTemporaryDirectoriesState,
 	{prepareGadgetTreeState.name, func(statemachine *StateMachine) error { return nil }},
 	{prepareClassicImageState.name, func(statemachine *StateMachine) error { return nil }},
 	{loadGadgetYamlState.name, func(statemachine *StateMachine) error { return nil }},
@@ -379,7 +378,7 @@ func TestFunctionErrors(t *testing.T) {
 		newStateFunc  stateFunc
 	}{
 		{"error_state_func", 0, stateFunc{"test_error_state_func", func(stateMachine *StateMachine) error { return fmt.Errorf("Test Error") }}},
-		{"error_write_metadata", 10, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
+		{"error_write_metadata", 8, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 			return nil
 		}}},

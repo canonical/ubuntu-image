@@ -9,68 +9,12 @@ import (
 	"strings"
 
 	diskfs "github.com/diskfs/go-diskfs"
-	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
-
-var makeTemporaryDirectoriesState = stateFunc{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories}
-
-// generate work directory file structure
-func (stateMachine *StateMachine) makeTemporaryDirectories() error {
-	// if no workdir was specified, open a /tmp dir
-	if stateMachine.stateMachineFlags.WorkDir == "" {
-		stateMachine.stateMachineFlags.WorkDir = filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
-		if err := osMkdir(stateMachine.stateMachineFlags.WorkDir, 0755); err != nil {
-			return fmt.Errorf("Failed to create temporary directory: %s", err.Error())
-		}
-		stateMachine.cleanWorkDir = true
-	} else {
-		err := osMkdirAll(stateMachine.stateMachineFlags.WorkDir, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating work directory: %s", err.Error())
-		}
-	}
-
-	stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
-	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
-	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
-	stateMachine.tempDirs.chroot = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "chroot")
-	stateMachine.tempDirs.scratch = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "scratch")
-
-	tempDirs := []string{stateMachine.tempDirs.scratch, stateMachine.tempDirs.rootfs, stateMachine.tempDirs.unpack}
-	for _, tempDir := range tempDirs {
-		err := osMkdir(tempDir, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating temporary directory \"%s\": \"%s\"", tempDir, err.Error())
-		}
-	}
-
-	return nil
-}
-
-var determineOutputDirectoryState = stateFunc{"determine_output_directory", (*StateMachine).determineOutputDirectory}
-
-// determineOutputDirectory sets the directory in which to place artifacts
-// and creates it if it doesn't already exist
-func (stateMachine *StateMachine) determineOutputDirectory() error {
-	if stateMachine.commonFlags.OutputDir == "" {
-		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd
-			stateMachine.commonFlags.OutputDir, _ = os.Getwd()
-		} else {
-			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
-		}
-	} else {
-		err := osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating OutputDir: %s", err.Error())
-		}
-	}
-	return nil
-}
 
 var setArtifactNamesState = stateFunc{"set_artifact_names", (*StateMachine).setArtifactNames}
 
