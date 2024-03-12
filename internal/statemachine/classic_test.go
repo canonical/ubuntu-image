@@ -4837,8 +4837,8 @@ func TestFailedUpdateBootloader(t *testing.T) {
 
 	// first, test that updateBootloader fails when the rootfs partition
 	// has not been found in earlier steps
-	stateMachine.rootfsPartNum = -1
-	stateMachine.rootfsVolName = ""
+	stateMachine.RootfsPartNum = -1
+	stateMachine.RootfsVolName = ""
 	err = stateMachine.updateBootloader()
 	asserter.AssertErrContains(err, "Error: could not determine partition number of the root filesystem")
 
@@ -4862,8 +4862,8 @@ func TestFailedUpdateBootloader(t *testing.T) {
 
 	// prepare state in such a way that the rootfs partition was found in
 	// earlier steps
-	stateMachine.rootfsPartNum = 3
-	stateMachine.rootfsVolName = "pc"
+	stateMachine.RootfsPartNum = 3
+	stateMachine.RootfsVolName = "pc"
 
 	// parse gadget.yaml and run updateBootloader with the mocked os.Mkdir
 	err = stateMachine.prepareGadgetTree()
@@ -4925,8 +4925,8 @@ func TestUnsupportedBootloader(t *testing.T) {
 
 	// prepare state in such a way that the rootfs partition was found in
 	// earlier steps
-	stateMachine.rootfsPartNum = 3
-	stateMachine.rootfsVolName = "pc"
+	stateMachine.RootfsPartNum = 3
+	stateMachine.RootfsVolName = "pc"
 
 	// set the bootloader for the volume to "test"
 	stateMachine.GadgetInfo.Volumes["pc"].Bootloader = "test"

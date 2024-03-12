@@ -98,8 +98,8 @@ type StateMachine struct {
 	ConfDefPath   string        // directory holding the model assertion / image definition file
 	YamlFilePath  string        // the location for the gadget yaml file
 	IsSeeded      bool          // core 20 images are seeded
-	rootfsVolName string        // volume on which the rootfs is located
-	rootfsPartNum int           // rootfs partition number
+	RootfsVolName string        // volume on which the rootfs is located
+	RootfsPartNum int           // rootfs partition number
 	SectorSize    quantity.Size // parsed (converted) sector size
 	RootfsSize    quantity.Size
 	tempDirs      temporaryDirectories
@@ -370,6 +370,8 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.CurrentStep = partialStateMachine.CurrentStep
 	stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
 	stateMachine.IsSeeded = partialStateMachine.IsSeeded
+	stateMachine.RootfsVolName = partialStateMachine.RootfsVolName
+	stateMachine.RootfsPartNum = partialStateMachine.RootfsPartNum
 
 	stateMachine.SectorSize = partialStateMachine.SectorSize
 	stateMachine.RootfsSize = partialStateMachine.RootfsSize
