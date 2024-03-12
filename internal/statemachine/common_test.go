@@ -897,9 +897,9 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			}
 
 			// while at it, ensure that the root partition has been found
-			if stateMachine.rootfsPartNum != tc.rootfsPartNum || stateMachine.rootfsVolName != tc.rootfsVolName {
+			if stateMachine.RootfsPartNum != tc.rootfsPartNum || stateMachine.RootfsVolName != tc.rootfsVolName {
 				t.Errorf("Root partition volume/numbe not detected correctly, expected %s/%d, got %s/%d",
-					tc.rootfsVolName, tc.rootfsPartNum, stateMachine.rootfsVolName, stateMachine.rootfsPartNum)
+					tc.rootfsVolName, tc.rootfsPartNum, stateMachine.RootfsVolName, stateMachine.RootfsPartNum)
 			}
 		})
 	}

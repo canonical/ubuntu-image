@@ -392,8 +392,8 @@ func (stateMachine *StateMachine) makeDisk() error {
 
 		// Save the rootfs partition number, if found, for later use
 		if rootfsPartitionNumber != -1 {
-			stateMachine.rootfsVolName = volumeName
-			stateMachine.rootfsPartNum = rootfsPartitionNumber
+			stateMachine.RootfsVolName = volumeName
+			stateMachine.RootfsPartNum = rootfsPartitionNumber
 		}
 
 		// Write the partition table to disk

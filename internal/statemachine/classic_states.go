@@ -1218,13 +1218,13 @@ var updateBootloaderState = stateFunc{"update_bootloader", (*StateMachine).updat
 // updateBootloader determines the bootloader for each volume
 // and runs the correct helper function to update the bootloader
 func (stateMachine *StateMachine) updateBootloader() error {
-	if stateMachine.rootfsPartNum == -1 || stateMachine.rootfsVolName == "" {
+	if stateMachine.RootfsPartNum == -1 || stateMachine.RootfsVolName == "" {
 		return fmt.Errorf("Error: could not determine partition number of the root filesystem")
 	}
-	volume := stateMachine.GadgetInfo.Volumes[stateMachine.rootfsVolName]
+	volume := stateMachine.GadgetInfo.Volumes[stateMachine.RootfsVolName]
 	switch volume.Bootloader {
 	case "grub":
-		err := stateMachine.updateGrub(stateMachine.rootfsVolName, stateMachine.rootfsPartNum)
+		err := stateMachine.updateGrub(stateMachine.RootfsVolName, stateMachine.RootfsPartNum)
 		if err != nil {
 			return err
 		}
