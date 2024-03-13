@@ -37,7 +37,24 @@
                             "edition": 1,
                             "preserve": null
                         }
-                    }
+                    },
+                    {
+                        "name": "BIOS Boot",
+                        "filesystem-label": "",
+                        "offset": 1048576,
+                        "offset-write": null,
+                        "min-size": 1048576,
+                        "size": 1048576,
+                        "type": "21686148-6449-6E6F-744E-656564454649",
+                        "role": "",
+                        "id": "",
+                        "filesystem": "",
+                        "content": null,
+                        "update": {
+                          "edition": 2,
+                          "preserve": null
+                        }
+                      }          
                 ]
             }
         },

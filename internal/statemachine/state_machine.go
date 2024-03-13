@@ -391,13 +391,28 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.Packages = partialStateMachine.Packages
 	stateMachine.Snaps = partialStateMachine.Snaps
 
-	// due to https://github.com/golang/go/issues/10415 we need to set back the volume
-	// structs we reset before encoding (see writeMetadata())
 	if stateMachine.GadgetInfo != nil {
+		// Due to https://github.com/golang/go/issues/10415 we need to set back the volume
+		// structs we reset before encoding (see writeMetadata())
 		gadget.SetEnclosingVolumeInStructs(stateMachine.GadgetInfo.Volumes)
+
+		rebuildYamlIndex(stateMachine.GadgetInfo)
 	}
 
 	return nil
+}
+
+// rebuildYamlIndex reset the YamlIndex field in VolumeStructure
+// This field is not serialized (for a good reason) so it is lost when saving the metadata
+// We consider here the JSON serialization keeps the struct order and we can naively
+// consider the YamlIndex value is the same as the index of the structure in the structure slice.
+func rebuildYamlIndex(info *gadget.Info) {
+	for _, v := range info.Volumes {
+		for i, s := range v.Structure {
+			s.YamlIndex = i
+			v.Structure[i] = s
+		}
+	}
 }
 
 // displayStates print the calculated states
