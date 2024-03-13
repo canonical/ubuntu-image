@@ -903,6 +903,20 @@ func TestStateMachine_readMetadata(t *testing.T) {
 									Update: gadget.VolumeUpdate{
 										Edition: 1,
 									},
+									YamlIndex: 0,
+								},
+								{
+									Name:    "BIOS Boot",
+									Offset:  ptrToOffset(quantity.Offset(quantity.Size(1048576))),
+									MinSize: quantity.Size(1048576),
+									Size:    quantity.Size(1048576),
+									Role:    "",
+									Type:    "21686148-6449-6E6F-744E-656564454649",
+									Content: nil,
+									Update: gadget.VolumeUpdate{
+										Edition: 2,
+									},
+									YamlIndex: 1,
 								},
 							},
 						},
@@ -1034,6 +1048,7 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 									Update: gadget.VolumeUpdate{
 										Edition: 1,
 									},
+									YamlIndex: 0,
 								},
 							},
 						},
