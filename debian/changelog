@@ -2,6 +2,7 @@ ubuntu-image (3.4) UNRELEASED; urgency=medium
 
   [ Paul Mars ]
   * Enable not setting any artifact in the image definition
+  * Make the resume feature more reliable
 
  -- Paul Mars <paul.mars@canonical.com>  Fri, 08 Mar 2024 16:02:07 +0100
 
