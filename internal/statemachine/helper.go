@@ -185,7 +185,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 }
 
 // copyStructureNoFS copies the contents to the new location.
-// It first zero it out. Structures without filesystem specified in the gadget
+// It first zeros it out. Structures without filesystem specified in the gadget
 // yaml must have the size specified, so the bs= argument below is valid
 func copyStructureNoFS(unpackDir string, structure gadget.VolumeStructure, partImg string) error {
 	ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",

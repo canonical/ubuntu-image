@@ -14,6 +14,7 @@ import (
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -1284,4 +1285,131 @@ Continuing
 			asserter.AssertEqual(tt.wantOutput, string(readStdout))
 		})
 	}
+}
+
+// TestMakeTemporaryDirectories tests a successful execution of the
+// make_temporary_directories state with and without --workdir
+func TestMakeTemporaryDirectories(t *testing.T) {
+	testCases := []struct {
+		name    string
+		workdir string
+	}{
+		{"with_workdir", "/tmp/make_temporary_directories-" + uuid.NewString()},
+		{"without_workdir", ""},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.WorkDir = tc.workdir
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			// make sure workdir was successfully created
+			if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err != nil {
+				t.Errorf("Failed to create workdir %s",
+					stateMachine.stateMachineFlags.WorkDir)
+			}
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		})
+	}
+}
+
+// TestFailedMakeTemporaryDirectories tests some failed executions of the make_temporary_directories state
+func TestFailedMakeTemporaryDirectories(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	// mock os.Mkdir and test with and without a WorkDir
+	osMkdir = mockMkdir
+	defer func() {
+		osMkdir = os.Mkdir
+	}()
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrContains(err, "Failed to create temporary directory")
+
+	stateMachine.stateMachineFlags.WorkDir = testDir
+	err = stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrContains(err, "Error creating temporary directory")
+
+	// mock os.MkdirAll and only test with a WorkDir
+	osMkdirAll = mockMkdirAll
+	defer func() {
+		osMkdirAll = os.MkdirAll
+	}()
+	err = stateMachine.makeTemporaryDirectories()
+	if err == nil {
+		// try adding a workdir to see if that triggers the failure
+		stateMachine.stateMachineFlags.WorkDir = testDir
+		err = stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrContains(err, "Error creating temporary directory")
+	}
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+}
+
+// TestDetermineOutputDirectory unit tests the determineOutputDirectory function
+func TestDetermineOutputDirectory(t *testing.T) {
+	testDir1 := "/tmp/determine_output_dir-" + uuid.NewString()
+	testDir2 := "/tmp/determine_output_dir-" + uuid.NewString()
+	cwd, _ := os.Getwd()
+	testCases := []struct {
+		name              string
+		workDir           string
+		outputDir         string
+		expectedOutputDir string
+		cleanUp           bool
+	}{
+		{"no_workdir_no_outputdir", "", "", cwd, false},
+		{"yes_workdir_no_outputdir", testDir1, "", testDir1, true},
+		{"no_workdir_yes_outputdir", "", testDir1, testDir1, true},
+		{"different_workdir_and_outputdir", testDir1, testDir2, testDir2, true},
+		{"same_workdir_and_outputdir", testDir1, testDir1, testDir1, true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.WorkDir = tc.workDir
+			stateMachine.commonFlags.OutputDir = tc.outputDir
+
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.determineOutputDirectory()
+			asserter.AssertErrNil(err, true)
+			if tc.cleanUp {
+				t.Cleanup(func() { os.RemoveAll(stateMachine.commonFlags.OutputDir) })
+			}
+
+			// ensure the correct output dir was set and that it exists
+			if stateMachine.commonFlags.OutputDir != tc.expectedOutputDir {
+				t.Errorf("OutputDir set in in struct \"%s\" does not match expected value \"%s\"",
+					stateMachine.commonFlags.OutputDir, tc.expectedOutputDir)
+			}
+			if _, err := os.Stat(stateMachine.commonFlags.OutputDir); err != nil {
+				t.Errorf("Failed to create output directory %s",
+					stateMachine.stateMachineFlags.WorkDir)
+			}
+		})
+	}
+}
+
+// TestDetermineOutputDirectory_fail tests failures in the determineOutputDirectory function
+func TestDetermineOutputDirectory_fail(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.commonFlags.OutputDir = "testdir"
+
+	// mock os.MkdirAll
+	osMkdirAll = mockMkdirAll
+	defer func() {
+		osMkdirAll = os.MkdirAll
+	}()
+	err := stateMachine.determineOutputDirectory()
+	asserter.AssertErrContains(err, "Error creating OutputDir")
+	osMkdirAll = os.MkdirAll
 }

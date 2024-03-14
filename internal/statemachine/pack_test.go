@@ -90,6 +90,27 @@ func TestPack_readMetadata_fail(t *testing.T) {
 	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
+// TestPack_makeTemporaryDirectories_fail tests the Setup function with makeTemporaryDirectories failing
+func TestPack_makeTemporaryDirectories_fail(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine PackStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+
+	stateMachine.stateMachineFlags.WorkDir = testDir
+
+	// mock os.MkdirAll
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
+		osMkdirAll = os.MkdirAll
+	})
+	err := stateMachine.Setup()
+	asserter.AssertErrContains(err, "Error creating work directory")
+}
+
 func TestPack_populateTemporaryDirectories(t *testing.T) {
 	testCases := []struct {
 		name        string

@@ -96,6 +96,49 @@ func TestFailedReadMetadataSnap(t *testing.T) {
 	asserter.AssertErrContains(err, "error reading metadata file")
 }
 
+// TestSnapStateMachine_Setup_Fail_makeTemporaryDirectories tests the Setup function
+// with makeTemporaryDirectories failing
+func TestSnapStateMachine_Setup_Fail_makeTemporaryDirectories(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine SnapStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+
+	stateMachine.stateMachineFlags.WorkDir = testDir
+
+	// mock os.MkdirAll
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
+		osMkdirAll = os.MkdirAll
+	})
+	err := stateMachine.Setup()
+	asserter.AssertErrContains(err, "Error creating work directory")
+}
+
+// TestSnapStateMachine_Setup_Fail_determineOutputDirectory tests the Setup function
+// with determineOutputDirectory failing
+func TestSnapStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine SnapStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.commonFlags.OutputDir = "/tmp/test"
+
+	// mock os.MkdirAll
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
+		osMkdirAll = os.MkdirAll
+	})
+	err := stateMachine.Setup()
+	asserter.AssertErrContains(err, "Error creating OutputDir")
+}
+
 // TestSuccessfulSnapCore20 builds a core 20 image and makes sure the factory boot flag is set
 func TestSuccessfulSnapCore20(t *testing.T) {
 	if testing.Short() {
