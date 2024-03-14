@@ -634,6 +634,50 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 }
 
+// TestClassicStateMachine_Setup_Fail_makeTemporaryDirectories tests the Setup function
+// with makeTemporaryDirectories failing
+func TestClassicStateMachine_Setup_Fail_makeTemporaryDirectories(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.stateMachineFlags.WorkDir = testDir
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_amd64.yaml")
+
+	// mock os.MkdirAll
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
+		osMkdirAll = os.MkdirAll
+	})
+	err := stateMachine.Setup()
+	asserter.AssertErrContains(err, "Error creating work directory")
+}
+
+// TestClassicStateMachine_Setup_Fail_determineOutputDirectory tests the Setup function
+// with determineOutputDirectory failing
+func TestClassicStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_amd64.yaml")
+	stateMachine.commonFlags.OutputDir = "/tmp/test"
+
+	// mock os.MkdirAll
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
+		osMkdirAll = os.MkdirAll
+	})
+	err := stateMachine.Setup()
+	asserter.AssertErrContains(err, "Error creating OutputDir")
+}
+
 // TestPrepareGadgetTree runs prepareGadgetTree() and ensures the gadget_tree files
 // are placed in the correct locations
 func TestPrepareGadgetTree(t *testing.T) {
