@@ -13,7 +13,7 @@ This document covers the following topics:
 Ubuntu 18.04 LTS or later is recommended for ubuntu-image development.
 Usually, the [latest LTS](https://releases.ubuntu.com/) would be the best choice.
 
-Go 1.21 [(or later)](https://go.dev/dl/) is required to build ubuntu-image.
+Go 1.21 [(or later)](https://snapcraft.io/go) is required to build ubuntu-image.
 
 
 ## Building
