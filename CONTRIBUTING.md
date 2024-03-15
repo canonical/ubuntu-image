@@ -51,7 +51,7 @@ Alternatively, install the packages named in the `Build-Depends` field.
 
 To run the various tests that we have to ensure a high quality source:
 ```
-go test -timeout 0 github.com/canonical/ubuntu-image/...
+go test -timeout 0 ./...
 ```
 
 ### Running integration tests
