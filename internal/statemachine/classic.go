@@ -95,7 +95,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 	}
 
 	if imageDefinition.Rootfs.SourcesListDeb822 == nil {
-		fmt.Print("WARNING: rootfs.sources-list-deb822 was not set. Please explicitely set the format desired for sources list in your image definition.\n")
+		fmt.Print("WARNING: rootfs.sources-list-deb822 was not set. Please explicitly set the format desired for sources list in your image definition.\n")
 	}
 
 	// populate the default values for imageDefinition if they were not provided in
