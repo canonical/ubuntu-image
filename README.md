@@ -1,4 +1,4 @@
-# ubuntu-image 
+# ubuntu-image: build Ubuntu images
 
 ![Build](https://github.com/canonical/ubuntu-image/actions/workflows/build-and-test.yml/badge.svg)
 [![codecov](https://codecov.io/gh/canonical/ubuntu-image/branch/main/graph/badge.svg?token=F9jE9HKo1a)](https://codecov.io/gh/canonical/ubuntu-image)
@@ -6,8 +6,8 @@
 
 ubuntu-image is used to build the following Ubuntu images:
 
-* Ubuntu Core snap-based images from model assertions
-* Ubuntu classic preinstalled images using image definition
+* Snap-based Ubuntu Core images from model assertions
+* Classical preinstalled Ubuntu images using image definition
 
 Future versions should be generalized to build more (eventually all) Ubuntu images.
 
@@ -28,8 +28,4 @@ Ubuntu 18.04 (Bionic Beaver) is the minimum platform requirement, but Ubuntu 20.
 
 ## Building & testing
 
-For instructions on building and testing ubuntu-image, refer to the following sections in [CONTRIBUTING.md](./CONTRIBUTING.md): 
-
-* [Building](https://github.com/canonical/ubuntu-image/blob/main/CONTRIBUTING.md#building)
-
-* [Testing](https://github.com/canonical/ubuntu-image/blob/main/CONTRIBUTING.md#testing)
+For instructions on building and testing ubuntu-image, see [CONTRIBUTING.md](./CONTRIBUTING.md).
