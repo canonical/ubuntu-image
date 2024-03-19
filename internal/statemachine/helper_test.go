@@ -764,9 +764,8 @@ func TestFailedManualTouchFile(t *testing.T) {
 // TestStateMachine_manualExecute tests manualExecute
 func TestStateMachine_manualExecute(t *testing.T) {
 	type expectedCmd struct {
-		cmd   string
-		stdin string
-		env   []string
+		cmd string
+		env []string
 	}
 
 	type args struct {

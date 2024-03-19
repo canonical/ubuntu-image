@@ -3102,6 +3102,9 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 	testHelperCheckMakeDirs(t, mountDir)
 	testHelperCheckAddUser(t, &asserter, mountDir)
+	testHelperCheckAddGroup(t, &asserter, mountDir)
+	testHelperCheckTouchFile(t, mountDir)
+	testHelperCheckExecute(t, &asserter, mountDir)
 	testHelperCheckGrubConfig(t, mountDir)
 	testHelperCheckCleanedFiles(t, mountDir)
 	testHelperCheckLocaleFile(t, &asserter, mountDir)
@@ -3219,6 +3222,60 @@ func testHelperCheckAddUser(t *testing.T, asserter *helper.Asserter, mountDir st
 
 	if expire != "0" {
 		t.Error("ubuntu2 user password should be expired")
+	}
+}
+
+func testHelperCheckAddGroup(t *testing.T, asserter *helper.Asserter, mountDir string) {
+	t.Helper()
+
+	groupFilePath := filepath.Join(mountDir, "etc", "group")
+	groupFile, err := os.Open(groupFilePath)
+	asserter.AssertErrNil(err, true)
+	defer groupFile.Close()
+	addGroupFeatureFound := false
+	addGroupLine := ""
+
+	scanner := bufio.NewScanner(groupFile)
+
+	for scanner.Scan() {
+		if strings.HasPrefix(scanner.Text(), "addgroupfeature") {
+			addGroupLine = scanner.Text()
+			addGroupFeatureFound = true
+			break
+		}
+	}
+
+	if !addGroupFeatureFound {
+		t.Error("addgroupfeature user not created")
+	}
+
+	gid := strings.Split(addGroupLine, ":")[2]
+
+	if gid != "4321" {
+		t.Errorf("addgroupfeature did not create the group with the right gid. Got gid %s", gid)
+	}
+}
+
+func testHelperCheckTouchFile(t *testing.T, mountDir string) {
+	t.Helper()
+
+	toucheFilePath := filepath.Join(mountDir, "etc", "touchfilefeature")
+	_, err := os.Stat(toucheFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("File \"%s\" should exist, but does not", toucheFilePath)
+		}
+	}
+}
+
+func testHelperCheckExecute(t *testing.T, asserter *helper.Asserter, mountDir string) {
+	t.Helper()
+
+	executeFilePath := filepath.Join(mountDir, "etc", "executefeature")
+	executeBytes, err := os.ReadFile(executeFilePath)
+	asserter.AssertErrNil(err, true)
+	if string(executeBytes) != "test" {
+		t.Errorf("Expected 'test' in %s, but got %s", executeFilePath, string(executeBytes))
 	}
 }
 

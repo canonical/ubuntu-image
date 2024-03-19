@@ -30,10 +30,22 @@ customization:
     make-dirs:
       - path: /etc/foo/bar
         permissions: 0755
+    touch-file:
+      - path: /etc/touchfilefeature
+    execute:
+      - path: /usr/bin/bash
+        args:
+          - "-c"
+          - "echo -n 'test' > $ENV_VAR_TEST"
+        env: 
+        - "ENV_VAR_TEST=/etc/executefeature"
     add-user:
       - name: ubuntu2
         password: ubuntu2
         password-type: text
+    add-group:
+      - name: addgroupfeature
+        id: 4321
   components:
     - main
     - universe

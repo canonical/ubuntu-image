@@ -263,6 +263,7 @@ The following specification defines what is supported in the YAML:
               - <string>
               - <string>
             # Environment variables to set before executing the command
+            # Format: ENV=VALUE
             env: (optional)
               - <string>
               - <string>
@@ -286,7 +287,7 @@ The following specification defines what is supported in the YAML:
             # The name of the group to create.
             name: <string>
             # The GID to assign to this group.
-            gid: <string> (optional)
+            id: <string> (optional)
       # Set a custom fstab. The existing one (if any) will be truncated.
       fstab: (optional)
         -
