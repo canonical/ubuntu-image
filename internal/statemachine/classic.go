@@ -83,14 +83,8 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 func (stateMachine *StateMachine) parseImageDefinition() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// Open and decode the yaml file
-	var imageDefinition imagedefinition.ImageDefinition
-	imageFile, err := os.Open(classicStateMachine.Args.ImageDefinition)
+	imageDefinition, err := readImageDefinition(classicStateMachine.Args.ImageDefinition)
 	if err != nil {
-		return fmt.Errorf("Error opening image definition file: %s", err.Error())
-	}
-	defer imageFile.Close()
-	if err := yaml.NewDecoder(imageFile).Decode(&imageDefinition); err != nil {
 		return err
 	}
 
@@ -100,7 +94,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 
 	// populate the default values for imageDefinition if they were not provided in
 	// the image definition YAML file
-	if err := helperSetDefaults(&imageDefinition); err != nil {
+	if err := helperSetDefaults(imageDefinition); err != nil {
 		return err
 	}
 
@@ -110,17 +104,42 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		fmt.Print("WARNING: rootfs.sources-list-deb822 is set to false. The deprecated format will be used to manage sources list. Please if possible adopt the new format.\n")
 	}
 
-	// The official standard for YAML schemas states that they are an extension of
-	// JSON schema draft 4. We therefore validate the decoded YAML against a JSON
-	// schema. The workflow is as follows:
-	// 1. Use the jsonschema library to generate a schema from the struct definition
-	// 2. Load the created schema and parsed yaml into types defined by gojsonschema
-	// 3. Use the gojsonschema library to validate the parsed YAML against the schema
+	err = validateImageDefinition(imageDefinition)
+	if err != nil {
+		return err
+	}
 
+	classicStateMachine.ImageDef = *imageDefinition
+
+	return nil
+}
+
+func readImageDefinition(imageDefPath string) (*imagedefinition.ImageDefinition, error) {
+	imageDefinition := &imagedefinition.ImageDefinition{}
+	imageFile, err := os.Open(imageDefPath)
+	if err != nil {
+		return nil, fmt.Errorf("Error opening image definition file: %s", err.Error())
+	}
+	defer imageFile.Close()
+	if err := yaml.NewDecoder(imageFile).Decode(imageDefinition); err != nil {
+		return nil, err
+	}
+
+	return imageDefinition, nil
+}
+
+// validateImageDefinition validates the given imageDefinition
+// The official standard for YAML schemas states that they are an extension of
+// JSON schema draft 4. We therefore validate the decoded YAML against a JSON
+// schema. The workflow is as follows:
+// 1. Use the jsonschema library to generate a schema from the struct definition
+// 2. Load the created schema and parsed yaml into types defined by gojsonschema
+// 3. Use the gojsonschema library to validate the parsed YAML against the schema
+func validateImageDefinition(imageDefinition *imagedefinition.ImageDefinition) error {
 	var jsonReflector jsonschema.Reflector
 
 	// 1. parse the ImageDefinition struct into a schema using the jsonschema tags
-	schema := jsonReflector.Reflect(&imagedefinition.ImageDefinition{})
+	schema := jsonReflector.Reflect(imagedefinition.ImageDefinition{})
 
 	// 2. load the schema and parsed YAML data into types understood by gojsonschema
 	schemaLoader := gojsonschema.NewGoLoader(schema)
@@ -132,7 +151,34 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return fmt.Errorf("Schema validation returned an error: %s", err.Error())
 	}
 
-	// do custom validation for gadgetURL being required if gadget is not pre-built
+	err = validateGadget(imageDefinition, result)
+	if err != nil {
+		return err
+	}
+
+	err = validateCustomization(imageDefinition, result)
+	if err != nil {
+		return err
+	}
+
+	// TODO: I've created a PR upstream in xeipuuv/gojsonschema
+	// https://github.com/xeipuuv/gojsonschema/pull/352
+	// if it gets merged this can be removed
+	err = helperCheckEmptyFields(imageDefinition, result, schema)
+	if err != nil {
+		return err
+	}
+
+	if !result.Valid() {
+		return fmt.Errorf("Schema validation failed: %s", result.Errors())
+	}
+
+	return nil
+}
+
+// validateCustomization validates the Gadget section of the image definition
+func validateGadget(imageDefinition *imagedefinition.ImageDefinition, result *gojsonschema.Result) error {
+	// Do custom validation for gadgetURL being required if gadget is not pre-built
 	if imageDefinition.Gadget != nil {
 		if imageDefinition.Gadget.GadgetType != "prebuilt" && imageDefinition.Gadget.GadgetURL == "" {
 			jsonContext := gojsonschema.NewJsonContext("gadget_validation", nil)
@@ -149,10 +195,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 				errDetail,
 			)
 		}
-	}
-
-	// don't allow any images to be created without a gadget
-	if imageDefinition.Gadget == nil {
+	} else {
 		diskUsed, err := helperCheckTags(imageDefinition.Artifacts, "is_disk")
 		if err != nil {
 			return fmt.Errorf("Error checking struct tags for Artifacts: \"%s\"", err.Error())
@@ -174,110 +217,96 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		}
 	}
 
-	if imageDefinition.Customization != nil {
-		// do custom validation for private PPAs requiring fingerprint
-		for _, p := range imageDefinition.Customization.ExtraPPAs {
-			if p.Auth != "" && p.Fingerprint == "" {
-				jsonContext := gojsonschema.NewJsonContext("ppa_validation", nil)
-				errDetail := gojsonschema.ErrorDetails{
-					"ppaName": p.Name,
-				}
-				result.AddError(
-					imagedefinition.NewInvalidPPAError(
-						gojsonschema.NewJsonContext("missingPrivatePPAFingerprint",
-							jsonContext),
-						52,
-						errDetail,
-					),
-					errDetail,
-				)
-			}
-		}
-		// do custom validation for manual customization paths
-		if imageDefinition.Customization.Manual != nil {
-			jsonContext := gojsonschema.NewJsonContext("manual_path_validation", nil)
-			if imageDefinition.Customization.Manual.MakeDirs != nil {
-				for _, mkdir := range imageDefinition.Customization.Manual.MakeDirs {
-					// XXX: filepath.IsAbs() does returns true for paths like /../../something
-					// and those are NOT absolute paths.
-					if !filepath.IsAbs(mkdir.Path) || strings.Contains(mkdir.Path, "/../") {
-						errDetail := gojsonschema.ErrorDetails{
-							"key":   "customization:manual:mkdir:destination",
-							"value": mkdir.Path,
-						}
-						result.AddError(
-							imagedefinition.NewPathNotAbsoluteError(
-								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
-									jsonContext),
-								52,
-								errDetail,
-							),
-							errDetail,
-						)
-					}
-				}
-			}
-			if imageDefinition.Customization.Manual.CopyFile != nil {
-				for _, copy := range imageDefinition.Customization.Manual.CopyFile {
-					// XXX: filepath.IsAbs() does returns true for paths like /../../something
-					// and those are NOT absolute paths.
-					if !filepath.IsAbs(copy.Dest) || strings.Contains(copy.Dest, "/../") {
-						errDetail := gojsonschema.ErrorDetails{
-							"key":   "customization:manual:copy-file:destination",
-							"value": copy.Dest,
-						}
-						result.AddError(
-							imagedefinition.NewPathNotAbsoluteError(
-								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
-									jsonContext),
-								52,
-								errDetail,
-							),
-							errDetail,
-						)
-					}
-				}
-			}
-			if imageDefinition.Customization.Manual.TouchFile != nil {
-				for _, touch := range imageDefinition.Customization.Manual.TouchFile {
-					// XXX: filepath.IsAbs() does returns true for paths like /../../something
-					// and those are NOT absolute paths.
-					if !filepath.IsAbs(touch.TouchPath) || strings.Contains(touch.TouchPath, "/../") {
-						errDetail := gojsonschema.ErrorDetails{
-							"key":   "customization:manual:touch-file:path",
-							"value": touch.TouchPath,
-						}
-						result.AddError(
-							imagedefinition.NewPathNotAbsoluteError(
-								gojsonschema.NewJsonContext("nonAbsoluteManualPath",
-									jsonContext),
-								52,
-								errDetail,
-							),
-							errDetail,
-						)
-					}
-				}
-			}
-		}
+	return nil
+}
+
+// validateCustomization validates the Customization section of the image definition
+func validateCustomization(imageDefinition *imagedefinition.ImageDefinition, result *gojsonschema.Result) error {
+	if imageDefinition.Customization == nil {
+		return nil
 	}
 
-	// TODO: I've created a PR upstream in xeipuuv/gojsonschema
-	// https://github.com/xeipuuv/gojsonschema/pull/352
-	// if it gets merged this can be removed
-	err = helperCheckEmptyFields(&imageDefinition, result, schema)
-	if err != nil {
-		return err
+	validateExtraPPAs(imageDefinition, result)
+	if imageDefinition.Customization.Manual != nil {
+		jsonContext := gojsonschema.NewJsonContext("manual_path_validation", nil)
+		validateManualMakeDirs(imageDefinition, result, jsonContext)
+		validateManualCopyFile(imageDefinition, result, jsonContext)
+		validateManualTouchFile(imageDefinition, result, jsonContext)
 	}
-
-	if !result.Valid() {
-		return fmt.Errorf("Schema validation failed: %s", result.Errors())
-	}
-
-	// Validation succeeded, so set the value in the parent struct
-	classicStateMachine.ImageDef = imageDefinition
 
 	return nil
+}
+
+// validateExtraPPAs validates the Customization.ExtraPPAs section of the image definition
+func validateExtraPPAs(imageDefinition *imagedefinition.ImageDefinition, result *gojsonschema.Result) {
+	for _, p := range imageDefinition.Customization.ExtraPPAs {
+		if p.Auth != "" && p.Fingerprint == "" {
+			jsonContext := gojsonschema.NewJsonContext("ppa_validation", nil)
+			errDetail := gojsonschema.ErrorDetails{
+				"ppaName": p.Name,
+			}
+			result.AddError(
+				imagedefinition.NewInvalidPPAError(
+					gojsonschema.NewJsonContext("missingPrivatePPAFingerprint",
+						jsonContext),
+					52,
+					errDetail,
+				),
+				errDetail,
+			)
+		}
+	}
+}
+
+// validateManualMakeDirs validates the Customization.Manual.MakeDirs section of the image definition
+func validateManualMakeDirs(imageDefinition *imagedefinition.ImageDefinition, result *gojsonschema.Result, jsonContext *gojsonschema.JsonContext) {
+	if imageDefinition.Customization.Manual.MakeDirs == nil {
+		return
+	}
+	for _, mkdir := range imageDefinition.Customization.Manual.MakeDirs {
+		validateAbsolutePath(mkdir.Path, "customization:manual:mkdir:destination", result, jsonContext)
+	}
+}
+
+// validateManualCopyFile validates the Customization.Manual.CopyFile section of the image definition
+func validateManualCopyFile(imageDefinition *imagedefinition.ImageDefinition, result *gojsonschema.Result, jsonContext *gojsonschema.JsonContext) {
+	if imageDefinition.Customization.Manual.CopyFile == nil {
+		return
+	}
+	for _, copy := range imageDefinition.Customization.Manual.CopyFile {
+		validateAbsolutePath(copy.Dest, "customization:manual:copy-file:destination", result, jsonContext)
+	}
+}
+
+// validateManualTouchFile validates the Customization.Manual.TouchFile section of the image definition
+func validateManualTouchFile(imageDefinition *imagedefinition.ImageDefinition, result *gojsonschema.Result, jsonContext *gojsonschema.JsonContext) {
+	if imageDefinition.Customization.Manual.TouchFile == nil {
+		return
+	}
+	for _, touch := range imageDefinition.Customization.Manual.TouchFile {
+		validateAbsolutePath(touch.TouchPath, "customization:manual:touch-file:path", result, jsonContext)
+	}
+}
+
+// validateAbsolutePath validates the
+func validateAbsolutePath(path string, errorKey string, result *gojsonschema.Result, jsonContext *gojsonschema.JsonContext) {
+	// XXX: filepath.IsAbs() does returns true for paths like ../../../something
+	// and those are NOT absolute paths.
+	if !filepath.IsAbs(path) || strings.Contains(path, "/../") {
+		errDetail := gojsonschema.ErrorDetails{
+			"key":   errorKey,
+			"value": path,
+		}
+		result.AddError(
+			imagedefinition.NewPathNotAbsoluteError(
+				gojsonschema.NewJsonContext("nonAbsoluteManualPath",
+					jsonContext),
+				52,
+				errDetail,
+			),
+			errDetail,
+		)
+	}
 }
 
 // calculateStates dynamically calculates all the states
