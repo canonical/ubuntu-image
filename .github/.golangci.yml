@@ -6,6 +6,7 @@ linters:
     - gosimple
     - govet
     - gofmt
+    - gocyclo
     - ineffassign
     - nakedret
     - staticcheck
