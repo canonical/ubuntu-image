@@ -728,10 +728,9 @@ var prepareClassicImageState = stateFunc{"prepare_image", (*StateMachine).prepar
 // prepareClassicImage calls image.Prepare to stage snaps in classic images
 func (stateMachine *StateMachine) prepareClassicImage() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
-
-	var imageOpts image.Options
-
+	imageOpts := &image.Options{}
 	var err error
+
 	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(classicStateMachine.Snaps)
 	if err != nil {
 		return err
@@ -743,95 +742,22 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	// plug/slot sanitization needed by provider handling
 	snap.SanitizePlugsSlots = builtin.SanitizePlugsSlots
 
-	// check if the rootfs is already preseeded. This can happen when building from a
-	// rootfs tarball
-	if osutil.FileExists(filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "snapd", "state.json")) {
-		// first get a list of all preseeded snaps
-		// seededSnaps maps the snap name and channel that was seeded
-		preseededSnaps, err := getPreseededSnaps(classicStateMachine.tempDirs.chroot)
-		if err != nil {
-			return fmt.Errorf("Error getting list of preseeded snaps from existing rootfs: %s",
-				err.Error())
-		}
-		for snap, channel := range preseededSnaps {
-			// if a channel is specified on the command line for a snap that was already
-			// preseeded, use the channel from the command line instead of the channel
-			// that was originally used for the preseeding
-			if !helper.SliceHasElement(imageOpts.Snaps, snap) {
-				imageOpts.Snaps = append(imageOpts.Snaps, snap)
-				imageOpts.SnapChannels[snap] = channel
-			}
-		}
-		// preseed.ClassicReset automatically has some output that we only want for
-		// verbose or greater logging
-		if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
-			oldPreseedStdout := preseed.Stdout
-			preseed.Stdout = io.Discard
-			defer func() {
-				preseed.Stdout = oldPreseedStdout
-			}()
-		}
-		// We need to use the snap-preseed binary for the reset as well, as using
-		// preseed.ClassicReset() might leave us in a chroot jail
-		cmd := execCommand("/usr/lib/snapd/snap-preseed", "--reset", stateMachine.tempDirs.chroot)
-		err = cmd.Run()
-		if err != nil {
-			return fmt.Errorf("Error resetting preseeding in the chroot. Error is \"%s\"", err.Error())
-		}
+	err = resetPreseeding(imageOpts, classicStateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug, stateMachine.commonFlags.Verbose)
+	if err != nil {
+		return err
 	}
 
-	// iterate through the list of snaps and ensure that all of their bases
-	// are also set to be installed. Note we only do this for snaps that are
-	// seeded. Users are expected to specify all base and content provider
-	// snaps in the image definition.
-	snapStore := store.New(nil, nil)
-	snapContext := context.Background()
-	for _, seededSnap := range imageOpts.Snaps {
-		snapSpec := store.SnapSpec{Name: seededSnap}
-		snapInfo, err := snapStore.SnapInfo(snapContext, snapSpec, nil)
-		if err != nil {
-			return fmt.Errorf("Error getting info for snap %s: \"%s\"",
-				seededSnap, err.Error())
-		}
-		if snapInfo.Base != "" && !helper.SliceHasElement(imageOpts.Snaps, snapInfo.Base) {
-			imageOpts.Snaps = append(imageOpts.Snaps, snapInfo.Base)
-		}
+	err = ensureSnapBasesInstalled(imageOpts)
+	if err != nil {
+		return err
 	}
 
-	// add any extra snaps from the image definition to the list
-	// this is done last to ensure the correct channels are being used
-	if classicStateMachine.ImageDef.Customization != nil && len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
-		imageOpts.SeedManifest = seedwriter.NewManifest()
-		for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
-			if !helper.SliceHasElement(imageOpts.Snaps, extraSnap.SnapName) {
-				imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
-			}
-			if extraSnap.Channel != "" {
-				imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
-			}
-			if extraSnap.SnapRevision != 0 {
-				fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n",
-					extraSnap.SnapRevision,
-					extraSnap.SnapName,
-				)
-				err = imageOpts.SeedManifest.SetAllowedSnapRevision(extraSnap.SnapName, snap.R(extraSnap.SnapRevision))
-				if err != nil {
-					return fmt.Errorf("error dealing with the extra snap %s: %w", extraSnap.SnapName, err)
-				}
-			}
-		}
+	err = addExtraSnaps(imageOpts, &classicStateMachine.ImageDef)
+	if err != nil {
+		return err
 	}
 
-	modelAssertionPath := strings.TrimPrefix(classicStateMachine.ImageDef.ModelAssertion, "file://")
-	// if no explicit model assertion was given, keep empty ModelFile to let snapd fallback to default
-	// model assertion
-	if len(modelAssertionPath) != 0 {
-		if !filepath.IsAbs(modelAssertionPath) {
-			imageOpts.ModelFile = filepath.Join(stateMachine.ConfDefPath, modelAssertionPath)
-		} else {
-			imageOpts.ModelFile = modelAssertionPath
-		}
-	}
+	setModelFile(imageOpts, classicStateMachine.ImageDef.ModelAssertion, stateMachine.ConfDefPath)
 
 	imageOpts.Classic = true
 	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
@@ -849,11 +775,118 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 		}()
 	}
 
-	if err := imagePrepare(&imageOpts); err != nil {
+	if err := imagePrepare(imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
 
 	return nil
+}
+
+// resetPreseeding checks if the rootfs is already preseeded and reset if necessary.
+// This can happen when building from a rootfs tarball
+func resetPreseeding(imageOpts *image.Options, chroot string, debug, verbose bool) error {
+	if !osutil.FileExists(filepath.Join(chroot, "var", "lib", "snapd", "state.json")) {
+		return nil
+	}
+	// first get a list of all preseeded snaps
+	// seededSnaps maps the snap name and channel that was seeded
+	preseededSnaps, err := getPreseededSnaps(chroot)
+	if err != nil {
+		return fmt.Errorf("Error getting list of preseeded snaps from existing rootfs: %s",
+			err.Error())
+	}
+	for snap, channel := range preseededSnaps {
+		// if a channel is specified on the command line for a snap that was already
+		// preseeded, use the channel from the command line instead of the channel
+		// that was originally used for the preseeding
+		if !helper.SliceHasElement(imageOpts.Snaps, snap) {
+			imageOpts.Snaps = append(imageOpts.Snaps, snap)
+			imageOpts.SnapChannels[snap] = channel
+		}
+	}
+	// preseed.ClassicReset automatically has some output that we only want for
+	// verbose or greater logging
+	if !debug && !verbose {
+		oldPreseedStdout := preseed.Stdout
+		preseed.Stdout = io.Discard
+		defer func() {
+			preseed.Stdout = oldPreseedStdout
+		}()
+	}
+	// We need to use the snap-preseed binary for the reset as well, as using
+	// preseed.ClassicReset() might leave us in a chroot jail
+	cmd := execCommand("/usr/lib/snapd/snap-preseed", "--reset", chroot)
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("Error resetting preseeding in the chroot. Error is \"%s\"", err.Error())
+	}
+
+	return nil
+}
+
+// ensureSnapBasesInstalled iterates through the list of snaps and ensure that all
+// of their bases are also set to be installed. Note we only do this for snaps that
+// are seeded. Users are expected to specify all base and content provider snaps
+// in the image definition.
+func ensureSnapBasesInstalled(imageOpts *image.Options) error {
+	snapStore := store.New(nil, nil)
+	snapContext := context.Background()
+	for _, seededSnap := range imageOpts.Snaps {
+		snapSpec := store.SnapSpec{Name: seededSnap}
+		snapInfo, err := snapStore.SnapInfo(snapContext, snapSpec, nil)
+		if err != nil {
+			return fmt.Errorf("Error getting info for snap %s: \"%s\"",
+				seededSnap, err.Error())
+		}
+		if snapInfo.Base != "" && !helper.SliceHasElement(imageOpts.Snaps, snapInfo.Base) {
+			imageOpts.Snaps = append(imageOpts.Snaps, snapInfo.Base)
+		}
+	}
+	return nil
+}
+
+// addExtraSnaps adds any extra snaps from the image definition to the list
+// This should be done last to ensure the correct channels are being used
+func addExtraSnaps(imageOpts *image.Options, imageDefinition *imagedefinition.ImageDefinition) error {
+	if imageDefinition.Customization == nil || len(imageDefinition.Customization.ExtraSnaps) == 0 {
+		return nil
+	}
+
+	imageOpts.SeedManifest = seedwriter.NewManifest()
+	for _, extraSnap := range imageDefinition.Customization.ExtraSnaps {
+		if !helper.SliceHasElement(imageOpts.Snaps, extraSnap.SnapName) {
+			imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
+		}
+		if extraSnap.Channel != "" {
+			imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
+		}
+		if extraSnap.SnapRevision != 0 {
+			fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n",
+				extraSnap.SnapRevision,
+				extraSnap.SnapName,
+			)
+			err := imageOpts.SeedManifest.SetAllowedSnapRevision(extraSnap.SnapName, snap.R(extraSnap.SnapRevision))
+			if err != nil {
+				return fmt.Errorf("error dealing with the extra snap %s: %w", extraSnap.SnapName, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// setModelFile sets the ModelFile based on the given ModelAssertion
+func setModelFile(imageOpts *image.Options, modelAssertion string, confDefPath string) {
+	modelAssertionPath := strings.TrimPrefix(modelAssertion, "file://")
+	// if no explicit model assertion was given, keep empty ModelFile to let snapd fallback to default
+	// model assertion
+	if len(modelAssertionPath) != 0 {
+		if !filepath.IsAbs(modelAssertionPath) {
+			imageOpts.ModelFile = filepath.Join(confDefPath, modelAssertionPath)
+		} else {
+			imageOpts.ModelFile = modelAssertionPath
+		}
+	}
 }
 
 var preseedClassicImageState = stateFunc{"preseed_image", (*StateMachine).preseedClassicImage}
