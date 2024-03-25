@@ -298,7 +298,7 @@ func TestCheckEmptyFields(t *testing.T) {
 	t.Parallel()
 	// define the struct we will use to test
 	type testStruct struct {
-		A string `yaml:"a" json:"fieldA,required"`
+		A string `yaml:"a" json:"fieldA" jsonschema:"required"`
 		B string `yaml:"b" json:"fieldB"`
 		C string `yaml:"c" json:"fieldC,omitempty"`
 	}

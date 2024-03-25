@@ -12,8 +12,8 @@ type CommonOpts struct {
 	OutputDir  string `short:"O" long:"output-dir" description:"The directory in which to put generated disk image files. For snap builds, the disk image files themselves will be named <volume>.img inside this directory, where <volume> is the volume name taken from the gadget.yaml file. For classic builds, the disk image files themselves will be named based on the image definition inside this directory. The output dir will default to the value of --workdir if --workdir is specified and --output-dir is not. If neither --output-dir or --workdir is used, the images will be placed in the current working directory." value-name:"DIRECTORY"`
 	Version    bool   `long:"version" description:"Print the version number of ubuntu-image and exit"`
 	Channel    string `short:"c" long:"channel" description:"The default snap channel to use" value-name:"CHANNEL"`
-	SectorSize string `long:"sector-size" description:"Sector size to use when creating the disk image. Only 512 and 4k sector sizes are supported." choice:"512" choice:"4096" value-name:"SECTOR-SIZE" default:"512"`
-	Validation string `long:"validation" description:"Control whether validations should be ignored or enforced" choice:"ignore" choice:"enforce"`
+	SectorSize string `long:"sector-size" description:"Sector size to use when creating the disk image. Only 512 and 4k sector sizes are supported." choice:"512" choice:"4096" value-name:"SECTOR-SIZE" default:"512"` //nolint:staticcheck,SA5008
+	Validation string `long:"validation" description:"Control whether validations should be ignored or enforced" choice:"ignore" choice:"enforce"`                                                                      //nolint:staticcheck,SA5008
 }
 
 // StateMachineOpts stores the options that are related to the state machine
