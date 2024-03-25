@@ -201,62 +201,92 @@ func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema
 		// it and search for missing required fields in each
 		// element of the slice
 		if field.Type().Kind() == reflect.Slice {
-			for i := 0; i < field.Cap(); i++ {
-				sliceElem := field.Index(i)
-				if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
-					err := CheckEmptyFields(sliceElem.Interface(), result, schema)
-					if err != nil {
-						return err
-					}
-				}
+			err := checkEmptyFieldsInSlice(field, result, schema)
+			if err != nil {
+				return err
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
 			// otherwise if it's just a pointer to a nested struct
 			// search it for empty required fields
-			if field.Elem().Kind() == reflect.Struct {
-				err := CheckEmptyFields(field.Interface(), result, schema)
-				if err != nil {
-					return err
-				}
+			err := checkEmptyFieldsInPtr(field, result, schema)
+			if err != nil {
+				return err
 			}
 		} else {
+			tags, requiredFromTags := getTags(elem, i)
+			if !requiredFromTags && !isRequiredFromSchema(elem, i, schema) {
+				continue
+			}
+			// this is a required field, check for zero values
+			if !reflect.Indirect(field).IsZero() {
+				continue
+			}
+			jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
+			errDetail := gojsonschema.ErrorDetails{
+				"property": tags.Get("yaml"),
+				"parent":   elem.Type().Name(),
+			}
+			result.AddError(
+				newMissingFieldError(
+					gojsonschema.NewJsonContext("missing_field", jsonContext),
+					52,
+					errDetail,
+				),
+				errDetail,
+			)
+		}
+	}
+	return nil
+}
 
-			// check if the field is required and if it is present in the YAML file
-			required := false
-			tags := elem.Type().Field(i).Tag
-			jsonTag, hasJSON := tags.Lookup("json")
-			if hasJSON {
-				if !strings.Contains(jsonTag, "omitempty") {
-					required = true
-				}
-			}
-			// also check for required values in the jsonschema
-			for _, requiredField := range schema.Required {
-				if elem.Type().Field(i).Name == requiredField {
-					required = true
-				}
-			}
-			if required {
-				// this is a required field, check for zero values
-				if reflect.Indirect(field).IsZero() {
-					jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
-					errDetail := gojsonschema.ErrorDetails{
-						"property": tags.Get("yaml"),
-						"parent":   elem.Type().Name(),
-					}
-					result.AddError(
-						newMissingFieldError(
-							gojsonschema.NewJsonContext("missing_field", jsonContext),
-							52,
-							errDetail,
-						),
-						errDetail,
-					)
-				}
+func checkEmptyFieldsInSlice(field reflect.Value, result *gojsonschema.Result, schema *jsonschema.Schema) error {
+	for i := 0; i < field.Cap(); i++ {
+		sliceElem := field.Index(i)
+		if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
+			err := CheckEmptyFields(sliceElem.Interface(), result, schema)
+			if err != nil {
+				return err
 			}
 		}
 	}
 	return nil
+}
+
+func checkEmptyFieldsInPtr(field reflect.Value, result *gojsonschema.Result, schema *jsonschema.Schema) error {
+	if field.Elem().Kind() == reflect.Struct {
+		err := CheckEmptyFields(field.Interface(), result, schema)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// getTags returns the json tags associated to the given element and checks if
+// these tags specify that the field is required.
+func getTags(elem reflect.Value, i int) (reflect.StructTag, bool) {
+	required := false
+	tags := elem.Type().Field(i).Tag
+	jsonTag, hasJSON := tags.Lookup("json")
+	if hasJSON {
+		if !strings.Contains(jsonTag, "omitempty") {
+			required = true
+		}
+	}
+
+	return tags, required
+}
+
+// isRequiredFromSchema checks if the field is required from the schema
+func isRequiredFromSchema(elem reflect.Value, i int, schema *jsonschema.Schema) bool {
+	required := false
+	// also check for required values in the jsonschema
+	for _, requiredField := range schema.Required {
+		if elem.Type().Field(i).Name == requiredField {
+			required = true
+		}
+	}
+	return required
 }
 
 func newMissingFieldError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingFieldError {
