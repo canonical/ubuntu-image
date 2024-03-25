@@ -8,6 +8,8 @@ linters:
     - gofmt
     - ineffassign
     - nakedret
+    - staticcheck
+    - unused
   disable-all: true
 linters-settings:
   gci:
@@ -19,6 +21,8 @@ linters-settings:
     min-complexity: 10
   nakedret:
     max-func-lines: 5
+  errcheck:
+    check-blank: true
 issues:
   # these values ensure that all issues will be surfaced
   max-issues-per-linter: 0
