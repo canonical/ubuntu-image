@@ -217,38 +217,26 @@ func TestExecHelperProcess(t *testing.T) {
 		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
 	case "TestGenerateFilelist":
 		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
-	case "TestFailedPreseedClassicImage":
-		fallthrough
-	case "TestFailedUpdateGrubLosetup":
-		fallthrough
-	case "TestFailedMakeQcow2Image":
-		fallthrough
-	case "TestFailedGeneratePackageManifest":
-		fallthrough
-	case "TestFailedGenerateFilelist":
-		fallthrough
-	case "TestFailedGerminate":
-		fallthrough
-	case "TestFailedSetupLiveBuildCommands":
-		fallthrough
-	case "TestFailedCreateChroot":
-		fallthrough
-	case "TestStateMachine_installPackages_fail":
-		fallthrough
-	case "TestFailedPrepareClassicImage":
-		fallthrough
-	case "TestFailedBuildGadgetTree":
+	case "TestFailedPreseedClassicImage",
+		"TestFailedUpdateGrubLosetup",
+		"TestFailedMakeQcow2Image",
+		"TestFailedGeneratePackageManifest",
+		"TestFailedGenerateFilelist",
+		"TestFailedGerminate",
+		"TestFailedSetupLiveBuildCommands",
+		"TestFailedCreateChroot",
+		"TestStateMachine_installPackages_fail",
+		"TestFailedPrepareClassicImage",
+		"TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
 	case "TestFailedUpdateGrubOther": // this passes the initial losetup command and fails a later command
 		if args[0] != "losetup" {
 			os.Exit(1)
 		}
-	case "TestFailedCreateChrootNoHostname":
-		fallthrough
-	case "TestFailedCreateChrootSkip":
-		fallthrough
-	case "TestFailedRunLiveBuild":
+	case "TestFailedCreateChrootNoHostname",
+		"TestFailedCreateChrootSkip",
+		"TestFailedRunLiveBuild":
 		// Do nothing so we don't have to wait for actual lb commands
 		break
 	}
