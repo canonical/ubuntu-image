@@ -239,19 +239,7 @@ func (stateMachine *StateMachine) installPackages() error {
 		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
 	}
 
-	// if any extra packages are specified, install them alongside the seeded packages
-	if classicStateMachine.ImageDef.Customization != nil {
-		for _, packageInfo := range classicStateMachine.ImageDef.Customization.ExtraPackages {
-			classicStateMachine.Packages = append(classicStateMachine.Packages,
-				packageInfo.PackageName)
-		}
-	}
-
-	// Make sure to install the extra kernel if it is specified
-	if classicStateMachine.ImageDef.Kernel != "" {
-		classicStateMachine.Packages = append(classicStateMachine.Packages,
-			classicStateMachine.ImageDef.Kernel)
-	}
+	stateMachine.gatherPackages(&classicStateMachine.ImageDef)
 
 	// setupCmds should be filled as a FIFO list
 	var setupCmds []*exec.Cmd
@@ -300,30 +288,12 @@ func (stateMachine *StateMachine) installPackages() error {
 		},
 	)
 
-	for _, mp := range mountPoints {
-		var mountCmds, umountCmds []*exec.Cmd
-		var err error
-		if mp.bind {
-			mp.src, err = osMkdirTemp(stateMachine.tempDirs.scratch, strings.Trim(mp.relpath, "/"))
-			if err != nil {
-				return fmt.Errorf("Error mounting temporary directory for mountpoint \"%s\": \"%s\"",
-					mp.relpath,
-					err.Error(),
-				)
-			}
-		}
-
-		mountCmds, umountCmds, err = mp.getMountCmd()
-		if err != nil {
-			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
-				mp.relpath,
-				err.Error(),
-			)
-		}
-
-		setupCmds = append(setupCmds, mountCmds...)
-		teardownCmds = append(umountCmds, teardownCmds...)
+	mountCmds, umountCmds, err := generateMountPointCmds(mountPoints, stateMachine.tempDirs.scratch)
+	if err != nil {
+		return err
 	}
+	setupCmds = append(setupCmds, mountCmds...)
+	teardownCmds = append(umountCmds, teardownCmds...)
 
 	teardownCmds = append([]*exec.Cmd{
 		execCommand("udevadm", "settle"),
@@ -381,6 +351,50 @@ func (stateMachine *StateMachine) installPackages() error {
 	}
 
 	return nil
+}
+
+func (stateMachine *StateMachine) gatherPackages(imageDef *imagedefinition.ImageDefinition) {
+	if imageDef.Customization != nil {
+		for _, packageInfo := range imageDef.Customization.ExtraPackages {
+			stateMachine.Packages = append(stateMachine.Packages,
+				packageInfo.PackageName)
+		}
+	}
+
+	// Make sure to install the extra kernel if it is specified
+	if imageDef.Kernel != "" {
+		stateMachine.Packages = append(stateMachine.Packages,
+			imageDef.Kernel)
+	}
+}
+
+// generateMountPointCmds generate lists of mount/umount commands for a list of mountpoints
+func generateMountPointCmds(mountPoints []*mountPoint, scratchDir string) (allMountCmds []*exec.Cmd, allUmountCmds []*exec.Cmd, err error) {
+	for _, mp := range mountPoints {
+		var mountCmds, umountCmds []*exec.Cmd
+		var err error
+		if mp.bind {
+			mp.src, err = osMkdirTemp(scratchDir, strings.Trim(mp.relpath, "/"))
+			if err != nil {
+				return nil, nil, fmt.Errorf("Error making temporary directory for mountpoint \"%s\": \"%s\"",
+					mp.relpath,
+					err.Error(),
+				)
+			}
+		}
+
+		mountCmds, umountCmds, err = mp.getMountCmd()
+		if err != nil {
+			return nil, nil, fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
+				mp.relpath,
+				err.Error(),
+			)
+		}
+
+		allMountCmds = append(allMountCmds, mountCmds...)
+		allUmountCmds = append(umountCmds, allUmountCmds...)
+	}
+	return allMountCmds, allUmountCmds, err
 }
 
 var verifyArtifactNamesState = stateFunc{"verify_artifact_names", (*StateMachine).verifyArtifactNames}
