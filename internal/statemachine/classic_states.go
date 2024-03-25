@@ -1110,13 +1110,24 @@ func (stateMachine *StateMachine) fixFstab() error {
 		return fmt.Errorf("Error reading fstab: %s", err.Error())
 	}
 
+	lines := strings.Split(string(fstabBytes), "\n")
+	newLines := generateFstabLines(lines)
+
+	err = osWriteFile(fstabPath, []byte(strings.Join(newLines, "\n")+"\n"), 0644)
+	if err != nil {
+		return fmt.Errorf("Error writing to fstab: %s", err.Error())
+	}
+	return nil
+}
+
+// generateFstabLines generates new fstab lines from current ones
+func generateFstabLines(lines []string) []string {
 	rootMountFound := false
 	newLines := make([]string, 0)
 	rootFSLabel := "writable"
 	rootFSOptions := "discard,errors=remount-ro"
 	fsckOrder := "1"
 
-	lines := strings.Split(string(fstabBytes), "\n")
 	for _, l := range lines {
 		if l == "# UNCONFIGURED FSTAB" {
 			// omit this line if still present
@@ -1148,11 +1159,7 @@ func (stateMachine *StateMachine) fixFstab() error {
 		newLines = append(newLines, fmt.Sprintf("LABEL=%s	/	ext4	%s	0	%s", rootFSLabel, rootFSOptions, fsckOrder))
 	}
 
-	err = osWriteFile(fstabPath, []byte(strings.Join(newLines, "\n")+"\n"), 0644)
-	if err != nil {
-		return fmt.Errorf("Error writing to fstab: %s", err.Error())
-	}
-	return nil
+	return newLines
 }
 
 var setDefaultLocaleState = stateFunc{"set_default_locale", (*StateMachine).setDefaultLocale}
