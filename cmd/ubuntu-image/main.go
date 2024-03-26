@@ -85,7 +85,46 @@ func unhidePackOpts(parser *flags.Parser) {
 	}
 }
 
-func main() {
+// parseFlags parses received flags and returns error code accordingly
+func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdout, stderr io.Reader, resume, version bool) (error, int) {
+	if _, err := parser.Parse(); err != nil {
+		if e, ok := err.(*flags.Error); ok {
+			switch e.Type {
+			case flags.ErrHelp:
+				restoreStdout()
+				restoreStderr()
+				readStdout, err := io.ReadAll(stdout)
+				if err != nil {
+					fmt.Printf("Error reading from stdout: %s\n", err.Error())
+					return err, 1
+				}
+				fmt.Println(string(readStdout))
+				return e, 0
+			case flags.ErrCommandRequired:
+				// if --resume was given, this is not an error
+				if !resume && !version {
+					restoreStdout()
+					restoreStderr()
+					readStderr, err := io.ReadAll(stderr)
+					if err != nil {
+						fmt.Printf("Error reading from stderr: %s\n", err.Error())
+						return err, 1
+					}
+					fmt.Printf("Error: %s\n", string(readStderr))
+					return e, 1
+				}
+			default:
+				restoreStdout()
+				restoreStderr()
+				fmt.Printf("Error: %s\n", err.Error())
+				return e, 1
+			}
+		}
+	}
+	return nil, 0
+}
+
+func main() { //nolint: gocyclo
 	commonOpts := new(commands.CommonOpts)
 	stateMachineOpts := new(commands.StateMachineOpts)
 	ubuntuImageCommand := new(commands.UbuntuImageCommand)
@@ -126,44 +165,10 @@ func main() {
 	unhidePackOpts(parser)
 
 	// Parse the options provided and handle specific errors
-	if _, err := parser.Parse(); err != nil {
-		if e, ok := err.(*flags.Error); ok {
-			switch e.Type {
-			case flags.ErrHelp:
-				restoreStdout()
-				restoreStderr()
-				readStdout, err := io.ReadAll(stdout)
-				if err != nil {
-					fmt.Printf("Error reading from stdout: %s\n", err.Error())
-					osExit(1)
-					return
-				}
-				fmt.Println(string(readStdout))
-				osExit(0)
-				return
-			case flags.ErrCommandRequired:
-				// if --resume was given, this is not an error
-				if !stateMachineOpts.Resume && !commonOpts.Version {
-					restoreStdout()
-					restoreStderr()
-					readStderr, err := io.ReadAll(stderr)
-					if err != nil {
-						fmt.Printf("Error reading from stderr: %s\n", err.Error())
-						osExit(1)
-						return
-					}
-					fmt.Printf("Error: %s\n", string(readStderr))
-					osExit(1)
-					return
-				}
-			default:
-				restoreStdout()
-				restoreStderr()
-				fmt.Printf("Error: %s\n", err.Error())
-				osExit(1)
-				return
-			}
-		}
+	err, code := parseFlags(parser, restoreStdout, restoreStderr, stdout, stderr, stateMachineOpts.Resume, commonOpts.Version)
+	if err != nil {
+		osExit(code)
+		return
 	}
 
 	// restore stdout
