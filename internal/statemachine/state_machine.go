@@ -145,7 +145,7 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 		return nil
 	}
 
-	if !strings.Contains(stateMachine.commonFlags.Size, ":") {
+	if stateMachine.hasSingleImageSizeValue() {
 		err := stateMachine.handleSingleImageSize()
 		if err != nil {
 			return err
@@ -157,6 +157,26 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 		}
 	}
 	return nil
+}
+
+// hasSingleImageSizeValue determines if the provided --image-size flags contains
+// a single value to use for every volumes or a list of values for some volumes
+func (stateMachine *StateMachine) hasSingleImageSizeValue() bool {
+	return !strings.Contains(stateMachine.commonFlags.Size, ":")
+}
+
+// getSuggestedImageSize returns the suggested size for the given volume
+func (stateMachine *StateMachine) getSuggestedImageSize(volumeName string) quantity.Size {
+	var parsedSize quantity.Size
+	if stateMachine.hasSingleImageSizeValue() {
+		// this scenario has just one size for each volume
+		// no need to check error as it has already been done by
+		// the parseImageSizes function
+		parsedSize, _ = quantity.ParseSize(stateMachine.commonFlags.Size)
+	} else {
+		parsedSize = stateMachine.ImageSizes[volumeName]
+	}
+	return parsedSize
 }
 
 // handleSingleImageSize parses as a single value and applies the image size given in
