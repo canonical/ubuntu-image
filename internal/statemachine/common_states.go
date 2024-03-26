@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	diskfs "github.com/diskfs/go-diskfs"
+	diskutils "github.com/diskfs/go-diskfs/disk"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
@@ -304,29 +305,9 @@ func (stateMachine *StateMachine) makeDisk() error {
 		}
 		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[volumeName])
 
-		// Create the disk image
-		imgSize, found := stateMachine.ImageSizes[volumeName]
-		if !found {
-			// Calculate the minimum size that would be
-			// valid according to gadget.yaml.
-			imgSize = volume.MinSize()
-		}
-
-		if err := osRemoveAll(imgName); err != nil {
-			return fmt.Errorf("Error removing old disk image: %s", err.Error())
-		}
-		sectorSizeFlag := diskfs.SectorSize(int(stateMachine.SectorSize))
-		diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw, sectorSizeFlag)
+		diskImg, imgSize, err := stateMachine.createDiskImage(volumeName, volume, imgName)
 		if err != nil {
-			return fmt.Errorf("Error creating disk image: %s", err.Error())
-		}
-
-		// make sure the disk image size is a multiple of its block/sector size
-		imgSize = quantity.Size(math.Ceil(float64(imgSize)/float64(stateMachine.SectorSize))) *
-			stateMachine.SectorSize
-		if err := osTruncate(diskImg.File.Name(), int64(imgSize)); err != nil {
-			return fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
-				err.Error())
+			return err
 		}
 
 		// set up the partition table on the device
@@ -363,4 +344,33 @@ func (stateMachine *StateMachine) makeDisk() error {
 		}
 	}
 	return nil
+}
+
+// createDiskImage creates a disk image and making sure the size respects the configuration and
+// the SectorSize
+func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gadget.Volume, imgName string) (*diskutils.Disk, quantity.Size, error) {
+	imgSize, found := stateMachine.ImageSizes[volumeName]
+	if !found {
+		// Calculate the minimum size that would be
+		// valid according to gadget.yaml.
+		imgSize = volume.MinSize()
+	}
+	if err := osRemoveAll(imgName); err != nil {
+		return nil, 0, fmt.Errorf("Error removing old disk image: %s", err.Error())
+	}
+	sectorSizeFlag := diskfs.SectorSize(int(stateMachine.SectorSize))
+	diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw, sectorSizeFlag)
+	if err != nil {
+		return nil, 0, fmt.Errorf("Error creating disk image: %s", err.Error())
+	}
+
+	// make sure the disk image size is a multiple of its block/sector size
+	imgSize = quantity.Size(math.Ceil(float64(imgSize)/float64(stateMachine.SectorSize))) *
+		stateMachine.SectorSize
+	if err := osTruncate(diskImg.File.Name(), int64(imgSize)); err != nil {
+		return nil, 0, fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
+			err.Error())
+	}
+
+	return diskImg, imgSize, nil
 }
