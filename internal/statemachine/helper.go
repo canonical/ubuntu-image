@@ -176,7 +176,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			return err
 		}
 	} else {
-		err := stateMachine.createFS(volume, structure, structIndex, contentRoot, partImg)
+		err := stateMachine.prepareAndCreateFS(volume, structure, structIndex, contentRoot, partImg)
 		if err != nil {
 			return err
 		}
@@ -215,8 +215,8 @@ func copyStructureNoFS(unpackDir string, structure gadget.VolumeStructure, partI
 	return nil
 }
 
-// createFS creates a filesystem for the given structure
-func (stateMachine *StateMachine) createFS(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int, contentRoot, partImg string) error {
+// prepareAndCreateFS prepares and creates a filesystem for the given structure
+func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int, contentRoot, partImg string) error {
 	blockSize := structure.Size
 	if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Size < stateMachine.RootfsSize {
 		// system-data and system-seed structures are not required to have
@@ -232,12 +232,22 @@ func (stateMachine *StateMachine) createFS(volume *gadget.Volume, structure gadg
 		volume.Structure[structIndex] = structure
 	}
 
+	err := prepareDiskImg(structure, partImg, blockSize, stateMachine.RootfsSize)
+	if err != nil {
+		return err
+	}
+
+	return makeFS(structure, contentRoot, partImg, stateMachine.SectorSize)
+}
+
+// prepareDiskImg prepares a raw image
+func prepareDiskImg(structure gadget.VolumeStructure, partImg string, blockSize quantity.Size, rootfsSize quantity.Size) error {
 	if structure.Role == gadget.SystemData {
 		_, err := os.Create(partImg)
 		if err != nil {
 			return fmt.Errorf("unable to create partImg file: %w", err)
 		}
-		err = os.Truncate(partImg, int64(stateMachine.RootfsSize))
+		err = os.Truncate(partImg, int64(rootfsSize))
 		if err != nil {
 			return fmt.Errorf("unable to truncate partImg file: %w", err)
 		}
@@ -250,26 +260,30 @@ func (stateMachine *StateMachine) createFS(volume *gadget.Volume, structure gadg
 				partImg, err.Error())
 		}
 	}
+	return nil
+}
 
+// makeFS actually creates the filesystem for the given structure
+func makeFS(structure gadget.VolumeStructure, contentRoot string, partImg string, sectorSize quantity.Size) error {
 	hasC, err := hasContent(structure, contentRoot)
 	if err != nil {
 		return err
 	}
 
-	// Create the filesystem
 	if hasC {
 		err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
-			contentRoot, structure.Size, stateMachine.SectorSize)
+			contentRoot, structure.Size, sectorSize)
 		if err != nil {
 			return fmt.Errorf("Error running mkfs with content: %s", err.Error())
 		}
-	} else {
-		err := mkfsMake(structure.Filesystem, partImg, structure.Label,
-			structure.Size, stateMachine.SectorSize)
-		if err != nil {
-			return fmt.Errorf("Error running mkfs: %s", err.Error())
-		}
+		return nil
 	}
+	err = mkfsMake(structure.Filesystem, partImg, structure.Label,
+		structure.Size, sectorSize)
+	if err != nil {
+		return fmt.Errorf("Error running mkfs: %s", err.Error())
+	}
+
 	return nil
 }
 
