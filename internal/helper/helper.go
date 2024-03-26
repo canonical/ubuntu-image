@@ -459,13 +459,22 @@ func CheckTags(searchStruct interface{}, tag string) (string, error) {
 		return "", fmt.Errorf("The argument to CheckTags must be a pointer")
 	}
 	elem := value.Elem()
+
+	return checkTagsOnField(elem, tag)
+}
+
+func isSliceOfPtrToStructs(field reflect.Value) bool {
+	return field.Type().Kind() == reflect.Slice &&
+		field.Cap() > 0 &&
+		field.Index(0).Kind() == reflect.Pointer
+}
+
+func checkTagsOnField(elem reflect.Value, tag string) (string, error) {
 	for i := 0; i < elem.NumField(); i++ {
 		field := elem.Field(i)
 		// if we're dealing with a slice of pointers to structs,
 		// iterate through it and check the tags for each struct pointer
-		if field.Type().Kind() == reflect.Slice &&
-			field.Cap() > 0 &&
-			field.Index(0).Kind() == reflect.Pointer {
+		if isSliceOfPtrToStructs(field) {
 			for i := 0; i < field.Cap(); i++ {
 				tagUsed, err := CheckTags(field.Index(i).Interface(), tag)
 				if err != nil {
