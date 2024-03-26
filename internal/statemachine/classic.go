@@ -367,27 +367,7 @@ func (s *StateMachine) calculateStates() error {
 		rootfsCreationStates = append(rootfsCreationStates, generateDiskInfoState)
 	}
 
-	if c.ImageDef.Artifacts != nil {
-		if c.ImageDef.Gadget != nil {
-			s.addImgStates(&rootfsCreationStates)
-		}
-
-		if c.ImageDef.Artifacts.Qcow2 != nil {
-			s.addQcow2States(&rootfsCreationStates)
-		}
-
-		if c.ImageDef.Artifacts.Manifest != nil {
-			rootfsCreationStates = append(rootfsCreationStates, generatePackageManifestState)
-		}
-
-		if c.ImageDef.Artifacts.Filelist != nil {
-			rootfsCreationStates = append(rootfsCreationStates, generateFilelistState)
-		}
-
-		if c.ImageDef.Artifacts.RootfsTar != nil {
-			rootfsCreationStates = append(rootfsCreationStates, generateRootfsTarballState)
-		}
-	}
+	s.addArtifactsStates(c, &rootfsCreationStates)
 
 	// Append the newly calculated states to the slice of funcs in the parent struct
 	s.states = append(s.states, rootfsCreationStates...)
@@ -479,6 +459,32 @@ func (s *StateMachine) addCustomizationStates(states *[]stateFunc) {
 	}
 	if c.ImageDef.Customization.Manual != nil {
 		*states = append(*states, manualCustomizationState)
+	}
+}
+
+// addArtifactsStates adds the needed states to generates the artifacts
+func (s *StateMachine) addArtifactsStates(c *ClassicStateMachine, states *[]stateFunc) {
+	if c.ImageDef.Artifacts == nil {
+		return
+	}
+	if c.ImageDef.Gadget != nil {
+		s.addImgStates(states)
+	}
+
+	if c.ImageDef.Artifacts.Qcow2 != nil {
+		s.addQcow2States(states)
+	}
+
+	if c.ImageDef.Artifacts.Manifest != nil {
+		*states = append(*states, generatePackageManifestState)
+	}
+
+	if c.ImageDef.Artifacts.Filelist != nil {
+		*states = append(*states, generateFilelistState)
+	}
+
+	if c.ImageDef.Artifacts.RootfsTar != nil {
+		*states = append(*states, generateRootfsTarballState)
 	}
 }
 
