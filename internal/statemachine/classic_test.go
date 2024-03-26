@@ -4352,28 +4352,18 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 	restoreStdout()
 	readStdout, _ := io.ReadAll(stdout)
 
-	expectedCmds := []*regexp.Regexp{
-		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/sys$"),
-		regexp.MustCompile("^umount --recursive /tmp.*/chroot/sys$"),
-		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/proc$"),
-		regexp.MustCompile("^umount --recursive /tmp.*/chroot/proc$"),
-		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/dev/pts$"),
-		regexp.MustCompile("^umount --recursive /tmp.*/chroot/dev/pts$"),
-		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/dev$"),
-		regexp.MustCompile("^umount --recursive /tmp.*/chroot/dev$"),
-	}
-
 	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
-	if len(expectedCmds) != len(gotCmds) {
-		t.Fatalf("%v commands to be executed, expected %v commands. Got: %v", len(gotCmds), len(expectedCmds), gotCmds)
+	// Clean empty commands
+	for i, cmd := range gotCmds {
+		if len(cmd) == 0 {
+			copy(gotCmds[i:], gotCmds[i+1:])
+			gotCmds[len(gotCmds)-1] = ""
+			gotCmds = gotCmds[:len(gotCmds)-1]
+		}
 	}
 
-	for i, gotCmd := range gotCmds {
-		expected := expectedCmds[i]
-
-		if !expected.Match([]byte(gotCmd)) {
-			t.Errorf("Cmd \"%v\" not matching. Expected %v\n", gotCmd, expected.String())
-		}
+	if len(gotCmds) != 0 {
+		t.Fatalf("%v commands to be executed, expected no commands. Got: %v", len(gotCmds), gotCmds)
 	}
 }
 
