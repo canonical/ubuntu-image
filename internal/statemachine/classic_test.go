@@ -2990,7 +2990,14 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 	testHelperCheckPPAInstalled(t, &asserter, stateMachine.tempDirs.chroot)
 	testHelperCheckSnapInstalled(t, &asserter, stateMachine.tempDirs.chroot)
-	testHelperCheckArtifacts(t, &asserter, stateMachine.commonFlags.OutputDir)
+
+	artifacts := map[string]string{
+		"pc-amd64.img":            "DOS/MBR boot sector",
+		"pc-amd64.qcow2":          "QEMU QCOW",
+		"filesystem-manifest.txt": "text",
+		"filesystem-filelist.txt": "text",
+	}
+	testHelperCheckArtifacts(t, &asserter, stateMachine.commonFlags.OutputDir, artifacts)
 
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
@@ -3158,14 +3165,8 @@ func testHelperCheckSnapInstalled(t *testing.T, asserter *helper.Asserter, chroo
 	}
 }
 
-func testHelperCheckArtifacts(t *testing.T, asserter *helper.Asserter, outputDir string) {
+func testHelperCheckArtifacts(t *testing.T, asserter *helper.Asserter, outputDir string, artifacts map[string]string) {
 	t.Helper()
-	artifacts := map[string]string{
-		"pc-amd64.img":            "DOS/MBR boot sector",
-		"pc-amd64.qcow2":          "QEMU QCOW",
-		"filesystem-manifest.txt": "text",
-		"filesystem-filelist.txt": "text",
-	}
 	for artifact, fileType := range artifacts {
 		fullPath := filepath.Join(outputDir, artifact)
 		_, err := os.Stat(fullPath)

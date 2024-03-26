@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/snapcore/snapd/osutil"
@@ -361,26 +360,8 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 	})
 
-	// make sure all the artifacts were created and are the correct file types
 	artifacts := map[string]string{"pc.img": "DOS/MBR boot sector"}
-	for artifact, fileType := range artifacts {
-		fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
-		_, err := os.Stat(fullPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				t.Errorf("File \"%s\" should exist, but does not", fullPath)
-			}
-		}
-
-		// check it is the expected file type
-		fileCommand := *exec.Command("file", fullPath)
-		cmdOutput, err := fileCommand.CombinedOutput()
-		asserter.AssertErrNil(err, true)
-		if !strings.Contains(string(cmdOutput), fileType) {
-			t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
-				fullPath, fileType, string(cmdOutput))
-		}
-	}
+	testHelperCheckArtifacts(t, &asserter, stateMachine.commonFlags.OutputDir, artifacts)
 
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
@@ -490,11 +471,5 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		}
 	}
 
-	grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
-	_, err = os.Stat(grubCfg)
-	if err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("File \"%s\" should exist, but does not", grubCfg)
-		}
-	}
+	testHelperCheckGrubConfig(t, mountDir)
 }
