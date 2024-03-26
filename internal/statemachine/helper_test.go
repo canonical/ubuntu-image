@@ -525,40 +525,28 @@ func TestGenerateUniqueDiskID(t *testing.T) {
 // TestGetHostArch unit tests the getHostArch function
 func TestGetHostArch(t *testing.T) {
 	t.Parallel()
-	hostArch := getHostArch()
+
+	var expected string
 	switch runtime.GOARCH {
 	case "amd64":
-		expected := "amd64"
-		if hostArch != expected {
-			t.Errorf("Wrong value of getHostArch. Expected %s, got %s", expected, hostArch)
-		}
+		expected = "amd64"
 	case "arm":
-		expected := "armhf"
-		if hostArch != expected {
-			t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
-		}
+		expected = "armhf"
 	case "arm64":
-		expected := "arm64"
-		if hostArch != expected {
-			t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
-		}
+		expected = "arm64"
 	case "ppc64le":
-		expected := "ppc64el"
-		if hostArch != expected {
-			t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
-		}
+		expected = "ppc64el"
 	case "s390x":
-		expected := "s390x"
-		if hostArch != expected {
-			t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
-		}
+		expected = "s390x"
 	case "riscv64":
-		expected := "riscv64"
-		if hostArch != expected {
-			t.Errorf("Wrong value of getHostArch. Expected %s, got %s", "amd64", hostArch)
-		}
+		expected = "riscv64"
 	default:
 		t.Skipf("Test not supported on architecture %s", runtime.GOARCH)
+	}
+
+	hostArch := getHostArch()
+	if hostArch != expected {
+		t.Errorf("Wrong value of getHostArch. Expected %s, got %s", expected, hostArch)
 	}
 }
 
