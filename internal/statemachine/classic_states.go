@@ -402,7 +402,7 @@ func generateMountPointCmds(mountPoints []*mountPoint, scratchDir string) (allMo
 		allMountCmds = append(allMountCmds, mountCmds...)
 		allUmountCmds = append(umountCmds, allUmountCmds...)
 	}
-	return
+	return allMountCmds, allUmountCmds, err
 }
 
 var verifyArtifactNamesState = stateFunc{"verify_artifact_names", (*StateMachine).verifyArtifactNames}
