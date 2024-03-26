@@ -420,9 +420,9 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	return offset2
 }
 
-// createPartitionTable creates a disk image file and writes the partition table to it,
-// returning the partition table and the partition number of the root partition.
-func createPartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, int) {
+// generatePartitionTable prepares the partition table for a structures in a volume and
+// returns it with the the partition number of the root partition.
+func generatePartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, int) {
 	var gptPartitions = make([]*gpt.Partition, 0)
 	var mbrPartitions = make([]*mbr.Partition, 0)
 	var partitionTable partition.Table
@@ -435,55 +435,18 @@ func createPartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded boo
 		}
 
 		// Record the actual partition number of the root partition, as it
-		// might be useful for certain operations (like updating the
-		// bootloader)
+		// might be useful for certain operations (like updating the bootloader)
 		if structure.Role == gadget.SystemData {
 			rootfsPartitionNumber = partitionNumber
 		}
 
-		var structureType string
-		// Check for hybrid MBR/GPT
-		if strings.Contains(structure.Type, ",") {
-			types := strings.Split(structure.Type, ",")
-			if volume.Schema == schemaGPT {
-				structureType = types[1]
-			} else {
-				structureType = types[0]
-			}
-		} else {
-			structureType = structure.Type
-		}
+		structureType := getStructureType(structure, volume.Schema)
 
 		if volume.Schema == schemaMBR {
-			bootable := false
-			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
-				bootable = true
-			}
-			// mbr.Type is a byte. snapd has already verified that this string
-			// is exactly two chars, so we can parse those two chars to a byte
-			partitionType, _ := strconv.ParseUint(structureType, 16, 8)
-			mbrPartition := &mbr.Partition{
-				Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
-				Size:     uint32(math.Ceil(float64(structure.Size) / float64(sectorSize))),
-				Type:     mbr.Type(partitionType),
-				Bootable: bootable,
-			}
+			mbrPartition := mbrPartitionFromStruct(structure, sectorSize, structureType)
 			mbrPartitions = append(mbrPartitions, mbrPartition)
 		} else {
-			var partitionName string
-			if structure.Role == gadget.SystemData && structure.Name == "" {
-				partitionName = "writable"
-			} else {
-				partitionName = structure.Name
-			}
-
-			partitionType := gpt.Type(structureType)
-			gptPartition := &gpt.Partition{
-				Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
-				Size:  uint64(structure.Size),
-				Type:  partitionType,
-				Name:  partitionName,
-			}
+			gptPartition := gptPartitionFromStruct(structure, sectorSize, structureType)
 			gptPartitions = append(gptPartitions, gptPartition)
 		}
 
@@ -506,6 +469,58 @@ func createPartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded boo
 	}
 
 	return &partitionTable, rootfsPartitionNumber
+}
+
+// getStructureType extracts the structure type from the structure.Type considering
+// the schema
+func getStructureType(structure gadget.VolumeStructure, schema string) string {
+	structureType := structure.Type
+	// Check for hybrid MBR/GPT
+	if !strings.Contains(structure.Type, ",") {
+		return structureType
+	}
+
+	types := strings.Split(structure.Type, ",")
+	structureType = types[0]
+
+	if schema == schemaGPT {
+		structureType = types[1]
+	}
+
+	return structureType
+}
+
+// mbrPartitionFromStruct prepares a mbr.Partition object from a gadget.VolumeStructure
+func mbrPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64, structureType string) *mbr.Partition {
+	bootable := false
+	if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+		bootable = true
+	}
+	// mbr.Type is a byte. snapd has already verified that this string
+	// is exactly two chars, so we can safely parse those two chars to a byte
+	partitionType, _ := strconv.ParseUint(structureType, 16, 8)
+
+	return &mbr.Partition{
+		Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
+		Size:     uint32(math.Ceil(float64(structure.Size) / float64(sectorSize))),
+		Type:     mbr.Type(partitionType),
+		Bootable: bootable,
+	}
+}
+
+// gptPartitionFromStruct prepares a gpt.Partition object from a gadget.VolumeStructure
+func gptPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64, structureType string) *gpt.Partition {
+	partitionName := structure.Name
+	if structure.Role == gadget.SystemData && structure.Name == "" {
+		partitionName = "writable"
+	}
+
+	return &gpt.Partition{
+		Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
+		Size:  uint64(structure.Size),
+		Type:  gpt.Type(structureType),
+		Name:  partitionName,
+	}
 }
 
 // copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
