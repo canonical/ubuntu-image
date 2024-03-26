@@ -4414,7 +4414,7 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 		osMkdirTemp = os.MkdirTemp
 	})
 	err = stateMachine.installPackages()
-	asserter.AssertErrContains(err, "Error mounting temporary directory for mountpoint")
+	asserter.AssertErrContains(err, "Error making temporary directory for mountpoint")
 	osMkdirTemp = os.MkdirTemp
 
 	// Setup the exec.Command mock
