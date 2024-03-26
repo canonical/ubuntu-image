@@ -121,64 +121,94 @@ func SetDefaults(needsDefaults interface{}) error {
 		field := elem.Field(i)
 		// if we're dealing with a slice of pointers to structs,
 		// iterate through it and set the defaults for each struct pointer
-		if field.Type().Kind() == reflect.Slice &&
-			field.Cap() > 0 &&
-			field.Index(0).Kind() == reflect.Pointer {
-			for i := 0; i < field.Cap(); i++ {
-				err := SetDefaults(field.Index(i).Interface())
-				if err != nil {
-					return err
-				}
+		if isSliceOfPtrToStructs(field) {
+			err := setDefaultsToSlice(field)
+			if err != nil {
+				return err
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
-			// if it's a pointer to a struct, look for default types
-			if field.Elem().Kind() == reflect.Struct {
-				err := SetDefaults(field.Interface())
-				if err != nil {
-					return err
-				}
-				// special case for pointer to bools
-			} else if field.Type().Elem() == reflect.TypeOf(true) {
-				// if a value is set, do nothing
-				if !field.IsNil() {
-					continue
-				}
-				tags := elem.Type().Field(i).Tag
-				defaultValue, hasDefault := tags.Lookup("default")
-				if !hasDefault {
-					// If no default and no value is set, make sure we have a valid
-					// value consistent with the "zero" value for a bool (false)
-					field.Set(reflect.ValueOf(BoolPtr(false)))
-					continue
-				}
-				if defaultValue == "true" {
-					field.Set(reflect.ValueOf(BoolPtr(true)))
-				} else {
-					field.Set(reflect.ValueOf(BoolPtr(false)))
-				}
+			err := setDefaultToPtr(field, elem, i)
+			if err != nil {
+				return err
 			}
 		} else {
-			tags := elem.Type().Field(i).Tag
-			defaultValue, hasDefault := tags.Lookup("default")
-			if !hasDefault {
-				continue
+			err := setDefaultToBasicType(field, elem, i)
+			if err != nil {
+				return err
 			}
-			indirectedField := reflect.Indirect(field)
-			if indirectedField.CanSet() && field.IsZero() {
-				varType := field.Type().Kind()
-				switch varType {
-				case reflect.String:
-					field.SetString(defaultValue)
-				case reflect.Slice:
-					defaultValues := strings.Split(defaultValue, ",")
-					field.Set(reflect.ValueOf(defaultValues))
-				case reflect.Bool:
-					return fmt.Errorf("Setting default value of a boolean not supported. Use a pointer to boolean instead.")
-				default:
-					return fmt.Errorf("Setting default value of type %s not supported",
-						varType)
-				}
-			}
+		}
+	}
+	return nil
+}
+
+// setDefaultsToSlice sets default values to elements of a slice.
+// It assumes it was already checked field is a non empty slice. Otherwise this
+// function will probably panic.
+func setDefaultsToSlice(field reflect.Value) error {
+	for i := 0; i < field.Cap(); i++ {
+		err := SetDefaults(field.Index(i).Interface())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// setDefaultToPtr sets a default value to a field being a pointer.
+// It assumes it was already checked that field is a ptr. Otherwise this
+// function will probably panic.
+func setDefaultToPtr(field reflect.Value, elem reflect.Value, fieldIndex int) error {
+	// if it's a pointer to a struct, look for default types
+	if field.Elem().Kind() == reflect.Struct {
+		err := SetDefaults(field.Interface())
+		if err != nil {
+			return err
+		}
+		// special case for pointer to bools
+	} else if field.Type().Elem() == reflect.TypeOf(true) {
+		// if a value is set, do nothing
+		if !field.IsNil() {
+			return nil
+		}
+		tags := elem.Type().Field(fieldIndex).Tag
+		defaultValue, hasDefault := tags.Lookup("default")
+		if !hasDefault {
+			// If no default and no value is set, make sure we have a valid
+			// value consistent with the "zero" value for a bool (false)
+			field.Set(reflect.ValueOf(BoolPtr(false)))
+			return nil
+		}
+		if defaultValue == "true" {
+			field.Set(reflect.ValueOf(BoolPtr(true)))
+		} else {
+			field.Set(reflect.ValueOf(BoolPtr(false)))
+		}
+	}
+	return nil
+}
+
+// setDefaultToBasicType sets the default value to a basic type (and slice) based on the
+// "default" tag.
+func setDefaultToBasicType(field reflect.Value, elem reflect.Value, fieldIndex int) error {
+	tags := elem.Type().Field(fieldIndex).Tag
+	defaultValue, hasDefault := tags.Lookup("default")
+	if !hasDefault {
+		return nil
+	}
+	indirectedField := reflect.Indirect(field)
+	if indirectedField.CanSet() && field.IsZero() {
+		varType := field.Type().Kind()
+		switch varType {
+		case reflect.String:
+			field.SetString(defaultValue)
+		case reflect.Slice:
+			defaultValues := strings.Split(defaultValue, ",")
+			field.Set(reflect.ValueOf(defaultValues))
+		case reflect.Bool:
+			return fmt.Errorf("Setting default value of a boolean not supported. Use a pointer to boolean instead.")
+		default:
+			return fmt.Errorf("Setting default value of type %s not supported",
+				varType)
 		}
 	}
 	return nil
