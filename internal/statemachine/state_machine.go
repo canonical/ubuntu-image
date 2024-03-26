@@ -146,47 +146,67 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 	}
 
 	if !strings.Contains(stateMachine.commonFlags.Size, ":") {
-		// handle the "one size to rule them all" case
-		parsedSize, err := quantity.ParseSize(stateMachine.commonFlags.Size)
+		err := stateMachine.handleSingleImageSize()
 		if err != nil {
-			return fmt.Errorf("Failed to parse argument to --image-size: %s", err.Error())
-		}
-		for volumeName := range stateMachine.GadgetInfo.Volumes {
-			stateMachine.ImageSizes[volumeName] = parsedSize
+			return err
 		}
 	} else {
-		allSizes := strings.Split(stateMachine.commonFlags.Size, ",")
-		for _, size := range allSizes {
-			// each of these should be of the form "<name|number>:<size>"
-			splitSize := strings.Split(size, ":")
-			if len(splitSize) != 2 {
-				return fmt.Errorf("Argument to --image-size %s is not "+
-					"in the correct format", size)
-			}
-			parsedSize, err := quantity.ParseSize(splitSize[1])
-			if err != nil {
-				return fmt.Errorf("Failed to parse argument to --image-size: %s",
-					err.Error())
-			}
-			// the image size parsed successfully, now find which volume to associate it with
-			volumeNumber, err := strconv.Atoi(splitSize[0])
-			if err == nil {
-				// argument passed was numeric.
-				if volumeNumber < len(stateMachine.VolumeOrder) {
-					stateName := stateMachine.VolumeOrder[volumeNumber]
-					stateMachine.ImageSizes[stateName] = parsedSize
-				} else {
-					return fmt.Errorf("Volume index %d is out of range", volumeNumber)
-				}
-			} else {
-				if _, found := stateMachine.GadgetInfo.Volumes[splitSize[0]]; !found {
-					return fmt.Errorf("Volume %s does not exist in gadget.yaml",
-						splitSize[0])
-				}
-				stateMachine.ImageSizes[splitSize[0]] = parsedSize
-			}
+		err := stateMachine.handleMultipleImageSizes()
+		if err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+// handleSingleImageSize parses as a single value and applies the image size given in
+// the flag --image-size
+func (stateMachine *StateMachine) handleSingleImageSize() error {
+	parsedSize, err := quantity.ParseSize(stateMachine.commonFlags.Size)
+	if err != nil {
+		return fmt.Errorf("Failed to parse argument to --image-size: %s", err.Error())
+	}
+	for volumeName := range stateMachine.GadgetInfo.Volumes {
+		stateMachine.ImageSizes[volumeName] = parsedSize
+	}
+	return nil
+}
+
+// handleMultipleImageSizes parses and applies the image size given in
+// the flag --image-size in the format <volumeName>:<volumeSize>,<volumeName2>:<volumeSize2>
+func (stateMachine *StateMachine) handleMultipleImageSizes() error {
+	allSizes := strings.Split(stateMachine.commonFlags.Size, ",")
+	for _, size := range allSizes {
+		// each of these should be of the form "<name|number>:<size>"
+		splitSize := strings.Split(size, ":")
+		if len(splitSize) != 2 {
+			return fmt.Errorf("Argument to --image-size %s is not "+
+				"in the correct format", size)
+		}
+		parsedSize, err := quantity.ParseSize(splitSize[1])
+		if err != nil {
+			return fmt.Errorf("Failed to parse argument to --image-size: %s",
+				err.Error())
+		}
+		// the image size parsed successfully, now find which volume to associate it with
+		volumeNumber, err := strconv.Atoi(splitSize[0])
+		if err == nil {
+			// argument passed was numeric.
+			if volumeNumber < len(stateMachine.VolumeOrder) {
+				stateName := stateMachine.VolumeOrder[volumeNumber]
+				stateMachine.ImageSizes[stateName] = parsedSize
+			} else {
+				return fmt.Errorf("Volume index %d is out of range", volumeNumber)
+			}
+		} else {
+			if _, found := stateMachine.GadgetInfo.Volumes[splitSize[0]]; !found {
+				return fmt.Errorf("Volume %s does not exist in gadget.yaml",
+					splitSize[0])
+			}
+			stateMachine.ImageSizes[splitSize[0]] = parsedSize
+		}
+	}
+
 	return nil
 }
 
