@@ -321,8 +321,7 @@ func (stateMachine *StateMachine) makeDisk() error {
 			return err
 		}
 
-		// set up the partition table on the device
-		partitionTable, rootfsPartitionNumber := createPartitionTable(volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
+		partitionTable, rootfsPartitionNumber := generatePartitionTable(volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
 
 		// Save the rootfs partition number, if found, for later use
 		if rootfsPartitionNumber != -1 {
@@ -330,14 +329,13 @@ func (stateMachine *StateMachine) makeDisk() error {
 			stateMachine.RootfsPartNum = rootfsPartitionNumber
 		}
 
-		// Write the partition table to disk
 		if err := diskImg.Partition(*partitionTable); err != nil {
 			return fmt.Errorf("Error partitioning image file: %s", err.Error())
 		}
 
 		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
 		// this function is a temporary workaround, but we should change upstream go-diskfs
-		if volume.Schema == "mbr" {
+		if volume.Schema == schemaMBR {
 			err = fixDiskIDOnMBR(imgName)
 			if err != nil {
 				return err
