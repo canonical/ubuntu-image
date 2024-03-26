@@ -18,7 +18,17 @@ var prepareImageState = stateFunc{"prepare_image", (*StateMachine).prepareImage}
 func (stateMachine *StateMachine) prepareImage() error {
 	snapStateMachine := stateMachine.parent.(*SnapStateMachine)
 
-	var imageOpts image.Options
+	imageOpts := &image.Options{
+		ModelFile:                 snapStateMachine.Args.ModelAssertion,
+		Preseed:                   snapStateMachine.Opts.Preseed,
+		PreseedSignKey:            snapStateMachine.Opts.PreseedSignKey,
+		AppArmorKernelFeaturesDir: snapStateMachine.Opts.AppArmorKernelFeaturesDir,
+		SysfsOverlay:              snapStateMachine.Opts.SysfsOverlay,
+		SeedManifestPath:          filepath.Join(stateMachine.commonFlags.OutputDir, "seed.manifest"),
+		PrepareDir:                snapStateMachine.tempDirs.unpack,
+		Channel:                   snapStateMachine.commonFlags.Channel,
+		Customizations:            snapStateMachine.imageOptsCustomizations(),
+	}
 
 	var err error
 	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
@@ -27,41 +37,10 @@ func (stateMachine *StateMachine) prepareImage() error {
 		return err
 	}
 
-	imageOpts.PrepareDir = snapStateMachine.tempDirs.unpack
-	imageOpts.ModelFile = snapStateMachine.Args.ModelAssertion
-	if snapStateMachine.commonFlags.Channel != "" {
-		imageOpts.Channel = snapStateMachine.commonFlags.Channel
+	imageOpts.SeedManifest, err = snapStateMachine.imageOptsSeedManifest()
+	if err != nil {
+		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
-
-	// setup the pre-provided manifest if revisions are passed
-	if len(snapStateMachine.Opts.Revisions) > 0 {
-		imageOpts.SeedManifest = seedwriter.NewManifest()
-		for snapName, snapRev := range snapStateMachine.Opts.Revisions {
-			fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n", snapRev, snapName)
-			err = imageOpts.SeedManifest.SetAllowedSnapRevision(snapName, snap.R(snapRev))
-			if err != nil {
-				return fmt.Errorf("Error preparing image: error dealing with snap revision %s: %w", snapName, err)
-			}
-		}
-	}
-
-	// preseeding-related
-	imageOpts.Preseed = snapStateMachine.Opts.Preseed
-	imageOpts.PreseedSignKey = snapStateMachine.Opts.PreseedSignKey
-	imageOpts.SysfsOverlay = snapStateMachine.Opts.SysfsOverlay
-	imageOpts.AppArmorKernelFeaturesDir = snapStateMachine.Opts.AppArmorKernelFeaturesDir
-	imageOpts.SeedManifestPath = filepath.Join(stateMachine.commonFlags.OutputDir, "seed.manifest")
-
-	customizations := *new(image.Customizations)
-	if snapStateMachine.Opts.DisableConsoleConf {
-		customizations.ConsoleConf = "disabled"
-	}
-	if snapStateMachine.Opts.FactoryImage {
-		customizations.BootFlags = append(customizations.BootFlags, "factory")
-	}
-	customizations.CloudInitUserData = snapStateMachine.Opts.CloudInit
-	customizations.Validation = stateMachine.commonFlags.Validation
-	imageOpts.Customizations = customizations
 
 	// plug/slot sanitization needed by provider handling
 	snap.SanitizePlugsSlots = builtin.SanitizePlugsSlots
@@ -76,14 +55,46 @@ func (stateMachine *StateMachine) prepareImage() error {
 		}()
 	}
 
-	if err := imagePrepare(&imageOpts); err != nil {
+	if err := imagePrepare(imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
 
-	// set the gadget yaml location
 	snapStateMachine.YamlFilePath = filepath.Join(stateMachine.tempDirs.unpack, "gadget", gadgetYamlPathInTree)
 
 	return nil
+}
+
+// imageOptsSeedManifest sets up the pre-provided manifest if revisions are passed
+func (snapStateMachine *SnapStateMachine) imageOptsSeedManifest() (*seedwriter.Manifest, error) {
+	if len(snapStateMachine.Opts.Revisions) == 0 {
+		return nil, nil
+	}
+	seedManifest := seedwriter.NewManifest()
+	for snapName, snapRev := range snapStateMachine.Opts.Revisions {
+		fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n", snapRev, snapName)
+		err := seedManifest.SetAllowedSnapRevision(snapName, snap.R(snapRev))
+		if err != nil {
+			return nil, fmt.Errorf("error dealing with snap revision %s: %w", snapName, err)
+		}
+	}
+
+	return seedManifest, nil
+}
+
+// imageOptsCustomizations prepares the Customizations options to give to image.Prepare
+func (snapStateMachine *SnapStateMachine) imageOptsCustomizations() image.Customizations {
+	customizations := image.Customizations{
+		CloudInitUserData: snapStateMachine.Opts.CloudInit,
+		Validation:        snapStateMachine.commonFlags.Validation,
+	}
+	if snapStateMachine.Opts.DisableConsoleConf {
+		customizations.ConsoleConf = "disabled"
+	}
+	if snapStateMachine.Opts.FactoryImage {
+		customizations.BootFlags = append(customizations.BootFlags, "factory")
+	}
+
+	return customizations
 }
 
 var populateSnapRootfsContentsState = stateFunc{"populate_rootfs_contents", (*StateMachine).populateSnapRootfsContents}
