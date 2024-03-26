@@ -2988,75 +2988,9 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 	})
 
-	// make sure packages were successfully installed from public and private ppas
-	files := []string{
-		filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-public"),
-		filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-private"),
-	}
-	for _, file := range files {
-		_, err = os.Stat(file)
-		asserter.AssertErrNil(err, true)
-	}
-
-	// make sure snaps from the correct channel were installed
-	type snapList struct {
-		Snaps []struct {
-			Name    string `yaml:"name"`
-			Channel string `yaml:"channel"`
-		} `yaml:"snaps"`
-	}
-
-	seedYaml := filepath.Join(stateMachine.tempDirs.chroot,
-		"var", "lib", "snapd", "seed", "seed.yaml")
-
-	seedFile, err := os.Open(seedYaml)
-	asserter.AssertErrNil(err, true)
-	defer seedFile.Close()
-
-	var seededSnaps snapList
-	err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
-	asserter.AssertErrNil(err, true)
-
-	expectedSnapChannels := map[string]string{
-		"hello":  "candidate",
-		"core20": "stable",
-	}
-
-	for _, seededSnap := range seededSnaps.Snaps {
-		channel, found := expectedSnapChannels[seededSnap.Name]
-		if found {
-			if channel != seededSnap.Channel {
-				t.Errorf("Expected snap %s to be pre-seeded with channel %s, but got %s",
-					seededSnap.Name, channel, seededSnap.Channel)
-			}
-		}
-	}
-
-	// make sure all the artifacts were created and are the correct file types
-	artifacts := map[string]string{
-		"pc-amd64.img":            "DOS/MBR boot sector",
-		"pc-amd64.qcow2":          "QEMU QCOW",
-		"filesystem-manifest.txt": "text",
-		"filesystem-filelist.txt": "text",
-	}
-	for artifact, fileType := range artifacts {
-		fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, artifact)
-		_, err := os.Stat(fullPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				t.Errorf("File \"%s\" should exist, but does not", fullPath)
-			}
-		}
-
-		// check it is the expected file type
-		fileCommand := *exec.Command("file", fullPath)
-		cmdOutput, err := fileCommand.CombinedOutput()
-		asserter.AssertErrNil(err, true)
-		if !strings.Contains(string(cmdOutput), fileType) {
-			t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
-				fullPath, fileType, string(cmdOutput))
-		}
-	}
+	testHelperCheckPPAInstalled(t, &asserter, stateMachine.tempDirs.chroot)
+	testHelperCheckSnapInstalled(t, &asserter, stateMachine.tempDirs.chroot)
+	testHelperCheckArtifacts(t, &asserter, stateMachine.commonFlags.OutputDir)
 
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
@@ -3168,16 +3102,103 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		}
 	}
 
-	// test make-dirs customization
+	testHelperCheckMakeDirs(t, mountDir)
+	testHelperCheckAddUser(t, &asserter, mountDir)
+	testHelperCheckGrubConfig(t, mountDir)
+	testHelperCheckCleanedFiles(t, mountDir)
+	testHelperCheckLocaleFile(t, &asserter, mountDir)
+	testHelperCheckSourcesList(t, &asserter, mountDir)
+}
+
+func testHelperCheckPPAInstalled(t *testing.T, asserter *helper.Asserter, chroot string) {
+	t.Helper()
+	files := []string{
+		filepath.Join(chroot, "usr", "bin", "hello-ubuntu-image-public"),
+		filepath.Join(chroot, "usr", "bin", "hello-ubuntu-image-private"),
+	}
+	for _, file := range files {
+		_, err := os.Stat(file)
+		asserter.AssertErrNil(err, true)
+	}
+}
+
+func testHelperCheckSnapInstalled(t *testing.T, asserter *helper.Asserter, chroot string) {
+	t.Helper()
+	type snapList struct {
+		Snaps []struct {
+			Name    string `yaml:"name"`
+			Channel string `yaml:"channel"`
+		} `yaml:"snaps"`
+	}
+
+	seedYaml := filepath.Join(chroot,
+		"var", "lib", "snapd", "seed", "seed.yaml")
+
+	seedFile, err := os.Open(seedYaml)
+	asserter.AssertErrNil(err, true)
+	defer seedFile.Close()
+
+	var seededSnaps snapList
+	err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
+	asserter.AssertErrNil(err, true)
+
+	expectedSnapChannels := map[string]string{
+		"hello":  "candidate",
+		"core20": "stable",
+	}
+
+	for _, seededSnap := range seededSnaps.Snaps {
+		channel, found := expectedSnapChannels[seededSnap.Name]
+		if found {
+			if channel != seededSnap.Channel {
+				t.Errorf("Expected snap %s to be pre-seeded with channel %s, but got %s",
+					seededSnap.Name, channel, seededSnap.Channel)
+			}
+		}
+	}
+}
+
+func testHelperCheckArtifacts(t *testing.T, asserter *helper.Asserter, outputDir string) {
+	t.Helper()
+	artifacts := map[string]string{
+		"pc-amd64.img":            "DOS/MBR boot sector",
+		"pc-amd64.qcow2":          "QEMU QCOW",
+		"filesystem-manifest.txt": "text",
+		"filesystem-filelist.txt": "text",
+	}
+	for artifact, fileType := range artifacts {
+		fullPath := filepath.Join(outputDir, artifact)
+		_, err := os.Stat(fullPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("File \"%s\" should exist, but does not", fullPath)
+			}
+		}
+
+		// check it is the expected file type
+		fileCommand := *exec.Command("file", fullPath)
+		cmdOutput, err := fileCommand.CombinedOutput()
+		asserter.AssertErrNil(err, true)
+		if !strings.Contains(string(cmdOutput), fileType) {
+			t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
+				fullPath, fileType, string(cmdOutput))
+		}
+	}
+}
+
+func testHelperCheckMakeDirs(t *testing.T, mountDir string) {
+	t.Helper()
 	addedDir := filepath.Join(mountDir, "etc", "foo", "bar")
-	_, err = os.Stat(addedDir)
+	_, err := os.Stat(addedDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			t.Errorf("Directory \"%s\" should exist, but does not", addedDir)
 		}
 	}
+}
 
-	// test addUser customization
+func testHelperCheckAddUser(t *testing.T, asserter *helper.Asserter, mountDir string) {
+	t.Helper()
 	shadowPath := filepath.Join(mountDir, "etc", "shadow")
 	shadowFile, err := os.Open(shadowPath)
 	asserter.AssertErrNil(err, true)
@@ -3204,16 +3225,21 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	if expire != "0" {
 		t.Error("ubuntu2 user password should be expired")
 	}
+}
 
+func testHelperCheckGrubConfig(t *testing.T, mountDir string) {
+	t.Helper()
 	grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
-	_, err = os.Stat(grubCfg)
+	_, err := os.Stat(grubCfg)
 	if err != nil {
 		if os.IsNotExist(err) {
 			t.Errorf("File \"%s\" should exist, but does not", grubCfg)
 		}
 	}
+}
 
-	// Check cleaned files were removed
+func testHelperCheckCleanedFiles(t *testing.T, mountDir string) {
+	t.Helper()
 	cleaned := []string{
 		filepath.Join(mountDir, "var", "lib", "dbus", "machine-id"),
 		filepath.Join(mountDir, "etc", "ssh", "ssh_host_rsa_key"),
@@ -3244,16 +3270,21 @@ func TestSuccessfulClassicRun(t *testing.T) {
 			t.Errorf("File %s should be empty, but it is not. Size: %v", file, fileInfo.Size())
 		}
 	}
+}
 
-	// check if the locale is set to a sane default
+func testHelperCheckLocaleFile(t *testing.T, asserter *helper.Asserter, mountDir string) {
+	t.Helper()
 	localeFile := filepath.Join(mountDir, "etc", "default", "locale")
 	localeBytes, err := os.ReadFile(localeFile)
 	asserter.AssertErrNil(err, true)
 	if !strings.Contains(string(localeBytes), "LANG=C.UTF-8") {
 		t.Errorf("Expected LANG=C.UTF-8 in %s, but got %s", localeFile, string(localeBytes))
 	}
+}
 
-	// check if components and pocket correctly setup in /etc/apt/sources.list.d/ubuntu.sources
+// testHelperCheckSourcesList checks if components and pocket correctly setup in /etc/apt/sources.list.d/ubuntu.sources
+func testHelperCheckSourcesList(t *testing.T, asserter *helper.Asserter, mountDir string) {
+	t.Helper()
 	aptDeb822SourcesListBytes, err := os.ReadFile(filepath.Join(mountDir, "etc", "apt", "sources.list.d", "ubuntu.sources"))
 	asserter.AssertErrNil(err, true)
 	wantAptDeb822SourcesList := `## Ubuntu distribution repository
@@ -3346,48 +3377,10 @@ func TestSuccessfulClassicRunNoArtifact(t *testing.T) {
 	})
 
 	// make sure packages were successfully installed from public and private ppas
-	files := []string{
-		filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-public"),
-		filepath.Join(stateMachine.tempDirs.chroot, "usr", "bin", "hello-ubuntu-image-private"),
-	}
-	for _, file := range files {
-		_, err = os.Stat(file)
-		asserter.AssertErrNil(err, true)
-	}
+	testHelperCheckPPAInstalled(t, &asserter, stateMachine.tempDirs.chroot)
 
 	// make sure snaps from the correct channel were installed
-	type snapList struct {
-		Snaps []struct {
-			Name    string `yaml:"name"`
-			Channel string `yaml:"channel"`
-		} `yaml:"snaps"`
-	}
-
-	seedYaml := filepath.Join(stateMachine.tempDirs.chroot,
-		"var", "lib", "snapd", "seed", "seed.yaml")
-
-	seedFile, err := os.Open(seedYaml)
-	asserter.AssertErrNil(err, true)
-	defer seedFile.Close()
-
-	var seededSnaps snapList
-	err = yaml.NewDecoder(seedFile).Decode(&seededSnaps)
-	asserter.AssertErrNil(err, true)
-
-	expectedSnapChannels := map[string]string{
-		"hello":  "candidate",
-		"core20": "stable",
-	}
-
-	for _, seededSnap := range seededSnaps.Snaps {
-		channel, found := expectedSnapChannels[seededSnap.Name]
-		if found {
-			if channel != seededSnap.Channel {
-				t.Errorf("Expected snap %s to be pre-seeded with channel %s, but got %s",
-					seededSnap.Name, channel, seededSnap.Channel)
-			}
-		}
-	}
+	testHelperCheckSnapInstalled(t, &asserter, stateMachine.tempDirs.chroot)
 }
 
 func TestSuccessfulRootfsGeneration(t *testing.T) {
