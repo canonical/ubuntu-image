@@ -3525,34 +3525,41 @@ func TestGerminate(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			// spot check some packages that should remain seeded for a long time
-			for _, expectedPackage := range tc.expectedPackages {
-				found := false
-				for _, seedPackage := range stateMachine.Packages {
-					if expectedPackage == seedPackage {
-						found = true
-					}
-				}
-				if !found {
-					t.Errorf("Expected to find %s in list of packages: %v",
-						expectedPackage, stateMachine.Packages)
-				}
-			}
+			testHelperCheckGerminatedPackages(t, tc.expectedPackages, stateMachine.Packages)
 			// spot check some snaps that should remain seeded for a long time
-			for _, expectedSnap := range tc.expectedSnaps {
-				found := false
-				for _, seedSnap := range stateMachine.Snaps {
-					snapName := strings.Split(seedSnap, "=")[0]
-					if expectedSnap == snapName {
-						found = true
-					}
-				}
-				if !found {
-					t.Errorf("Expected to find %s in list of snaps: %v",
-						expectedSnap, stateMachine.Snaps)
-				}
-			}
-
+			testHelperCheckGerminatedSnaps(t, tc.expectedSnaps, stateMachine.Snaps)
 		})
+	}
+}
+
+func testHelperCheckGerminatedPackages(t *testing.T, expectedPackages []string, gotPackages []string) {
+	for _, expectedPackage := range expectedPackages {
+		found := false
+		for _, seedPackage := range gotPackages {
+			if expectedPackage == seedPackage {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("Expected to find %s in list of packages: %v",
+				expectedPackage, gotPackages)
+		}
+	}
+}
+
+func testHelperCheckGerminatedSnaps(t *testing.T, expectedSnaps []string, gotSnaps []string) {
+	for _, expectedSnap := range expectedSnaps {
+		found := false
+		for _, seedSnap := range gotSnaps {
+			snapName := strings.Split(seedSnap, "=")[0]
+			if expectedSnap == snapName {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("Expected to find %s in list of snaps: %v",
+				expectedSnap, gotSnaps)
+		}
 	}
 }
 
