@@ -40,37 +40,11 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	// make the gadget directory under scratch
 	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
 
-	err := osMkdir(gadgetDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("Error creating scratch/gadget directory: %s", err.Error())
+	err := classicStateMachine.prepareGadgetDir(gadgetDir)
+	if err != nil {
+		return err
 	}
 
-	switch classicStateMachine.ImageDef.Gadget.GadgetType {
-	case "git":
-		err := cloneGitRepo(classicStateMachine.ImageDef, gadgetDir)
-		if err != nil {
-			return fmt.Errorf("Error cloning gadget repository: \"%s\"", err.Error())
-		}
-	case "directory":
-		gadgetTreePath := strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
-		if !filepath.IsAbs(gadgetTreePath) {
-			gadgetTreePath = filepath.Join(stateMachine.ConfDefPath, gadgetTreePath)
-		}
-
-		// copy the source tree to the workdir
-		files, err := osReadDir(gadgetTreePath)
-		if err != nil {
-			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
-		}
-		for _, gadgetFile := range files {
-			srcFile := filepath.Join(gadgetTreePath, gadgetFile.Name())
-			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
-				return fmt.Errorf("Error copying gadget source: %s", err.Error())
-			}
-		}
-	}
-
-	// now run "make" to build the gadget tree
 	makeCmd := execCommand("make")
 
 	// if a make target was specified then add it to the command
@@ -95,6 +69,40 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 			err.Error(), makeOutput.String())
 	}
 
+	return nil
+}
+
+// prepareGadgetDir prepares the gadget directory prior to running the make command
+func (classicStateMachine *ClassicStateMachine) prepareGadgetDir(gadgetDir string) error {
+	err := osMkdir(gadgetDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating scratch/gadget directory: %s", err.Error())
+	}
+
+	switch classicStateMachine.ImageDef.Gadget.GadgetType {
+	case "git":
+		err := cloneGitRepo(classicStateMachine.ImageDef, gadgetDir)
+		if err != nil {
+			return fmt.Errorf("Error cloning gadget repository: \"%s\"", err.Error())
+		}
+	case "directory":
+		gadgetTreePath := strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
+		if !filepath.IsAbs(gadgetTreePath) {
+			gadgetTreePath = filepath.Join(classicStateMachine.ConfDefPath, gadgetTreePath)
+		}
+
+		// copy the source tree to the workdir
+		files, err := osReadDir(gadgetTreePath)
+		if err != nil {
+			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
+		}
+		for _, gadgetFile := range files {
+			srcFile := filepath.Join(gadgetTreePath, gadgetFile.Name())
+			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
+				return fmt.Errorf("Error copying gadget source: %s", err.Error())
+			}
+		}
+	}
 	return nil
 }
 
