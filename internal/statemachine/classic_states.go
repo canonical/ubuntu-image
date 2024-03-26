@@ -1321,7 +1321,7 @@ var cleanRootfsState = stateFunc{"clean_rootfs", (*StateMachine).cleanRootfs}
 // cleanRootfs cleans the created chroot from secrets/values generated
 // during the various preceding install steps
 func (stateMachine *StateMachine) cleanRootfs() error {
-	toClean := []string{
+	toDelete := []string{
 		filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
 	}
 
@@ -1329,56 +1329,69 @@ func (stateMachine *StateMachine) cleanRootfs() error {
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
 	}
 
-	// openssh default keys
-	sshPubKeys, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_*_key.pub"))
+	toCleanFromPattern, err := listWithPatterns(stateMachine.tempDirs.chroot,
+		[]string{
+			filepath.Join("etc", "ssh", "ssh_host_*_key.pub"),
+			filepath.Join("etc", "ssh", "ssh_host_*_key"),
+			filepath.Join("var", "cache", "debconf", "*-old"),
+			filepath.Join("var", "lib", "dpkg", "*-old"),
+		})
 	if err != nil {
-		return fmt.Errorf("unable to list ssh pub keys: %s", err.Error())
+		return err
 	}
 
-	toClean = append(toClean, sshPubKeys...)
+	toDelete = append(toDelete, toCleanFromPattern...)
 
-	sshPrivKeys, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_*_key"))
+	err = doDeleteFiles(toDelete)
 	if err != nil {
-		return fmt.Errorf("unable to list ssh pub keys: %s", err.Error())
+		return err
 	}
 
-	toClean = append(toClean, sshPrivKeys...)
-
-	oldDebconf, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "var", "cache", "debconf", "*-old"))
+	toTruncateFromPattern, err := listWithPatterns(stateMachine.tempDirs.chroot,
+		[]string{
+			// udev persistent rules
+			filepath.Join("etc", "udev", "rules.d", "*persistent-net.rules"),
+		})
 	if err != nil {
-		return fmt.Errorf("unable to list old debconf conf: %s", err.Error())
+		return err
 	}
 
-	toClean = append(toClean, oldDebconf...)
+	toTruncate = append(toTruncate, toTruncateFromPattern...)
 
-	oldDpkg, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dpkg", "*-old"))
-	if err != nil {
-		return fmt.Errorf("unable to list old dpkg conf: %s", err.Error())
+	return doTruncateFiles(toTruncate)
+}
+
+func listWithPatterns(chroot string, patterns []string) ([]string, error) {
+	files := make([]string, 0)
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(filepath.Join(chroot, pattern))
+		if err != nil {
+			return nil, fmt.Errorf("unable to list files for pattern %s: %s", pattern, err.Error())
+		}
+
+		files = append(files, matches...)
 	}
+	return files, nil
+}
 
-	toClean = append(toClean, oldDpkg...)
-
-	for _, f := range toClean {
-		err = osRemove(f)
+// doDeleteFiles deletes the given list of files
+func doDeleteFiles(toDelete []string) error {
+	for _, f := range toDelete {
+		err := osRemove(f)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error removing %s: %s", f, err.Error())
 		}
 	}
+	return nil
+}
 
-	// udev persistent rules
-	udevRules, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "etc", "udev", "rules.d", "*persistent-net.rules"))
-	if err != nil {
-		return fmt.Errorf("unable to list udev persistent rules: %s", err.Error())
-	}
-
-	toTruncate = append(toTruncate, udevRules...)
-
+// doTruncateFiles truncates content in the given list of files
+func doTruncateFiles(toTruncate []string) error {
 	for _, f := range toTruncate {
-		err = osTruncate(f, 0)
+		err := osTruncate(f, 0)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error truncating %s: %s", f, err.Error())
 		}
 	}
-
 	return nil
 }
