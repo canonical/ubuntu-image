@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	diskfs "github.com/diskfs/go-diskfs"
 	diskutils "github.com/diskfs/go-diskfs/disk"
@@ -105,81 +104,76 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 
 var calculateRootfsSizeState = stateFunc{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize}
 
-// Calculate the size of the root filesystem
-// on a 100MiB filesystem, ext4 takes a little over 7MiB for the
-// metadata. Use 8MB as a minimum padding here
+// calculateRootfsSize calculates the size of the root filesystem.
+// On a 100MiB filesystem, ext4 takes a little over 7MiB for the
+// metadata, so use 8MB as a minimum padding.
 func (stateMachine *StateMachine) calculateRootfsSize() error {
-	// use `du` to calculate the size of the rootfs
 	rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
 	if err != nil {
 		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
 	}
-	var rootfsQuantity quantity.Size = rootfsSize
 
 	// fudge factor for incidentals
 	rootfsPadding := 8 * quantity.SizeMiB
-	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity) * 1.5))
-	rootfsQuantity += rootfsPadding
+	rootfsSize = quantity.Size(math.Ceil(float64(rootfsSize) * 1.5))
+	rootfsSize += rootfsPadding
 
-	// align the size of the rootfs to sector size
-	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity)/float64(stateMachine.SectorSize))) *
-		quantity.Size(stateMachine.SectorSize)
-
-	stateMachine.RootfsSize = rootfsQuantity
+	stateMachine.RootfsSize = stateMachine.alignToSectorSize(rootfsSize)
 
 	if stateMachine.commonFlags.Size != "" {
-		var parsedSize quantity.Size
-
-		// identify which structure has the rootfs
-		var rootfsVolume *gadget.Volume
-		var rootfsVolumeName string
-		for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
-			for _, structure := range volume.Structure {
-				if structure.Size == 0 {
-					rootfsVolume = volume
-					rootfsVolumeName = volumeName
-					break
-				}
-			}
-		}
-
-		if !strings.Contains(stateMachine.commonFlags.Size, ":") {
-			// this scenario has just one size for each volume
-			// no need to check error as it has already been done by
-			// the parseImageSizes function
-			parsedSize, _ = quantity.ParseSize(stateMachine.commonFlags.Size)
-		} else {
-			parsedSize = stateMachine.ImageSizes[rootfsVolumeName]
-		}
+		rootfsVolume, rootfsVolumeName := stateMachine.findRootfsVolume()
+		desiredSize := stateMachine.getSuggestedImageSize(rootfsVolumeName)
 
 		// subtract the size and offsets of the existing volumes
 		if rootfsVolume != nil {
 			for _, structure := range rootfsVolume.Structure {
-				parsedSize = helper.SafeQuantitySubtraction(parsedSize, structure.Size)
+				desiredSize = helper.SafeQuantitySubtraction(desiredSize, structure.Size)
 				if structure.Offset != nil {
-					parsedSize = helper.SafeQuantitySubtraction(parsedSize,
+					desiredSize = helper.SafeQuantitySubtraction(desiredSize,
 						quantity.Size(*structure.Offset))
 				}
 			}
 
-			// align the size of the rootfs to sector size
-			parsedSize = quantity.Size(math.Ceil(float64(parsedSize)/float64(stateMachine.SectorSize))) *
-				quantity.Size(stateMachine.SectorSize)
+			desiredSize = stateMachine.alignToSectorSize(desiredSize)
 
-			if parsedSize < stateMachine.RootfsSize {
+			if desiredSize < stateMachine.RootfsSize {
 				return fmt.Errorf("Error: calculated rootfs partition size %d is smaller "+
 					"than actual rootfs contents (%d). Try using a larger value of "+
 					"--image-size",
-					parsedSize, stateMachine.RootfsSize,
+					desiredSize, stateMachine.RootfsSize,
 				)
 			}
 
-			stateMachine.RootfsSize = parsedSize
+			stateMachine.RootfsSize = desiredSize
 		}
 	}
 
-	// we have already saved the rootfs size in the state machine struct, but we
-	// should also set it in the gadget.Structure that represents the rootfs
+	stateMachine.syncGadgetStructureRootfsSize()
+	return nil
+}
+
+// findRootfsVolume finds the volume associated to the rootfs
+func (stateMachine *StateMachine) findRootfsVolume() (*gadget.Volume, string) {
+	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+		for _, structure := range volume.Structure {
+			if structure.Size == 0 {
+				return volume, volumeName
+			}
+		}
+	}
+	return nil, ""
+}
+
+// alignToSectorSize align the given size to the SectorSize of the stateMachine
+func (stateMachine *StateMachine) alignToSectorSize(size quantity.Size) quantity.Size {
+	return quantity.Size(math.Ceil(float64(size)/float64(stateMachine.SectorSize))) *
+		quantity.Size(stateMachine.SectorSize)
+}
+
+// syncGadgetStructureRootfsSize synchronizes size of the gadget.Structure that
+// represents the rootfs with the RootfsSize value of the statemachine
+// This functions assumes stateMachine.RootfsSize was previously correctly updated.
+func (stateMachine *StateMachine) syncGadgetStructureRootfsSize() {
 	for _, volume := range stateMachine.GadgetInfo.Volumes {
 		for structIndex, structure := range volume.Structure {
 			if structure.Size == 0 {
@@ -188,7 +182,6 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 			volume.Structure[structIndex] = structure
 		}
 	}
-	return nil
 }
 
 var populateBootfsContentsState = stateFunc{"populate_bootfs_contents", (*StateMachine).populateBootfsContents}
@@ -382,9 +375,7 @@ func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gad
 		return nil, 0, fmt.Errorf("Error creating disk image: %s", err.Error())
 	}
 
-	// make sure the disk image size is a multiple of its block/sector size
-	imgSize = quantity.Size(math.Ceil(float64(imgSize)/float64(stateMachine.SectorSize))) *
-		stateMachine.SectorSize
+	imgSize = stateMachine.alignToSectorSize(imgSize)
 	if err := osTruncate(diskImg.File.Name(), int64(imgSize)); err != nil {
 		return nil, 0, fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
 			err.Error())
