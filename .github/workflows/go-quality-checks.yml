@@ -10,7 +10,7 @@ jobs:
         with:
           fetch-depth: 2
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.21'
 
@@ -21,7 +21,7 @@ jobs:
         run: FMT=`go fmt ./...` && [ -z "$FMT" ]
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
         id: lint
         with:
           version: latest
