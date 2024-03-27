@@ -10,14 +10,6 @@ import (
 )
 
 func Test_getMountCmd(t *testing.T) {
-	type args struct {
-		typ        string
-		src        string
-		targetDir  string
-		mountpoint string
-		bind       bool
-		options    []string
-	}
 	tests := []struct {
 		name           string
 		mp             mountPoint

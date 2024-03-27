@@ -96,9 +96,6 @@ func mockMkfsWithContent(typ, img, label, contentRootDir string, deviceSize, sec
 func mockMkfs(typ, img, label string, deviceSize, sectorSize quantity.Size) error {
 	return fmt.Errorf("Test Error")
 }
-func mockReadAll(io.Reader) ([]byte, error) {
-	return []byte{}, fmt.Errorf("Test Error")
-}
 func mockReadDir(string) ([]os.DirEntry, error) {
 	return []os.DirEntry{}, fmt.Errorf("Test Error")
 }
@@ -154,9 +151,6 @@ func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
 	return nil, fmt.Errorf("Test error")
 }
 func mockImagePrepare(*image.Options) error {
-	return fmt.Errorf("Test Error")
-}
-func mockUnmarshal([]byte, any) error {
 	return fmt.Errorf("Test Error")
 }
 func mockMarshal(interface{}) ([]byte, error) {

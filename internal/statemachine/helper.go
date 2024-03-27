@@ -814,60 +814,6 @@ echo "Warning: Fake initctl called, doing nothing"
 	return helper.BackupReplace(initctl, initctlContent)
 }
 
-// getMountCmd returns mount/umount commands to mount the given mountpoint
-// If the mountpoint does not exist, it will be created.
-func getMountCmd(typ string, src string, targetDir string, mountpoint string, bind bool, options ...string) (mountCmds, umountCmds []*exec.Cmd, err error) {
-	if bind && len(typ) > 0 {
-		return nil, nil, fmt.Errorf("invalid mount arguments. Cannot use --bind and -t at the same time.")
-	}
-
-	targetPath := filepath.Join(targetDir, mountpoint)
-	mountCmd := execCommand("mount")
-
-	if len(typ) > 0 {
-		mountCmd.Args = append(mountCmd.Args, "-t", typ)
-	}
-
-	if bind {
-		mountCmd.Args = append(mountCmd.Args, "--bind")
-	}
-
-	mountCmd.Args = append(mountCmd.Args, src)
-	if len(options) > 0 {
-		mountCmd.Args = append(mountCmd.Args, "-o", strings.Join(options, ","))
-	}
-	mountCmd.Args = append(mountCmd.Args, targetPath)
-
-	if _, err := os.Stat(targetPath); err != nil {
-		err := osMkdirAll(targetPath, 0755)
-		if err != nil && !os.IsExist(err) {
-			return nil, nil, fmt.Errorf("Error creating mountpoint \"%s\": \"%s\"", targetPath, err.Error())
-		}
-	}
-
-	umountCmds = getUnmountCmd(targetPath)
-
-	return []*exec.Cmd{mountCmd}, umountCmds, nil
-}
-
-func getNewMountPoints(olds []mountPoint, currents []mountPoint) []mountPoint {
-	news := []mountPoint{}
-
-	for _, m := range currents {
-		found := false
-		for _, o := range olds {
-			if m.src == o.src {
-				found = true
-			}
-		}
-		if !found {
-			news = append(news, m)
-		}
-	}
-
-	return news
-}
-
 // execTeardownCmds executes given commands and collects error to join them with an existing error.
 // Failure to execute one command will not stop from executing following ones.
 func execTeardownCmds(teardownCmds []*exec.Cmd, debug bool, prevErr error) (err error) {
