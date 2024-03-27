@@ -52,15 +52,9 @@ The gadget.yaml file is expected to be located in a "meta" subdirectory of the p
 	}
 
 	// check if the unpack dir should be preserved
-	envar := os.Getenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
-	if envar != "" {
-		err := osMkdirAll(envar, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating preserve_unpack directory: %s", err.Error())
-		}
-		if err := osutilCopySpecialFile(stateMachine.tempDirs.unpack, envar); err != nil {
-			return fmt.Errorf("Error preserving unpack dir: %s", err.Error())
-		}
+	err = preserveUnpack(stateMachine.tempDirs.unpack)
+	if err != nil {
+		return err
 	}
 
 	// for the --image-size argument, the order of the volumes specified in gadget.yaml
@@ -84,6 +78,22 @@ The gadget.yaml file is expected to be located in a "meta" subdirectory of the p
 		return err
 	}
 
+	return nil
+}
+
+// preserveUnpack checks if and does preserve the gadget unpack directory
+func preserveUnpack(unpackDir string) error {
+	preserveUnpackDir := os.Getenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
+	if len(preserveUnpackDir) == 0 {
+		return nil
+	}
+	err := osMkdirAll(preserveUnpackDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating preserve unpack directory: %s", err.Error())
+	}
+	if err := osutilCopySpecialFile(unpackDir, preserveUnpackDir); err != nil {
+		return fmt.Errorf("Error preserving unpack dir: %s", err.Error())
+	}
 	return nil
 }
 
