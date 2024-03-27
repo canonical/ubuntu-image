@@ -88,7 +88,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return err
 	}
 
-	if imageDefinition.Rootfs.SourcesListDeb822 == nil {
+	if imageDefinition.Rootfs != nil && imageDefinition.Rootfs.SourcesListDeb822 == nil {
 		fmt.Print("WARNING: rootfs.sources-list-deb822 was not set. Please explicitly set the format desired for sources list in your image definition.\n")
 	}
 
@@ -98,7 +98,7 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return err
 	}
 
-	if *imageDefinition.Rootfs.SourcesListDeb822 {
+	if imageDefinition.Rootfs != nil && *imageDefinition.Rootfs.SourcesListDeb822 {
 		fmt.Print("WARNING: rootfs.sources-list-deb822 is set to true. The DEB822 format will be used to manage sources list. Please make sure you are not building an image older than noble.\n")
 	} else {
 		fmt.Print("WARNING: rootfs.sources-list-deb822 is set to false. The deprecated format will be used to manage sources list. Please if possible adopt the new format.\n")
