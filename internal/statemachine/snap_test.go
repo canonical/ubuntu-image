@@ -261,7 +261,8 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 	diskImg := filepath.Join(workDir, "pc.img")
 	fdiskCommand := *exec.Command("fdisk", "-l", "-o", "Name", diskImg)
 
-	fdiskBytes, _ := fdiskCommand.CombinedOutput()
+	fdiskBytes, err := fdiskCommand.CombinedOutput()
+	asserter.AssertErrNil(err, true)
 	if !strings.Contains(string(fdiskBytes), "writable") {
 		t.Error("system-data partition is not named \"writable\"")
 	}

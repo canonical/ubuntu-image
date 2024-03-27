@@ -75,6 +75,7 @@ func RunScript(hookScript string) error {
 }
 
 // SaveCWD gets the current working directory and returns a function to go back to it
+// nolint: errcheck
 func SaveCWD() func() {
 	wd, _ := os.Getwd()
 	return func() {

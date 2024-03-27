@@ -76,7 +76,7 @@ func unhidePackOpts(parser *flags.Parser) {
 	defer func() { parser.Options = opts }()
 	// parse once to determine the active command
 	// we do not care about error here since we will reparse again
-	_, _ = parser.Parse()
+	_, _ = parser.Parse() // nolint: errcheck
 
 	if parser.Active != nil {
 		if parser.Active.Name == "pack" {
