@@ -48,3 +48,45 @@ jobs:
           flags: unittests
           files: .coverage/coverage-*.out
           verbose: true
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-image-coverage
+          path: .coverage
+          retention-days: 1
+
+  tics-report:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Cleanup coverage directory
+        run: |
+          rm -rf coverage || true
+          mkdir coverage
+
+      - name: Download coverage report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ubuntu-image-coverage
+          path: coverage
+
+      - name: Install gocov tools
+        run: |
+          go install github.com/axw/gocov/gocov@latest
+          go install github.com/AlekSi/gocov-xml@latest
+
+      - name: Convert report to xml
+        run: |
+          cd coverage && \
+          gocov convert coverage.out > coverage.json && \
+          gocov-xml < coverage.json > coverage-go.xml
+
+      - name: TICS analysis and report
+        if: github.event.pull_request.merged == true
+        uses: tiobe/tics-github-action@v2
+        with:
+          projectName: ubuntu-image
+          ticsConfiguration: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
+          installTics: true
