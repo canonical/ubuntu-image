@@ -79,7 +79,10 @@ The gadget.yaml file is expected to be located in a "meta" subdirectory of the p
 
 	// pre-parse the sector size argument here as it's a string and we will be using it
 	// in various places
-	stateMachine.SectorSize, _ = quantity.ParseSize(stateMachine.commonFlags.SectorSize)
+	stateMachine.SectorSize, err = quantity.ParseSize(stateMachine.commonFlags.SectorSize)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

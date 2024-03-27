@@ -172,7 +172,7 @@ func (stateMachine *StateMachine) getSuggestedImageSize(volumeName string) quant
 		// this scenario has just one size for each volume
 		// no need to check error as it has already been done by
 		// the parseImageSizes function
-		parsedSize, _ = quantity.ParseSize(stateMachine.commonFlags.Size)
+		parsedSize, _ = quantity.ParseSize(stateMachine.commonFlags.Size) // nolint: errcheck
 	} else {
 		parsedSize = stateMachine.ImageSizes[volumeName]
 	}
@@ -597,7 +597,11 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 func (stateMachine *StateMachine) determineOutputDirectory() error {
 	if stateMachine.commonFlags.OutputDir == "" {
 		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd
-			stateMachine.commonFlags.OutputDir, _ = os.Getwd()
+			var err error
+			stateMachine.commonFlags.OutputDir, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("Error creating OutputDir: %s", err.Error())
+			}
 		} else {
 			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
 		}

@@ -388,14 +388,14 @@ func WriteSnapManifest(snapsDir string, outputPath string) error {
 // getHostArch uses dpkg to return the host architecture of the current system
 func getHostArch() string {
 	cmd := exec.Command("dpkg", "--print-architecture")
-	outputBytes, _ := cmd.Output()
+	outputBytes, _ := cmd.Output() // nolint: errcheck
 	return strings.TrimSpace(string(outputBytes))
 }
 
 // getHostSuite checks the release name of the host system to use as a default if --suite is not passed
 func getHostSuite() string {
 	cmd := exec.Command("lsb_release", "-c", "-s")
-	outputBytes, _ := cmd.Output()
+	outputBytes, _ := cmd.Output() // nolint: errcheck
 	return strings.TrimSpace(string(outputBytes))
 }
 
@@ -498,7 +498,7 @@ func mbrPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64,
 	}
 	// mbr.Type is a byte. snapd has already verified that this string
 	// is exactly two chars, so we can safely parse those two chars to a byte
-	partitionType, _ := strconv.ParseUint(structureType, 16, 8)
+	partitionType, _ := strconv.ParseUint(structureType, 16, 8) // nolint: errcheck
 
 	return &mbr.Partition{
 		Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
