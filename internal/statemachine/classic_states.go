@@ -121,7 +121,10 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	if classicStateMachine.ImageDef.Gadget.GadgetType == "prebuilt" {
 		gadgetTree = strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
 		if !filepath.IsAbs(gadgetTree) {
-			gadgetTree, _ = filepath.Abs(gadgetTree)
+			gadgetTree, err = filepath.Abs(gadgetTree)
+			if err != nil {
+				return fmt.Errorf("Error finding the absolute path of the gadget tree: %s", err.Error())
+			}
 		}
 	} else {
 		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget", "install")

@@ -1210,7 +1210,7 @@ func TestBuildRootfsFromTasks(t *testing.T) {
 // TestExtractRootfsTar unit tests the extractRootfsTar function
 func TestExtractRootfsTar(t *testing.T) {
 	t.Parallel()
-	wd, _ := os.Getwd()
+	wd, _ := os.Getwd() // nolint: errcheck
 	testCases := []struct {
 		name          string
 		rootfsTar     string
@@ -1769,8 +1769,9 @@ func TestStateMachine_manualCustomization(t *testing.T) {
 		},
 	}
 
-	d, _ := os.Getwd()
-	err := stateMachine.setConfDefDir(filepath.Join(d, "image_definition.yaml"))
+	d, err := os.Getwd()
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.setConfDefDir(filepath.Join(d, "image_definition.yaml"))
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.makeTemporaryDirectories()
@@ -3614,7 +3615,8 @@ func TestBuildGadgetTreeGit(t *testing.T) {
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// test the directory method
-	d, _ := os.Getwd()
+	d, err := os.Getwd()
+	asserter.AssertErrNil(err, true)
 	sourcePath := filepath.Join(d, "testdata", "gadget_source")
 	sourcePath = "file://" + sourcePath
 	imageDef := imagedefinition.ImageDefinition{
@@ -3856,7 +3858,8 @@ func TestGadgetGadgetTargets(t *testing.T) {
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
 
-			wd, _ := os.Getwd()
+			wd, err := os.Getwd()
+			asserter.AssertErrNil(err, true)
 			gadgetSrc := filepath.Join(wd, "testdata", "gadget_source")
 			imageDef := imagedefinition.ImageDefinition{
 				Architecture: getHostArch(),
@@ -3968,7 +3971,8 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 	t.Cleanup(func() {
 		execCommand = exec.Command
 	})
-	wd, _ := os.Getwd()
+	wd, err := os.Getwd()
+	asserter.AssertErrNil(err, true)
 	sourcePath := filepath.Join(wd, "testdata", "gadget_source")
 	sourcePath = "file://" + sourcePath
 	imageDef = imagedefinition.ImageDefinition{
@@ -4226,7 +4230,8 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
 
-	stdout, restoreStdout, _ := helper.CaptureStd(&os.Stdout)
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { restoreStdout() })
 
 	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfSuccess
@@ -4238,7 +4243,8 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	restoreStdout()
-	readStdout, _ := io.ReadAll(stdout)
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
 
 	expectedCmds := []*regexp.Regexp{
 		regexp.MustCompile("^mount -t devtmpfs devtmpfs-build /tmp.*/chroot/dev$"),
@@ -4296,7 +4302,8 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
 
-	stdout, restoreStdout, _ := helper.CaptureStd(&os.Stdout)
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { restoreStdout() })
 
 	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfSuccess
@@ -4313,7 +4320,8 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 	asserter.AssertErrContains(err, "Test error")
 
 	restoreStdout()
-	readStdout, _ := io.ReadAll(stdout)
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
 
 	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
 	// Clean empty commands

@@ -1335,7 +1335,7 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 func TestDetermineOutputDirectory(t *testing.T) {
 	testDir1 := "/tmp/determine_output_dir-" + uuid.NewString()
 	testDir2 := "/tmp/determine_output_dir-" + uuid.NewString()
-	cwd, _ := os.Getwd()
+	cwd, _ := os.Getwd() // nolint: errcheck
 	testCases := []struct {
 		name              string
 		workDir           string

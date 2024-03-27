@@ -911,7 +911,8 @@ func Test_manualAddUser(t *testing.T) {
 				asserter.AssertEqual(tc.expectedCmds[i].cmd, cmd.String())
 
 				if cmd.Stdin != nil {
-					stdin, _ := io.ReadAll(cmd.Stdin)
+					stdin, err := io.ReadAll(cmd.Stdin)
+					asserter.AssertErrNil(err, true)
 					asserter.AssertEqual(tc.expectedCmds[i].stdin, string(stdin))
 					t.Logf("stdin: %s", stdin)
 				}
@@ -1116,14 +1117,16 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
 
-	stdout, restoreStdout, _ := helper.CaptureStd(&os.Stdout)
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { restoreStdout() })
 
 	err = stateMachine.updateGrub("", 2)
 	asserter.AssertErrNil(err, true)
 
 	restoreStdout()
-	readStdout, _ := io.ReadAll(stdout)
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
 
 	expectedCmds := []*regexp.Regexp{
 		regexp.MustCompile("^mount .*p2 .*/scratch/loopback$"),
