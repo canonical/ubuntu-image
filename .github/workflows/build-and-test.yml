@@ -49,11 +49,11 @@ jobs:
           files: .coverage/coverage-*.out
           verbose: true
 
-      - name: Upload coverage report
+      - name: Upload coverage report to artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ubuntu-image-coverage
-          path: .coverage
+          name: ubuntu-image-coverage-${{ matrix.test-scenario }}
+          path: .coverage/coverage-*.out
           retention-days: 1
 
   tics-report:
@@ -68,8 +68,8 @@ jobs:
       - name: Download coverage report artifact
         uses: actions/download-artifact@v4
         with:
-          name: ubuntu-image-coverage
-          path: coverage
+          name: ubuntu-image-coverage-long
+          path: .coverage
 
       - name: Install gocov tools
         run: |
@@ -78,8 +78,8 @@ jobs:
 
       - name: Convert report to xml
         run: |
-          cd coverage && \
-          gocov convert coverage.out > coverage.json && \
+          cd .coverage && \
+          gocov convert coverage-long.out > coverage.json && \
           gocov-xml < coverage.json > coverage-go.xml
 
       - name: TICS analysis and report
