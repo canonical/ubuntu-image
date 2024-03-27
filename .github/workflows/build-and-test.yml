@@ -43,7 +43,7 @@ jobs:
         run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
