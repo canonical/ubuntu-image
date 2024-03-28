@@ -75,6 +75,7 @@ func RunScript(hookScript string) error {
 }
 
 // SaveCWD gets the current working directory and returns a function to go back to it
+// nolint: errcheck
 func SaveCWD() func() {
 	wd, _ := os.Getwd()
 	return func() {
@@ -121,64 +122,94 @@ func SetDefaults(needsDefaults interface{}) error {
 		field := elem.Field(i)
 		// if we're dealing with a slice of pointers to structs,
 		// iterate through it and set the defaults for each struct pointer
-		if field.Type().Kind() == reflect.Slice &&
-			field.Cap() > 0 &&
-			field.Index(0).Kind() == reflect.Pointer {
-			for i := 0; i < field.Cap(); i++ {
-				err := SetDefaults(field.Index(i).Interface())
-				if err != nil {
-					return err
-				}
+		if isSliceOfPtrToStructs(field) {
+			err := setDefaultsToSlice(field)
+			if err != nil {
+				return err
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
-			// if it's a pointer to a struct, look for default types
-			if field.Elem().Kind() == reflect.Struct {
-				err := SetDefaults(field.Interface())
-				if err != nil {
-					return err
-				}
-				// special case for pointer to bools
-			} else if field.Type().Elem() == reflect.TypeOf(true) {
-				// if a value is set, do nothing
-				if !field.IsNil() {
-					continue
-				}
-				tags := elem.Type().Field(i).Tag
-				defaultValue, hasDefault := tags.Lookup("default")
-				if !hasDefault {
-					// If no default and no value is set, make sure we have a valid
-					// value consistent with the "zero" value for a bool (false)
-					field.Set(reflect.ValueOf(BoolPtr(false)))
-					continue
-				}
-				if defaultValue == "true" {
-					field.Set(reflect.ValueOf(BoolPtr(true)))
-				} else {
-					field.Set(reflect.ValueOf(BoolPtr(false)))
-				}
+			err := setDefaultToPtr(field, elem, i)
+			if err != nil {
+				return err
 			}
 		} else {
-			tags := elem.Type().Field(i).Tag
-			defaultValue, hasDefault := tags.Lookup("default")
-			if !hasDefault {
-				continue
+			err := setDefaultToBasicType(field, elem, i)
+			if err != nil {
+				return err
 			}
-			indirectedField := reflect.Indirect(field)
-			if indirectedField.CanSet() && field.IsZero() {
-				varType := field.Type().Kind()
-				switch varType {
-				case reflect.String:
-					field.SetString(defaultValue)
-				case reflect.Slice:
-					defaultValues := strings.Split(defaultValue, ",")
-					field.Set(reflect.ValueOf(defaultValues))
-				case reflect.Bool:
-					return fmt.Errorf("Setting default value of a boolean not supported. Use a pointer to boolean instead.")
-				default:
-					return fmt.Errorf("Setting default value of type %s not supported",
-						varType)
-				}
-			}
+		}
+	}
+	return nil
+}
+
+// setDefaultsToSlice sets default values to elements of a slice.
+// It assumes it was already checked field is a non empty slice. Otherwise this
+// function will probably panic.
+func setDefaultsToSlice(field reflect.Value) error {
+	for i := 0; i < field.Cap(); i++ {
+		err := SetDefaults(field.Index(i).Interface())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// setDefaultToPtr sets a default value to a field being a pointer.
+// It assumes it was already checked that field is a ptr. Otherwise this
+// function will probably panic.
+func setDefaultToPtr(field reflect.Value, elem reflect.Value, fieldIndex int) error {
+	// if it's a pointer to a struct, look for default types
+	if field.Elem().Kind() == reflect.Struct {
+		err := SetDefaults(field.Interface())
+		if err != nil {
+			return err
+		}
+		// special case for pointer to bools
+	} else if field.Type().Elem() == reflect.TypeOf(true) {
+		// if a value is set, do nothing
+		if !field.IsNil() {
+			return nil
+		}
+		tags := elem.Type().Field(fieldIndex).Tag
+		defaultValue, hasDefault := tags.Lookup("default")
+		if !hasDefault {
+			// If no default and no value is set, make sure we have a valid
+			// value consistent with the "zero" value for a bool (false)
+			field.Set(reflect.ValueOf(BoolPtr(false)))
+			return nil
+		}
+		if defaultValue == "true" {
+			field.Set(reflect.ValueOf(BoolPtr(true)))
+		} else {
+			field.Set(reflect.ValueOf(BoolPtr(false)))
+		}
+	}
+	return nil
+}
+
+// setDefaultToBasicType sets the default value to a basic type (and slice) based on the
+// "default" tag.
+func setDefaultToBasicType(field reflect.Value, elem reflect.Value, fieldIndex int) error {
+	tags := elem.Type().Field(fieldIndex).Tag
+	defaultValue, hasDefault := tags.Lookup("default")
+	if !hasDefault {
+		return nil
+	}
+	indirectedField := reflect.Indirect(field)
+	if indirectedField.CanSet() && field.IsZero() {
+		varType := field.Type().Kind()
+		switch varType {
+		case reflect.String:
+			field.SetString(defaultValue)
+		case reflect.Slice:
+			defaultValues := strings.Split(defaultValue, ",")
+			field.Set(reflect.ValueOf(defaultValues))
+		case reflect.Bool:
+			return fmt.Errorf("Setting default value of a boolean not supported. Use a pointer to boolean instead.")
+		default:
+			return fmt.Errorf("Setting default value of type %s not supported",
+				varType)
 		}
 	}
 	return nil
@@ -201,62 +232,84 @@ func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema
 		// it and search for missing required fields in each
 		// element of the slice
 		if field.Type().Kind() == reflect.Slice {
-			for i := 0; i < field.Cap(); i++ {
-				sliceElem := field.Index(i)
-				if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
-					err := CheckEmptyFields(sliceElem.Interface(), result, schema)
-					if err != nil {
-						return err
-					}
-				}
+			err := checkEmptyFieldsInSlice(field, result, schema)
+			if err != nil {
+				return err
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
 			// otherwise if it's just a pointer to a nested struct
 			// search it for empty required fields
-			if field.Elem().Kind() == reflect.Struct {
-				err := CheckEmptyFields(field.Interface(), result, schema)
-				if err != nil {
-					return err
-				}
+			err := checkEmptyFieldsInPtr(field, result, schema)
+			if err != nil {
+				return err
 			}
 		} else {
+			required, tags := isRequired(elem, i, schema)
+			if !required {
+				continue
+			}
+			// this is a required field, check for zero values
+			if !reflect.Indirect(field).IsZero() {
+				continue
+			}
+			jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
+			errDetail := gojsonschema.ErrorDetails{
+				"property": tags.Get("yaml"),
+				"parent":   elem.Type().Name(),
+			}
+			result.AddError(
+				newMissingFieldError(
+					gojsonschema.NewJsonContext("missing_field", jsonContext),
+					52,
+					errDetail,
+				),
+				errDetail,
+			)
+		}
+	}
+	return nil
+}
 
-			// check if the field is required and if it is present in the YAML file
-			required := false
-			tags := elem.Type().Field(i).Tag
-			jsonTag, hasJSON := tags.Lookup("json")
-			if hasJSON {
-				if !strings.Contains(jsonTag, "omitempty") {
-					required = true
-				}
-			}
-			// also check for required values in the jsonschema
-			for _, requiredField := range schema.Required {
-				if elem.Type().Field(i).Name == requiredField {
-					required = true
-				}
-			}
-			if required {
-				// this is a required field, check for zero values
-				if reflect.Indirect(field).IsZero() {
-					jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
-					errDetail := gojsonschema.ErrorDetails{
-						"property": tags.Get("yaml"),
-						"parent":   elem.Type().Name(),
-					}
-					result.AddError(
-						newMissingFieldError(
-							gojsonschema.NewJsonContext("missing_field", jsonContext),
-							52,
-							errDetail,
-						),
-						errDetail,
-					)
-				}
+func checkEmptyFieldsInSlice(field reflect.Value, result *gojsonschema.Result, schema *jsonschema.Schema) error {
+	for i := 0; i < field.Cap(); i++ {
+		sliceElem := field.Index(i)
+		if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
+			err := CheckEmptyFields(sliceElem.Interface(), result, schema)
+			if err != nil {
+				return err
 			}
 		}
 	}
 	return nil
+}
+
+func checkEmptyFieldsInPtr(field reflect.Value, result *gojsonschema.Result, schema *jsonschema.Schema) error {
+	if field.Elem().Kind() == reflect.Struct {
+		err := CheckEmptyFields(field.Interface(), result, schema)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isRequired checks if the field is required and if it is present in the YAML file
+func isRequired(elem reflect.Value, i int, schema *jsonschema.Schema) (bool, reflect.StructTag) {
+	required := false
+	tags := elem.Type().Field(i).Tag
+	jsonTag, hasJSON := tags.Lookup("json")
+	if hasJSON {
+		if !strings.Contains(jsonTag, "omitempty") {
+			required = true
+		}
+	}
+	// also check for required values in the jsonschema
+	for _, requiredField := range schema.Required {
+		if elem.Type().Field(i).Name == requiredField {
+			required = true
+		}
+	}
+	return required, tags
 }
 
 func newMissingFieldError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingFieldError {
@@ -429,13 +482,22 @@ func CheckTags(searchStruct interface{}, tag string) (string, error) {
 		return "", fmt.Errorf("The argument to CheckTags must be a pointer")
 	}
 	elem := value.Elem()
+
+	return checkTagsOnField(elem, tag)
+}
+
+func isSliceOfPtrToStructs(field reflect.Value) bool {
+	return field.Type().Kind() == reflect.Slice &&
+		field.Cap() > 0 &&
+		field.Index(0).Kind() == reflect.Pointer
+}
+
+func checkTagsOnField(elem reflect.Value, tag string) (string, error) {
 	for i := 0; i < elem.NumField(); i++ {
 		field := elem.Field(i)
 		// if we're dealing with a slice of pointers to structs,
 		// iterate through it and check the tags for each struct pointer
-		if field.Type().Kind() == reflect.Slice &&
-			field.Cap() > 0 &&
-			field.Index(0).Kind() == reflect.Pointer {
+		if isSliceOfPtrToStructs(field) {
 			for i := 0; i < field.Cap(); i++ {
 				tagUsed, err := CheckTags(field.Index(i).Interface(), tag)
 				if err != nil {

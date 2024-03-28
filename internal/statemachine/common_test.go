@@ -109,7 +109,7 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 	}()
 	t.Cleanup(func() { os.RemoveAll(preserveDir) })
 	err = stateMachine.loadGadgetYaml()
-	asserter.AssertErrContains(err, "Error creating preserve_unpack directory")
+	asserter.AssertErrContains(err, "Error creating preserve unpack directory")
 	osMkdirAll = os.MkdirAll
 
 	// mock osutil.CopySpecialFile
@@ -213,7 +213,8 @@ func TestCalculateRootfsSizeNoImageSize(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// rootfs size will be slightly different in different environments
-	correctSizeLower, _ := quantity.ParseSize("8M")
+	correctSizeLower, err := quantity.ParseSize("8M")
+	asserter.AssertErrNil(err, true)
 	correctSizeUpper := correctSizeLower + 100000 // 0.1 MB range
 	if stateMachine.RootfsSize > correctSizeUpper ||
 		stateMachine.RootfsSize < correctSizeLower {
@@ -753,7 +754,9 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			imgFile := filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img")
 			dumpe2fsCommand := *exec.Command("dumpe2fs", imgFile)
 
-			dumpe2fsBytes, _ := dumpe2fsCommand.CombinedOutput()
+			dumpe2fsBytes, _ := dumpe2fsCommand.CombinedOutput() // nolint: errcheck
+			// The command will return an error because the image itself is not valid but we do
+			// not care here.
 			if !strings.Contains(string(dumpe2fsBytes), tc.tableType) {
 				t.Errorf("File %s should have partition table %s, instead got \"%s\"",
 					imgFile, tc.tableType, string(dumpe2fsBytes))

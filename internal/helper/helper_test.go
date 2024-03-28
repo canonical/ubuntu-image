@@ -298,7 +298,7 @@ func TestCheckEmptyFields(t *testing.T) {
 	t.Parallel()
 	// define the struct we will use to test
 	type testStruct struct {
-		A string `yaml:"a" json:"fieldA,required"`
+		A string `yaml:"a" json:"fieldA" jsonschema:"required"`
 		B string `yaml:"b" json:"fieldB"`
 		C string `yaml:"c" json:"fieldC,omitempty"`
 	}
@@ -359,7 +359,7 @@ func prepareMainFileToBackup(workDir string) (string, error) {
 	return mainTargetPath, nil
 }
 
-func prepareBackupFile(workDir string, content string, mainTargetPath string) (string, error) {
+func prepareBackupFile(content string, mainTargetPath string) (string, error) {
 	backupPath := mainTargetPath + backupExt
 	mainConf, err := os.Create(backupPath)
 	if err != nil {
@@ -388,7 +388,7 @@ func TestBackupReplace(t *testing.T) {
 	backupContent := "Backup"
 
 	// Test backup file exists
-	backupPath, err := prepareBackupFile(workDir, backupContent, mainTargetPath)
+	backupPath, err := prepareBackupFile(backupContent, mainTargetPath)
 	asserter.AssertErrNil(err, true)
 	restoreFunc, err := BackupReplace(mainTargetPath, backupContent)
 	asserter.AssertErrNil(err, true)
@@ -433,7 +433,7 @@ func TestBackupReplace(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// Mock the os.Rename failure
-	_, err = prepareBackupFile(workDir, backupContent, mainTargetPath)
+	_, err = prepareBackupFile(backupContent, mainTargetPath)
 	asserter.AssertErrNil(err, true)
 
 	osRename = mockRename

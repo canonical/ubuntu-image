@@ -176,7 +176,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			return err
 		}
 	} else {
-		err := stateMachine.createFS(volume, structure, structIndex, contentRoot, partImg)
+		err := stateMachine.prepareAndCreateFS(volume, structure, structIndex, contentRoot, partImg)
 		if err != nil {
 			return err
 		}
@@ -215,8 +215,8 @@ func copyStructureNoFS(unpackDir string, structure gadget.VolumeStructure, partI
 	return nil
 }
 
-// createFS creates a filesystem for the given structure
-func (stateMachine *StateMachine) createFS(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int, contentRoot, partImg string) error {
+// prepareAndCreateFS prepares and creates a filesystem for the given structure
+func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int, contentRoot, partImg string) error {
 	blockSize := structure.Size
 	if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Size < stateMachine.RootfsSize {
 		// system-data and system-seed structures are not required to have
@@ -232,12 +232,22 @@ func (stateMachine *StateMachine) createFS(volume *gadget.Volume, structure gadg
 		volume.Structure[structIndex] = structure
 	}
 
+	err := prepareDiskImg(structure, partImg, blockSize, stateMachine.RootfsSize)
+	if err != nil {
+		return err
+	}
+
+	return makeFS(structure, contentRoot, partImg, stateMachine.SectorSize)
+}
+
+// prepareDiskImg prepares a raw image
+func prepareDiskImg(structure gadget.VolumeStructure, partImg string, blockSize quantity.Size, rootfsSize quantity.Size) error {
 	if structure.Role == gadget.SystemData {
 		_, err := os.Create(partImg)
 		if err != nil {
 			return fmt.Errorf("unable to create partImg file: %w", err)
 		}
-		err = os.Truncate(partImg, int64(stateMachine.RootfsSize))
+		err = os.Truncate(partImg, int64(rootfsSize))
 		if err != nil {
 			return fmt.Errorf("unable to truncate partImg file: %w", err)
 		}
@@ -250,26 +260,30 @@ func (stateMachine *StateMachine) createFS(volume *gadget.Volume, structure gadg
 				partImg, err.Error())
 		}
 	}
+	return nil
+}
 
+// makeFS actually creates the filesystem for the given structure
+func makeFS(structure gadget.VolumeStructure, contentRoot string, partImg string, sectorSize quantity.Size) error {
 	hasC, err := hasContent(structure, contentRoot)
 	if err != nil {
 		return err
 	}
 
-	// Create the filesystem
 	if hasC {
 		err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
-			contentRoot, structure.Size, stateMachine.SectorSize)
+			contentRoot, structure.Size, sectorSize)
 		if err != nil {
 			return fmt.Errorf("Error running mkfs with content: %s", err.Error())
 		}
-	} else {
-		err := mkfsMake(structure.Filesystem, partImg, structure.Label,
-			structure.Size, stateMachine.SectorSize)
-		if err != nil {
-			return fmt.Errorf("Error running mkfs: %s", err.Error())
-		}
+		return nil
 	}
+	err = mkfsMake(structure.Filesystem, partImg, structure.Label,
+		structure.Size, sectorSize)
+	if err != nil {
+		return fmt.Errorf("Error running mkfs: %s", err.Error())
+	}
+
 	return nil
 }
 
@@ -374,14 +388,14 @@ func WriteSnapManifest(snapsDir string, outputPath string) error {
 // getHostArch uses dpkg to return the host architecture of the current system
 func getHostArch() string {
 	cmd := exec.Command("dpkg", "--print-architecture")
-	outputBytes, _ := cmd.Output()
+	outputBytes, _ := cmd.Output() // nolint: errcheck
 	return strings.TrimSpace(string(outputBytes))
 }
 
 // getHostSuite checks the release name of the host system to use as a default if --suite is not passed
 func getHostSuite() string {
 	cmd := exec.Command("lsb_release", "-c", "-s")
-	outputBytes, _ := cmd.Output()
+	outputBytes, _ := cmd.Output() // nolint: errcheck
 	return strings.TrimSpace(string(outputBytes))
 }
 
@@ -406,9 +420,9 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	return offset2
 }
 
-// createPartitionTable creates a disk image file and writes the partition table to it,
-// returning the partition table and the partition number of the root partition.
-func createPartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, int) {
+// generatePartitionTable prepares the partition table for a structures in a volume and
+// returns it with the the partition number of the root partition.
+func generatePartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, int) {
 	var gptPartitions = make([]*gpt.Partition, 0)
 	var mbrPartitions = make([]*mbr.Partition, 0)
 	var partitionTable partition.Table
@@ -421,55 +435,18 @@ func createPartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded boo
 		}
 
 		// Record the actual partition number of the root partition, as it
-		// might be useful for certain operations (like updating the
-		// bootloader)
+		// might be useful for certain operations (like updating the bootloader)
 		if structure.Role == gadget.SystemData {
 			rootfsPartitionNumber = partitionNumber
 		}
 
-		var structureType string
-		// Check for hybrid MBR/GPT
-		if strings.Contains(structure.Type, ",") {
-			types := strings.Split(structure.Type, ",")
-			if volume.Schema == schemaGPT {
-				structureType = types[1]
-			} else {
-				structureType = types[0]
-			}
-		} else {
-			structureType = structure.Type
-		}
+		structureType := getStructureType(structure, volume.Schema)
 
 		if volume.Schema == schemaMBR {
-			bootable := false
-			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
-				bootable = true
-			}
-			// mbr.Type is a byte. snapd has already verified that this string
-			// is exactly two chars, so we can parse those two chars to a byte
-			partitionType, _ := strconv.ParseUint(structureType, 16, 8)
-			mbrPartition := &mbr.Partition{
-				Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
-				Size:     uint32(math.Ceil(float64(structure.Size) / float64(sectorSize))),
-				Type:     mbr.Type(partitionType),
-				Bootable: bootable,
-			}
+			mbrPartition := mbrPartitionFromStruct(structure, sectorSize, structureType)
 			mbrPartitions = append(mbrPartitions, mbrPartition)
 		} else {
-			var partitionName string
-			if structure.Role == gadget.SystemData && structure.Name == "" {
-				partitionName = "writable"
-			} else {
-				partitionName = structure.Name
-			}
-
-			partitionType := gpt.Type(structureType)
-			gptPartition := &gpt.Partition{
-				Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
-				Size:  uint64(structure.Size),
-				Type:  partitionType,
-				Name:  partitionName,
-			}
+			gptPartition := gptPartitionFromStruct(structure, sectorSize, structureType)
 			gptPartitions = append(gptPartitions, gptPartition)
 		}
 
@@ -492,6 +469,58 @@ func createPartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded boo
 	}
 
 	return &partitionTable, rootfsPartitionNumber
+}
+
+// getStructureType extracts the structure type from the structure.Type considering
+// the schema
+func getStructureType(structure gadget.VolumeStructure, schema string) string {
+	structureType := structure.Type
+	// Check for hybrid MBR/GPT
+	if !strings.Contains(structure.Type, ",") {
+		return structureType
+	}
+
+	types := strings.Split(structure.Type, ",")
+	structureType = types[0]
+
+	if schema == schemaGPT {
+		structureType = types[1]
+	}
+
+	return structureType
+}
+
+// mbrPartitionFromStruct prepares a mbr.Partition object from a gadget.VolumeStructure
+func mbrPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64, structureType string) *mbr.Partition {
+	bootable := false
+	if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+		bootable = true
+	}
+	// mbr.Type is a byte. snapd has already verified that this string
+	// is exactly two chars, so we can safely parse those two chars to a byte
+	partitionType, _ := strconv.ParseUint(structureType, 16, 8) // nolint: errcheck
+
+	return &mbr.Partition{
+		Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
+		Size:     uint32(math.Ceil(float64(structure.Size) / float64(sectorSize))),
+		Type:     mbr.Type(partitionType),
+		Bootable: bootable,
+	}
+}
+
+// gptPartitionFromStruct prepares a gpt.Partition object from a gadget.VolumeStructure
+func gptPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64, structureType string) *gpt.Partition {
+	partitionName := structure.Name
+	if structure.Role == gadget.SystemData && structure.Name == "" {
+		partitionName = "writable"
+	}
+
+	return &gpt.Partition{
+		Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
+		Size:  uint64(structure.Size),
+		Type:  gpt.Type(structureType),
+		Name:  partitionName,
+	}
 }
 
 // copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
@@ -783,60 +812,6 @@ echo "Warning: Fake initctl called, doing nothing"
 
 	initctl := filepath.Join(baseDir, "sbin", "initctl")
 	return helper.BackupReplace(initctl, initctlContent)
-}
-
-// getMountCmd returns mount/umount commands to mount the given mountpoint
-// If the mountpoint does not exist, it will be created.
-func getMountCmd(typ string, src string, targetDir string, mountpoint string, bind bool, options ...string) (mountCmds, umountCmds []*exec.Cmd, err error) {
-	if bind && len(typ) > 0 {
-		return nil, nil, fmt.Errorf("invalid mount arguments. Cannot use --bind and -t at the same time.")
-	}
-
-	targetPath := filepath.Join(targetDir, mountpoint)
-	mountCmd := execCommand("mount")
-
-	if len(typ) > 0 {
-		mountCmd.Args = append(mountCmd.Args, "-t", typ)
-	}
-
-	if bind {
-		mountCmd.Args = append(mountCmd.Args, "--bind")
-	}
-
-	mountCmd.Args = append(mountCmd.Args, src)
-	if len(options) > 0 {
-		mountCmd.Args = append(mountCmd.Args, "-o", strings.Join(options, ","))
-	}
-	mountCmd.Args = append(mountCmd.Args, targetPath)
-
-	if _, err := os.Stat(targetPath); err != nil {
-		err := osMkdirAll(targetPath, 0755)
-		if err != nil && !os.IsExist(err) {
-			return nil, nil, fmt.Errorf("Error creating mountpoint \"%s\": \"%s\"", targetPath, err.Error())
-		}
-	}
-
-	umountCmds = getUnmountCmd(targetPath)
-
-	return []*exec.Cmd{mountCmd}, umountCmds, nil
-}
-
-func getNewMountPoints(olds []mountPoint, currents []mountPoint) []mountPoint {
-	news := []mountPoint{}
-
-	for _, m := range currents {
-		found := false
-		for _, o := range olds {
-			if m.src == o.src {
-				found = true
-			}
-		}
-		if !found {
-			news = append(news, m)
-		}
-	}
-
-	return news
 }
 
 // execTeardownCmds executes given commands and collects error to join them with an existing error.

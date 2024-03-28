@@ -145,48 +145,88 @@ func (stateMachine *StateMachine) parseImageSizes() error {
 		return nil
 	}
 
-	if !strings.Contains(stateMachine.commonFlags.Size, ":") {
-		// handle the "one size to rule them all" case
-		parsedSize, err := quantity.ParseSize(stateMachine.commonFlags.Size)
+	if stateMachine.hasSingleImageSizeValue() {
+		err := stateMachine.handleSingleImageSize()
 		if err != nil {
-			return fmt.Errorf("Failed to parse argument to --image-size: %s", err.Error())
-		}
-		for volumeName := range stateMachine.GadgetInfo.Volumes {
-			stateMachine.ImageSizes[volumeName] = parsedSize
+			return err
 		}
 	} else {
-		allSizes := strings.Split(stateMachine.commonFlags.Size, ",")
-		for _, size := range allSizes {
-			// each of these should be of the form "<name|number>:<size>"
-			splitSize := strings.Split(size, ":")
-			if len(splitSize) != 2 {
-				return fmt.Errorf("Argument to --image-size %s is not "+
-					"in the correct format", size)
-			}
-			parsedSize, err := quantity.ParseSize(splitSize[1])
-			if err != nil {
-				return fmt.Errorf("Failed to parse argument to --image-size: %s",
-					err.Error())
-			}
-			// the image size parsed successfully, now find which volume to associate it with
-			volumeNumber, err := strconv.Atoi(splitSize[0])
-			if err == nil {
-				// argument passed was numeric.
-				if volumeNumber < len(stateMachine.VolumeOrder) {
-					stateName := stateMachine.VolumeOrder[volumeNumber]
-					stateMachine.ImageSizes[stateName] = parsedSize
-				} else {
-					return fmt.Errorf("Volume index %d is out of range", volumeNumber)
-				}
-			} else {
-				if _, found := stateMachine.GadgetInfo.Volumes[splitSize[0]]; !found {
-					return fmt.Errorf("Volume %s does not exist in gadget.yaml",
-						splitSize[0])
-				}
-				stateMachine.ImageSizes[splitSize[0]] = parsedSize
-			}
+		err := stateMachine.handleMultipleImageSizes()
+		if err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+// hasSingleImageSizeValue determines if the provided --image-size flags contains
+// a single value to use for every volumes or a list of values for some volumes
+func (stateMachine *StateMachine) hasSingleImageSizeValue() bool {
+	return !strings.Contains(stateMachine.commonFlags.Size, ":")
+}
+
+// getSuggestedImageSize returns the suggested size for the given volume
+func (stateMachine *StateMachine) getSuggestedImageSize(volumeName string) quantity.Size {
+	var parsedSize quantity.Size
+	if stateMachine.hasSingleImageSizeValue() {
+		// this scenario has just one size for each volume
+		// no need to check error as it has already been done by
+		// the parseImageSizes function
+		parsedSize, _ = quantity.ParseSize(stateMachine.commonFlags.Size) // nolint: errcheck
+	} else {
+		parsedSize = stateMachine.ImageSizes[volumeName]
+	}
+	return parsedSize
+}
+
+// handleSingleImageSize parses as a single value and applies the image size given in
+// the flag --image-size
+func (stateMachine *StateMachine) handleSingleImageSize() error {
+	parsedSize, err := quantity.ParseSize(stateMachine.commonFlags.Size)
+	if err != nil {
+		return fmt.Errorf("Failed to parse argument to --image-size: %s", err.Error())
+	}
+	for volumeName := range stateMachine.GadgetInfo.Volumes {
+		stateMachine.ImageSizes[volumeName] = parsedSize
+	}
+	return nil
+}
+
+// handleMultipleImageSizes parses and applies the image size given in
+// the flag --image-size in the format <volumeName>:<volumeSize>,<volumeName2>:<volumeSize2>
+func (stateMachine *StateMachine) handleMultipleImageSizes() error {
+	allSizes := strings.Split(stateMachine.commonFlags.Size, ",")
+	for _, size := range allSizes {
+		// each of these should be of the form "<name|number>:<size>"
+		splitSize := strings.Split(size, ":")
+		if len(splitSize) != 2 {
+			return fmt.Errorf("Argument to --image-size %s is not "+
+				"in the correct format", size)
+		}
+		parsedSize, err := quantity.ParseSize(splitSize[1])
+		if err != nil {
+			return fmt.Errorf("Failed to parse argument to --image-size: %s",
+				err.Error())
+		}
+		// the image size parsed successfully, now find which volume to associate it with
+		volumeNumber, err := strconv.Atoi(splitSize[0])
+		if err == nil {
+			// argument passed was numeric.
+			if volumeNumber < len(stateMachine.VolumeOrder) {
+				stateName := stateMachine.VolumeOrder[volumeNumber]
+				stateMachine.ImageSizes[stateName] = parsedSize
+			} else {
+				return fmt.Errorf("Volume index %d is out of range", volumeNumber)
+			}
+		} else {
+			if _, found := stateMachine.GadgetInfo.Volumes[splitSize[0]]; !found {
+				return fmt.Errorf("Volume %s does not exist in gadget.yaml",
+					splitSize[0])
+			}
+			stateMachine.ImageSizes[splitSize[0]] = parsedSize
+		}
+	}
+
 	return nil
 }
 
@@ -230,6 +270,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var lastOffset quantity.Offset
 	farthestOffsetUnknown := false
 	var volume *gadget.Volume
+
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume = stateMachine.GadgetInfo.Volumes[volumeName]
 		volumeBaseDir := filepath.Join(stateMachine.tempDirs.volumes, volumeName)
@@ -237,51 +278,23 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			return fmt.Errorf("Error creating volume dir: %s", err.Error())
 		}
 		// look for the rootfs and check if the image is seeded
-		for ii, structure := range volume.Structure {
-			if structure.Role == "" && structure.Label == gadget.SystemBoot {
-				if !stateMachine.commonFlags.Quiet {
-					fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
-						"used for defining partition roles; use role instead\n",
-						volumeName, ii)
-				}
-			} else if structure.Role == gadget.SystemData {
+		for i, structure := range volume.Structure {
+			stateMachine.warnUsageOfSystemLabel(volumeName, structure, i)
+
+			if structure.Role == gadget.SystemData {
 				rootfsSeen = true
-			} else if structure.Role == gadget.SystemSeed {
-				stateMachine.IsSeeded = true
-				if structure.Label == "" {
-					structure.Label = "ubuntu-seed"
-					volume.Structure[ii] = structure
-				}
 			}
 
-			// make sure there are no "../" paths in the structure's contents
-			for _, content := range structure.Content {
-				if strings.Contains(content.UnresolvedSource, "../") {
-					return fmt.Errorf("filesystem content source \"%s\" contains \"../\". "+
-						"This is disallowed for security purposes",
-						content.UnresolvedSource)
-				}
+			stateMachine.checkSeeded(volume, structure, i)
+
+			err := checkStructureContent(structure)
+			if err != nil {
+				return err
 			}
-			if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
-				// handle special syntax of rootfs:/<file path> in
-				// structure content. This is needed to allow images
-				// such as raspberry pi to source their kernel and
-				// initrd from the staged rootfs later in the build
-				// process.
-				relativeRootfsPath, err := filepathRel(
-					filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
-					stateMachine.tempDirs.rootfs,
-				)
-				if err != nil {
-					return fmt.Errorf("Error creating relative path from unpack/gadget to rootfs: \"%s\"", err.Error())
-				}
-				for jj, content := range structure.Content {
-					content.UnresolvedSource = strings.ReplaceAll(content.UnresolvedSource,
-						"rootfs:",
-						relativeRootfsPath,
-					)
-					volume.Structure[ii].Content[jj] = content
-				}
+
+			err = stateMachine.handleRootfsScheme(structure, volume, i)
+			if err != nil {
+				return err
 			}
 
 			// update farthestOffset if needed
@@ -293,28 +306,88 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				farthestOffset = maxOffset(lastOffset, farthestOffset)
 			}
 
-			// system-data and system-seed do not always have content defined.
-			// this makes Content be a nil slice and lead copyStructureContent() skip the rootfs copying later.
-			// so we need to make an empty slice here to avoid this situation.
-			if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Content == nil {
-				structure.Content = make([]gadget.VolumeContent, 0)
-			}
-
-			// we've manually updated the offset, but since structure is
-			// not a pointer we need to overwrite the value in volume.Structure
-			volume.Structure[ii] = structure
+			fixMissingContent(volume, structure, i)
 		}
 	}
 
-	if !farthestOffsetUnknown && !rootfsSeen && len(stateMachine.GadgetInfo.Volumes) == 1 {
-		// We still need to handle the case of unspecified system-data
-		// partition where we simply attach the rootfs at the end of the
-		// partition list.
-		//
-		// Since so far we have no knowledge of the rootfs contents, the
-		// size is set to 0, and will be calculated later
+	fixMissingSystemData(volume, farthestOffset, farthestOffsetUnknown, rootfsSeen, stateMachine.GadgetInfo.Volumes)
 
-		// Note that there is only one volume, so "volume" points to it
+	return nil
+}
+
+func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, structure gadget.VolumeStructure, structIndex int) {
+	if structure.Role == "" && structure.Label == gadget.SystemBoot && !stateMachine.commonFlags.Quiet {
+		fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
+			"used for defining partition roles; use role instead\n",
+			volumeName, structIndex)
+	}
+}
+
+func (stateMachine *StateMachine) checkSeeded(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int) {
+	if structure.Role == gadget.SystemSeed {
+		stateMachine.IsSeeded = true
+		if structure.Label == "" {
+			structure.Label = "ubuntu-seed"
+			volume.Structure[structIndex] = structure
+		}
+	}
+}
+
+// checkStructureContent makes sure there are no "../" paths in the structure's contents
+func checkStructureContent(structure gadget.VolumeStructure) error {
+	for _, content := range structure.Content {
+		if strings.Contains(content.UnresolvedSource, "../") {
+			return fmt.Errorf("filesystem content source \"%s\" contains \"../\". "+
+				"This is disallowed for security purposes",
+				content.UnresolvedSource)
+		}
+	}
+	return nil
+}
+
+// handleRootfsScheme handles special syntax of rootfs:/<file path> in structure
+// content. This is needed to allow images such as raspberry pi to source their
+// kernel and initrd from the staged rootfs later in the build process.
+func (stateMachine *StateMachine) handleRootfsScheme(structure gadget.VolumeStructure, volume *gadget.Volume, structIndex int) error {
+	if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+		relativeRootfsPath, err := filepathRel(
+			filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
+			stateMachine.tempDirs.rootfs,
+		)
+		if err != nil {
+			return fmt.Errorf("Error creating relative path from unpack/gadget to rootfs: \"%s\"", err.Error())
+		}
+		for j, content := range structure.Content {
+			content.UnresolvedSource = strings.ReplaceAll(content.UnresolvedSource,
+				"rootfs:",
+				relativeRootfsPath,
+			)
+			volume.Structure[structIndex].Content[j] = content
+		}
+	}
+	return nil
+}
+
+// fixMissingContent adds Content to system-data and system-seed.
+// It may not be defined for these roles, so Content is a nil slice leading
+// copyStructureContent() skip the rootfs copying later.
+// So we need to make an empty slice here to avoid this situation.
+func fixMissingContent(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int) {
+	if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Content == nil {
+		structure.Content = make([]gadget.VolumeContent, 0)
+	}
+
+	volume.Structure[structIndex] = structure
+}
+
+// fixMissingSystemData handles the case of unspecified system-data
+// partition where we simply attach the rootfs at the end of the
+// partition list.
+// Since so far we have no knowledge of the rootfs contents, the
+// size is set to 0, and will be calculated later
+// Note that there is only one volume, so "volume" points to it
+func fixMissingSystemData(volume *gadget.Volume, farthestOffset quantity.Offset, farthestOffsetUnknown bool, rootfsSeen bool, volumes map[string]*gadget.Volume) {
+	if !farthestOffsetUnknown && !rootfsSeen && len(volumes) == 1 {
 		rootfsStructure := gadget.VolumeStructure{
 			Name:       "",
 			Label:      "writable",
@@ -334,7 +407,6 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 		// we now add the rootfs structure to the volume
 		volume.Structure = append(volume.Structure, rootfsStructure)
 	}
-	return nil
 }
 
 // readMetadata reads info about a partial state machine encoded as JSON from disk
@@ -515,7 +587,11 @@ func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 func (stateMachine *StateMachine) determineOutputDirectory() error {
 	if stateMachine.commonFlags.OutputDir == "" {
 		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd
-			stateMachine.commonFlags.OutputDir, _ = os.Getwd()
+			var err error
+			stateMachine.commonFlags.OutputDir, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("Error creating OutputDir: %s", err.Error())
+			}
 		} else {
 			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
 		}
