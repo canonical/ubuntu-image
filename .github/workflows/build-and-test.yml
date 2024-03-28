@@ -96,3 +96,5 @@ jobs:
           ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
           installTics: true
           filelist: .
+          calc: ALL
+          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS
