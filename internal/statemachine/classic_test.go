@@ -3168,6 +3168,52 @@ func TestSuccessfulClassicRun(t *testing.T) {
 		t.Error("ubuntu2 user password should be expired")
 	}
 
+	// test addGroup customization
+	groupFilePath := filepath.Join(mountDir, "etc", "group")
+	groupFile, err := os.Open(groupFilePath)
+	asserter.AssertErrNil(err, true)
+	defer groupFile.Close()
+	addGroupFeatureFound := false
+	addGroupLine := ""
+
+	scanner = bufio.NewScanner(groupFile)
+
+	for scanner.Scan() {
+		if strings.HasPrefix(scanner.Text(), "addgroupfeature") {
+			addGroupLine = scanner.Text()
+			addGroupFeatureFound = true
+			break
+		}
+	}
+
+	if !addGroupFeatureFound {
+		t.Error("addgroupfeature user not created")
+	}
+
+	gid := strings.Split(addGroupLine, ":")[2]
+
+	if gid != "4321" {
+		t.Errorf("addgroupfeature did not create the group with the right gid. Got gid %s", gid)
+	}
+
+	// test touch file customization
+	toucheFilePath := filepath.Join(mountDir, "etc", "touchfilefeature")
+	_, err = os.Stat(toucheFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("File \"%s\" should exist, but does not", toucheFilePath)
+		}
+	}
+
+	// test execute file customization
+	executeFilePath := filepath.Join(mountDir, "etc", "executefeature")
+	executeBytes, err := os.ReadFile(executeFilePath)
+	asserter.AssertErrNil(err, true)
+	if string(executeBytes) != "test" {
+		t.Errorf("Expected 'test' in %s, but got %s", executeFilePath, string(executeBytes))
+	}
+
+	// test grub conf
 	grubCfg := filepath.Join(mountDir, "boot", "grub", "grub.cfg")
 	_, err = os.Stat(grubCfg)
 	if err != nil {
@@ -4220,7 +4266,7 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "sbin", "initctl"))
 	asserter.AssertErrNil(err, true)
 
-	mockCmder := NewMockExecCommand()
+	mockCmder := NewMockExecCommander()
 
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
@@ -4290,7 +4336,7 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	mockCmder := NewMockExecCommand()
+	mockCmder := NewMockExecCommander()
 
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
