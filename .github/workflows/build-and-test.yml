@@ -76,10 +76,11 @@ jobs:
           name: ubuntu-image-coverage-long
           path: .coverage
 
-      - name: Install gocov tools
+      - name: Install tools
         run: |
           go install github.com/axw/gocov/gocov@latest
           go install github.com/AlekSi/gocov-xml@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
 
       - name: Convert report to xml
         run: |
@@ -98,3 +99,4 @@ jobs:
           filelist: .
           calc: ALL
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS
+          additionalFlags: "-resultdir .coverage/"
