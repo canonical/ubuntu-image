@@ -111,6 +111,41 @@ func TestPack_makeTemporaryDirectories_fail(t *testing.T) {
 	asserter.AssertErrContains(err, "Error creating work directory")
 }
 
+// TestPackStateMachine_DryRun tests a successful dry-run execution
+func TestPackStateMachine_DryRun(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	workDir := "ubuntu-image-test-dry-run"
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+
+	var stateMachine PackStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.commonFlags.DryRun = true
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	files, err := osReadDir(workDir)
+	asserter.AssertErrNil(err, true)
+
+	if len(files) != 0 {
+		t.Errorf("Some files were created in the workdir but should not. Created files: %s", files)
+	}
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.Teardown()
+	asserter.AssertErrNil(err, true)
+}
+
 func TestPack_populateTemporaryDirectories(t *testing.T) {
 	testCases := []struct {
 		name        string

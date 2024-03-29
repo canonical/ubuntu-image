@@ -371,6 +371,41 @@ func TestDebug(t *testing.T) {
 	}
 }
 
+// TestDryRun ensures that the name of the states is not printed when the --dry-run flag is used
+// because nothing should be executed
+func TestDryRun(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	workDir := "ubuntu-image-test-debug"
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+
+	var stateMachine testStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.commonFlags.DryRun = true
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	// just use the one state
+	stateMachine.states = testStates
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
+
+	if strings.Contains(string(readStdout), stateMachine.states[0].name) {
+		t.Errorf("Expected state name \"%s\" to not appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
+	}
+}
+
 // TestFunction replaces some of the stateFuncs to test various error scenarios
 func TestFunctionErrors(t *testing.T) {
 	testCases := []struct {
@@ -1180,6 +1215,52 @@ Following states will be executed:
 [1] stateFunc2
 
 Continuing
+`,
+		},
+		{
+			name: "simple case with 2 states in dry-run mode",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug:  false,
+					DryRun: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+				},
+			},
+			wantOutput: `
+Following states would be executed:
+[0] stateFunc1
+[1] stateFunc2
+`,
+		},
+		{
+			name: "simple case with 2 states in dry-run mode and debug",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug:  true,
+					DryRun: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+				},
+			},
+			wantOutput: `
+Following states would be executed:
+[0] stateFunc1
+[1] stateFunc2
 `,
 		},
 		{

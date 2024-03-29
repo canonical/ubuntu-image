@@ -417,10 +417,16 @@ func rebuildYamlIndex(info *gadget.Info) {
 
 // displayStates print the calculated states
 func (s *StateMachine) displayStates() {
-	if !s.commonFlags.Debug {
+	if !s.commonFlags.Debug && !s.commonFlags.DryRun {
 		return
 	}
-	fmt.Println("\nFollowing states will be executed:")
+
+	verb := "will"
+	if s.commonFlags.DryRun {
+		verb = "would"
+	}
+	fmt.Printf("\nFollowing states %s be executed:\n", verb)
+
 	for i, state := range s.states {
 		if state.name == s.stateMachineFlags.Until {
 			break
@@ -430,6 +436,10 @@ func (s *StateMachine) displayStates() {
 		if state.name == s.stateMachineFlags.Thru {
 			break
 		}
+	}
+
+	if s.commonFlags.DryRun {
+		return
 	}
 	fmt.Println("\nContinuing")
 }
@@ -530,6 +540,9 @@ func (stateMachine *StateMachine) determineOutputDirectory() error {
 
 // Run iterates through the state functions, stopping when appropriate based on --until and --thru
 func (stateMachine *StateMachine) Run() error {
+	if stateMachine.commonFlags.DryRun {
+		return nil
+	}
 	// iterate through the states
 	for i := 0; i < len(stateMachine.states); i++ {
 		stateFunc := stateMachine.states[i]
@@ -564,6 +577,9 @@ func (stateMachine *StateMachine) Run() error {
 
 // Teardown handles anything else that needs to happen after the states have finished running
 func (stateMachine *StateMachine) Teardown() error {
+	if stateMachine.commonFlags.DryRun {
+		return nil
+	}
 	if stateMachine.cleanWorkDir {
 		return stateMachine.cleanup()
 	}

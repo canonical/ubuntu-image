@@ -66,17 +66,17 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 		return err
 	}
 
+	classicStateMachine.displayStates()
+
+	if classicStateMachine.commonFlags.DryRun {
+		return nil
+	}
+
 	if err := classicStateMachine.makeTemporaryDirectories(); err != nil {
 		return err
 	}
 
-	if err := classicStateMachine.determineOutputDirectory(); err != nil {
-		return err
-	}
-
-	classicStateMachine.displayStates()
-
-	return nil
+	return classicStateMachine.determineOutputDirectory()
 }
 
 // parseImageDefinition parses the provided yaml file and ensures it is valid

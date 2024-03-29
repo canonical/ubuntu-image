@@ -678,6 +678,43 @@ func TestClassicStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 	asserter.AssertErrContains(err, "Error creating OutputDir")
 }
 
+// TestClassicStateMachine_DryRun tests a successful dry-run execution
+func TestClassicStateMachine_DryRun(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	workDir := "ubuntu-image-test-dry-run"
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
+		"test_amd64.yaml")
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.commonFlags.DryRun = true
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	files, err := osReadDir(workDir)
+	asserter.AssertErrNil(err, true)
+
+	if len(files) != 0 {
+		t.Errorf("Some files were created in the workdir but should not. Created files: %s", files)
+	}
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.Teardown()
+	asserter.AssertErrNil(err, true)
+}
+
 // TestPrepareGadgetTree runs prepareGadgetTree() and ensures the gadget_tree files
 // are placed in the correct locations
 func TestPrepareGadgetTree(t *testing.T) {

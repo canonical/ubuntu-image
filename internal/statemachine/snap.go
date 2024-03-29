@@ -53,15 +53,15 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 		return err
 	}
 
+	snapStateMachine.displayStates()
+
+	if snapStateMachine.commonFlags.DryRun {
+		return nil
+	}
+
 	if err := snapStateMachine.makeTemporaryDirectories(); err != nil {
 		return err
 	}
 
-	if err := snapStateMachine.determineOutputDirectory(); err != nil {
-		return err
-	}
-
-	snapStateMachine.displayStates()
-
-	return nil
+	return snapStateMachine.determineOutputDirectory()
 }
