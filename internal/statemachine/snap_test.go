@@ -139,6 +139,41 @@ func TestSnapStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 	asserter.AssertErrContains(err, "Error creating OutputDir")
 }
 
+// TestSnapStateMachine_DryRun tests a successful dry-run execution
+func TestSnapStateMachine_DryRun(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := helper.SaveCWD()
+	defer restoreCWD()
+
+	workDir := "ubuntu-image-test-dry-run"
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+
+	var stateMachine SnapStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.commonFlags.DryRun = true
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	files, err := osReadDir(workDir)
+	asserter.AssertErrNil(err, true)
+
+	if len(files) != 0 {
+		t.Errorf("Some files were created in the workdir but should not. Created files: %s", files)
+	}
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.Teardown()
+	asserter.AssertErrNil(err, true)
+}
+
 // TestSuccessfulSnapCore20 builds a core 20 image and makes sure the factory boot flag is set
 func TestSuccessfulSnapCore20(t *testing.T) {
 	if testing.Short() {

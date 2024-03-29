@@ -49,11 +49,11 @@ func (packStateMachine *PackStateMachine) Setup() error {
 		return err
 	}
 
-	if err := packStateMachine.makeTemporaryDirectories(); err != nil {
-		return err
-	}
-
 	packStateMachine.displayStates()
 
-	return nil
+	if packStateMachine.commonFlags.DryRun {
+		return nil
+	}
+
+	return packStateMachine.makeTemporaryDirectories()
 }
