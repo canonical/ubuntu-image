@@ -51,7 +51,6 @@ func initStateMachine(imageType string, commonOpts *commands.CommonOpts, stateMa
 }
 
 func executeStateMachine(sm statemachine.SmInterface) error {
-	// set up, run, and tear down the state machine
 	if err := sm.Setup(); err != nil {
 		return err
 	}

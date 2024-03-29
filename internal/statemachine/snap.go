@@ -25,8 +25,7 @@ type SnapStateMachine struct {
 	Args commands.SnapArgs
 }
 
-// Setup assigns variables and calls other functions that must be executed before Run(). It is
-// exported so it can be used as a polymorphism in main
+// Setup assigns variables and calls other functions that must be executed before Run().
 func (snapStateMachine *SnapStateMachine) Setup() error {
 	// set the parent pointer of the embedded struct
 	snapStateMachine.parent = snapStateMachine
