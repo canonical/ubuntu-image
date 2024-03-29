@@ -339,7 +339,7 @@ func TestUntilThru(t *testing.T) {
 func TestDebug(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	workDir := "ubuntu-image-test-debug"
-	if err := os.Mkdir("ubuntu-image-test-debug", 0755); err != nil {
+	if err := os.Mkdir(workDir, 0755); err != nil {
 		t.Errorf("Failed to create temporary directory %s\n", workDir)
 	}
 

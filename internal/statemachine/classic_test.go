@@ -511,8 +511,8 @@ func TestFailedCalculateStates(t *testing.T) {
 	asserter.AssertErrContains(err, "Test Error")
 }
 
-// TestPrintStates ensures the states are printed to stdout when the --debug flag is set
-func TestPrintStates(t *testing.T) {
+// TestDisplayStates ensures the states are printed to stdout when the --debug flag is set
+func TestDisplayStates(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	restoreCWD := helper.SaveCWD()
 	defer restoreCWD()
