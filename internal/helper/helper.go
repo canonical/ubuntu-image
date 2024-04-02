@@ -244,8 +244,8 @@ func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema
 				return err
 			}
 		} else {
-			tags, requiredFromTags := getTags(elem, i)
-			if !requiredFromTags && !isRequiredFromSchema(elem, i, schema) {
+			tags := elem.Type().Field(i).Tag
+			if !isRequiredFromTags(tags) && !isRequiredFromSchema(elem, i, schema) {
 				continue
 			}
 			// this is a required field, check for zero values
@@ -293,31 +293,25 @@ func checkEmptyFieldsInPtr(field reflect.Value, result *gojsonschema.Result, sch
 	return nil
 }
 
-// getTags returns the json tags associated to the given element and checks if
-// these tags specify that the field is required.
-func getTags(elem reflect.Value, i int) (reflect.StructTag, bool) {
-	required := false
-	tags := elem.Type().Field(i).Tag
+// isRequiredFromTags checks if the field is required from the JSON tags
+func isRequiredFromTags(tags reflect.StructTag) bool {
 	jsonTag, hasJSON := tags.Lookup("json")
 	if hasJSON {
 		if !strings.Contains(jsonTag, "omitempty") {
-			required = true
+			return true
 		}
 	}
-
-	return tags, required
+	return false
 }
 
 // isRequiredFromSchema checks if the field is required from the schema
 func isRequiredFromSchema(elem reflect.Value, i int, schema *jsonschema.Schema) bool {
-	required := false
-	// also check for required values in the jsonschema
 	for _, requiredField := range schema.Required {
 		if elem.Type().Field(i).Name == requiredField {
-			required = true
+			return true
 		}
 	}
-	return required
+	return false
 }
 
 func newMissingFieldError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingFieldError {
