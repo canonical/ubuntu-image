@@ -1138,6 +1138,7 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert"),
 		regexp.MustCompile("^chroot .*/scratch/loopback update-grub$"),
 		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert --remove"),
+		regexp.MustCompile("^udevadm settle$"),
 		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/sys$"),
 		regexp.MustCompile("^umount --recursive .*scratch/loopback/sys$"),
 		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/proc$"),
