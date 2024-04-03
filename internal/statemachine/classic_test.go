@@ -2194,6 +2194,18 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 	asserter.AssertErrContains(err, "Error preparing image")
 	imagePrepare = image.Prepare
 
+	// Test with a model assertion file
+	stateMachine.ImageDef.ModelAssertion = filepath.Join("testdata", "modelAssertionClassic")
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrNil(err, true)
+
+	path, err := filepath.Abs(filepath.Join("testdata", "modelAssertionClassic"))
+	asserter.AssertErrNil(err, true)
+	stateMachine.ImageDef.ModelAssertion = path
+	err = stateMachine.prepareClassicImage()
+	asserter.AssertErrNil(err, true)
+
+	stateMachine.ImageDef.ModelAssertion = ""
 	// preseed the chroot, create a state.json file to trigger a reset, and mock some related functions
 	err = stateMachine.prepareClassicImage()
 	asserter.AssertErrNil(err, true)
