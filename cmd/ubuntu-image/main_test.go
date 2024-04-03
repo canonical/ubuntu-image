@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/statemachine"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 var (
@@ -173,7 +174,7 @@ func TestExitCode(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 			// Override os.Exit temporarily
 			oldOsExit := osExit
@@ -217,7 +218,7 @@ func TestVersion(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 			// Override os.Exit temporarily
 			oldOsExit := osExit

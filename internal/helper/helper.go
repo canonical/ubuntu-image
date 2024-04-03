@@ -74,15 +74,6 @@ func RunScript(hookScript string) error {
 	return nil
 }
 
-// SaveCWD gets the current working directory and returns a function to go back to it
-// nolint: errcheck
-func SaveCWD() func() {
-	wd, _ := os.Getwd()
-	return func() {
-		_ = os.Chdir(wd)
-	}
-}
-
 // Du recurses through a directory similar to du and adds all the sizes of files together
 func Du(path string) (quantity.Size, error) {
 	duCommand := *exec.Command("du", "-s", "-B1")

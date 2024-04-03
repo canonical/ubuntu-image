@@ -44,7 +44,7 @@ func TestMain(m *testing.M) {
 // TestClassicSetup tests a successful run of the polymorphed Setup function
 func TestClassicSetup(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -90,7 +90,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -113,7 +113,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 // failure cases in the parseImageDefinition state
 func TestFailedParseImageDefinition(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -457,7 +457,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -484,7 +484,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 // calculateStates function
 func TestFailedCalculateStates(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -514,7 +514,7 @@ func TestFailedCalculateStates(t *testing.T) {
 // TestDisplayStates ensures the states are printed to stdout when the --debug flag is set
 func TestDisplayStates(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -575,7 +575,7 @@ func TestDisplayStates(t *testing.T) {
 // TestClassicStateMachine_Setup_Fail_setConfDefDir tests a failure in the Setup() function when setting the configuration definition directory
 func TestClassicStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -601,7 +601,7 @@ func TestClassicStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
 // TestFailedValidateInputClassic tests a failure in the Setup() function when validating common input
 func TestFailedValidateInputClassic(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	// use both --until and --thru to trigger this failure
@@ -618,7 +618,7 @@ func TestFailedValidateInputClassic(t *testing.T) {
 // TestFailedReadMetadataClassic tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestFailedReadMetadataClassic(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	// start a --resume with no previous SM run
@@ -638,7 +638,7 @@ func TestFailedReadMetadataClassic(t *testing.T) {
 // with makeTemporaryDirectories failing
 func TestClassicStateMachine_Setup_Fail_makeTemporaryDirectories(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -660,7 +660,7 @@ func TestClassicStateMachine_Setup_Fail_makeTemporaryDirectories(t *testing.T) {
 // with determineOutputDirectory failing
 func TestClassicStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -681,7 +681,7 @@ func TestClassicStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 // TestClassicStateMachine_DryRun tests a successful dry-run execution
 func TestClassicStateMachine_DryRun(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	workDir := "ubuntu-image-test-dry-run"
@@ -720,7 +720,7 @@ func TestClassicStateMachine_DryRun(t *testing.T) {
 func TestPrepareGadgetTree(t *testing.T) {
 	t.Parallel()
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -761,7 +761,7 @@ func TestPrepareGadgetTree(t *testing.T) {
 func TestPrepareGadgetTreePrebuilt(t *testing.T) {
 	t.Parallel()
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -1186,7 +1186,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -1232,7 +1232,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 func TestBuildRootfsFromTasks(t *testing.T) {
 	t.Parallel()
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -1321,7 +1321,7 @@ func TestExtractRootfsTar(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -1361,7 +1361,7 @@ func TestExtractRootfsTar(t *testing.T) {
 // TestFailedExtractRootfsTar tests failures in the extractRootfsTar function
 func TestFailedExtractRootfsTar(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -1505,7 +1505,7 @@ chpasswd:
 		t.Run("test_customize_cloud_init_"+tc.name, func(t *testing.T) {
 			// Test setup
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -1588,7 +1588,7 @@ chpasswd:
 // TestStatemachine_customizeCloudInit_failed tests failure modes of customizeCloudInit method
 func TestStatemachine_customizeCloudInit_failed(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -1748,7 +1748,7 @@ func TestStateMachine_manualCustomization(t *testing.T) {
 	}
 
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -1865,7 +1865,7 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 
 	t.Run("test_failed_manual_customization", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		restoreCWD := helper.SaveCWD()
+		restoreCWD := testhelper.SaveCWD()
 		t.Cleanup(restoreCWD)
 
 		var stateMachine ClassicStateMachine
@@ -1990,7 +1990,7 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			t.Cleanup(restoreCWD)
 
 			stateMachine.ImageDef.Customization = &imagedefinition.Customization{
@@ -2016,7 +2016,7 @@ func TestPrepareClassicImage(t *testing.T) {
 	}
 
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -2084,7 +2084,7 @@ func TestClassicSnapRevisions(t *testing.T) {
 		t.Skip("Test for amd64 only")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -2154,7 +2154,7 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -2230,7 +2230,7 @@ func TestStateMachine_PopulateClassicRootfsContents(t *testing.T) {
 		t.Skip("Test for amd64 only")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -2571,7 +2571,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -2684,7 +2684,7 @@ UUID=1234-5678	/	ext4	defaults	0	0
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -2959,7 +2959,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	}
 
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
@@ -3348,7 +3348,7 @@ func TestSuccessfulClassicRunNoArtifact(t *testing.T) {
 	}
 
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
@@ -3390,7 +3390,7 @@ func TestSuccessfulRootfsGeneration(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
@@ -3492,7 +3492,7 @@ func TestGerminate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test_germinate_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -3572,7 +3572,7 @@ func TestFailedGerminate(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -3639,7 +3639,7 @@ func TestBuildGadgetTreeGit(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -3694,7 +3694,7 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	saveCWD := helper.SaveCWD()
+	saveCWD := testhelper.SaveCWD()
 	defer saveCWD()
 
 	var stateMachine ClassicStateMachine
@@ -3800,7 +3800,7 @@ func TestStateMachine_buildGadgetTree_paths(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test_build_gadget_tree_paths_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -3884,7 +3884,7 @@ func TestGadgetGadgetTargets(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test_gadget_make_targets_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -3935,7 +3935,7 @@ func TestGadgetGadgetTargets(t *testing.T) {
 // TestFailedBuildGadgetTree tests failures in the  buildGadgetTree function
 func TestFailedBuildGadgetTree(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4035,7 +4035,7 @@ func TestCreateChroot(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4150,7 +4150,7 @@ func TestFailedCreateChroot(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4378,7 +4378,7 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 // TestStateMachine_installPackages_fail tests failure cases in installPackages
 func TestStateMachine_installPackages_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4532,7 +4532,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -4584,7 +4584,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 // TestStateMachine_customizeFstab_fail tests failures in the customizeFstab function
 func TestStateMachine_customizeFstab_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4653,7 +4653,7 @@ func TestGenerateRootfsTarball(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine ClassicStateMachine
@@ -4700,7 +4700,7 @@ func TestGenerateRootfsTarball(t *testing.T) {
 // extracts the tar archive and ensures the xattr is still present
 func TestTarXattrs(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4743,7 +4743,7 @@ func TestTarXattrs(t *testing.T) {
 // and ensures that the security.capability extended attribute is still present
 func TestPingXattrs(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4769,7 +4769,7 @@ func TestPingXattrs(t *testing.T) {
 // TestFailedMakeQcow2Img tests failures in the makeQcow2Img function
 func TestFailedMakeQcow2Img(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4806,7 +4806,7 @@ func TestPreseedResetChroot(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4897,7 +4897,7 @@ func TestPreseedResetChroot(t *testing.T) {
 // TestFailedUpdateBootloader tests failures in the updateBootloader function
 func TestFailedUpdateBootloader(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -4963,7 +4963,7 @@ func TestFailedUpdateBootloader(t *testing.T) {
 // bootloader specified in gadget.yaml is not supported
 func TestUnsupportedBootloader(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -5036,7 +5036,7 @@ func TestPreseedClassicImage(t *testing.T) {
 	}
 
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -5108,7 +5108,7 @@ func TestPreseedClassicImage(t *testing.T) {
 // TestFailedPreseedClassicImage tests failures in the preseedClassicImage function
 func TestFailedPreseedClassicImage(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine ClassicStateMachine
@@ -5253,7 +5253,7 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	t.Cleanup(restoreCWD)
 
 	var stateMachine ClassicStateMachine
