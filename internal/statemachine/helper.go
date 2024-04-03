@@ -1124,6 +1124,10 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		teardownCmds = append(umountCmds, teardownCmds...)
 	}
 
+	teardownCmds = append([]*exec.Cmd{
+		execCommand("udevadm", "settle"),
+	}, teardownCmds...)
+
 	divert, undivert := divertOSProber(mountDir)
 
 	updateGrubCmds = append(updateGrubCmds, divert)
