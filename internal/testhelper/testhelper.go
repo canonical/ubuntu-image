@@ -10,6 +10,15 @@ import (
 	"os"
 )
 
+// SaveCWD gets the current working directory and returns a function to go back to it
+// nolint: errcheck
+func SaveCWD() func() {
+	wd, _ := os.Getwd()
+	return func() {
+		_ = os.Chdir(wd)
+	}
+}
+
 // OSMockConf enables setting thresholds to indicate how many calls a the mocked
 // functions should accept before returning an error.
 // See osMock methods for specific behaviors.

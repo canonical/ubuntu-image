@@ -16,7 +16,7 @@ import (
 
 func TestPack_Setup(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine PackStateMachine
@@ -57,7 +57,7 @@ func TestPack_validateInput_fail(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test_failed_snap_setup_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine PackStateMachine
@@ -75,7 +75,7 @@ func TestPack_validateInput_fail(t *testing.T) {
 // TestPack_readMetadata_fail tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestPack_readMetadata_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	// start a --resume with no previous SM run
@@ -92,7 +92,7 @@ func TestPack_readMetadata_fail(t *testing.T) {
 // TestPack_makeTemporaryDirectories_fail tests the Setup function with makeTemporaryDirectories failing
 func TestPack_makeTemporaryDirectories_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine PackStateMachine
@@ -113,7 +113,7 @@ func TestPack_makeTemporaryDirectories_fail(t *testing.T) {
 // TestPackStateMachine_DryRun tests a successful dry-run execution
 func TestPackStateMachine_DryRun(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	workDir := "ubuntu-image-test-dry-run"
@@ -283,7 +283,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 	}
 
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this

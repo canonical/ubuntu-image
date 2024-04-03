@@ -22,6 +22,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 // TestMaxOffset tests the functionality of the maxOffset function
@@ -1241,7 +1242,7 @@ func TestStateMachine_setConfDefDir(t *testing.T) {
 			tName := strings.ReplaceAll(tc.name, " ", "_")
 
 			tmpDirPath := filepath.Join("/tmp", tName)
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			err := os.Mkdir(tmpDirPath, 0755)

@@ -19,12 +19,13 @@ import (
 	"github.com/snapcore/snapd/store"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 // TestSnapStateMachine_Setup_Fail_setConfDefDir tests a failure in the Setup() function when setting the configuration definition directory
 func TestSnapStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine SnapStateMachine
@@ -63,7 +64,7 @@ func TestFailedSnapSetup(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test_failed_snap_setup_"+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			// use both --until and --thru to trigger this failure
@@ -82,7 +83,7 @@ func TestFailedSnapSetup(t *testing.T) {
 // TestFailedReadMetadataSnap tests a failed metadata read by passing --resume with no previous partial state machine run
 func TestFailedReadMetadataSnap(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	// start a --resume with no previous SM run
@@ -100,7 +101,7 @@ func TestFailedReadMetadataSnap(t *testing.T) {
 // with makeTemporaryDirectories failing
 func TestSnapStateMachine_Setup_Fail_makeTemporaryDirectories(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine SnapStateMachine
@@ -122,7 +123,7 @@ func TestSnapStateMachine_Setup_Fail_makeTemporaryDirectories(t *testing.T) {
 // with determineOutputDirectory failing
 func TestSnapStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine SnapStateMachine
@@ -142,7 +143,7 @@ func TestSnapStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 // TestSnapStateMachine_DryRun tests a successful dry-run execution
 func TestSnapStateMachine_DryRun(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	workDir := "ubuntu-image-test-dry-run"
@@ -180,7 +181,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine SnapStateMachine
@@ -219,7 +220,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine SnapStateMachine
@@ -289,7 +290,7 @@ func TestFailedPrepareImage(t *testing.T) {
 	// by attempting to use --disable-console-conf with a core20 image
 	t.Run("test_failed_prepare_image_imagePrepare", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		restoreCWD := helper.SaveCWD()
+		restoreCWD := testhelper.SaveCWD()
 		defer restoreCWD()
 
 		var stateMachine SnapStateMachine
@@ -311,7 +312,7 @@ func TestFailedPrepareImage(t *testing.T) {
 
 	t.Run("test_failed_prepare_image_snap_revision", func(t *testing.T) {
 		asserter := helper.Asserter{T: t}
-		restoreCWD := helper.SaveCWD()
+		restoreCWD := testhelper.SaveCWD()
 		defer restoreCWD()
 
 		var stateMachine SnapStateMachine
@@ -353,7 +354,7 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine SnapStateMachine
@@ -400,7 +401,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
@@ -531,7 +532,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 // TestFailedGenerateSnapManifest tests if snap-based image manifest generation failures are catched
 func TestFailedGenerateSnapManifest(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	osReadDir = func(string) ([]os.DirEntry, error) {
@@ -579,7 +580,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 				t.Skip("Test for amd64 only")
 			}
 			asserter := helper.Asserter{T: t}
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
 			var stateMachine SnapStateMachine
@@ -666,7 +667,7 @@ func TestSnapRevisions(t *testing.T) {
 		t.Skip("Test for amd64 only")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine SnapStateMachine
@@ -723,7 +724,7 @@ func TestValidationFlag(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine SnapStateMachine
@@ -761,7 +762,7 @@ func TestGadgetEdgeCases(t *testing.T) {
 	}
 
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var stateMachine SnapStateMachine
@@ -789,7 +790,7 @@ func TestGadgetEdgeCases(t *testing.T) {
 
 func TestPreseedFlag(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	restoreCWD := helper.SaveCWD()
+	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
 	var calledOpts *image.Options
