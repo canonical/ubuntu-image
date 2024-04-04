@@ -1003,6 +1003,10 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 		teardownCmds = append(umountCmds, teardownCmds...)
 	}
 
+	teardownCmds = append([]*exec.Cmd{
+		execCommand("udevadm", "settle"),
+	}, teardownCmds...)
+
 	preseedCmds = append(preseedCmds,
 		//nolint:gosec,G204
 		exec.Command("/usr/lib/snapd/snap-preseed", stateMachine.tempDirs.chroot),
