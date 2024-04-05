@@ -4476,6 +4476,41 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 
 }
 
+// Test_generateMountPointCmds_fail tests when generateMountPointCmds fails
+func Test_generateMountPointCmds_fail(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+
+	tmpDirPath := filepath.Join("/tmp", "test_failed_set_conf_dir")
+	err := os.Mkdir(tmpDirPath, 0755)
+	t.Cleanup(func() {
+		os.RemoveAll(tmpDirPath)
+	})
+	asserter.AssertErrNil(err, true)
+
+	mountPoints := []*mountPoint{
+		{
+			src:      "devtmpfs-build",
+			basePath: tmpDirPath,
+			relpath:  "/dev",
+			typ:      "devtmpfs",
+		},
+		{
+			src:      "doesnotexists",
+			basePath: "/doesnotexists",
+			relpath:  "/doesnotexists",
+			typ:      "devpts",
+			bind:     true,
+			opts:     []string{"nodev", "nosuid"},
+		},
+	}
+
+	gotAllMountCmds, gotAllUmountCmds, err := generateMountPointCmds(mountPoints, tmpDirPath)
+	asserter.AssertErrContains(err, "Error preparing mountpoint")
+	asserter.AssertEqual(nil, gotAllMountCmds)
+	asserter.AssertEqual(nil, gotAllUmountCmds)
+
+}
+
 // TestCustomizeFstab tests functionality of the customizeFstab function
 func TestCustomizeFstab(t *testing.T) {
 	testCases := []struct {
