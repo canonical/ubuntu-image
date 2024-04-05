@@ -783,9 +783,8 @@ func TestStateMachine_manualExecute(t *testing.T) {
 			args: args{
 				customizations: []*imagedefinition.Execute{
 					{
-						ExecutePath: "/execute/path",
-						ExecuteArgs: []string{"arg1", "arg2"},
-						Env:         []string{"VAR1=value1", "VAR2=value2"},
+						ExecuteCommand: "/execute/path arg1 arg2",
+						Env:            []string{"VAR1=value1", "VAR2=value2"},
 					},
 				},
 				targetDir: "test",
@@ -802,23 +801,64 @@ func TestStateMachine_manualExecute(t *testing.T) {
 			},
 		},
 		{
-			name: "3 commands",
+			name: "3 commands with path",
 			args: args{
 				customizations: []*imagedefinition.Execute{
 					{
 						ExecutePath: "/execute/path1",
-						ExecuteArgs: []string{"arg1", "arg2"},
 						Env:         []string{"VAR1=value1", "VAR2=value2"},
 					},
 					{
 						ExecutePath: "/execute/path2",
-						ExecuteArgs: []string{"arg21", "arg22"},
 						Env:         []string{"VAR1=value21", "VAR2=value22"},
 					},
 					{
 						ExecutePath: "/execute/path3",
-						ExecuteArgs: []string{"arg31", "arg32"},
 						Env:         []string{"VAR1=value31", "VAR2=value32"},
+					},
+				},
+				targetDir: "test",
+				debug:     true,
+			},
+			expectedCmds: []expectedCmd{
+				{
+					cmd: "/usr/sbin/chroot test /execute/path1",
+					env: []string{
+						"VAR1=value1",
+						"VAR2=value2",
+					},
+				},
+				{
+					cmd: "/usr/sbin/chroot test /execute/path2",
+					env: []string{
+						"VAR1=value21",
+						"VAR2=value22",
+					},
+				},
+				{
+					cmd: "/usr/sbin/chroot test /execute/path3",
+					env: []string{
+						"VAR1=value31",
+						"VAR2=value32",
+					},
+				},
+			},
+		},
+		{
+			name: "3 commands with command",
+			args: args{
+				customizations: []*imagedefinition.Execute{
+					{
+						ExecuteCommand: "/execute/path1 arg1 arg2",
+						Env:            []string{"VAR1=value1", "VAR2=value2"},
+					},
+					{
+						ExecuteCommand: "/execute/path2 arg21 arg22",
+						Env:            []string{"VAR1=value21", "VAR2=value22"},
+					},
+					{
+						ExecuteCommand: "/execute/path3 arg31 arg32",
+						Env:            []string{"VAR1=value31", "VAR2=value32"},
 					},
 				},
 				targetDir: "test",

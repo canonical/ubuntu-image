@@ -241,6 +241,7 @@ func validateCustomization(imageDefinition *imagedefinition.ImageDefinition, res
 		validateManualMakeDirs(imageDefinition, result, jsonContext)
 		validateManualCopyFile(imageDefinition, result, jsonContext)
 		validateManualTouchFile(imageDefinition, result, jsonContext)
+		validateManualExecute(imageDefinition, result, jsonContext)
 	}
 
 	return nil
@@ -294,6 +295,50 @@ func validateManualTouchFile(imageDefinition *imagedefinition.ImageDefinition, r
 	}
 	for _, touch := range imageDefinition.Customization.Manual.TouchFile {
 		validateAbsolutePath(touch.TouchPath, "customization:manual:touch-file:path", result, jsonContext)
+	}
+}
+
+// validateManualExecute validates the Customization.Manual.Execute section of the image definition
+func validateManualExecute(imageDefinition *imagedefinition.ImageDefinition, result *gojsonschema.Result, jsonContext *gojsonschema.JsonContext) {
+	if imageDefinition.Customization.Manual.Execute == nil {
+		return
+	}
+
+	for _, execute := range imageDefinition.Customization.Manual.Execute {
+		if len(execute.ExecutePath) != 0 {
+			fmt.Print("WARNING: customization.manual.path was used. This option will soon be deprecated. Please use the \"command\" field.\n")
+		}
+
+		if len(execute.ExecutePath) != 0 && len(execute.ExecuteCommand) != 0 {
+			errDetail := gojsonschema.ErrorDetails{
+				"key1": "customization:manual:execute:execute-path",
+				"key2": "customization:manual:execute:execute-command",
+			}
+			result.AddError(
+				imagedefinition.NewExclusiveKeyError(
+					gojsonschema.NewJsonContext("exclusiveKeyError",
+						jsonContext),
+					52,
+					errDetail,
+				),
+				errDetail,
+			)
+		}
+
+		if len(execute.ExecutePath) == 0 && len(execute.ExecuteCommand) == 0 {
+			errDetail := gojsonschema.ErrorDetails{
+				"execute": "customization:manual:execute",
+			}
+			result.AddError(
+				imagedefinition.NewMissingCommandError(
+					gojsonschema.NewJsonContext("missingPathOrCommandError",
+						jsonContext),
+					52,
+					errDetail,
+				),
+				errDetail,
+			)
+		}
 	}
 }
 

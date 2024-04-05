@@ -250,18 +250,18 @@ The following specification defines what is supported in the YAML:
             # The location of the rootfs will be prepended to this
             # path automatically.
             path: <string>
-        # Chroots into the rootfs and executes an executable file.
+        # Chroots into the rootfs and executes comamnds and executables.
         # This customization state is run after the copy-files state,
         # so files that have been copied into the rootfs are valid
         # targets to be executed.
         execute: (optional)
           -
-            # Path inside the rootfs.
+            # Path to a executable inside the rootfs. This field only 
+            # supports a single path and not arguments. This field is
+            # deprecated. Use command instead.
             path: <string>
-            # Arguments to give to the command
-            args: (optional)
-              - <string>
-              - <string>
+            # Full command to execute, including arguments
+            command: <string>
             # Environment variables to set before executing the command
             # Format: ENV=VALUE
             env: (optional)
