@@ -296,16 +296,27 @@ func TestSetDefaults(t *testing.T) {
 // TestCheckEmptyFields unit tests the CheckEmptyFields function
 func TestCheckEmptyFields(t *testing.T) {
 	t.Parallel()
-	// define the struct we will use to test
-	type testStruct struct {
+	type testStruct2 struct {
 		A string `yaml:"a" json:"fieldA" jsonschema:"required"`
 		B string `yaml:"b" json:"fieldB"`
-		C string `yaml:"c" json:"fieldC,omitempty"`
+	}
+
+	// define the struct we will use to test
+	type testStruct struct {
+		A string         `yaml:"a" json:"fieldA" jsonschema:"required"`
+		B string         `yaml:"b" json:"fieldB"`
+		C string         `yaml:"c" json:"fieldC,omitempty"`
+		D []string       `yaml:"d" json:"fieldD"`
+		E *string        `yaml:"e" json:"fieldE"`
+		F *testStruct2   `yaml:"f" json:"fieldF"`
+		G []*testStruct2 `yaml:"g" json:"fieldG"`
 	}
 
 	// generate the schema for our testStruct
 	var jsonReflector jsonschema.Reflector
 	schema := jsonReflector.Reflect(&testStruct{})
+
+	valueE := "e"
 
 	// now run CheckEmptyFields with a variety of test data
 	// to ensure the correct return values
@@ -314,10 +325,51 @@ func TestCheckEmptyFields(t *testing.T) {
 		structData testStruct
 		shouldPass bool
 	}{
-		{"success", testStruct{A: "foo", B: "bar", C: "baz"}, true},
-		{"missing_explicitly_required", testStruct{B: "bar", C: "baz"}, false},
-		{"missing_implicitly_required", testStruct{A: "foo", C: "baz"}, false},
-		{"missing_omitempty", testStruct{A: "foo", B: "bar"}, true},
+		{
+			name: "success",
+			structData: testStruct{
+				A: "foo",
+				B: "bar",
+				C: "baz",
+				D: []string{"a", "b"},
+				E: &valueE,
+				F: &testStruct2{
+					A: "a",
+					B: "b",
+				},
+				G: []*testStruct2{
+					{
+						A: "a",
+						B: "b",
+					},
+				},
+			},
+			shouldPass: true,
+		},
+		{
+			name: "missing_explicitly_required",
+			structData: testStruct{A: "foo", B: "bar", C: "baz",
+				F: &testStruct2{
+					B: "b",
+				},
+				G: []*testStruct2{
+					{
+						B: "b",
+					},
+				},
+			},
+			shouldPass: false,
+		},
+		{
+			name:       "missing_implicitly_required",
+			structData: testStruct{A: "foo", C: "baz"},
+			shouldPass: false,
+		},
+		{
+			name:       "missing_omitempty",
+			structData: testStruct{A: "foo", B: "bar"},
+			shouldPass: true,
+		},
 	}
 	for i, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -330,13 +382,29 @@ func TestCheckEmptyFields(t *testing.T) {
 
 			// make sure validation will fail only when expected
 			if tc.shouldPass && !result.Valid() {
-				t.Error("CheckEmptyFields added errors when it should not have")
+				t.Error("CheckEmptyFields had errors when it should not have")
 			}
 			if !tc.shouldPass && result.Valid() {
-				t.Error("CheckEmptyFields did NOT add errors when it should have")
+				t.Error("CheckEmptyFields did NOT have errors when it should have")
 			}
 		})
 	}
+}
+
+func Test_CheckEmptyFields_not_a_pointer(t *testing.T) {
+	type testStruct struct {
+		A string `yaml:"a" json:"fieldA" jsonschema:"required"`
+	}
+
+	var jsonReflector jsonschema.Reflector
+	schema := jsonReflector.Reflect(&testStruct{})
+
+	structData := testStruct{A: "test"}
+	result := new(gojsonschema.Result)
+
+	asserter := Asserter{T: t}
+	err := CheckEmptyFields(structData, result, schema)
+	asserter.AssertErrContains(err, "must be a pointer")
 }
 
 func prepareMainFileToBackup(workDir string) (string, error) {
