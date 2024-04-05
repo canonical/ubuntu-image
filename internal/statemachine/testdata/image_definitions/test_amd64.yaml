@@ -33,10 +33,7 @@ customization:
     touch-file:
       - path: /etc/touchfilefeature
     execute:
-      - path: /usr/bin/bash
-        args:
-          - "-c"
-          - "echo -n 'test' > $ENV_VAR_TEST"
+      - command: /usr/bin/bash -c "echo -n 'test' > $ENV_VAR_TEST"
         env: 
         - "ENV_VAR_TEST=/etc/executefeature"
     add-user:
