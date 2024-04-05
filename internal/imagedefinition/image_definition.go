@@ -148,9 +148,9 @@ type CopyFile struct {
 
 // Execute allows users to execute a script/command in the rootfs of an image
 type Execute struct {
-	ExecutePath string   `yaml:"path" json:"ExecutePath"`
-	ExecuteArgs []string `yaml:"args" json:"ExecuteArgs,omitempty"`
-	Env         []string `yaml:"env"  json:"Env,omitempty"`
+	ExecutePath    string   `yaml:"path" json:"ExecutePath,omitempty"`
+	ExecuteCommand string   `yaml:"command" json:"ExecuteCommand,omitempty"`
+	Env            []string `yaml:"env"  json:"Env,omitempty"`
 }
 
 // TouchFile allows users to touch a file in the rootfs of an image
@@ -308,6 +308,46 @@ func NewDependentKeyError(context *gojsonschema.JsonContext, value interface{}, 
 // other keys being specified
 type DependentKeyError struct {
 	gojsonschema.ResultErrorFields
+}
+
+// ExclusiveKeyError implements gojsonschema.ErrorType.
+// It is used for custom errors for keys that cannot be
+// used with others
+type ExclusiveKeyError struct {
+	gojsonschema.ResultErrorFields
+}
+
+// NewExclusiveKeyError fails the image definition parsing when one
+// field depends on another being specified
+func NewExclusiveKeyError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *ExclusiveKeyError {
+	err := ExclusiveKeyError{}
+	err.SetContext(context)
+	err.SetType("exclusive_key_error")
+	err.SetDescriptionFormat("Key {{.key1}} cannot be used with key {{.key2}}")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
+}
+
+// MissingCommandError implements gojsonschema.ErrorType.
+// It is used for custom errors for missing command or path
+// in Execute object
+type MissingCommandError struct {
+	gojsonschema.ResultErrorFields
+}
+
+// NewMissingCommandError fails the image definition parsing when
+// a Execute object does not have a path or a command defined
+func NewMissingCommandError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingCommandError {
+	err := MissingCommandError{}
+	err.SetContext(context)
+	err.SetType("missing_path_or_command_error")
+	err.SetDescriptionFormat("No path or command where defined in the manual execute entry")
+	err.SetValue(value)
+	err.SetDetails(details)
+
+	return &err
 }
 
 func (i ImageDefinition) securityMirror() string {
