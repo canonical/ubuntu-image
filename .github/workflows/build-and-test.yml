@@ -36,11 +36,11 @@ jobs:
 
       - name: short tests
         if: ${{ matrix.test-scenario == 'short' }}
-        run: sudo go test -timeout 0 -v -test.short -coverprofile=.coverage/coverage-short.out -covermode=atomic ./...
+        run: sudo go test -timeout 0 -v -test.short -coverprofile=.coverage/coverage-short.out -coverpkg $(go list ./... 2> /dev/null | tr '\n' ",") -covermode=atomic ./...
 
       - name: long tests
         if: ${{ matrix.test-scenario == 'long' }}
-        run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -covermode=atomic ./...
+        run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -coverpkg $(go list ./... 2> /dev/null | tr '\n' ",") -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
