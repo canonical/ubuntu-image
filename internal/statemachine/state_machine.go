@@ -278,7 +278,8 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			return fmt.Errorf("Error creating volume dir: %s", err.Error())
 		}
 		// look for the rootfs and check if the image is seeded
-		for i, structure := range volume.Structure {
+		for i := range volume.Structure {
+			structure := &volume.Structure[i]
 			stateMachine.warnUsageOfSystemLabel(volumeName, structure, i)
 
 			if structure.Role == gadget.SystemData {
@@ -315,7 +316,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	return nil
 }
 
-func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, structure gadget.VolumeStructure, structIndex int) {
+func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, structure *gadget.VolumeStructure, structIndex int) {
 	if structure.Role == "" && structure.Label == gadget.SystemBoot && !stateMachine.commonFlags.Quiet {
 		fmt.Printf("WARNING: volumes:%s:structure:%d:filesystem_label "+
 			"used for defining partition roles; use role instead\n",
@@ -323,18 +324,18 @@ func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, stru
 	}
 }
 
-func (stateMachine *StateMachine) checkSeeded(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int) {
+func (stateMachine *StateMachine) checkSeeded(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
 	if structure.Role == gadget.SystemSeed {
 		stateMachine.IsSeeded = true
 		if structure.Label == "" {
 			structure.Label = "ubuntu-seed"
-			volume.Structure[structIndex] = structure
+			volume.Structure[structIndex] = *structure
 		}
 	}
 }
 
 // checkStructureContent makes sure there are no "../" paths in the structure's contents
-func checkStructureContent(structure gadget.VolumeStructure) error {
+func checkStructureContent(structure *gadget.VolumeStructure) error {
 	for _, content := range structure.Content {
 		if strings.Contains(content.UnresolvedSource, "../") {
 			return fmt.Errorf("filesystem content source \"%s\" contains \"../\". "+
@@ -348,7 +349,7 @@ func checkStructureContent(structure gadget.VolumeStructure) error {
 // handleRootfsScheme handles special syntax of rootfs:/<file path> in structure
 // content. This is needed to allow images such as raspberry pi to source their
 // kernel and initrd from the staged rootfs later in the build process.
-func (stateMachine *StateMachine) handleRootfsScheme(structure gadget.VolumeStructure, volume *gadget.Volume, structIndex int) error {
+func (stateMachine *StateMachine) handleRootfsScheme(structure *gadget.VolumeStructure, volume *gadget.Volume, structIndex int) error {
 	if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
 		relativeRootfsPath, err := filepathRel(
 			filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
@@ -372,12 +373,12 @@ func (stateMachine *StateMachine) handleRootfsScheme(structure gadget.VolumeStru
 // It may not be defined for these roles, so Content is a nil slice leading
 // copyStructureContent() skip the rootfs copying later.
 // So we need to make an empty slice here to avoid this situation.
-func fixMissingContent(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int) {
+func fixMissingContent(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
 	if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Content == nil {
 		structure.Content = make([]gadget.VolumeContent, 0)
 	}
 
-	volume.Structure[structIndex] = structure
+	volume.Structure[structIndex] = *structure
 }
 
 // fixMissingSystemData handles the case of unspecified system-data
