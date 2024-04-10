@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -183,6 +182,11 @@ func fakeExecCommand(command string, args ...string) *exec.Cmd {
 	tc := "TEST_CASE=" + testCaseName
 	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", tc}
 	return cmd
+}
+
+// helper function to define *quantity.Offsets inline
+func createOffsetPointer(x quantity.Offset) *quantity.Offset {
+	return &x
 }
 
 // This is a helper that mocks out any exec calls performed in this package
@@ -643,181 +647,321 @@ func TestHandleContentSizes(t *testing.T) {
 	}
 }
 
-// TestPostProcessGadgetYaml runs through a variety of gadget.yaml files
-// and ensures the volume/structures are as expected
-func TestPostProcessGadgetYaml(t *testing.T) {
-	// helper function to define *quantity.Offsets inline
-	createOffsetPointer := func(x quantity.Offset) *quantity.Offset {
-		return &x
+// TestStateMachine_postProcessGadgetYaml tests postProcessGadgetYaml
+func TestStateMachine_postProcessGadgetYaml(t *testing.T) {
+	cmpOpts := []cmp.Option{
+		cmpopts.IgnoreUnexported(
+			gadget.Volume{},
+		),
+		cmpopts.IgnoreFields(gadget.VolumeStructure{}, "EnclosingVolume"),
 	}
-	testCases := []struct {
-		name           string
-		gadgetYaml     string
-		expectedResult gadget.Volume
+	tests := []struct {
+		name         string
+		gadgetYaml   []byte
+		wantVolumes  map[string]*gadget.Volume
+		wantIsSeeded bool
+		expectedErr  string
 	}{
 		{
-			"rootfs_gadget_source",
-			filepath.Join("testdata", "gadget_rootfs_source.yaml"),
-			gadget.Volume{
-				Schema:     "mbr",
-				Bootloader: "u-boot",
-				Name:       "pc",
-				Structure: []gadget.VolumeStructure{
-					{
-						VolumeName: "pc",
-						Type:       "0C",
-						Offset:     createOffsetPointer(1048576),
-						MinSize:    536870912,
-						Size:       536870912,
-						Label:      "system-boot",
-						Filesystem: "vfat",
-						Content: []gadget.VolumeContent{
-							{
-								UnresolvedSource: "install/boot-assets/",
-								Target:           "/",
+			name: "simple full test",
+			gadgetYaml: []byte(`volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        update:
+          edition: 1
+        content:
+          - image: pc-boot.img
+      - name: BIOS Boot
+        type: DA,21686148-6449-6E6F-744E-656564454649
+        size: 1M
+        offset: 1M
+        offset-write: mbr+92
+        update:
+          edition: 2
+        content:
+          - image: pc-core.img
+      - name: ubuntu-seed
+        role: system-seed
+        filesystem: vfat
+        # UEFI will boot the ESP partition by default first
+        type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        size: 1200M
+        update:
+          edition: 2
+        content:
+          - source: grubx64.efi
+            target: EFI/boot/grubx64.efi
+          - source: shim.efi.signed
+            target: EFI/boot/bootx64.efi
+      - name: ubuntu-boot
+        filesystem-label: system-boot
+        filesystem: ext4
+        type: 83,0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        # whats the appropriate size?
+        size: 750M
+        update:
+          edition: 1
+        content:
+          - source: grubx64.efi
+            target: EFI/boot/grubx64.efi
+          - source: shim.efi.signed
+            target: EFI/boot/bootx64.efi
+      - name: ubuntu-save
+        role: system-save
+        filesystem: ext4
+        type: 83,0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        size: 16M
+      - name: ubuntu-data
+        role: system-data
+        filesystem: ext4
+        type: 83,0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        size: 1G
+`),
+			wantIsSeeded: true,
+			wantVolumes: map[string]*gadget.Volume{
+				"pc": {
+					Schema:     "gpt",
+					Bootloader: "grub",
+					Structure: []gadget.VolumeStructure{
+						{
+							VolumeName: "pc",
+							Name:       "mbr",
+							Offset:     createOffsetPointer(0),
+							MinSize:    440,
+							Size:       440,
+							Type:       "mbr",
+							Role:       "mbr",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-boot.img",
+								},
 							},
-							{
-								UnresolvedSource: "../../root/boot/vmlinuz",
-								Target:           "/",
+							Update: gadget.VolumeUpdate{Edition: 1},
+						},
+						{
+							VolumeName: "pc",
+							Name:       "BIOS Boot",
+							Offset:     createOffsetPointer(1048576),
+							OffsetWrite: &gadget.RelativeOffset{
+								RelativeTo: "mbr",
+								Offset:     quantity.Offset(92),
 							},
-							{
-								UnresolvedSource: "../../root/boot/initrd.img",
-								Target:           "/",
+							MinSize: 1048576,
+							Size:    1048576,
+							Type:    "DA,21686148-6449-6E6F-744E-656564454649",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-core.img",
+								},
 							},
+							Update:    gadget.VolumeUpdate{Edition: 2},
+							YamlIndex: 1,
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-seed",
+							Label:      "ubuntu-seed",
+							Offset:     createOffsetPointer(2097152),
+							MinSize:    1258291200,
+							Size:       1258291200,
+							Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+							Role:       "system-seed",
+							Filesystem: "vfat",
+							Content: []gadget.VolumeContent{
+								{
+									UnresolvedSource: "grubx64.efi",
+									Target:           "EFI/boot/grubx64.efi",
+								},
+								{
+									UnresolvedSource: "shim.efi.signed",
+									Target:           "EFI/boot/bootx64.efi",
+								},
+							},
+							Update:    gadget.VolumeUpdate{Edition: 2},
+							YamlIndex: 2,
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-boot",
+							Offset:     createOffsetPointer(1260388352),
+							MinSize:    786432000,
+							Size:       786432000,
+							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+							Label:      "system-boot",
+							Filesystem: "ext4",
+							Content: []gadget.VolumeContent{
+								{
+									UnresolvedSource: "grubx64.efi",
+									Target:           "EFI/boot/grubx64.efi",
+								},
+								{
+									UnresolvedSource: "shim.efi.signed",
+									Target:           "EFI/boot/bootx64.efi",
+								},
+							},
+							Update:    gadget.VolumeUpdate{Edition: 1},
+							YamlIndex: 3,
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-save",
+							Offset:     createOffsetPointer(2046820352),
+							MinSize:    16777216,
+							Size:       16777216,
+							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+							Role:       "system-save",
+							Filesystem: "ext4",
+							YamlIndex:  4,
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-data",
+							Offset:     createOffsetPointer(2063597568),
+							MinSize:    1073741824,
+							Size:       1073741824,
+							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+							Role:       "system-data",
+							Filesystem: "ext4",
+							Content:    []gadget.VolumeContent{},
+							YamlIndex:  5,
 						},
 					},
-					{
-						Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
-						Role:       "system-data",
-						Filesystem: "ext4",
-						Label:      "writable",
-						Offset:     createOffsetPointer(537919488),
-						Content:    []gadget.VolumeContent{},
-						YamlIndex:  1,
-					},
+					Name: "pc",
 				},
 			},
 		},
 		{
-			"rootfs_unspecified",
-			filepath.Join("testdata", "gadget_no_rootfs.yaml"),
-			gadget.Volume{
-				Schema:     "gpt",
-				Bootloader: "grub",
-				Name:       "pc",
-				Structure: []gadget.VolumeStructure{
-					{
-						VolumeName: "pc",
-						Name:       "mbr",
-						Type:       "mbr",
-						Offset:     createOffsetPointer(0),
-						Role:       "mbr",
-						MinSize:    440,
-						Size:       440,
-						Content: []gadget.VolumeContent{
-							{
-								Image:  "pc-boot.img",
-								Offset: createOffsetPointer(0),
+			name: "minimal configuration, adding a system-data structure and missing content on system-seed",
+			gadgetYaml: []byte(`volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        update:
+          edition: 1
+        content:
+          - image: pc-boot.img
+      - name: ubuntu-seed
+        role: system-seed
+        filesystem: vfat
+        # UEFI will boot the ESP partition by default first
+        type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        size: 1200M
+        update:
+          edition: 2
+`),
+			wantIsSeeded: true,
+			wantVolumes: map[string]*gadget.Volume{
+				"pc": {
+					Schema:     "gpt",
+					Bootloader: "grub",
+					Structure: []gadget.VolumeStructure{
+						{
+							VolumeName: "pc",
+							Name:       "mbr",
+							Offset:     createOffsetPointer(0),
+							MinSize:    440,
+							Size:       440,
+							Type:       "mbr",
+							Role:       "mbr",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-boot.img",
+								},
 							},
+							Update: gadget.VolumeUpdate{Edition: 1},
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-seed",
+							Label:      "ubuntu-seed",
+							Offset:     createOffsetPointer(1048576),
+							MinSize:    1258291200,
+							Size:       1258291200,
+							Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+							Role:       "system-seed",
+							Filesystem: "vfat",
+							Content:    []gadget.VolumeContent{},
+							Update:     gadget.VolumeUpdate{Edition: 2},
+							YamlIndex:  1,
+						},
+						{
+							VolumeName: "",
+							Name:       "",
+							Label:      "writable",
+							Offset:     createOffsetPointer(1259339776),
+							MinSize:    0,
+							Size:       0,
+							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+							Role:       "system-data",
+							Filesystem: "ext4",
+							Content:    []gadget.VolumeContent{},
+							YamlIndex:  2,
 						},
 					},
-					{
-						VolumeName: "pc",
-						Name:       "BIOS Boot",
-						Type:       "DA,21686148-6449-6E6F-744E-656564454649",
-						MinSize:    1048576,
-						Size:       1048576,
-						OffsetWrite: &gadget.RelativeOffset{
-							RelativeTo: "mbr",
-							Offset:     quantity.Offset(92),
-						},
-						Offset: createOffsetPointer(1048576),
-						Content: []gadget.VolumeContent{
-							{
-								Image: "pc-core.img",
-							},
-						},
-						YamlIndex: 1,
-					},
-					{
-						VolumeName: "pc",
-						Name:       "EFI System",
-						Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
-						MinSize:    52428800,
-						Size:       52428800,
-						Filesystem: "vfat",
-						Offset:     createOffsetPointer(2097152),
-						Label:      "system-boot",
-						Content: []gadget.VolumeContent{
-							{
-								UnresolvedSource: "grubx64.efi",
-								Target:           "EFI/boot/grubx64.efi",
-							},
-							{
-								UnresolvedSource: "shim.efi.signed",
-								Target:           "EFI/boot/bootx64.efi",
-							},
-							{
-								UnresolvedSource: "grub-cpc.cfg",
-								Target:           "EFI/ubuntu/grub.cfg",
-							},
-						},
-						YamlIndex: 2,
-					},
-					{
-						Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
-						Role:       "system-data",
-						Filesystem: "ext4",
-						Label:      "writable",
-						Offset:     createOffsetPointer(54525952),
-						Content:    []gadget.VolumeContent{},
-						YamlIndex:  3,
-					},
+					Name: "pc",
 				},
 			},
 		},
+		{
+			name: "error with invalid source path",
+			gadgetYaml: []byte(`volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: ubuntu-seed
+        role: system-seed
+        filesystem: vfat
+        # UEFI will boot the ESP partition by default first
+        type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        size: 1200M
+        update:
+          edition: 2
+        content:
+          - source: ../grubx64.efi
+            target: EFI/boot/grubx64.efi
+`),
+			wantIsSeeded: true,
+			expectedErr:  "filesystem content source \"../grubx64.efi\" contains \"../\". This is disallowed for security purposes",
+		},
 	}
-	for _, tc := range testCases {
-		t.Run("test_post_process_gadget_yaml_"+tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
+			stateMachine := &StateMachine{
+				VolumeOrder: []string{"pc"},
+			}
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-			// need workdir and loaded gadget.yaml set up for this
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, false)
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-			// load in the gadget.yaml file
-			stateMachine.YamlFilePath = tc.gadgetYaml
-
-			// ensure unpack exists and load gadget.yaml
-			err = os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
-			asserter.AssertErrNil(err, true)
-			err = stateMachine.loadGadgetYaml()
+			stateMachine.GadgetInfo, err = gadget.InfoFromGadgetYaml(tt.gadgetYaml, nil)
 			asserter.AssertErrNil(err, false)
 
-			// we now need to also ensure the expectedResult to have properly set volume pointers
-			for i := range tc.expectedResult.Structure {
-				if tc.expectedResult.Structure[i].VolumeName != "" {
-					tc.expectedResult.Structure[i].EnclosingVolume = stateMachine.GadgetInfo.Volumes[tc.expectedResult.Structure[i].VolumeName]
-				}
-			}
+			err = stateMachine.postProcessGadgetYaml()
 
-			if !reflect.DeepEqual(*stateMachine.GadgetInfo.Volumes["pc"], tc.expectedResult) {
-				t.Errorf("GadgetInfo after postProcessGadgetYaml:\n%+v "+
-					"does not match expected result:\n%+v",
-					*stateMachine.GadgetInfo.Volumes["pc"],
-					tc.expectedResult,
-				)
+			if len(tt.expectedErr) == 0 {
+				asserter.AssertErrNil(err, true)
+				asserter.AssertEqual(tt.wantIsSeeded, stateMachine.IsSeeded)
+				asserter.AssertEqual(tt.wantVolumes, stateMachine.GadgetInfo.Volumes, cmpOpts...)
+			} else {
+				asserter.AssertErrContains(err, tt.expectedErr)
 			}
 		})
 	}
 }
 
-// TestFailedPostProcessGadgetYaml tests failues in the post processing of
-// the gadget.yaml file after loading it in. This is accomplished by mocking
-// os.MkdirAll
-func TestFailedPostProcessGadgetYaml(t *testing.T) {
+// TestStateMachine_postProcessGadgetYaml_fail tests failues in the post processing of
+// the gadget.yaml file after loading it in.
+func TestStateMachine_postProcessGadgetYaml_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	var stateMachine StateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
