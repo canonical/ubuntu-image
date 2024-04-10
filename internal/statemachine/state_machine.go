@@ -324,6 +324,7 @@ func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, stru
 	}
 }
 
+// checkSystemSeed checks if the struture is a system-seed one and fixes the Label if needed
 func (stateMachine *StateMachine) checkSeeded(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
 	if structure.Role == gadget.SystemSeed {
 		stateMachine.IsSeeded = true
@@ -405,7 +406,6 @@ func fixMissingSystemData(volume *gadget.Volume, farthestOffset quantity.Offset,
 			YamlIndex: len(volume.Structure),
 		}
 
-		// we now add the rootfs structure to the volume
 		volume.Structure = append(volume.Structure, rootfsStructure)
 	}
 }

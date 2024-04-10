@@ -99,12 +99,12 @@ func (snapStateMachine *SnapStateMachine) imageOptsCustomizations() image.Custom
 
 var populateSnapRootfsContentsState = stateFunc{"populate_rootfs_contents", (*StateMachine).populateSnapRootfsContents}
 
-// populateSnapRootfsContents uses a NewMountedFileSystemWriter to populate the rootfs
+// populateSnapRootfsContents populates the rootfs
 func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 	var src, dst string
 	if stateMachine.IsSeeded {
 		// For now, since we only create the system-seed partition for
-		// uc20 images, we hard-code to use this path for the rootfs
+		// uc20+ images, we hard-code to use this path for the rootfs
 		// seed population.  In the future we might want to consider
 		// populating other partitions from `snap prepare-image` output
 		// as well, so looking into directories like system-data/ etc.
@@ -146,7 +146,6 @@ func (stateMachine *StateMachine) generateSnapManifest() error {
 	// actually it doesn't make things much easier than doing it manually -
 	// like we did in the past. So let's just go with this.
 
-	// snaps.manifest
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir, "snaps.manifest")
 	snapsDir := filepath.Join(stateMachine.tempDirs.rootfs, "system-data", "var", "lib", "snapd", "snaps")
 	return WriteSnapManifest(snapsDir, outputPath)

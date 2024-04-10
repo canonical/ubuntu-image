@@ -421,7 +421,7 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 }
 
 // generatePartitionTable prepares the partition table for a structures in a volume and
-// returns it with the the partition number of the root partition.
+// returns it with the partition number of the root partition.
 func generatePartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, int) {
 	var gptPartitions = make([]*gpt.Partition, 0)
 	var mbrPartitions = make([]*mbr.Partition, 0)
