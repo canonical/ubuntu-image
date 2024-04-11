@@ -2022,7 +2022,7 @@ func TestPrepareClassicImage(t *testing.T) {
 	var stateMachine ClassicStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
-	stateMachine.Snaps = []string{"lxd"}
+	stateMachine.Snaps = []string{"core20"}
 	stateMachine.commonFlags.Channel = "stable"
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
 		Architecture: getHostArch(),
@@ -2033,7 +2033,11 @@ func TestPrepareClassicImage(t *testing.T) {
 					Channel:  "candidate",
 				},
 				{
-					SnapName: "core20",
+					SnapName: "lxd",
+					Channel:  "latest/stable",
+				},
+				{
+					SnapName: "core22",
 				},
 			},
 		},
@@ -2049,7 +2053,7 @@ func TestPrepareClassicImage(t *testing.T) {
 
 	// check that the lxd and hello snaps, as well as lxd's base, core20
 	// were prepared in the correct location
-	snaps := map[string]string{"lxd": "stable", "hello": "candidate", "core20": "stable"}
+	snaps := map[string]string{"lxd": "stable", "hello": "candidate", "core20": "stable", "core22": "stable"}
 	for snapName, snapChannel := range snaps {
 		// reach out to the snap store to find the revision
 		// of the snap for the specified channel
