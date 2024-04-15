@@ -61,6 +61,7 @@ jobs:
   tics-report:
     runs-on: ubuntu-latest
     needs: test
+    if: ${{ github.event_name == 'push' || github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,14 +90,19 @@ jobs:
           gocov-xml < coverage.json > coverage-go.xml
 
       - name: TICS analysis and report
-        if: ${{ github.event_name == 'push' || github.ref == 'refs/heads/main' }}
-        uses: tiobe/tics-github-action@v2
+        run: |
+          export TICSAUTHTOKEN=${{ secrets.TICSAUTHTOKEN }}
+
+          set -x
+          # Install the TICS and staticcheck
+          curl --silent --show-error "https://canonical.tiobe.com/tiobeweb/TICS/api/public/v1/fapi/installtics/Script?cfg=default&platform=linux&url=https://canonical.tiobe.com/tiobeweb/TICS/" > install_tics.sh
+          . ./install_tics.sh
+          TICSQServer -project ubuntu-image -tmpdir /tmp/tics -branchdir .
+
+      - name: Upload TICS report
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          projectName: ubuntu-image
-          ticsConfiguration: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
-          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
-          installTics: true
-          filelist: .
-          calc: ALL
-          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS
-          additionalFlags: "-resultdir .coverage/"
+          name: tics-report
+          path: /tmp/tics/ticstmpdir
+          retention-days: 7
