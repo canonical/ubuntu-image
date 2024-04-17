@@ -253,7 +253,7 @@ func TestLegacyAddRemove(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 	asserter.AssertEqual(legacyPPA2Content, string(ppaBytes))
 
-	tmpGPGDir := filepath.Join(tmpDirPath, "tmp", "ubuntu-image-gpg")
+	tmpGPGDir := filepath.Join(tmpDirPath, "tmp", "u-i-gpg")
 	_, err = os.Stat(tmpGPGDir)
 	if !os.IsNotExist(err) {
 		t.Errorf("Dir %s should not exist, but does", tmpGPGDir)
