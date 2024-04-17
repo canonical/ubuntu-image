@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -344,6 +345,14 @@ func TestAdd_fail(t *testing.T) {
 	gpgDir := filepath.Join(tmpDirPath, trustedGPGDPath)
 	err = os.MkdirAll(gpgDir, 0755)
 	asserter.AssertErrNil(err, true)
+
+	longName := strings.Repeat("a", 100)
+	longTmpDirPath, err := os.MkdirTemp("/tmp", longName)
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(longTmpDirPath) })
+
+	err = p.Add(longTmpDirPath, true)
+	asserter.AssertErrContains(err, "dirmngr cannot handle a homedir path length of 100 or above")
 
 	osMkdirAll = mockMkdirAll
 	t.Cleanup(func() {
