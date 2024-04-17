@@ -252,7 +252,7 @@ func (p *BasePPA) ensureFingerprint(baseURL string) error {
 }
 
 func (p *BasePPA) createTmpGPGDir(basePath string) (string, error) {
-	tmpGPGDir := filepath.Join(basePath, "tmp", "ubuntu-image-gpg")
+	tmpGPGDir := filepath.Join(basePath, "tmp", "u-i-gpg")
 	err := osMkdirAll(tmpGPGDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		return "", fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
