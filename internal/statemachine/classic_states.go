@@ -457,30 +457,31 @@ func (stateMachine *StateMachine) prepareImgArtifactsMultipleVolumes(artifacts *
 // The names of these images are placed in the VolumeNames map, which is used
 // as an input file for an eventual `qemu-convert` operation.
 func (stateMachine *StateMachine) prepareQcow2ArtifactsMultipleVolumes(artifacts *imagedefinition.Artifact) error {
-	if artifacts.Qcow2 != nil {
-		for _, qcow2 := range *artifacts.Qcow2 {
-			if qcow2.Qcow2Volume == "" {
-				return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
+	if artifacts.Qcow2 == nil {
+		return nil
+	}
+	for _, qcow2 := range *artifacts.Qcow2 {
+		if qcow2.Qcow2Volume == "" {
+			return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
+		}
+		// We can save a whole lot of disk I/O here if the volume is
+		// already specified as a .img file
+		if artifacts.Img != nil {
+			found := false
+			for _, img := range *artifacts.Img {
+				if img.ImgVolume == qcow2.Qcow2Volume {
+					found = true
+				}
 			}
-			// We can save a whole lot of disk I/O here if the volume is
-			// already specified as a .img file
-			if artifacts.Img != nil {
-				found := false
-				for _, img := range *artifacts.Img {
-					if img.ImgVolume == qcow2.Qcow2Volume {
-						found = true
-					}
-				}
-				if !found {
-					// if a .img artifact for this volume isn't explicitly stated in
-					// the image definition, then create one
-					stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
-				}
-			} else {
-				// no .img artifacts exist in the image definition,
-				// but we still need to create one to convert to qcow2
+			if !found {
+				// if a .img artifact for this volume isn't explicitly stated in
+				// the image definition, then create one
 				stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
 			}
+		} else {
+			// no .img artifacts exist in the image definition,
+			// but we still need to create one to convert to qcow2
+			stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
 		}
 	}
 	return nil
