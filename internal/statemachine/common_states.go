@@ -51,8 +51,18 @@ The gadget.yaml file is expected to be located in a "meta" subdirectory of the p
 		return fmt.Errorf("Error running InfoFromGadgetYaml: %s", err.Error())
 	}
 
+	err = gadget.Validate(stateMachine.GadgetInfo, nil, nil)
+	if err != nil {
+		return fmt.Errorf("invalid gadget: %s", err.Error())
+	}
+
 	// check if the unpack dir should be preserved
 	err = preserveUnpack(stateMachine.tempDirs.unpack)
+	if err != nil {
+		return err
+	}
+
+	err = stateMachine.validateVolumes()
 	if err != nil {
 		return err
 	}
@@ -60,7 +70,7 @@ The gadget.yaml file is expected to be located in a "meta" subdirectory of the p
 	// for the --image-size argument, the order of the volumes specified in gadget.yaml
 	// must be preserved. However, since gadget.Info stores the volumes as a map, the
 	// order is not preserved. We use the already read-in gadget.yaml file to store the
-	// order of the volumes as an array in the StateMachine struct
+	// order of the volumes in a slice in the StateMachine struct
 	stateMachine.saveVolumeOrder(string(gadgetYamlBytes))
 
 	if err := stateMachine.postProcessGadgetYaml(); err != nil {
@@ -93,6 +103,14 @@ func preserveUnpack(unpackDir string) error {
 	}
 	if err := osutilCopySpecialFile(unpackDir, preserveUnpackDir); err != nil {
 		return fmt.Errorf("Error preserving unpack dir: %s", err.Error())
+	}
+	return nil
+}
+
+// validateVolumes checks there is at least one volume in the gadget
+func (stateMachine *StateMachine) validateVolumes() error {
+	if len(stateMachine.GadgetInfo.Volumes) < 1 {
+		return fmt.Errorf("no volume in the gadget.yaml. Specify at least one volume.")
 	}
 	return nil
 }
