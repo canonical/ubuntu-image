@@ -294,7 +294,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				rootfsSeen = true
 			}
 
-			stateMachine.checkSystemSeed(volume, structure, i)
+			stateMachine.handleSystemSeed(volume, structure, i)
 
 			err := checkStructureContent(structure)
 			if err != nil {
@@ -332,14 +332,18 @@ func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, stru
 	}
 }
 
-// checkSystemSeed checks if the struture is a system-seed one and fixes the Label if needed
-func (stateMachine *StateMachine) checkSystemSeed(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
-	if structure.Role == gadget.SystemSeed {
-		stateMachine.IsSeeded = true
-		if structure.Label == "" {
-			structure.Label = structure.Name
-			volume.Structure[structIndex] = *structure
-		}
+// handleSystemSeed checks if the struture is a system-seed one and fixes the Label if needed
+func (stateMachine *StateMachine) handleSystemSeed(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
+	if structure.Role != gadget.SystemSeed {
+		return
+	}
+	stateMachine.IsSeeded = true
+	// The "main" volume is the one with a system-seed structure
+	stateMachine.MainVolumeName = structure.VolumeName
+
+	if structure.Label == "" {
+		structure.Label = structure.Name
+		volume.Structure[structIndex] = *structure
 	}
 }
 
