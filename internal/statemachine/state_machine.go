@@ -279,7 +279,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var rootfsSeen bool = false
 	var farthestOffset quantity.Offset
 	var lastOffset quantity.Offset
-	farthestOffsetUnknown := false
+	var farthestOffsetUnknown bool = false
 	lastVolumeName := ""
 
 	for _, volumeName := range stateMachine.VolumeOrder {
@@ -397,22 +397,21 @@ func fixMissingContent(volume *gadget.Volume, structure *gadget.VolumeStructure,
 	volume.Structure[structIndex] = *structure
 }
 
-// fixMissingSystemData handles the case of unspecified system-data
-// partition where we simply attach the rootfs at the end of the
-// partition list.
-// Since so far we have no knowledge of the rootfs contents, the
-// size is set to 0, and will be calculated later
+// fixMissingSystemData handles the case of unspecified system-data partition
+// where we simply attach the rootfs at the end of the partition list.
+// Since so far we have no knowledge of the rootfs contents, the size is set
+// to 0, and will be calculated later
 func (stateMachine *StateMachine) fixMissingSystemData(lastVolumeName string, farthestOffset quantity.Offset, farthestOffsetUnknown bool, rootfsSeen bool) {
-	// For now we consider the main volume to be the last one unless it was previously found
-	volume := stateMachine.GadgetInfo.Volumes[lastVolumeName]
-
-	if len(stateMachine.MainVolumeName) != 0 {
-		volume = stateMachine.GadgetInfo.Volumes[stateMachine.MainVolumeName]
-	}
-
-	if !farthestOffsetUnknown || !rootfsSeen || len(stateMachine.GadgetInfo.Volumes) != 1 {
+	// We only add the structure if there is a single volume because we cannot
+	// be sure which volume is considered the "main one" by the user, even though
+	// we have a way to find it (see comment about the MainVolume field). We
+	// should revisit this if we want to be stricter in the future about that.
+	if farthestOffsetUnknown || rootfsSeen || len(stateMachine.GadgetInfo.Volumes) != 1 {
 		return
 	}
+	// So for now we consider the main volume to be the last one
+	volume := stateMachine.GadgetInfo.Volumes[lastVolumeName]
+
 	rootfsStructure := gadget.VolumeStructure{
 		Name:       "",
 		Label:      "writable",

@@ -658,6 +658,7 @@ func TestStateMachine_postProcessGadgetYaml(t *testing.T) {
 	tests := []struct {
 		name         string
 		gadgetYaml   []byte
+		volumeOrder  []string
 		wantVolumes  map[string]*gadget.Volume
 		wantIsSeeded bool
 		expectedErr  string
@@ -721,6 +722,7 @@ func TestStateMachine_postProcessGadgetYaml(t *testing.T) {
         type: 83,0FC63DAF-8483-4772-8E79-3D69D8477DE4
         size: 1G
 `),
+			volumeOrder:  []string{"pc"},
 			wantIsSeeded: true,
 			wantVolumes: map[string]*gadget.Volume{
 				"pc": {
@@ -856,6 +858,7 @@ func TestStateMachine_postProcessGadgetYaml(t *testing.T) {
         update:
           edition: 2
 `),
+			volumeOrder:  []string{"pc"},
 			wantIsSeeded: true,
 			wantVolumes: map[string]*gadget.Volume{
 				"pc": {
@@ -910,6 +913,100 @@ func TestStateMachine_postProcessGadgetYaml(t *testing.T) {
 			},
 		},
 		{
+			name: "do not add a system-data structure if there is not exactly one",
+			gadgetYaml: []byte(`volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        update:
+          edition: 1
+        content:
+          - image: pc-boot.img
+      - name: ubuntu-seed
+        role: system-seed
+        filesystem: vfat
+        # UEFI will boot the ESP partition by default first
+        type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        size: 1200M
+        update:
+          edition: 2
+  pc2:
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        update:
+          edition: 1
+        content:
+          - image: pc-boot.img
+`),
+			volumeOrder:  []string{"pc", "pc2"},
+			wantIsSeeded: true,
+			wantVolumes: map[string]*gadget.Volume{
+				"pc": {
+					Schema:     "gpt",
+					Bootloader: "grub",
+					Structure: []gadget.VolumeStructure{
+						{
+							VolumeName: "pc",
+							Name:       "mbr",
+							Offset:     createOffsetPointer(0),
+							MinSize:    440,
+							Size:       440,
+							Type:       "mbr",
+							Role:       "mbr",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-boot.img",
+								},
+							},
+							Update: gadget.VolumeUpdate{Edition: 1},
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-seed",
+							Label:      "ubuntu-seed",
+							Offset:     createOffsetPointer(1048576),
+							MinSize:    1258291200,
+							Size:       1258291200,
+							Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+							Role:       "system-seed",
+							Filesystem: "vfat",
+							Content:    []gadget.VolumeContent{},
+							Update:     gadget.VolumeUpdate{Edition: 2},
+							YamlIndex:  1,
+						},
+					},
+					Name: "pc",
+				},
+				"pc2": {
+					Schema:     "gpt",
+					Bootloader: "",
+					Structure: []gadget.VolumeStructure{
+						{
+							VolumeName: "pc2",
+							Name:       "mbr",
+							Offset:     createOffsetPointer(0),
+							MinSize:    440,
+							Size:       440,
+							Type:       "mbr",
+							Role:       "mbr",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-boot.img",
+								},
+							},
+							Update: gadget.VolumeUpdate{Edition: 1},
+						},
+					},
+					Name: "pc2",
+				},
+			},
+		},
+		{
 			name: "error with invalid source path",
 			gadgetYaml: []byte(`volumes:
   pc:
@@ -927,6 +1024,7 @@ func TestStateMachine_postProcessGadgetYaml(t *testing.T) {
           - source: ../grubx64.efi
             target: EFI/boot/grubx64.efi
 `),
+			volumeOrder:  []string{"pc"},
 			wantIsSeeded: true,
 			expectedErr:  "filesystem content source \"../grubx64.efi\" contains \"../\". This is disallowed for security purposes",
 		},
@@ -935,7 +1033,7 @@ func TestStateMachine_postProcessGadgetYaml(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			stateMachine := &StateMachine{
-				VolumeOrder: []string{"pc"},
+				VolumeOrder: tt.volumeOrder,
 			}
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
