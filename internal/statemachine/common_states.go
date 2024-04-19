@@ -266,7 +266,7 @@ func (stateMachine *StateMachine) populateBootfsLayoutStructure(laidOutStructure
 		}
 	}
 	if laidOutStructure.HasFilesystem() {
-		mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(&laidOutVolume.LaidOutStructure[index], nil)
+		mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(nil, &laidOutVolume.LaidOutStructure[index], nil)
 		if err != nil {
 			return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
 		}

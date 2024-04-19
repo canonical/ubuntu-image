@@ -85,7 +85,7 @@ func mockLayoutVolume(*gadget.Volume,
 	*gadget.LayoutOptions) (*gadget.LaidOutVolume, error) {
 	return nil, fmt.Errorf("Test Error")
 }
-func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure,
+func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure, *gadget.LaidOutStructure,
 	gadget.ContentObserver) (*gadget.MountedFilesystemWriter, error) {
 	return nil, fmt.Errorf("Test Error")
 }
