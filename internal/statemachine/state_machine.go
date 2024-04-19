@@ -129,6 +129,9 @@ type StateMachine struct {
 	// names of images for each volume
 	VolumeNames map[string]string
 
+	// name of the "main volume"
+	MainVolumeName string
+
 	Packages []string
 	Snaps    []string
 }
@@ -400,10 +403,14 @@ func fixMissingContent(volume *gadget.Volume, structure *gadget.VolumeStructure,
 // Since so far we have no knowledge of the rootfs contents, the
 // size is set to 0, and will be calculated later
 func (stateMachine *StateMachine) fixMissingSystemData(lastVolumeName string, farthestOffset quantity.Offset, farthestOffsetUnknown bool, rootfsSeen bool) {
-	// For now we consider the main volume to be the last one
+	// For now we consider the main volume to be the last one unless it was previously found
 	volume := stateMachine.GadgetInfo.Volumes[lastVolumeName]
 
-	if !farthestOffsetUnknown || !rootfsSeen || len(stateMachine.GadgetInfo.Volumes) == 1 {
+	if len(stateMachine.MainVolumeName) != 0 {
+		volume = stateMachine.GadgetInfo.Volumes[stateMachine.MainVolumeName]
+	}
+
+	if !farthestOffsetUnknown || !rootfsSeen || len(stateMachine.GadgetInfo.Volumes) != 1 {
 		return
 	}
 	rootfsStructure := gadget.VolumeStructure{
@@ -475,6 +482,7 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.ImageSizes = partialStateMachine.ImageSizes
 	stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
 	stateMachine.VolumeNames = partialStateMachine.VolumeNames
+	stateMachine.MainVolumeName = partialStateMachine.MainVolumeName
 
 	stateMachine.Packages = partialStateMachine.Packages
 	stateMachine.Snaps = partialStateMachine.Snaps
