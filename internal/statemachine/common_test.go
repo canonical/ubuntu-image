@@ -89,6 +89,10 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrContains(err, "Error running InfoFromGadgetYaml")
 
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_no_volumes.yaml")
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrContains(err, "Specify at least one volume.")
+
 	// set a valid yaml file and preserveDir
 	stateMachine.YamlFilePath = filepath.Join("testdata",
 		"gadget_tree", "meta", "gadget.yaml")
