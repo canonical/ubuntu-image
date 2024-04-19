@@ -28,13 +28,14 @@ require (
 	github.com/skeema/knownhosts v1.2.1 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
+	go.etcd.io/bbolt v1.3.9 // indirect
 	golang.org/x/mod v0.16.0 // indirect
 	golang.org/x/tools v0.19.0 // indirect
 )
 
 require (
-	github.com/snapcore/secboot v0.0.0-20230623151406-4d331d24f830 // indirect
-	github.com/snapcore/snapd v0.0.0-20240403130118-9134ef8daa86
+	github.com/snapcore/secboot v0.0.0-20240411101434-f3ad7c92552a // indirect
+	github.com/snapcore/snapd v0.0.0-20240418221819-83735930aefc
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
@@ -72,7 +73,6 @@ require (
 	github.com/pkg/xattr v0.4.9
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/snapcore/bolt v1.3.2-0.20210908134111-63c8bfcf7af8 // indirect
 	github.com/snapcore/go-gettext v0.0.0-20230721153050-9082cdc2db05 // indirect
 	gopkg.in/macaroon.v1 v1.0.0 // indirect
 )
