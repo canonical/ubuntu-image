@@ -103,20 +103,20 @@ func (snapStateMachine *SnapStateMachine) decodeModelAssertion() (*asserts.Model
 		return nil, fmt.Errorf("cannot read model assertion: %s", err)
 	}
 
-	ass, err := asserts.Decode(rawAssert)
+	assertion, err := asserts.Decode(rawAssert)
 	if err != nil {
 		return nil, fmt.Errorf("cannot decode model assertion %q: %s", fn, err)
 	}
-	modela, ok := ass.(*asserts.Model)
+	modelAssertion, ok := assertion.(*asserts.Model)
 	if !ok {
 		return nil, fmt.Errorf("assertion in %q is not a model assertion", fn)
 	}
 
 	for _, rsvd := range reserved {
-		if modela.Header(rsvd) != nil {
+		if modelAssertion.Header(rsvd) != nil {
 			return nil, fmt.Errorf("model assertion cannot have reserved/unsupported header %q set", rsvd)
 		}
 	}
 
-	return modela, nil
+	return modelAssertion, nil
 }
