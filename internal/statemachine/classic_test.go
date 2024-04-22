@@ -2495,10 +2495,9 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 ##                      or updates from the Ubuntu security team.
 ## Components: Aside from main, the following components can be added to the list
 ##   restricted  - Software that may not be under a free license, or protected by patents.
-##   universe    - Community maintained packages.
-##                 Software from this repository is only maintained and supported by Canonical
-##                 for machines with Ubuntu Pro subscriptions. Without Ubuntu Pro, the Ubuntu
-##                 community provides best-effort security maintenance.
+##   universe    - Community maintained packages. Software in this repository receives maintenance
+##                 from volunteers in the Ubuntu community, or a 10 year security maintenance
+##                 commitment from Canonical when an Ubuntu Pro subscription is attached.
 ##   multiverse  - Community maintained of restricted. Software from this repository is
 ##                 ENTIRELY UNSUPPORTED by the Ubuntu team, and may not be under a free
 ##                 licence. Please satisfy yourself as to your rights to use the software.
@@ -3323,10 +3322,9 @@ func testHelperCheckSourcesList(t *testing.T, asserter *helper.Asserter, mountDi
 ##                      or updates from the Ubuntu security team.
 ## Components: Aside from main, the following components can be added to the list
 ##   restricted  - Software that may not be under a free license, or protected by patents.
-##   universe    - Community maintained packages.
-##                 Software from this repository is only maintained and supported by Canonical
-##                 for machines with Ubuntu Pro subscriptions. Without Ubuntu Pro, the Ubuntu
-##                 community provides best-effort security maintenance.
+##   universe    - Community maintained packages. Software in this repository receives maintenance
+##                 from volunteers in the Ubuntu community, or a 10 year security maintenance
+##                 commitment from Canonical when an Ubuntu Pro subscription is attached.
 ##   multiverse  - Community maintained of restricted. Software from this repository is
 ##                 ENTIRELY UNSUPPORTED by the Ubuntu team, and may not be under a free
 ##                 licence. Please satisfy yourself as to your rights to use the software.
@@ -4130,10 +4128,9 @@ func TestCreateChroot(t *testing.T) {
 ##                      or updates from the Ubuntu security team.
 ## Components: Aside from main, the following components can be added to the list
 ##   restricted  - Software that may not be under a free license, or protected by patents.
-##   universe    - Community maintained packages.
-##                 Software from this repository is only maintained and supported by Canonical
-##                 for machines with Ubuntu Pro subscriptions. Without Ubuntu Pro, the Ubuntu
-##                 community provides best-effort security maintenance.
+##   universe    - Community maintained packages. Software in this repository receives maintenance
+##                 from volunteers in the Ubuntu community, or a 10 year security maintenance
+##                 commitment from Canonical when an Ubuntu Pro subscription is attached.
 ##   multiverse  - Community maintained of restricted. Software from this repository is
 ##                 ENTIRELY UNSUPPORTED by the Ubuntu team, and may not be under a free
 ##                 licence. Please satisfy yourself as to your rights to use the software.
