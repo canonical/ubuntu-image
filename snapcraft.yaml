@@ -59,8 +59,8 @@ parts:
       - e2fsprogs
     build-attributes: [ enable-patchelf ]
     override-build: |
-      # Gather mkfs configuration for every series
-      ./collect-mkfs-confs.sh 
+      # Check if mkfs configuration for every series are up to date
+      ./check-mkfs-confs.sh 
       ins_bin=$SNAPCRAFT_PART_INSTALL/bin/
       mkdir -p "$ins_bin"
       # Make ubuntu-image statically compiled to avoid libc deps.
