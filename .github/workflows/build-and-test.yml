@@ -64,6 +64,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+      - name: apt-update
+        run: sudo apt update
+
+      - name: install-test-dependencies
+        run: sudo apt install -y devscripts
+
       - name: check mkfs conf updates
         id: check-mkfs
         shell: bash
