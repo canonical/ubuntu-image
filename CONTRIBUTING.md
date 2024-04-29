@@ -125,6 +125,20 @@ git subtree pull --prefix tests/lib/external/snapd-testing-tools/ https://github
 ```
 
 
+## mkfs configuration
+
+ubuntu-image embeds in the snap different configurations to generate filesystems compatible with different series of ubuntu (and specifically different releases of `mkfs`). The snap building process should detect if one of these configurations is out of date and should fail. In this case, update the configurations by running the following from the project root directory:
+```
+# First install dependencies if needed
+sudo apt install ubuntu-dev-tools
+
+# Run the configuration updater
+./tools/collect-mkfs-confs.sh
+```
+
+Then check the configuration and the `./mkfs/db` file were updated. Commit the resulting changes.
+
+
 ## Release process
 
 ubuntu-image is released as a snap on the [Snap Store](https://snapcraft.io/ubuntu-image).
