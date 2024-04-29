@@ -2,7 +2,7 @@
 
 # Check if newer versions of e2fsprogs packages exists compared to our small configuration "database"
 
-set -eu
+set -euo pipefail
 
 WORKDIR=$(pwd)
 DB="$WORKDIR"/mkfs/db
