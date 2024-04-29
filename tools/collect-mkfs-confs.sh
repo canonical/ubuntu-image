@@ -10,6 +10,10 @@ DB="$WORKDIR"/mkfs/db
 
 rm -r "${MKFS_CONF:?}"/* || true
 
+if [ -d "$DB" ]; then
+    rm "$DB" 
+fi
+
 mkdir -p "$MKFS_CONF"
 mkdir -p "$TMP_DIR"/pkg
 
@@ -26,6 +30,8 @@ for FULL_SERIES in $TOTAL_SERIES; do
     SERIES_CODENAME=$(echo "$FULL_SERIES" | cut -d " " -f 2)
     SERIES_RELEASE_POCKET="$SERIES_RELEASE"-updates
 
+    # Collect configurations from amd64 packages for now. This is working under the assumption the configuration
+    # is the same for every arch. This may be wrong now or in the future.
     cd "$TMP_DIR" && \
     pull-lp-debs -a amd64 -p debs -d "$PKG $SERIES_RELEASE"-updates > in_updates.txt || true
     IN_UPDATES=$(grep "Found" "$TMP_DIR"/in_updates.txt || true)
