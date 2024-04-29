@@ -476,59 +476,61 @@ Raspberry Pi images is:
 
 .. code:: yaml
 
-       name: ubuntu-server-raspi-arm64
-       display-name: Ubuntu Server Raspberry Pi arm64
-       revision: 2
-       architecture: arm64
-       series: jammy
-       class: preinstalled
-       kernel:
-         name: linux-raspi
-       gadget:
-         url: "https://github.com/snapcore/pi-gadget.git"
-         branch: "classic"
-         type: "git"
-       model-assertion: pi-generic.model
-       rootfs:
-         archive: ubuntu
-         mirror: "http://ports.ubuntu.com/ubuntu/"
-         seed:
-           urls:
-             - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
-             - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
-           branch: jammy
-           names:
-             - server
-             - minimal
-             - standard
-             - cloud-image
-             - ubuntu-server-raspi
-       customization:
-         cloud-init:
-           user-data: |
-               name: ubuntu
-               password: ubuntu
-         extra-packages:
-           - name: ubuntu-minimal
-           - name: linux-firmware-raspi
-           - name: pi-bluetooth
-         fstab:
-           -
-             label: "writable"
-             mountpoint: "/"
-             filesystem-type: "ext4"
-             dump: false
-             fsck-order: 1
-           -
-             label: "system-boot"
-             mountpoint: "/boot/firmware"
-             filesystem-type: "vfat"
-             mount-options: "defaults"
-             dump: false
-             fsck-order: 1
-       artifacts:
-         img:
-           -
-             name: raspi.img
-         manifest:
-           name: raspi.manifest
+  name: ubuntu-server-raspi-arm64
+  display-name: Ubuntu Server Raspberry Pi arm64
+  revision: 2
+  architecture: arm64
+  series: noble
+  class: preinstalled
+  kernel: linux-image-raspi
+  gadget:
+    url: "https://git.launchpad.net/snap-pi"
+    branch: "classic"
+    type: "git"
+  rootfs:
+    archive: ubuntu
+    sources-list-deb822: true
+    components:
+      - main
+      - restricted
+      - universe
+      - multiverse
+    mirror: "http://ports.ubuntu.com/ubuntu-ports/"
+    pocket: updates
+    seed:
+      urls:
+        - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+      branch: noble
+      names:
+        - server
+        - server-raspi
+        - raspi-common
+        - minimal
+        - standard
+        - cloud-image
+        - supported-raspi-common
+  customization:
+    cloud-init:
+      user-data: |
+        #cloud-config
+        name: ubuntu
+        password: ubuntu
+    extra-snaps:
+      - name: snapd
+    fstab:
+      - label: "writable"
+        mountpoint: "/"
+        filesystem-type: "ext4"
+        dump: false
+        fsck-order: 1
+      - label: "system-boot"
+        mountpoint: "/boot/firmware"
+        filesystem-type: "vfat"
+        mount-options: "defaults"
+        dump: false
+        fsck-order: 1
+  artifacts:
+    img:
+      - name: ubuntu-24.04-preinstalled-server-arm64+raspi.img
+    manifest:
+      name: ubuntu-24.04-preinstalled-server-arm64+raspi.manifest
