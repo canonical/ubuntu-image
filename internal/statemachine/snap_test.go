@@ -125,6 +125,7 @@ func TestSnapStateMachine_Setup_Fail_makeTemporaryDirectories(t *testing.T) {
 	var stateMachine SnapStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
+	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 
 	stateMachine.stateMachineFlags.WorkDir = testDir
 
@@ -147,6 +148,7 @@ func TestSnapStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 	var stateMachine SnapStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
+	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 	stateMachine.commonFlags.OutputDir = "/tmp/test"
 
 	// mock os.MkdirAll
@@ -173,6 +175,7 @@ func TestSnapStateMachine_DryRun(t *testing.T) {
 	var stateMachine SnapStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
+	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 	stateMachine.stateMachineFlags.WorkDir = workDir
 	stateMachine.commonFlags.DryRun = true
 
