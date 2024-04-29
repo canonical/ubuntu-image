@@ -66,7 +66,8 @@ jobs:
           fetch-depth: 2
       - name: check mkfs conf updates
         id: check-mkfs
-        run: ./check-mkfs-confs.sh
+        shell: bash
+        run: ./tools/check-mkfs-confs.sh
     
   tics-report:
     runs-on: ubuntu-latest
