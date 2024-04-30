@@ -39,6 +39,7 @@ parts:
       - debootstrap
       - gpg
       - germinate
+      - git
       - mtools
       - make
       - qemu-user-static
