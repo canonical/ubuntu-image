@@ -117,7 +117,7 @@ prepare: |
       apt install -y gcc-multilib binfmt-support qemu-user-static
   fi
   
-  snap install core22 --channel=latest/edge
+  snap install core24
   snap install yq
   snap install snapcraft --classic
   
