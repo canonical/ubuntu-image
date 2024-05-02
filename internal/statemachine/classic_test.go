@@ -5348,18 +5348,20 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 	err = stateMachine.cleanRootfs()
 	asserter.AssertErrNil(err, true)
 
-	// Check cleaned files were removed
+	// Check cleaned files and dirs were removed
 	cleaned := []string{
 		filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key"),
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key.pub"),
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key"),
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
+		filepath.Join(stateMachine.tempDirs.chroot, "run", "lock"),
+		filepath.Join(stateMachine.tempDirs.chroot, "run", "mount"),
 	}
 	for _, file := range cleaned {
 		_, err := os.Stat(file)
 		if !os.IsNotExist(err) {
-			t.Errorf("File %s should not exist, but does", file)
+			t.Errorf("File/Directory %s should not exist, but does", file)
 		}
 	}
 
@@ -5398,6 +5400,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "udev", "rules.d", "test2-persistent-net.rules"),
 				filepath.Join("var", "cache", "debconf", "test-old"),
 				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
+				filepath.Join("run", "lock", "test"),
+				filepath.Join("run", "mount", "test"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                    0,
@@ -5422,6 +5426,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
 				filepath.Join("var", "cache", "debconf", "test-old"),
 				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
+				filepath.Join("run", "lock", "test"),
+				filepath.Join("run", "mount", "test"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                   sampleSize,
@@ -5429,6 +5435,35 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
 				filepath.Join("var", "cache", "debconf", "test-old"):                 sampleSize,
 				filepath.Join("var", "lib", "dpkg", "testdpkg-old"):                  sampleSize,
+				filepath.Join("run", "lock", "test"):                                 sampleSize,
+				filepath.Join("run", "mount", "test"):                                sampleSize,
+			},
+		},
+		{
+			name: "fail to delete dirs",
+			mockFuncs: func() func() {
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{},
+				)
+
+				osRemoveAll = mock.RemoveAll
+				return func() { osRemoveAll = os.RemoveAll }
+			},
+			expectedErr: "Error removing",
+			initialRootfsContent: []string{
+				filepath.Join("etc", "machine-id"),
+				filepath.Join("var", "lib", "dbus", "machine-id"),
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
+				filepath.Join("var", "cache", "debconf", "test-old"),
+				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
+				filepath.Join("run", "lock", "test"),
+				filepath.Join("run", "mount", "test"),
+			},
+			wantRootfsContent: map[string]int64{
+				filepath.Join("etc", "machine-id"):                                   sampleSize,
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
+				filepath.Join("run", "lock", "test"):                                 sampleSize,
+				filepath.Join("run", "mount", "test"):                                sampleSize,
 			},
 		},
 		{
@@ -5446,6 +5481,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "machine-id"),
 				filepath.Join("var", "lib", "dbus", "machine-id"),
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
+				filepath.Join("run", "lock", "test"),
+				filepath.Join("run", "mount", "test"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                   sampleSize,

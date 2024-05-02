@@ -1364,6 +1364,19 @@ func (stateMachine *StateMachine) cleanRootfs() error {
 		return err
 	}
 
+	toDeleteDirFromPattern, err := listWithPatterns(stateMachine.tempDirs.chroot,
+		[]string{
+			filepath.Join("run", "*"),
+		})
+	if err != nil {
+		return err
+	}
+
+	err = doDeleteDirectories(toDeleteDirFromPattern)
+	if err != nil {
+		return err
+	}
+
 	toTruncateFromPattern, err := listWithPatterns(stateMachine.tempDirs.chroot,
 		[]string{
 			// udev persistent rules
@@ -1395,6 +1408,17 @@ func listWithPatterns(chroot string, patterns []string) ([]string, error) {
 func doDeleteFiles(toDelete []string) error {
 	for _, f := range toDelete {
 		err := osRemove(f)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("Error removing %s: %s", f, err.Error())
+		}
+	}
+	return nil
+}
+
+// doDeleteDirectories deletes the given list of directories
+func doDeleteDirectories(toDelete []string) error {
+	for _, f := range toDelete {
+		err := osRemoveAll(f)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error removing %s: %s", f, err.Error())
 		}
