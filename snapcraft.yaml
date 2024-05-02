@@ -6,7 +6,7 @@ description: |
 version: "3.4+snap6"
 grade: stable
 confinement: classic
-base: core22
+base: core24
 source-code: https://github.com/canonical/ubuntu-image
 issues: https://bugs.launchpad.net/ubuntu-image/+filebug
 
@@ -14,7 +14,7 @@ issues: https://bugs.launchpad.net/ubuntu-image/+filebug
 environment:
   FAKEROOT_FLAGS: "--lib $SNAP/usr/lib/lib-arch/libfakeroot/libfakeroot-tcp.so --faked $SNAP/usr/bin/faked-tcp"
   PATH: $SNAP/usr/bin:$SNAP/bin:$SNAP/usr/sbin:$SNAP/sbin:$PATH
-  GCONV_PATH: /snap/core22/current/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/gconv
+  GCONV_PATH: /snap/core24/current/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/gconv
   PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$PYTHONPATH
   DEBOOTSTRAP_DIR: $SNAP/usr/share/debootstrap
   PERL5LIB: $SNAP/usr/share/perl5:$SNAP/usr/share/perl:$PERL5LIB
@@ -50,12 +50,12 @@ parts:
       - devscripts
       - grub-common
       - libpython3-stdlib
-      - libpython3.10-stdlib
-      - libpython3.10-minimal
+      - libpython3.12-stdlib
+      - libpython3.12-minimal
       - python3
       - python3-apt
       - python3-minimal
-      - python3.10-minimal
+      - python3.12-minimal
       - e2fsprogs
     build-attributes: [ enable-patchelf ]
     override-build: |
@@ -69,9 +69,6 @@ parts:
       # issues with go binaries (https://github.com/NixOS/patchelf/issues/146).
       # On compiling statically go, see https://mt165.co.uk/blog/static-link-go/
       CGO_ENABLED=0 go build -o "$ins_bin" ./cmd/ubuntu-image/
-      # create a symlink /usr/bin/fakeroot -> /usr/bin/fakeroot-tcp
-      cd $SNAPCRAFT_PART_INSTALL/usr/bin/
-      ln -s fakeroot-tcp fakeroot
       # Create a symbolic link to /usr/lib/<arch> where libfakeroot will live
       cd $SNAPCRAFT_PART_INSTALL/usr/lib/
-      ln -s ${SNAPCRAFT_ARCH_TRIPLET} lib-arch
+      ln -s ${CRAFT_ARCH_TRIPLET_BUILD_FOR} lib-arch

@@ -117,6 +117,11 @@ It prints how to reuse the systems. Run `export REUSE_PROJECT=1` in your environ
 
 * Spread tests can be exercised on Ubuntu Core 20 and higher but need UEFI. UEFI support with a QEMU backend for Spread requires a BIOS from the [OVMF](https://wiki.ubuntu.com/UEFI/OVMF) package, which can be installed with `sudo apt install ovmf`.
 
+> [!NOTE] 
+> For series older than 20.04 a snap build (built on a 20.04 or onward) of the tool must be available in the current directory.
+> The tool cannot be built on 18.04 or older.
+
+
 ### Maintaining test helpers
 
 Spread tests rely on [snapd-testing-tools](https://github.com/snapcore/snapd-testing-tools). To update the subtree of this project, run:
