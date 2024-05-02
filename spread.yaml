@@ -35,6 +35,9 @@ backends:
       - ubuntu-23.10-64:
           storage: 45G
           workers: 1
+      - ubuntu-24.04-64:
+          storage: 45G
+          workers: 1
   google-arm:
     type: google
     key: '$(HOST: echo "$SPREAD_GOOGLE_KEY")'
@@ -48,6 +51,10 @@ backends:
           storage: 45G
       - ubuntu-22.04-arm-64:
           image: ubuntu-os-cloud/ubuntu-2204-lts-arm64
+          workers: 1
+          storage: 45G
+      - ubuntu-24.04-arm-64:
+          image: ubuntu-os-cloud/ubuntu-2404-lts-arm64
           workers: 1
           storage: 45G
   qemu:
@@ -66,6 +73,9 @@ backends:
             username: ubuntu
             password: ubuntu
       - ubuntu-23.10-64:
+            username: ubuntu
+            password: ubuntu
+      - ubuntu-24.04-64:
             username: ubuntu
             password: ubuntu
 
