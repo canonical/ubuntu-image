@@ -29,9 +29,6 @@ backends:
       - ubuntu-22.04-64:
           storage: 45G
           workers: 1
-      - ubuntu-23.04-64:
-          storage: 45G
-          workers: 1
       - ubuntu-23.10-64:
           storage: 45G
           workers: 1
@@ -67,9 +64,6 @@ backends:
             username: ubuntu
             password: ubuntu
       - ubuntu-22.04-64:
-            username: ubuntu
-            password: ubuntu
-      - ubuntu-23.04-64:
             username: ubuntu
             password: ubuntu
       - ubuntu-23.10-64:
