@@ -491,7 +491,7 @@ func (i *ImageDefinition) deb822SourcesList(target bool) string {
 		i.securityMirror(),
 		i.Series,
 		i.Rootfs.Components,
-		pocket,
+		SECURITY_POCKET,
 	)
 
 	return ubuntuSources
