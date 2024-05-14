@@ -2515,7 +2515,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 ## this should mirror your choices in the previous section.
 Types: deb
 URIs: http://security.ubuntu.com/ubuntu/
-Suites: jammy
+Suites: jammy-security
 Components: main restricted
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
@@ -3342,7 +3342,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 ## this should mirror your choices in the previous section.
 Types: deb
 URIs: http://security.ubuntu.com/ubuntu/
-Suites: jammy jammy-updates jammy-proposed
+Suites: jammy-security
 Components: main universe restricted
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
@@ -4148,7 +4148,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 ## this should mirror your choices in the previous section.
 Types: deb
 URIs: http://security.ubuntu.com/ubuntu/
-Suites: jammy jammy-updates jammy-proposed
+Suites: jammy-security
 Components: main restricted
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
