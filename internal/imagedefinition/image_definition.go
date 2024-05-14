@@ -315,6 +315,14 @@ func (i ImageDefinition) securityMirror() string {
 	return i.Rootfs.Mirror
 }
 
+// List of valid pockets
+const (
+	RELEASE_POCKET  = "release"
+	SECURITY_POCKET = "security"
+	UPDATES_POCKET  = "updates"
+	PROPOSED_POCKET = "proposed"
+)
+
 // generateLegacySourcesList returns the content to write to the sources.list file
 // under the legacy format.
 func generateLegacySourcesList(series string, components []string, mirror string, securityMirror string, pocket string) string {
@@ -335,13 +343,13 @@ func generateLegacySourcesList(series string, components []string, mirror string
 	sourcesList := make([]string, 0)
 
 	switch pocket {
-	case "release":
+	case RELEASE_POCKET:
 		sourcesList = append(sourcesList, releaseSource)
-	case "security":
+	case SECURITY_POCKET:
 		sourcesList = append(sourcesList, releaseSource, securitySource)
-	case "updates":
+	case UPDATES_POCKET:
 		sourcesList = append(sourcesList, releaseSource, securitySource, updatesSource)
-	case "proposed":
+	case PROPOSED_POCKET:
 		sourcesList = append(sourcesList, releaseSource, securitySource, updatesSource, proposedSource)
 	}
 
@@ -391,15 +399,15 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 	suites := make([]string, 0)
 
 	switch pocket {
-	case "security":
+	case SECURITY_POCKET:
 		suites = []string{series + "-security"}
-	case "proposed":
+	case PROPOSED_POCKET:
 		suites = append([]string{series + "-proposed"}, suites...)
 		fallthrough
-	case "updates":
+	case UPDATES_POCKET:
 		suites = append([]string{series + "-updates"}, suites...)
 		fallthrough
-	case "release":
+	case RELEASE_POCKET:
 		suites = append([]string{series}, suites...)
 	}
 
