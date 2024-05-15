@@ -26,7 +26,7 @@ The future versions of this tool will be more generalized, allowing users to bui
 See [Build your first Ubuntu Core image](https://ubuntu.com/core/docs/build-an-image) for instructions on how to use ubuntu-image to build an Ubuntu core image on a **Raspberry Pi**.
 
 > [!IMPORTANT] 
-> ubuntu-image requires **elevated permissions**. Please be sure to run it as **root** or with `sudo`.
+> `ubuntu-image` requires **elevated permissions**. Run it with **root** privileges or using `sudo`.
 
 ## Building images
 
