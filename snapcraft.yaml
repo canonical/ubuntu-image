@@ -3,7 +3,7 @@ summary: Create Ubuntu images
 description: |
   Official tool for building Ubuntu images, currently supporing Ubuntu Core
   snap-based images and preinstalled Ubuntu classic images.
-version: "3.4+snap3"
+version: "3.4+snap4"
 grade: stable
 confinement: classic
 base: core22
