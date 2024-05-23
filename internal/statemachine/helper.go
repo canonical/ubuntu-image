@@ -33,6 +33,8 @@ const (
 	schemaMBR = "mbr"
 	// schemaGPT identifies a GUID Partition Table partitioning schema
 	schemaGPT = "gpt"
+
+	gptBootableAttribute uint64 = 4
 )
 
 var runCmd = helper.RunCmd
@@ -538,12 +540,18 @@ func gptPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64,
 		partitionName = "writable"
 	}
 
-	return &gpt.Partition{
+	partition := &gpt.Partition{
 		Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
 		Size:  uint64(structure.Size),
 		Type:  gpt.Type(structureType),
 		Name:  partitionName,
 	}
+
+	if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+		partition.Attributes = gptBootableAttribute
+	}
+
+	return partition
 }
 
 // copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
