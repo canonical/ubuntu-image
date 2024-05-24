@@ -513,8 +513,12 @@ Raspberry Pi images is:
     cloud-init:
       user-data: |
         #cloud-config
-        name: ubuntu
-        password: ubuntu
+        chpasswd:
+          expire: true
+          users:
+            - name: ubuntu
+              password: ubuntu
+              type: text
     extra-snaps:
       - name: snapd
     fstab:
