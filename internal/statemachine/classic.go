@@ -37,7 +37,7 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 	// set the parent pointer of the embedded struct
 	classicStateMachine.parent = classicStateMachine
 
-	classicStateMachine.states = make([]stateFunc, 0)
+	classicStateMachine.stateFuncs = make([]stateFunc, 0)
 
 	if err := classicStateMachine.setConfDefDir(classicStateMachine.parent.(*ClassicStateMachine).Args.ImageDefinition); err != nil {
 		return err
@@ -379,7 +379,7 @@ func (s *StateMachine) calculateStates() error {
 	s.addArtifactsStates(c, &rootfsCreationStates)
 
 	// Append the newly calculated states to the slice of funcs in the parent struct
-	s.states = append(s.states, rootfsCreationStates...)
+	s.stateFuncs = append(s.stateFuncs, rootfsCreationStates...)
 
 	return nil
 }

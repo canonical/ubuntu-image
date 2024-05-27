@@ -248,7 +248,7 @@ type testStateMachine struct {
 // testStateMachine needs its own setup
 func (TestStateMachine *testStateMachine) Setup() error {
 	// set the states that will be used for this image type
-	TestStateMachine.states = allTestStates
+	TestStateMachine.stateFuncs = allTestStates
 
 	// do the validation common to all image types
 	if err := TestStateMachine.validateInput(); err != nil {
@@ -340,7 +340,7 @@ func TestDebug(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// just use the one state
-	stateMachine.states = testStates
+	stateMachine.stateFuncs = testStates
 	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
 	asserter.AssertErrNil(err, true)
 
@@ -352,8 +352,8 @@ func TestDebug(t *testing.T) {
 	readStdout, err := io.ReadAll(stdout)
 	asserter.AssertErrNil(err, true)
 
-	if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
-		t.Errorf("Expected state name \"%s\" to appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
+	if !strings.Contains(string(readStdout), stateMachine.stateFuncs[0].name) {
+		t.Errorf("Expected state name \"%s\" to appear in output \"%s\"\n", stateMachine.stateFuncs[0].name, string(readStdout))
 	}
 }
 
@@ -376,7 +376,7 @@ func TestDryRun(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// just use the one state
-	stateMachine.states = testStates
+	stateMachine.stateFuncs = testStates
 	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
 	asserter.AssertErrNil(err, true)
 
@@ -387,8 +387,8 @@ func TestDryRun(t *testing.T) {
 	readStdout, err := io.ReadAll(stdout)
 	asserter.AssertErrNil(err, true)
 
-	if strings.Contains(string(readStdout), stateMachine.states[0].name) {
-		t.Errorf("Expected state name \"%s\" to not appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
+	if strings.Contains(string(readStdout), stateMachine.stateFuncs[0].name) {
+		t.Errorf("Expected state name \"%s\" to not appear in output \"%s\"\n", stateMachine.stateFuncs[0].name, string(readStdout))
 	}
 }
 
@@ -421,10 +421,10 @@ func TestFunctionErrors(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			// override the function, but save the old one
-			oldStateFunc := stateMachine.states[tc.overrideState]
-			stateMachine.states[tc.overrideState] = tc.newStateFunc
+			oldStateFunc := stateMachine.stateFuncs[tc.overrideState]
+			stateMachine.stateFuncs[tc.overrideState] = tc.newStateFunc
 			defer func() {
-				stateMachine.states[tc.overrideState] = oldStateFunc
+				stateMachine.stateFuncs[tc.overrideState] = oldStateFunc
 			}()
 			if err := stateMachine.Run(); err == nil {
 				if err := stateMachine.Teardown(); err == nil {
@@ -1159,7 +1159,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 				IsSeeded:     true,
 				SectorSize:   quantity.Size(512),
 				RootfsSize:   quantity.Size(775915520),
-				states:       allTestStates[2:],
+				stateFuncs:   allTestStates[2:],
 				GadgetInfo: &gadget.Info{
 					Volumes: map[string]*gadget.Volume{
 						"pc": {
@@ -1246,7 +1246,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 					Resume:  false,
 					WorkDir: filepath.Join(testDataDir, "metadata"),
 				},
-				states: allTestStates,
+				stateFuncs: allTestStates,
 			},
 			shouldPass:    true,
 			expectedError: "error reading metadata file",
@@ -1270,7 +1270,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 					Resume:  tc.args.resume,
 					WorkDir: filepath.Join(testDataDir, "metadata"),
 				},
-				states: allTestStates,
+				stateFuncs: allTestStates,
 			}
 
 			err := gotStateMachine.readMetadata(tc.args.metadataFile)
@@ -1304,7 +1304,7 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 				IsSeeded:     true,
 				SectorSize:   quantity.Size(512),
 				RootfsSize:   quantity.Size(775915520),
-				states:       allTestStates[2:],
+				stateFuncs:   allTestStates[2:],
 				GadgetInfo: &gadget.Info{
 					Volumes: map[string]*gadget.Volume{
 						"pc": {
@@ -1597,7 +1597,7 @@ Continuing
 			s := &StateMachine{
 				commonFlags:       tt.fields.commonFlags,
 				stateMachineFlags: tt.fields.stateMachineFlags,
-				states:            tt.fields.states,
+				stateFuncs:        tt.fields.states,
 			}
 			s.displayStates()
 
