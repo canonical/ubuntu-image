@@ -88,7 +88,7 @@ func (stateMachine *StateMachine) validateUntilThru() error {
 	}
 
 	if searchState != "" {
-		for _, state := range stateMachine.states {
+		for _, state := range stateMachine.stateFuncs {
 			if state.name == searchState {
 				stateFound = true
 				break
