@@ -2,8 +2,6 @@ summary: Build classic Ubuntu server image
 
 kill-timeout: 3h
 
-systems: [-ubuntu-18.04-64]
-
 execute: |
     mkdir -p /tmp/${IMG}/{workdir,mount}
     IMG_DEF_PATH=/home/ubuntu-image/ubuntu-images/${IMG}.yaml

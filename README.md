@@ -17,7 +17,7 @@ The future versions of this tool will be more generalized, allowing users to bui
 
 ### Requirements
 
-* Ubuntu 18.04 (Bionic Beaver) or newer (recommended: Ubuntu 22.04 (Jammy Jellyfish))
+* Ubuntu 20.04 (Focal Fossa) or newer (recommended: Ubuntu 22.04 (Jammy Jellyfish))
 
 * Ability to install snaps ([SnapStore: ubuntu-image](https://snapcraft.io/ubuntu-image))
 
