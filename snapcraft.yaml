@@ -39,6 +39,7 @@ parts:
       - gdisk
       - fakeroot
       - apt
+      - apt-utils
       - dpkg
       - arch-test
       - mmdebstrap
@@ -47,6 +48,7 @@ parts:
       - git
       - mtools
       - make
+      - qemu-user
       - qemu-user-static
       - qemu-utils
       - u-boot-tools
