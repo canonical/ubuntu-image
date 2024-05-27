@@ -471,7 +471,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			stateNames := make([]string, 0)
-			for _, f := range stateMachine.states {
+			for _, f := range stateMachine.stateFuncs {
 				stateNames = append(stateNames, f.name)
 			}
 
