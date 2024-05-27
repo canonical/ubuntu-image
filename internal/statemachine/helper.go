@@ -726,7 +726,7 @@ func generateMmdebstrapCmd(imageDefinition imagedefinition.ImageDefinition, targ
 	)
 
 	if debug {
-		mmdebstrapCmd.Args = append(mmdebstrapCmd.Args, "--verbose")
+		mmdebstrapCmd.Args = append(mmdebstrapCmd.Args, "--debug")
 	}
 
 	if imageDefinition.Customization != nil && len(imageDefinition.Customization.ExtraPPAs) > 0 {
