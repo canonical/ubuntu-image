@@ -20,9 +20,6 @@ backends:
     plan: n2-standard-2
     halt-timeout: 2h
     systems:
-      # - ubuntu-16.04-64:
-      #       workers: 1
-      #       storage: 45G
       - ubuntu-18.04-64:
           storage: 45G
           workers: 1
@@ -56,9 +53,6 @@ backends:
   qemu:
     memory: 4G
     systems:
-      # - ubuntu-16.04-64:
-      #       username: ubuntu
-      #       password: ubuntu
       - ubuntu-18.04-64:
             username: ubuntu
             password: ubuntu

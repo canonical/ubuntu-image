@@ -10,7 +10,7 @@ This document covers the following topics:
 
 ## Setting up
 
-Ubuntu 18.04 LTS or later is recommended for ubuntu-image development.
+Ubuntu 20.04 LTS or later is recommended for ubuntu-image development.
 Usually, the [latest LTS](https://releases.ubuntu.com/) would be the best choice.
 
 Go 1.21 [(or later)](https://snapcraft.io/go) is required to build ubuntu-image.
@@ -101,16 +101,16 @@ Alternatively, instead of building the QEMU images manually, you can download un
 
 #### Running Spread with QEMU
 
-Finally, you can run the Spread tests for Ubuntu 18.04 LTS 64-bit with:
+Finally, you can run the Spread tests for Ubuntu 20.04 LTS 64-bit with:
 ```
-spread -v qemu:ubuntu-18.04-64
+spread -v qemu:ubuntu-20.04-64
 ```
 
-* To run for a different system, replace `ubuntu-18.04-64` with a different system name, which should be a basename of the [built](#building-spread-vm-images) or [downloaded](#downloading-spread-vm-images) Ubuntu image file.
+* To run for a different system, replace `ubuntu-20.04-64` with a different system name, which should be a basename of the [built](#building-spread-vm-images) or [downloaded](#downloading-spread-vm-images) Ubuntu image file.
 
 For quick reuse, run:
 ```
-spread -reuse qemu:ubuntu-18.04-64
+spread -reuse qemu:ubuntu-20.04-64
 ```
 
 It prints how to reuse the systems. Run `export REUSE_PROJECT=1` in your environment, too.
