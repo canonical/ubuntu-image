@@ -32,7 +32,7 @@ func (packStateMachine *PackStateMachine) Setup() error {
 	packStateMachine.parent = packStateMachine
 
 	// set the beginning states that will be used by all pack image builds
-	packStateMachine.states = packStates
+	packStateMachine.stateFuncs = packStates
 
 	// do the validation common to all image types
 	if err := packStateMachine.validateInput(); err != nil {

@@ -114,7 +114,7 @@ type StateMachine struct {
 	commonFlags       *commands.CommonOpts
 	stateMachineFlags *commands.StateMachineOpts
 
-	states []stateFunc // the state functions
+	stateFuncs []stateFunc // the state functions
 
 	// used to access image type specific variables from state functions
 	parent SmInterface
@@ -442,12 +442,12 @@ func (stateMachine *StateMachine) readMetadata(metadataFile string) error {
 func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) error {
 	stateMachine.StepsTaken = partialStateMachine.StepsTaken
 
-	if stateMachine.StepsTaken > len(stateMachine.states) {
-		return fmt.Errorf("invalid steps taken count (%d). The state machine only have %d steps", stateMachine.StepsTaken, len(stateMachine.states))
+	if stateMachine.StepsTaken > len(stateMachine.stateFuncs) {
+		return fmt.Errorf("invalid steps taken count (%d). The state machine only have %d steps", stateMachine.StepsTaken, len(stateMachine.stateFuncs))
 	}
 
 	// delete all of the stateFuncs that have already run
-	stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
+	stateMachine.stateFuncs = stateMachine.stateFuncs[stateMachine.StepsTaken:]
 
 	stateMachine.CurrentStep = partialStateMachine.CurrentStep
 	stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
@@ -509,7 +509,7 @@ func (s *StateMachine) displayStates() {
 	}
 	fmt.Printf("\nFollowing states %s be executed:\n", verb)
 
-	for i, state := range s.states {
+	for i, state := range s.stateFuncs {
 		if state.name == s.stateMachineFlags.Until {
 			break
 		}
@@ -609,8 +609,8 @@ func (stateMachine *StateMachine) Run() error {
 		return nil
 	}
 	// iterate through the states
-	for i := 0; i < len(stateMachine.states); i++ {
-		stateFunc := stateMachine.states[i]
+	for i := 0; i < len(stateMachine.stateFuncs); i++ {
+		stateFunc := stateMachine.stateFuncs[i]
 		stateMachine.CurrentStep = stateFunc.name
 		if stateFunc.name == stateMachine.stateMachineFlags.Until {
 			break
