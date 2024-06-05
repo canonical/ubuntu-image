@@ -16,6 +16,7 @@ type SnapOpts struct {
 	CloudInit                 string         `long:"cloud-init" description:"cloud-config data to be copied to the image" value-name:"USER-DATA-FILE"`
 	Revisions                 map[string]int `long:"revision" description:"The revision of a specific snap to install in the image." value-name:"REVISION"`
 	SysfsOverlay              string         `long:"sysfs-overlay" description:"The optional sysfs overlay to used for preseeding. Directories from /sys/class/* and /sys/devices/platform will be bind-mounted to the chroot when preseeding"`
+        AutoImport                string         `long:"auto-import" description:"Create a system-user account. Specify optional path to auto-import.assert. Only works with dangerous grade."`    
 }
 
 type SnapCommand struct {

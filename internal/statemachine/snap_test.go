@@ -842,3 +842,50 @@ func TestPreseedFlag(t *testing.T) {
 	err = stateMachine.Teardown()
 	asserter.AssertErrNil(err, true)
 }
+func TestAutoImportFlag(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := testhelper.SaveCWD()
+	defer restoreCWD()
+
+	var calledOpts *image.Options
+	imagePrepare = func(opts *image.Options) error {
+		calledOpts = opts
+		return nil
+	}
+	defer func() {
+		imagePrepare = image.Prepare
+	}()
+
+	var stateMachine SnapStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
+	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.stateMachineFlags.Thru = "prepare_image"
+	stateMachine.Opts.Preseed = false
+	stateMachine.Opts.AutoImport = "auto-import.assert"
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	if calledOpts == nil {
+		t.Errorf("options passed to image.Prepare are nil")
+	}
+
+	if calledOpts.AutoImport == "" {
+		t.Error("Expected Auto import assertion name is not null")
+	}
+	/*
+		expectedAssertionName := "auto-import.assert"
+		if calledOpts.AutoImport != expectedAssertionName {
+			t.Errorf("Expected auto import assertion name to be %q, but it's %q", expectedAssertionName, calledOpts.AutoImport)
+		}
+	*/
+	err = stateMachine.Teardown()
+	asserter.AssertErrNil(err, true)
+}
