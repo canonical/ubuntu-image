@@ -33,8 +33,6 @@ const (
 	schemaMBR = "mbr"
 	// schemaGPT identifies a GUID Partition Table partitioning schema
 	schemaGPT = "gpt"
-
-	bareStructure = "bare"
 )
 
 var runCmd = helper.RunCmd
@@ -454,8 +452,7 @@ func generatePartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded b
 	partitionNumber, rootfsPartitionNumber := 1, -1
 
 	for _, structure := range volume.Structure {
-		if structure.Role == schemaMBR || structure.Type == bareStructure ||
-			shouldSkipStructure(structure, isSeeded) {
+		if !structure.IsPartition() || shouldSkipStructure(structure, isSeeded) {
 			continue
 		}
 
