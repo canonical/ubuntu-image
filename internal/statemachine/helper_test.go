@@ -487,6 +487,51 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 	}
 }
 
+// TestStructureContentNonFSStructure verifies the handling of structures without a filesystem.
+func TestStructureContentNonFSStructure(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-no-fs.yaml")
+
+	// need workdir and loaded gadget.yaml set up for this
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+
+	// manually set the size of the rootfs structure to 0
+	var volume *gadget.Volume = stateMachine.GadgetInfo.Volumes["pc"]
+	var nonFSStructure gadget.VolumeStructure
+	var nonFSStructureNumber int = -1
+	for structureNumber, structure := range volume.Structure {
+		if structure.Name == "placeholder" {
+			nonFSStructure = structure
+			nonFSStructureNumber = structureNumber
+		}
+	}
+	asserter.AssertEqual(true, nonFSStructureNumber >= 0)
+
+	// mock FS helper such that calls would result in an error
+	mkfsMake = mockMkfs
+	t.Cleanup(func() {
+		mkfsMake = mkfs.Make
+	})
+
+	err = stateMachine.copyStructureContent(volume,
+		nonFSStructure,
+		nonFSStructureNumber,
+		stateMachine.tempDirs.rootfs,
+		filepath.Join(stateMachine.tempDirs.volumes, "part0.img"))
+	asserter.AssertErrNil(err, true)
+
+	partImg := filepath.Join(stateMachine.tempDirs.volumes, "part0.img")
+	if _, err := os.Stat(partImg); err != nil {
+		t.Errorf("File %s should exist, but does not", partImg)
+	}
+}
+
 // TestGenerateUniqueDiskID ensures that we generate unique disk IDs
 func TestGenerateUniqueDiskID(t *testing.T) {
 	t.Parallel()

@@ -174,7 +174,8 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 	structure gadget.VolumeStructure, structIndex int,
 	contentRoot, partImg string) error {
 
-	if structure.Filesystem == "" {
+	if !structure.HasFilesystem() {
+		// binary blobs like eg. raw bootloader images
 		err := copyStructureNoFS(stateMachine.tempDirs.unpack, structure, partImg)
 		if err != nil {
 			return err
