@@ -259,9 +259,9 @@ func TestFailedCopyStructureContent(t *testing.T) {
 
 	// mock helper.CopyBlob and test with no filesystem specified
 	helperCopyBlob = mockCopyBlob
-	defer func() {
+	t.Cleanup(func() {
 		helperCopyBlob = helper.CopyBlob
-	}()
+	})
 	err = stateMachine.copyStructureContent(volume, mbrStruct, 0, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error zeroing partition")
@@ -269,9 +269,9 @@ func TestFailedCopyStructureContent(t *testing.T) {
 
 	// set an invalid blocksize to mock the binary copy blob
 	blockSize = "0"
-	defer func() {
+	t.Cleanup(func() {
 		blockSize = "1"
-	}()
+	})
 	err = stateMachine.copyStructureContent(volume, mbrStruct, 0, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error copying image blob")
@@ -279,9 +279,9 @@ func TestFailedCopyStructureContent(t *testing.T) {
 
 	// mock helper.CopyBlob and test with filesystem: vfat
 	helperCopyBlob = mockCopyBlob
-	defer func() {
+	t.Cleanup(func() {
 		helperCopyBlob = helper.CopyBlob
-	}()
+	})
 	err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error zeroing image file")
@@ -289,9 +289,9 @@ func TestFailedCopyStructureContent(t *testing.T) {
 
 	// mock os.ReadDir
 	osReadDir = mockReadDir
-	defer func() {
+	t.Cleanup(func() {
 		osReadDir = os.ReadDir
-	}()
+	})
 	err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error listing contents of volume")
@@ -319,9 +319,9 @@ func TestFailedCopyStructureContent(t *testing.T) {
 
 	// mock gadget.MkfsWithContent
 	mkfsMakeWithContent = mockMkfsWithContent
-	defer func() {
+	t.Cleanup(func() {
 		mkfsMakeWithContent = mkfs.MakeWithContent
-	}()
+	})
 	err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error running mkfs with content")
@@ -330,9 +330,9 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	// mock mkfs.Mkfs
 	rootfsStruct.Content = nil // to trigger the "empty partition" case
 	mkfsMake = mockMkfs
-	defer func() {
+	t.Cleanup(func() {
 		mkfsMake = mkfs.Make
-	}()
+	})
 	err = stateMachine.copyStructureContent(volume, rootfsStruct, 0, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error running mkfs")
