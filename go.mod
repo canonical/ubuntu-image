@@ -35,7 +35,7 @@ require (
 
 require (
 	github.com/snapcore/secboot v0.0.0-20240411101434-f3ad7c92552a // indirect
-	github.com/snapcore/snapd v0.0.0-20240429124543-2ea10e81aa88
+	github.com/snapcore/snapd v0.0.0-20240618105125-0d60393deebb
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
@@ -56,7 +56,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
-	github.com/canonical/go-efilib v0.3.1-0.20220815143333-7e5151412e93 // indirect
+	github.com/canonical/go-efilib v0.4.0 // indirect
 	github.com/canonical/go-sp800.108-kdf v0.0.0-20210314145419-a3359f2d21b9 // indirect
 	github.com/canonical/go-sp800.90a-drbg v0.0.0-20210314144037-6eeb1040d6c3 // indirect
 	github.com/canonical/go-tpm2 v0.0.0-20210827151749-f80ff5afff61 // indirect
