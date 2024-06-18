@@ -14,8 +14,8 @@ github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xW
 github.com/buger/jsonparser v1.1.1 h1:2PnMjfWD7wBILjqQbt530v576A/cAbQvEW9gGIpYMUs=
 github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
 github.com/bwesterb/go-ristretto v1.2.3/go.mod h1:fUIoIZaG73pV5biE2Blr2xEzDoMj7NFEuV9ekS419A0=
-github.com/canonical/go-efilib v0.3.1-0.20220815143333-7e5151412e93 h1:F0bRDzPy/j2IX/iIWqCEA23S1nal+f7A+/vLyj6Ye+4=
-github.com/canonical/go-efilib v0.3.1-0.20220815143333-7e5151412e93/go.mod h1:9b2PNAuPcZsB76x75/uwH99D8CyH/A2y4rq1/+bvplg=
+github.com/canonical/go-efilib v0.4.0 h1:2ee5pvhIZ+g1EO4HxFE/owBgs5Up2g7dw1+Ls9/fiSs=
+github.com/canonical/go-efilib v0.4.0/go.mod h1:9b2PNAuPcZsB76x75/uwH99D8CyH/A2y4rq1/+bvplg=
 github.com/canonical/go-sp800.108-kdf v0.0.0-20210314145419-a3359f2d21b9 h1:USzKjrfWo/ESzozv2i3OMM7XDgxrZRvaHFrKkIKRtwU=
 github.com/canonical/go-sp800.108-kdf v0.0.0-20210314145419-a3359f2d21b9/go.mod h1:Zrs3YjJr+w51u0R/dyLh/oWt/EcBVdLPCVFYC4daW5s=
 github.com/canonical/go-sp800.90a-drbg v0.0.0-20210314144037-6eeb1040d6c3 h1:oe6fCvaEpkhyW3qAicT0TnGtyht/UrgvOwMcEgLb7Aw=
@@ -121,8 +121,8 @@ github.com/snapcore/go-gettext v0.0.0-20230721153050-9082cdc2db05/go.mod h1:1ueM
 github.com/snapcore/secboot v0.0.0-20240411101434-f3ad7c92552a h1:yzzVi0yUosDYkjSQqGZNVtaVi+6yNFLiF0erKHlBbdo=
 github.com/snapcore/secboot v0.0.0-20240411101434-f3ad7c92552a/go.mod h1:72paVOkm4sJugXt+v9ItmnjXgO921D8xqsbH2OekouY=
 github.com/snapcore/snapd v0.0.0-20201005140838-501d14ac146e/go.mod h1:3xrn7QDDKymcE5VO2rgWEQ5ZAUGb9htfwlXnoel6Io8=
-github.com/snapcore/snapd v0.0.0-20240429124543-2ea10e81aa88 h1:RecfXpnAX89weUaNZE/NqH0A08qYWoNd/bA8Pn4yAKc=
-github.com/snapcore/snapd v0.0.0-20240429124543-2ea10e81aa88/go.mod h1:QNsQNTz6P2yqZ22QTU5Jt1FUIGGLlcUuNURvo2tWYOo=
+github.com/snapcore/snapd v0.0.0-20240618105125-0d60393deebb h1:bnzbC+m9mF7ZM6JUvU7GmS/N6y+m9f2Agoo91iQhS78=
+github.com/snapcore/snapd v0.0.0-20240618105125-0d60393deebb/go.mod h1:RfaJNlcyEP2RfVuyAX/3x+CJPECCAlZn+36Yily9FzY=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
