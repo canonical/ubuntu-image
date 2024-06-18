@@ -136,7 +136,7 @@ sudo apt install ubuntu-dev-tools
 ./tools/collect-mkfs-confs.sh
 ```
 
-Then check the configuration and the `./mkfs/db` file were updated. Commit the resulting changes.
+Then check the configurations and the `./mkfs/db` file were updated. Commit the resulting changes.
 
 
 ## Release process
