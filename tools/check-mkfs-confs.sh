@@ -8,6 +8,7 @@ WORKDIR=$(pwd)
 DB="$WORKDIR"/mkfs/db
 NEW_DB="$WORKDIR"/mkfs/new_db
 MUST_UPDATE=0
+PKG=e2fsprogs
 
 if [ -f "$NEW_DB" ]; then
     rm "$NEW_DB" 
@@ -15,7 +16,7 @@ fi
 
 IFS=$'\n'
 
-CANDIDATES=$(rmadison -S e2fsprogs | grep "e2fsprogs " | awk -F '|' '{print $3","$2}' | tr -d ' ')
+CANDIDATES=$(rmadison -S "${PKG}" | grep "${PKG} " | awk -F '|' '{print $3","$2}' | tr -d ' ')
 
 ubuntu-distro-info --supported -f > supported
 ubuntu-distro-info --supported-esm -f > supported_esm
