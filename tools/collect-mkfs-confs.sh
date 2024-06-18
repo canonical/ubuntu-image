@@ -10,7 +10,7 @@ DB="$WORKDIR"/mkfs/db
 
 rm -r "${MKFS_CONF:?}"/* || true
 
-if [ -d "$DB" ]; then
+if [ -f "$DB" ]; then
     rm "$DB" 
 fi
 
