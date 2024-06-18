@@ -9,7 +9,7 @@ DB="$WORKDIR"/mkfs/db
 NEW_DB="$WORKDIR"/mkfs/new_db
 MUST_UPDATE=0
 
-if [ -d "$NEW_DB" ]; then
+if [ -f "$NEW_DB" ]; then
     rm "$NEW_DB" 
 fi
 
