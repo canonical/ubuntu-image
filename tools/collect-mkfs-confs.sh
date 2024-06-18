@@ -42,10 +42,10 @@ for FULL_SERIES in $TOTAL_SERIES; do
         SERIES_RELEASE_POCKET="$SERIES_RELEASE"
     fi
 
-    PKG_NAME=$(find . "${TMP_DIR}" -name "e2fsprogs_*.deb" | tail -1)
+    PKG_NAME=$(find . "${TMP_DIR}" -name "${PKG}_*.deb" | tail -1)
     VERSION=$(echo "$PKG_NAME" | cut -d "_" -f 2)
 
-    dpkg-deb --extract "$(find . "${TMP_DIR}" -name "e2fsprogs_*.deb" | tail -1)" "$TMP_DIR"/pkg/
+    dpkg-deb --extract "$(find . "${TMP_DIR}" -name "${PKG}_*.deb" | tail -1)" "$TMP_DIR"/pkg/
     mkdir -p "$MKFS_CONF"/"$SERIES_CODENAME"/
     ln -s -r "$MKFS_CONF"/"$SERIES_CODENAME"/ "$MKFS_CONF"/"$SERIES_RELEASE"
     cp "$TMP_DIR"/pkg/etc/mke2fs.conf "$MKFS_CONF"/"$SERIES_CODENAME"/
