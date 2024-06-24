@@ -35,6 +35,8 @@ const (
 	schemaGPT = "gpt"
 
 	bareStructure = "bare"
+
+	gptBootableAttribute uint64 = 4
 )
 
 var runCmd = helper.RunCmd
@@ -517,10 +519,6 @@ func getStructureType(structure gadget.VolumeStructure, schema string) string {
 
 // mbrPartitionFromStruct prepares a mbr.Partition object from a gadget.VolumeStructure
 func mbrPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64, structureType string) *mbr.Partition {
-	bootable := false
-	if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
-		bootable = true
-	}
 	// mbr.Type is a byte. snapd has already verified that this string
 	// is exactly two chars, so we can safely parse those two chars to a byte
 	partitionType, _ := strconv.ParseUint(structureType, 16, 8) // nolint: errcheck
@@ -529,7 +527,7 @@ func mbrPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64,
 		Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
 		Size:     uint32(math.Ceil(float64(structure.Size) / float64(sectorSize))),
 		Type:     mbr.Type(partitionType),
-		Bootable: bootable,
+		Bootable: isBootable(structure),
 	}
 }
 
@@ -540,12 +538,23 @@ func gptPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64,
 		partitionName = "writable"
 	}
 
-	return &gpt.Partition{
+	partition := &gpt.Partition{
 		Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
 		Size:  uint64(structure.Size),
 		Type:  gpt.Type(structureType),
 		Name:  partitionName,
 	}
+
+	if isBootable(structure) {
+		partition.Attributes = gptBootableAttribute
+	}
+
+	return partition
+}
+
+// isBootable checks if the structure is bootable
+func isBootable(structure gadget.VolumeStructure) bool {
+	return structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot
 }
 
 // copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
