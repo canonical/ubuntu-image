@@ -129,6 +129,9 @@ type StateMachine struct {
 	// names of images for each volume
 	VolumeNames map[string]string
 
+	// name of the "main volume"
+	MainVolumeName string
+
 	Packages []string
 	Snaps    []string
 }
@@ -268,21 +271,24 @@ func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
 	stateMachine.VolumeOrder = sortedVolumes
 }
 
-// postProcessGadgetYaml adds the rootfs to the partitions list if needed
+// postProcessGadgetYaml gathers several addition information from the volumes and
+// operates several fixes on the volumes in the GadgetInfo.
+// - Adds the rootfs to the partitions list if needed
+// - Adds missing content
 func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 	var rootfsSeen bool = false
 	var farthestOffset quantity.Offset
 	var lastOffset quantity.Offset
-	farthestOffsetUnknown := false
-	var volume *gadget.Volume
+	var farthestOffsetUnknown bool = false
+	lastVolumeName := ""
 
 	for _, volumeName := range stateMachine.VolumeOrder {
-		volume = stateMachine.GadgetInfo.Volumes[volumeName]
+		lastVolumeName = volumeName
+		volume := stateMachine.GadgetInfo.Volumes[volumeName]
 		volumeBaseDir := filepath.Join(stateMachine.tempDirs.volumes, volumeName)
 		if err := osMkdirAll(volumeBaseDir, 0755); err != nil {
 			return fmt.Errorf("Error creating volume dir: %s", err.Error())
 		}
-		// look for the rootfs and check if the image is seeded
 		for i := range volume.Structure {
 			structure := &volume.Structure[i]
 			stateMachine.warnUsageOfSystemLabel(volumeName, structure, i)
@@ -291,7 +297,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 				rootfsSeen = true
 			}
 
-			stateMachine.checkSystemSeed(volume, structure, i)
+			stateMachine.handleSystemSeed(volume, structure, i)
 
 			err := checkStructureContent(structure)
 			if err != nil {
@@ -316,7 +322,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 		}
 	}
 
-	fixMissingSystemData(volume, farthestOffset, farthestOffsetUnknown, rootfsSeen, stateMachine.GadgetInfo.Volumes)
+	stateMachine.fixMissingSystemData(lastVolumeName, farthestOffset, farthestOffsetUnknown, rootfsSeen)
 
 	return nil
 }
@@ -329,14 +335,18 @@ func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, stru
 	}
 }
 
-// checkSystemSeed checks if the struture is a system-seed one and fixes the Label if needed
-func (stateMachine *StateMachine) checkSystemSeed(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
-	if structure.Role == gadget.SystemSeed {
-		stateMachine.IsSeeded = true
-		if structure.Label == "" {
-			structure.Label = structure.Name
-			volume.Structure[structIndex] = *structure
-		}
+// handleSystemSeed checks if the struture is a system-seed one and fixes the Label if needed
+func (stateMachine *StateMachine) handleSystemSeed(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
+	if structure.Role != gadget.SystemSeed {
+		return
+	}
+	stateMachine.IsSeeded = true
+	// The "main" volume is the one with a system-seed structure
+	stateMachine.MainVolumeName = structure.VolumeName
+
+	if structure.Label == "" {
+		structure.Label = structure.Name
+		volume.Structure[structIndex] = *structure
 	}
 }
 
@@ -387,32 +397,38 @@ func fixMissingContent(volume *gadget.Volume, structure *gadget.VolumeStructure,
 	volume.Structure[structIndex] = *structure
 }
 
-// fixMissingSystemData handles the case of unspecified system-data
-// partition where we simply attach the rootfs at the end of the
-// partition list.
-// Since so far we have no knowledge of the rootfs contents, the
-// size is set to 0, and will be calculated later
-// Note that there is only one volume, so "volume" points to it
-func fixMissingSystemData(volume *gadget.Volume, farthestOffset quantity.Offset, farthestOffsetUnknown bool, rootfsSeen bool, volumes map[string]*gadget.Volume) {
-	if !farthestOffsetUnknown && !rootfsSeen && len(volumes) == 1 {
-		rootfsStructure := gadget.VolumeStructure{
-			Name:       "",
-			Label:      "writable",
-			Offset:     &farthestOffset,
-			Size:       quantity.Size(0),
-			Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
-			Role:       gadget.SystemData,
-			ID:         "",
-			Filesystem: "ext4",
-			Content:    []gadget.VolumeContent{},
-			Update:     gadget.VolumeUpdate{},
-			// "virtual" yaml index for the new structure (it would
-			// be the last one in gadget.yaml)
-			YamlIndex: len(volume.Structure),
-		}
-
-		volume.Structure = append(volume.Structure, rootfsStructure)
+// fixMissingSystemData handles the case of unspecified system-data partition
+// where we simply attach the rootfs at the end of the partition list.
+// Since so far we have no knowledge of the rootfs contents, the size is set
+// to 0, and will be calculated later
+func (stateMachine *StateMachine) fixMissingSystemData(lastVolumeName string, farthestOffset quantity.Offset, farthestOffsetUnknown bool, rootfsSeen bool) {
+	// We only add the structure if there is a single volume because we cannot
+	// be sure which volume is considered the "main one" by the user, even though
+	// we have a way to find it (see comment about the MainVolume field). We
+	// should revisit this if we want to be stricter in the future about that.
+	if farthestOffsetUnknown || rootfsSeen || len(stateMachine.GadgetInfo.Volumes) != 1 {
+		return
 	}
+	// So for now we consider the main volume to be the last one
+	volume := stateMachine.GadgetInfo.Volumes[lastVolumeName]
+
+	rootfsStructure := gadget.VolumeStructure{
+		Name:       "",
+		Label:      "writable",
+		Offset:     &farthestOffset,
+		Size:       quantity.Size(0),
+		Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+		Role:       gadget.SystemData,
+		ID:         "",
+		Filesystem: "ext4",
+		Content:    []gadget.VolumeContent{},
+		Update:     gadget.VolumeUpdate{},
+		// "virtual" yaml index for the new structure (it would
+		// be the last one in gadget.yaml)
+		YamlIndex: len(volume.Structure),
+	}
+
+	volume.Structure = append(volume.Structure, rootfsStructure)
 }
 
 // readMetadata reads info about a partial state machine encoded as JSON from disk
@@ -465,6 +481,7 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.ImageSizes = partialStateMachine.ImageSizes
 	stateMachine.VolumeOrder = partialStateMachine.VolumeOrder
 	stateMachine.VolumeNames = partialStateMachine.VolumeNames
+	stateMachine.MainVolumeName = partialStateMachine.MainVolumeName
 
 	stateMachine.Packages = partialStateMachine.Packages
 	stateMachine.Snaps = partialStateMachine.Snaps

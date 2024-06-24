@@ -3,6 +3,8 @@ ubuntu-image (3.5) UNRELEASED; urgency=medium
   [ Paul Mars ]
   * Update snapd dependency due to a breaking change
   * Fix deb822 format ubuntu.sources security entry
+  * Improve validation and overall handling of volumes from the
+    gadget.yaml. 
 
  -- Paul Mars <paul.mars@canonical.com>  Fri, 19 Apr 2024 15:53:14 +0200
  

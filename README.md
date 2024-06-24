@@ -1,7 +1,7 @@
 # ubuntu-image: build Ubuntu images
 
 [![ubuntu-image](https://snapcraft.io/ubuntu-image/badge.svg)](https://snapcraft.io/ubuntu-image)
-![Build](https://github.com/canonical/ubuntu-image/actions/workflows/build-and-test.yml/badge.svg)
+![Build](https://github.com/canonical/ubuntu-image/actions/workflows/build-and-test.yml/badge.svg?branch=main)
 [![codecov](https://codecov.io/gh/canonical/ubuntu-image/branch/main/graph/badge.svg?token=F9jE9HKo1a)](https://codecov.io/gh/canonical/ubuntu-image)
 [![Go Report Card](https://goreportcard.com/badge/github.com/canonical/ubuntu-image)](https://goreportcard.com/report/github.com/canonical/ubuntu-image)
 
