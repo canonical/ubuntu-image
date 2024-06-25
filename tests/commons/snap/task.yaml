@@ -4,6 +4,7 @@ environment:
     IMG/ubuntu_core_18_amd64: ubuntu-core-18-amd64
     IMG/ubuntu_core_20_amd64: ubuntu-core-20-amd64
     IMG/ubuntu_core_22_amd64: ubuntu-core-22-amd64
+    IMG/ubuntu_core_24_amd64: ubuntu-core-24-amd64
 
 execute: |
     mkdir -p /tmp/${IMG}/workdir

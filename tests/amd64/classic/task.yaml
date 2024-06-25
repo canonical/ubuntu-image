@@ -44,6 +44,11 @@ restore: |
 debug: |
     df -h
     du -h -d 1 /tmp/
+    ls -alh /tmp/${IMG}/workdir/
+    ls -alh /tmp/${IMG}/workdir/chroot/
+    if [ -f /tmp/${IMG}/workdir/chroot/etc/hostname ]; then
+        cat /tmp/${IMG}/workdir/chroot/etc/hostname
+    fi
     mount  -l
     if [ -f loop.txt ]; then
         cat loop.txt

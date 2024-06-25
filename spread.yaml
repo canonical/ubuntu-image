@@ -32,10 +32,10 @@ backends:
       - ubuntu-22.04-64:
           storage: 45G
           workers: 1
-      - ubuntu-23.04-64:
+      - ubuntu-23.10-64:
           storage: 45G
           workers: 1
-      - ubuntu-23.10-64:
+      - ubuntu-24.04-64:
           storage: 45G
           workers: 1
   google-arm:
@@ -53,6 +53,10 @@ backends:
           image: ubuntu-os-cloud/ubuntu-2204-lts-arm64
           workers: 1
           storage: 45G
+      - ubuntu-24.04-arm-64:
+          image: ubuntu-os-cloud/ubuntu-2404-lts-arm64
+          workers: 1
+          storage: 45G
   qemu:
     memory: 4G
     systems:
@@ -68,10 +72,10 @@ backends:
       - ubuntu-22.04-64:
             username: ubuntu
             password: ubuntu
-      - ubuntu-23.04-64:
+      - ubuntu-23.10-64:
             username: ubuntu
             password: ubuntu
-      - ubuntu-23.10-64:
+      - ubuntu-24.04-64:
             username: ubuntu
             password: ubuntu
 
