@@ -221,8 +221,8 @@ func (stateMachine *StateMachine) handleMultipleImageSizes() error {
 		if err == nil {
 			// argument passed was numeric.
 			if volumeNumber < len(stateMachine.VolumeOrder) {
-				stateName := stateMachine.VolumeOrder[volumeNumber]
-				stateMachine.ImageSizes[stateName] = parsedSize
+				volumeName := stateMachine.VolumeOrder[volumeNumber]
+				stateMachine.ImageSizes[volumeName] = parsedSize
 			} else {
 				return fmt.Errorf("Volume index %d is out of range", volumeNumber)
 			}
