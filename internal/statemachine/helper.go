@@ -309,6 +309,8 @@ func hasContent(structure gadget.VolumeStructure, contentRoot string) (bool, err
 	return structure.Content != nil || len(contentFiles) > 0, nil
 }
 
+const mbrDiskSignatureAddress = 440
+
 func fixDiskIDOnMBR(imgName string) error {
 	var existingDiskIds [][]byte
 	randomBytes, err := generateUniqueDiskID(&existingDiskIds)
@@ -321,7 +323,7 @@ func fixDiskIDOnMBR(imgName string) error {
 			err.Error())
 	}
 	defer diskFile.Close()
-	_, err = diskFile.WriteAt(randomBytes, 440)
+	_, err = diskFile.WriteAt(randomBytes, mbrDiskSignatureAddress)
 	if err != nil {
 		return fmt.Errorf("Error writing MBR disk identifier: %s", err.Error())
 	}
