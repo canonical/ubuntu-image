@@ -6,6 +6,7 @@ series: jammy
 class: preinstalled
 kernel: linux-image-generic
 rootfs:
+  sources-list-deb822: true
   components:
     - main
     - universe
