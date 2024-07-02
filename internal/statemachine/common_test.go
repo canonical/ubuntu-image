@@ -246,8 +246,8 @@ func TestCalculateRootfsSizeImageSize(t *testing.T) {
 		sizeArg      string
 		expectedSize quantity.Size
 	}{
-		{"one_image_size", "4G", 4183818240},
-		{"image_size_per_volume", "pc:4G", 4183818240},
+		{"one_image_size", "4G", 4240441344},
+		{"image_size_per_volume", "pc:4G", 4240441344},
 	}
 	for _, tc := range testCases {
 		t.Run("test_calculate_rootfs_size_image_size", func(t *testing.T) {
