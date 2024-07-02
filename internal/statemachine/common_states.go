@@ -347,7 +347,7 @@ func (stateMachine *StateMachine) makeDisk() error {
 		}
 		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[volumeName])
 
-		diskImg, imgSize, err := stateMachine.createDiskImage(volumeName, volume, imgName)
+		diskImg, err := stateMachine.createDiskImage(volumeName, volume, imgName)
 		if err != nil {
 			return err
 		}
@@ -379,36 +379,32 @@ func (stateMachine *StateMachine) makeDisk() error {
 		}
 
 		// Open the file and write any OffsetWrite values
-		if err := writeOffsetValues(volume, imgName, uint64(stateMachine.SectorSize), uint64(imgSize)); err != nil {
+		if err := writeOffsetValues(volume, imgName, uint64(stateMachine.SectorSize), uint64(diskImg.Size)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// createDiskImage creates a disk image and making sure the size respects the configuration and
+// createDiskImage creates a disk image and makes sure the size respects the configuration and
 // the SectorSize
-func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gadget.Volume, imgName string) (*diskutils.Disk, quantity.Size, error) {
+func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gadget.Volume, imgName string) (*diskutils.Disk, error) {
 	imgSize, found := stateMachine.ImageSizes[volumeName]
 	if !found {
-		// Calculate the minimum size that would be
-		// valid according to gadget.yaml.
+		// Calculate the minimum size that would be valid according to gadget.yaml.
 		imgSize = volume.MinSize()
 	}
 	if err := osRemoveAll(imgName); err != nil {
-		return nil, 0, fmt.Errorf("Error removing old disk image: %s", err.Error())
-	}
-	sectorSizeFlag := diskfs.SectorSize(int(stateMachine.SectorSize))
-	diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw, sectorSizeFlag)
-	if err != nil {
-		return nil, 0, fmt.Errorf("Error creating disk image: %s", err.Error())
+		return nil, fmt.Errorf("Error removing old disk image: %s", err.Error())
 	}
 
+	sectorSizeDiskfs := diskfs.SectorSize(int(stateMachine.SectorSize))
 	imgSize = stateMachine.alignToSectorSize(imgSize)
-	if err := osTruncate(diskImg.File.Name(), int64(imgSize)); err != nil {
-		return nil, 0, fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
-			err.Error())
+
+	diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw, sectorSizeDiskfs)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating disk image: %s", err.Error())
 	}
 
-	return diskImg, imgSize, nil
+	return diskImg, nil
 }
