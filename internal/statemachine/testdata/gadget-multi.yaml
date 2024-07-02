@@ -5,7 +5,7 @@ volumes:
       - name: EFI System
         type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
         filesystem: vfat
-        filesystem-label: system-boot
+        role: system-boot
         size: 50M
         content:
           - source: grubx64.efi
@@ -18,7 +18,6 @@ volumes:
     structure:
         - type: 00000000-0000-0000-0000-0000feedface
           size: 200
-          role: system-boot
   third:
     structure:
         - type: 00000000-0000-0000-0000-0000deafbead
