@@ -12,6 +12,9 @@ import (
 	"testing"
 
 	diskfs "github.com/diskfs/go-diskfs"
+	diskutils "github.com/diskfs/go-diskfs/disk"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -1062,5 +1065,245 @@ func TestImageSizeFlag(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+var volume1 = &gadget.Volume{
+	Schema:     "gpt",
+	Bootloader: "grub",
+	Structure: []gadget.VolumeStructure{
+		{
+			VolumeName: "pc",
+			Name:       "mbr",
+			Offset:     createOffsetPointer(0),
+			MinSize:    440,
+			Size:       440,
+			Type:       "mbr",
+			Role:       "mbr",
+			Content: []gadget.VolumeContent{
+				{
+					Image: "pc-boot.img",
+				},
+			},
+			Update: gadget.VolumeUpdate{Edition: 1},
+		},
+		{
+			VolumeName: "pc",
+			Name:       "BIOS Boot",
+			Offset:     createOffsetPointer(1048576),
+			OffsetWrite: &gadget.RelativeOffset{
+				RelativeTo: "mbr",
+				Offset:     quantity.Offset(92),
+			},
+			MinSize: 1048576,
+			Size:    1048576,
+			Type:    "DA,21686148-6449-6E6F-744E-656564454649",
+			Content: []gadget.VolumeContent{
+				{
+					Image: "pc-core.img",
+				},
+			},
+			Update:    gadget.VolumeUpdate{Edition: 2},
+			YamlIndex: 1,
+		},
+		{
+			VolumeName: "pc",
+			Name:       "ubuntu-seed",
+			Label:      "ubuntu-seed",
+			Offset:     createOffsetPointer(2097152),
+			MinSize:    1258291200,
+			Size:       1258291200,
+			Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+			Role:       "system-seed",
+			Filesystem: "vfat",
+			Content:    []gadget.VolumeContent{},
+			Update:     gadget.VolumeUpdate{Edition: 2},
+			YamlIndex:  1,
+		},
+		{
+			VolumeName: "pc",
+			Name:       "ubuntu-data",
+			Label:      "writable",
+			Offset:     createOffsetPointer(1260388352),
+			MinSize:    786432000,
+			Size:       786432000,
+			Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+			Role:       "system-data",
+			Filesystem: "ext4",
+			Content:    []gadget.VolumeContent{},
+			YamlIndex:  2,
+		},
+	},
+	Name: "pc",
+}
+
+var volume2Unaligned = &gadget.Volume{
+	Schema:     "gpt",
+	Bootloader: "grub",
+	Structure: []gadget.VolumeStructure{
+		{
+			VolumeName: "pc",
+			Name:       "mbr",
+			Offset:     createOffsetPointer(0),
+			MinSize:    440,
+			Size:       440,
+			Type:       "mbr",
+			Role:       "mbr",
+			Content: []gadget.VolumeContent{
+				{
+					Image: "pc-boot.img",
+				},
+			},
+			Update: gadget.VolumeUpdate{Edition: 1},
+		},
+		{
+			VolumeName: "pc",
+			Name:       "BIOS Boot",
+			Offset:     createOffsetPointer(1048476),
+			OffsetWrite: &gadget.RelativeOffset{
+				RelativeTo: "mbr",
+				Offset:     quantity.Offset(92),
+			},
+			MinSize: 1048476,
+			Size:    1048476,
+			Type:    "DA,21686148-6449-6E6F-744E-656564454649",
+			Content: []gadget.VolumeContent{
+				{
+					Image: "pc-core.img",
+				},
+			},
+			Update:    gadget.VolumeUpdate{Edition: 2},
+			YamlIndex: 1,
+		},
+		{
+			VolumeName: "pc",
+			Name:       "ubuntu-seed",
+			Label:      "ubuntu-seed",
+			Offset:     createOffsetPointer(2096952),
+			MinSize:    1258291200,
+			Size:       1258291200,
+			Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+			Role:       "system-seed",
+			Filesystem: "vfat",
+			Content:    []gadget.VolumeContent{},
+			Update:     gadget.VolumeUpdate{Edition: 2},
+			YamlIndex:  1,
+		},
+		{
+			VolumeName: "pc",
+			Name:       "ubuntu-data",
+			Label:      "writable",
+			Offset:     createOffsetPointer(1260388152),
+			MinSize:    786432000,
+			Size:       786432000,
+			Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+			Role:       "system-data",
+			Filesystem: "ext4",
+			Content:    []gadget.VolumeContent{},
+			YamlIndex:  2,
+		},
+	},
+	Name: "pc",
+}
+
+func TestStateMachine_createDiskImage(t *testing.T) {
+	cmpOpts := []cmp.Option{
+		cmpopts.IgnoreUnexported(
+			gadget.Volume{},
+			os.File{},
+		),
+		cmpopts.IgnoreFields(
+			diskutils.Disk{},
+			"File",
+			"Info",
+		),
+	}
+	type args struct {
+		volumeName string
+		volume     *gadget.Volume
+		imgName    string
+	}
+	tests := []struct {
+		name        string
+		imageSizes  map[string]quantity.Size
+		sectorSize  quantity.Size
+		args        args
+		wantDiskImg *diskutils.Disk
+		wantImgSize quantity.Size
+		expectedErr string
+	}{
+		{
+			name:       "basic case",
+			sectorSize: quantity.Size(512),
+			args: args{
+				volumeName: "pc",
+				volume:     volume1,
+			},
+			wantDiskImg: &diskutils.Disk{
+				DefaultBlocks:     true,
+				Writable:          true,
+				PhysicalBlocksize: 512,
+				LogicalBlocksize:  512,
+				Size:              2046820352,
+			},
+			wantImgSize: quantity.Size(2046820352),
+		},
+		{
+			name:       "basic case sector size 4k",
+			sectorSize: quantity.Size(4096),
+			args: args{
+				volumeName: "pc",
+				volume:     volume1,
+			},
+			wantDiskImg: &diskutils.Disk{
+				DefaultBlocks:     true,
+				Writable:          true,
+				PhysicalBlocksize: 4096,
+				LogicalBlocksize:  4096,
+				Size:              2046820352,
+			},
+			wantImgSize: quantity.Size(2046820352),
+		},
+		{
+			name:       "size to align to sector size 4k",
+			sectorSize: quantity.Size(4096),
+			args: args{
+				volumeName: "pc",
+				volume:     volume2Unaligned,
+			},
+			wantDiskImg: &diskutils.Disk{
+				DefaultBlocks:     true,
+				Writable:          true,
+				PhysicalBlocksize: 4096,
+				LogicalBlocksize:  4096,
+				Size:              2046820352, // would be 2046820152 if unaligned
+			},
+			wantImgSize: quantity.Size(2046820352),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+
+			stateMachine := &StateMachine{
+				SectorSize: tc.sectorSize,
+				ImageSizes: tc.imageSizes,
+			}
+
+			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			asserter.AssertErrNil(err, true)
+			t.Cleanup(func() { os.RemoveAll(outDir) })
+
+			imgPath := filepath.Join(outDir, tc.args.imgName)
+
+			gotDiskImg, err := stateMachine.createDiskImage(tc.args.volumeName, tc.args.volume, imgPath)
+
+			if err != nil || len(tc.expectedErr) != 0 {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+
+			asserter.AssertEqual(tc.wantDiskImg, gotDiskImg, cmpOpts...)
+			asserter.AssertEqual(tc.wantImgSize, quantity.Size(gotDiskImg.Size))
+		})
 	}
 }
