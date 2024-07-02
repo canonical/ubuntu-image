@@ -153,7 +153,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 
 	if stateMachine.commonFlags.Size != "" {
 		rootfsVolume, rootfsVolumeName := stateMachine.findRootfsVolume()
-		desiredSize := stateMachine.getSuggestedImageSize(rootfsVolumeName)
+		desiredSize := stateMachine.ImageSizes[rootfsVolumeName]
 
 		// subtract the size and offsets of the existing volumes
 		if rootfsVolume != nil {
