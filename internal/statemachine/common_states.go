@@ -133,38 +133,41 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 	return nil
 }
 
+// Semi-arbitrary value, probably larger than needed but high enough to not have issues
+// and low enough to stay in the same magnitude
+const ext4FudgeFactor = 1.5
+
+// On a 100MiB filesystem, ext4 takes a little over 7MiB for the
+// metadata, so use 8MB as a minimum padding
+const ext4Padding = 8 * quantity.SizeMiB
+
 var calculateRootfsSizeState = stateFunc{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize}
 
-// calculateRootfsSize calculates the size of the root filesystem.
-// On a 100MiB filesystem, ext4 takes a little over 7MiB for the
-// metadata, so use 8MB as a minimum padding.
+// calculateRootfsSize calculates the size needed by the root filesystem.
+// If an image size was specified, make sure it is big enough to contain the
+// rootfs and try to allocate it to the rootfs
 func (stateMachine *StateMachine) calculateRootfsSize() error {
 	rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
 	if err != nil {
 		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
 	}
 
-	// fudge factor for incidentals
-	rootfsPadding := 8 * quantity.SizeMiB
-	rootfsSize = quantity.Size(math.Ceil(float64(rootfsSize) * 1.5))
+	// Take into account ext4 filesystems metadata size
+	rootfsPadding := ext4Padding
+	rootfsSize = quantity.Size(math.Ceil(float64(rootfsSize) * ext4FudgeFactor))
 	rootfsSize += rootfsPadding
 
 	stateMachine.RootfsSize = stateMachine.alignToSectorSize(rootfsSize)
 
 	if stateMachine.commonFlags.Size != "" {
 		rootfsVolume, rootfsVolumeName := stateMachine.findRootfsVolume()
-		desiredSize := stateMachine.ImageSizes[rootfsVolumeName]
-
-		// subtract the size and offsets of the existing volumes
+		// subtract the size and offsets of the existing structures
 		if rootfsVolume != nil {
-			for _, structure := range rootfsVolume.Structure {
-				desiredSize = helper.SafeQuantitySubtraction(desiredSize, structure.Size)
-				if structure.Offset != nil {
-					desiredSize = helper.SafeQuantitySubtraction(desiredSize,
-						quantity.Size(*structure.Offset))
-				}
-			}
+			desiredSize := stateMachine.ImageSizes[rootfsVolumeName]
 
+			reservedSize := calculateNoRootfsSize(rootfsVolume)
+
+			desiredSize = helper.SafeQuantitySubtraction(desiredSize, reservedSize)
 			desiredSize = stateMachine.alignToSectorSize(desiredSize)
 
 			if desiredSize < stateMachine.RootfsSize {
@@ -183,11 +186,34 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	return nil
 }
 
+// calculateNoRootfsSize determines the needed space for existing structures
+// except for the rootfs
+func calculateNoRootfsSize(v *gadget.Volume) quantity.Size {
+	var size quantity.Size
+	for _, s := range v.Structure {
+		if isRootfsStructure(s) {
+			continue
+		}
+		if s.Offset != nil && quantity.Size(*s.Offset) > size {
+			size = quantity.Size(*s.Offset)
+		}
+		size += s.MinSize
+	}
+
+	return size
+}
+
+// isRootfsStructure determine if the given structure is the one associated
+// to the rootfs
+func isRootfsStructure(s gadget.VolumeStructure) bool {
+	return s.Role == gadget.SystemData
+}
+
 // findRootfsVolume finds the volume associated to the rootfs
 func (stateMachine *StateMachine) findRootfsVolume() (*gadget.Volume, string) {
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		for _, structure := range volume.Structure {
-			if structure.Role == gadget.SystemData {
+			if isRootfsStructure(structure) {
 				return volume, volumeName
 			}
 		}
