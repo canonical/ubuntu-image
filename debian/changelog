@@ -6,6 +6,9 @@ ubuntu-image (3.5) UNRELEASED; urgency=medium
   * Improve validation and overall handling of volumes from the
     gadget.yaml. 
 
+  [ Maciej Borzecki ]
+  * Improve handling of structures without a filesystem.
+
  -- Paul Mars <paul.mars@canonical.com>  Fri, 19 Apr 2024 15:53:14 +0200
  
 ubuntu-image (3.4) UNRELEASED; urgency=medium
