@@ -173,20 +173,6 @@ func (stateMachine *StateMachine) hasSingleImageSizeValue() bool {
 	return !strings.Contains(stateMachine.commonFlags.Size, ":")
 }
 
-// getSuggestedImageSize returns the suggested size for the given volume
-func (stateMachine *StateMachine) getSuggestedImageSize(volumeName string) quantity.Size {
-	var parsedSize quantity.Size
-	if stateMachine.hasSingleImageSizeValue() {
-		// this scenario has just one size for each volume
-		// no need to check error as it has already been done by
-		// the parseImageSizes function
-		parsedSize, _ = quantity.ParseSize(stateMachine.commonFlags.Size) // nolint: errcheck
-	} else {
-		parsedSize = stateMachine.ImageSizes[volumeName]
-	}
-	return parsedSize
-}
-
 // handleSingleImageSize parses as a single value and applies the image size given in
 // the flag --image-size
 func (stateMachine *StateMachine) handleSingleImageSize() error {
@@ -221,8 +207,8 @@ func (stateMachine *StateMachine) handleMultipleImageSizes() error {
 		if err == nil {
 			// argument passed was numeric.
 			if volumeNumber < len(stateMachine.VolumeOrder) {
-				stateName := stateMachine.VolumeOrder[volumeNumber]
-				stateMachine.ImageSizes[stateName] = parsedSize
+				volumeName := stateMachine.VolumeOrder[volumeNumber]
+				stateMachine.ImageSizes[volumeName] = parsedSize
 			} else {
 				return fmt.Errorf("Volume index %d is out of range", volumeNumber)
 			}
@@ -335,7 +321,7 @@ func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, stru
 	}
 }
 
-// handleSystemSeed checks if the struture is a system-seed one and fixes the Label if needed
+// handleSystemSeed checks if the structure is a system-seed one and fixes the Label if needed
 func (stateMachine *StateMachine) handleSystemSeed(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
 	if structure.Role != gadget.SystemSeed {
 		return
@@ -562,10 +548,10 @@ func (stateMachine *StateMachine) writeMetadata(metadataFile string) error {
 }
 
 // handleContentSizes ensures that the sizes of the partitions are large enough and stores
-// safe values in the stateMachine struct for use during make_image
+// safe values in the stateMachine struct for use during make_disk
 func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
 	// store volume sizes in the stateMachine Struct. These will be used during
-	// the make_image step
+	// the make_disk step
 	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
 	volumeSize, found := stateMachine.ImageSizes[volumeName]
 	if !found {

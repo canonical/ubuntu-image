@@ -11,6 +11,7 @@ gadget:
   type: "git"
 rootfs:
   seed:
+    sources-list-deb822: true
     urls:
       - "https://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
     branch: jammy
