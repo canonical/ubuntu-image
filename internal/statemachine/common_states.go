@@ -403,6 +403,8 @@ func (stateMachine *StateMachine) makeDisk() error {
 
 		partitionTable, rootfsPartitionNumber := generatePartitionTable(volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
 
+		fmt.Printf("partitionTable: %+v\n", *partitionTable)
+
 		// Save the rootfs partition number, if found, for later use
 		if rootfsPartitionNumber != -1 {
 			stateMachine.RootfsVolName = volumeName
@@ -431,6 +433,11 @@ func (stateMachine *StateMachine) makeDisk() error {
 		if err := writeOffsetValues(volume, imgName, uint64(stateMachine.SectorSize), uint64(diskImg.Size)); err != nil {
 			return err
 		}
+		p, err := diskImg.GetPartitionTable()
+		if err != nil {
+			fmt.Printf("partition table error: %+v\n", err)
+		}
+		fmt.Printf("partitionTable after: %+v\n", p)
 	}
 	return nil
 }

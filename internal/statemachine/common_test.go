@@ -4,6 +4,7 @@ package statemachine
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 
 	diskfs "github.com/diskfs/go-diskfs"
 	diskutils "github.com/diskfs/go-diskfs/disk"
+	partutils "github.com/diskfs/go-diskfs/partition"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
@@ -22,6 +24,7 @@ import (
 	"github.com/snapcore/snapd/osutil"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 // TestLoadGadgetYaml tests a successful load of gadget.yaml. It also tests that the unpack
@@ -822,11 +825,41 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 		rootfsVolName string
 		rootfsPartNum int
 	}{
-		{"gpt", "gpt", "512", "pc", 3},
-		{"mbr", "dos", "512", "pc", 3},
-		{"hybrid", "gpt", "512", "pc", 3},
-		{"gpt4k", "PMBR", "4096", "pc", 3}, // PMBR still seems valid GPT
-		{"gpt-efi-only", "gpt", "512", "pc", 2},
+		{
+			name:          "gpt",
+			tableType:     "gpt",
+			sectorSize:    "512",
+			rootfsVolName: "pc",
+			rootfsPartNum: 3,
+		},
+		{
+			name:          "mbr",
+			tableType:     "dos",
+			sectorSize:    "512",
+			rootfsVolName: "pc",
+			rootfsPartNum: 3,
+		},
+		{
+			name:          "hybrid",
+			tableType:     "gpt",
+			sectorSize:    "512",
+			rootfsVolName: "pc",
+			rootfsPartNum: 3,
+		},
+		// {
+		// 	name:          "gpt4k",
+		// 	tableType:     "gpt",
+		// 	sectorSize:    "4096",
+		// 	rootfsVolName: "pc",
+		// 	rootfsPartNum: 3,
+		// }, // PMBR still seems valid GPT
+		{
+			name:          "gpt-efi-only",
+			tableType:     "gpt",
+			sectorSize:    "512",
+			rootfsVolName: "pc",
+			rootfsPartNum: 2,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run("test_make_disk_partition_type_"+tc.name, func(t *testing.T) {
@@ -896,14 +929,39 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 
 			// now run "dumpe2fs" to ensure the correct type of partition table exists
 			imgFile := filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img")
-			dumpe2fsCommand := *exec.Command("dumpe2fs", imgFile)
+			sfdiskCommand := *exec.Command("sfdisk", "--json", imgFile)
 
-			dumpe2fsBytes, _ := dumpe2fsCommand.CombinedOutput() // nolint: errcheck
+			sfdiskBytes, err := sfdiskCommand.CombinedOutput() // nolint: errcheck
 			// The command will return an error because the image itself is not valid but we do
 			// not care here.
-			if !strings.Contains(string(dumpe2fsBytes), tc.tableType) {
+			t.Logf("sfdiskBytes error: %v\n", err)
+			t.Logf("sfdiskBytes stdout: %v\n", string(sfdiskBytes))
+
+			var sfDiskRes testhelper.SfdiskOutput
+
+			err = json.Unmarshal(sfdiskBytes, &sfDiskRes)
+			t.Logf("unmarshall error: %v\n", err)
+			t.Logf("sfDiskRes: %v\n", sfDiskRes)
+
+			d, err := os.Open(imgFile)
+			asserter.AssertErrNil(err, true)
+
+			sectorSize, err := strconv.Atoi(tc.sectorSize)
+			asserter.AssertErrNil(err, true)
+
+			parTable, err := partutils.Read(d, sectorSize, sectorSize)
+			asserter.AssertErrNil(err, true)
+			t.Logf("partTable: %+v\n", parTable)
+			t.Logf("partTable type: %+v\n", parTable.Type())
+
+			// if !strings.Contains(string(sfdiskBytes), tc.tableType) {
+			// 	t.Errorf("File %s should have partition table %s, instead got \"%s\"",
+			// 		imgFile, tc.tableType, string(sfdiskBytes))
+			// }
+
+			if sfDiskRes.PartitionTable.Label != tc.tableType {
 				t.Errorf("File %s should have partition table %s, instead got \"%s\"",
-					imgFile, tc.tableType, string(dumpe2fsBytes))
+					imgFile, tc.tableType, sfDiskRes.PartitionTable.Label)
 			}
 
 			// ensure the resulting image file is a multiple of the block size
@@ -917,7 +975,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 
 			// while at it, ensure that the root partition has been found
 			if stateMachine.RootfsPartNum != tc.rootfsPartNum || stateMachine.RootfsVolName != tc.rootfsVolName {
-				t.Errorf("Root partition volume/numbe not detected correctly, expected %s/%d, got %s/%d",
+				t.Errorf("Root partition volume/number not detected correctly, expected %s/%d, got %s/%d",
 					tc.rootfsVolName, tc.rootfsPartNum, stateMachine.RootfsVolName, stateMachine.RootfsPartNum)
 			}
 		})

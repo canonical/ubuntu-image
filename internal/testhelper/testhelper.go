@@ -132,3 +132,27 @@ func (o *osMock) ReadAll(io.Reader) ([]byte, error) {
 func NewOSMock(conf *OSMockConf) *osMock {
 	return &osMock{conf: conf}
 }
+
+type SfdiskOutput struct {
+	PartitionTable PartitionTable
+}
+
+type PartitionTable struct {
+	Label      string
+	Id         string
+	Device     string
+	Unit       string
+	FirstLBA   uint64
+	LastLBA    uint64
+	SectorSize uint64
+	Partitions []SfDiskPartitions
+}
+
+type SfDiskPartitions struct {
+	Node  string
+	Start uint64
+	Size  uint64
+	Type  string
+	Uuid  string
+	Name  string
+}
