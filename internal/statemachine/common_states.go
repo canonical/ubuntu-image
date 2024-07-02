@@ -187,7 +187,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 func (stateMachine *StateMachine) findRootfsVolume() (*gadget.Volume, string) {
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		for _, structure := range volume.Structure {
-			if structure.Size == 0 {
+			if structure.Role == gadget.SystemData {
 				return volume, volumeName
 			}
 		}
@@ -207,7 +207,7 @@ func (stateMachine *StateMachine) alignToSectorSize(size quantity.Size) quantity
 func (stateMachine *StateMachine) syncGadgetStructureRootfsSize() {
 	for _, volume := range stateMachine.GadgetInfo.Volumes {
 		for structIndex, structure := range volume.Structure {
-			if structure.Size == 0 {
+			if structure.Role == gadget.SystemData {
 				structure.Size = stateMachine.RootfsSize
 			}
 			volume.Structure[structIndex] = structure
