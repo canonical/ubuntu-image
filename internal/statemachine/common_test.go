@@ -952,34 +952,45 @@ func TestFailedMakeDisk(t *testing.T) {
 // with the flag (LP: #1947867)
 func TestImageSizeFlag(t *testing.T) {
 	testCases := []struct {
-		name       string
-		sizeArg    string
-		gadgetTree string
-		imageSize  map[string]quantity.Size
-		volNames   map[string]string
+		name           string
+		sizeArg        string
+		gadgetTree     string
+		volNames       map[string]string
+		wantImageSizes map[string]quantity.Size
 	}{
 		{
-			"one_volume",
-			"4G",
-			filepath.Join("testdata", "gadget_tree"),
-			map[string]quantity.Size{
-				"pc": 4 * quantity.SizeGiB,
-			},
-			map[string]string{
+			name:       "one volume",
+			sizeArg:    "4G",
+			gadgetTree: filepath.Join("testdata", "gadget_tree"),
+			volNames: map[string]string{
 				"pc": "pc.img",
+			},
+			wantImageSizes: map[string]quantity.Size{
+				"pc": 4 * quantity.SizeGiB,
 			},
 		},
 		{
-			"multi_volume",
-			"first:4G,second:1G",
-			filepath.Join("testdata", "gadget_tree_multi"),
-			map[string]quantity.Size{
-				"first":  4 * quantity.SizeGiB,
-				"second": 1 * quantity.SizeGiB,
+			name:       "one volume with requested size smaller than needed size",
+			sizeArg:    "4G",
+			gadgetTree: filepath.Join("testdata", "gadget_tree"),
+			volNames: map[string]string{
+				"pc": "pc.img",
 			},
-			map[string]string{
+			wantImageSizes: map[string]quantity.Size{
+				"pc": 4 * quantity.SizeGiB,
+			},
+		},
+		{
+			name:       "multi volume",
+			sizeArg:    "first:4G,second:1G",
+			gadgetTree: filepath.Join("testdata", "gadget_tree_multi"),
+			volNames: map[string]string{
 				"first":  "first.img",
 				"second": "second.img",
+			},
+			wantImageSizes: map[string]quantity.Size{
+				"first":  4 * quantity.SizeGiB,
+				"second": 1 * quantity.SizeGiB,
 			},
 		},
 	}
@@ -993,12 +1004,12 @@ func TestImageSizeFlag(t *testing.T) {
 
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
-			//t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			// also set up an output directory
 			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
-			//t.Cleanup(func() { os.RemoveAll(outDir) })
+			t.Cleanup(func() { os.RemoveAll(outDir) })
 			stateMachine.commonFlags.OutputDir = outDir
 
 			// set up volume names
@@ -1045,13 +1056,13 @@ func TestImageSizeFlag(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			// check the size of the disk(s)
-			for volume, expectedSize := range tc.imageSize {
+			for volume, wantSize := range tc.wantImageSizes {
 				imgFile := filepath.Join(stateMachine.commonFlags.OutputDir, volume+".img")
 				diskImg, err := os.Stat(imgFile)
 				asserter.AssertErrNil(err, true)
-				if diskImg.Size() != int64(expectedSize) {
+				if diskImg.Size() != int64(wantSize) {
 					t.Errorf("--image-size %d was specified, but resulting image is %d bytes",
-						expectedSize, diskImg.Size())
+						wantSize, diskImg.Size())
 				}
 			}
 		})
