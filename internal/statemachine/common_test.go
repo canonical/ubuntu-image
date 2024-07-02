@@ -609,7 +609,7 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 	osMkdir = os.Mkdir
 }
 
-// TestEmptyPartPopulatePreparePartitions performs a successful run a gadget.yaml that has,
+// TestEmptyPartPopulatePreparePartitions performs a successful run with a gadget.yaml that has,
 // besides regular partitions, one empty partition and makes sure that a partition image file
 // has been created for it (LP: #1947863)
 func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
