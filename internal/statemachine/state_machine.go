@@ -321,7 +321,7 @@ func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, stru
 	}
 }
 
-// handleSystemSeed checks if the struture is a system-seed one and fixes the Label if needed
+// handleSystemSeed checks if the structure is a system-seed one and fixes the Label if needed
 func (stateMachine *StateMachine) handleSystemSeed(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
 	if structure.Role != gadget.SystemSeed {
 		return
@@ -548,10 +548,10 @@ func (stateMachine *StateMachine) writeMetadata(metadataFile string) error {
 }
 
 // handleContentSizes ensures that the sizes of the partitions are large enough and stores
-// safe values in the stateMachine struct for use during make_image
+// safe values in the stateMachine struct for use during make_disk
 func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
 	// store volume sizes in the stateMachine Struct. These will be used during
-	// the make_image step
+	// the make_disk step
 	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
 	volumeSize, found := stateMachine.ImageSizes[volumeName]
 	if !found {
