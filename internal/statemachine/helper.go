@@ -467,7 +467,7 @@ func generatePartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded b
 
 		// Record the actual partition number of the root partition, as it
 		// might be useful for certain operations (like updating the bootloader)
-		if structure.Role == gadget.SystemData {
+		if isRootfsStructure(&structure) { //nolint:gosec,G301
 			rootfsPartitionNumber = partitionNumber
 		}
 

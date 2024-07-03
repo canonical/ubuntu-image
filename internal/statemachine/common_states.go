@@ -231,7 +231,7 @@ func (stateMachine *StateMachine) getRootfsDesiredSize(rootfsVolume *gadget.Volu
 func calculateNoRootfsSize(v *gadget.Volume) quantity.Size {
 	var size quantity.Size
 	for _, s := range v.Structure {
-		if isRootfsStructure(s) {
+		if isRootfsStructure(&s) { //nolint:gosec,G301
 			continue
 		}
 		if s.Offset != nil && quantity.Size(*s.Offset) > size {
@@ -358,7 +358,7 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 		}
 		for structIndex, structure := range volume.Structure {
 			var contentRoot string
-			if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
+			if isRootfsStructure(&structure) || structure.Role == gadget.SystemSeed { //nolint:gosec,G301
 				contentRoot = stateMachine.tempDirs.rootfs
 			} else {
 				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
