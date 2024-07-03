@@ -1160,6 +1160,9 @@ func TestImageSizeFlag(t *testing.T) {
 				asserter.AssertErrNil(err, true)
 			}
 
+			err = stateMachine.parseImageSizes()
+			asserter.AssertErrNil(err, true)
+
 			// also need to set the rootfs size to avoid partition errors
 			err = stateMachine.calculateRootfsSize()
 			asserter.AssertErrNil(err, true)
