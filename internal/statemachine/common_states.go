@@ -133,7 +133,7 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 	return nil
 }
 
-// Semi-arbitrary value, probably larger than needed but high enough to not have issues
+// Semi-arbitrary value, probably larger than needed but big enough to not have issues
 // and low enough to stay in the same magnitude
 const ext4FudgeFactor = 1.5
 
@@ -346,9 +346,10 @@ func (stateMachine *StateMachine) populateBootfsLayoutStructure(laidOutStructure
 
 var populatePreparePartitionsState = stateFunc{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions}
 
-// Populate and prepare the partitions. For partitions without "filesystem:" specified in
-// gadget.yaml, this involves using dd to copy the content blobs into a .img file. For
-// partitions that do have "filesystem:" specified, we use the Mkfs functions from snapd.
+// populatePreparePartitions populates and prepares the partitions. For partitions without
+// "filesystem:" specified in gadget.yaml, this involves using dd to copy the content blobs
+// into a .img file. For partitions that do have "filesystem:" specified, we use the Mkfs
+// functions from snapd.
 // Throughout this process, the offset is tracked to ensure partitions are not overlapping.
 func (stateMachine *StateMachine) populatePreparePartitions() error {
 	for _, volumeName := range stateMachine.VolumeOrder {
@@ -385,7 +386,7 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 
 var makeDiskState = stateFunc{"make_disk", (*StateMachine).makeDisk}
 
-// Make the disk
+// makeDisk makes the disk image
 func (stateMachine *StateMachine) makeDisk() error {
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		_, found := stateMachine.VolumeNames[volumeName]
