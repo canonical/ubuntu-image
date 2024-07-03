@@ -279,7 +279,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			structure := &volume.Structure[i]
 			stateMachine.warnUsageOfSystemLabel(volumeName, structure, i)
 
-			if structure.Role == gadget.SystemData {
+			if isRootfsStructure(structure) {
 				rootfsSeen = true
 			}
 
