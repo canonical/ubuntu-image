@@ -147,43 +147,83 @@ var calculateRootfsSizeState = stateFunc{"calculate_rootfs_size", (*StateMachine
 // If an image size was specified, make sure it is big enough to contain the
 // rootfs and try to allocate it to the rootfs
 func (stateMachine *StateMachine) calculateRootfsSize() error {
-	rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
+	rootfsMinSize, err := stateMachine.getRootfsMinSize()
 	if err != nil {
-		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
+		return err
+	}
+
+	stateMachine.RootfsSize = rootfsMinSize
+
+	rootfsVolume, rootfsVolumeName, rootfsStructure := stateMachine.findRootfsVolumeStructure()
+
+	gadgetRootfsMinSize := stateMachine.getGadgetRootfsMinSize(rootfsStructure)
+	if gadgetRootfsMinSize > stateMachine.RootfsSize {
+		stateMachine.RootfsSize = gadgetRootfsMinSize
+	}
+
+	desiredSize, foundDesiredSize := stateMachine.getRootfsDesiredSize(rootfsVolume, rootfsVolumeName)
+
+	if foundDesiredSize {
+		if stateMachine.RootfsSize > desiredSize {
+			return fmt.Errorf("Error: calculated rootfs partition size %d is smaller "+
+				"than actual rootfs contents (%d). Try using a larger value of "+
+				"--image-size",
+				desiredSize, stateMachine.RootfsSize,
+			)
+		}
+		stateMachine.RootfsSize = desiredSize
+	}
+
+	if rootfsStructure != nil {
+		rootfsStructure.Size = stateMachine.RootfsSize
+	}
+
+	return nil
+}
+
+// getRootfsMinSize gets the minimum size needed to hold the built rootfs directory
+func (stateMachine *StateMachine) getRootfsMinSize() (quantity.Size, error) {
+	rootfsMinSize, err := helper.Du(stateMachine.tempDirs.rootfs)
+	if err != nil {
+		return quantity.Size(0), fmt.Errorf("Error getting rootfs size: %s", err.Error())
 	}
 
 	// Take into account ext4 filesystems metadata size
 	rootfsPadding := ext4Padding
-	rootfsSize = quantity.Size(math.Ceil(float64(rootfsSize) * ext4FudgeFactor))
-	rootfsSize += rootfsPadding
+	rootfsMinSize = quantity.Size(math.Ceil(float64(rootfsMinSize) * ext4FudgeFactor))
+	rootfsMinSize += rootfsPadding
 
-	stateMachine.RootfsSize = stateMachine.alignToSectorSize(rootfsSize)
+	return stateMachine.alignToSectorSize(rootfsMinSize), nil
+}
 
-	if stateMachine.commonFlags.Size != "" {
-		rootfsVolume, rootfsVolumeName := stateMachine.findRootfsVolume()
-		// subtract the size and offsets of the existing structures
-		if rootfsVolume != nil {
-			desiredSize := stateMachine.ImageSizes[rootfsVolumeName]
-
-			reservedSize := calculateNoRootfsSize(rootfsVolume)
-
-			desiredSize = helper.SafeQuantitySubtraction(desiredSize, reservedSize)
-			desiredSize = stateMachine.alignToSectorSize(desiredSize)
-
-			if desiredSize < stateMachine.RootfsSize {
-				return fmt.Errorf("Error: calculated rootfs partition size %d is smaller "+
-					"than actual rootfs contents (%d). Try using a larger value of "+
-					"--image-size",
-					desiredSize, stateMachine.RootfsSize,
-				)
-			}
-
-			stateMachine.RootfsSize = desiredSize
-		}
+// getGadgetRootfsMinSize gets the minimum size of the rootfs requested in the
+// gadget YAML
+func (stateMachine *StateMachine) getGadgetRootfsMinSize(rootfsStructure *gadget.VolumeStructure) quantity.Size {
+	if rootfsStructure == nil {
+		return quantity.Size(0)
 	}
 
-	stateMachine.syncGadgetStructureRootfsSize()
-	return nil
+	return stateMachine.alignToSectorSize(rootfsStructure.MinSize)
+}
+
+// getRootfsDesiredSize subtracts the size and offsets of the existing structures
+// from the requested image size to determine how much room is left for the rootfs
+func (stateMachine *StateMachine) getRootfsDesiredSize(rootfsVolume *gadget.Volume, rootfsVolumeName string) (quantity.Size, bool) {
+	if rootfsVolume == nil {
+		return quantity.Size(0), false
+	}
+
+	desiredSize, found := stateMachine.ImageSizes[rootfsVolumeName]
+	if !found {
+		// So far we do not know of a desired size for the rootfs
+		return quantity.Size(0), found
+	}
+
+	reservedSize := calculateNoRootfsSize(rootfsVolume)
+	desiredSize = helper.SafeQuantitySubtraction(desiredSize, reservedSize)
+	desiredSize = stateMachine.alignToSectorSize(desiredSize)
+
+	return desiredSize, found
 }
 
 // calculateNoRootfsSize determines the needed space for existing structures
@@ -203,42 +243,23 @@ func calculateNoRootfsSize(v *gadget.Volume) quantity.Size {
 	return size
 }
 
-// isRootfsStructure determine if the given structure is the one associated
-// to the rootfs
-func isRootfsStructure(s gadget.VolumeStructure) bool {
-	return s.Role == gadget.SystemData
-}
-
-// findRootfsVolume finds the volume associated to the rootfs
-func (stateMachine *StateMachine) findRootfsVolume() (*gadget.Volume, string) {
+// findRootfsVolumeStructure finds the volume and the structure associated to the rootfs
+func (stateMachine *StateMachine) findRootfsVolumeStructure() (*gadget.Volume, string, *gadget.VolumeStructure) {
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
-		for _, structure := range volume.Structure {
-			if isRootfsStructure(structure) {
-				return volume, volumeName
+		for i := range volume.Structure {
+			s := &volume.Structure[i]
+			if isRootfsStructure(s) { //nolint:gosec,G301
+				return volume, volumeName, s
 			}
 		}
 	}
-	return nil, ""
+	return nil, "", nil
 }
 
 // alignToSectorSize align the given size to the SectorSize of the stateMachine
 func (stateMachine *StateMachine) alignToSectorSize(size quantity.Size) quantity.Size {
 	return quantity.Size(math.Ceil(float64(size)/float64(stateMachine.SectorSize))) *
 		quantity.Size(stateMachine.SectorSize)
-}
-
-// syncGadgetStructureRootfsSize synchronizes size of the gadget.Structure that
-// represents the rootfs with the RootfsSize value of the statemachine
-// This functions assumes stateMachine.RootfsSize was previously correctly updated.
-func (stateMachine *StateMachine) syncGadgetStructureRootfsSize() {
-	for _, volume := range stateMachine.GadgetInfo.Volumes {
-		for structIndex, structure := range volume.Structure {
-			if structure.Role == gadget.SystemData {
-				structure.Size = stateMachine.RootfsSize
-			}
-			volume.Structure[structIndex] = structure
-		}
-	}
 }
 
 var populateBootfsContentsState = stateFunc{"populate_bootfs_contents", (*StateMachine).populateBootfsContents}
