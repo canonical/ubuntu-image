@@ -4,6 +4,7 @@ package statemachine
 import (
 	"bytes"
 	"crypto/rand"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -210,6 +211,7 @@ func TestCalculateRootfsSizeNoImageSize(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// set a valid yaml file and load it in
 	stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -234,8 +236,41 @@ func TestCalculateRootfsSizeNoImageSize(t *testing.T) {
 			correctSizeUpper.IECString(),
 			stateMachine.RootfsSize.IECString())
 	}
+}
 
-	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+// TestCalculateRootfsSizeBigSizeGadget tests that the rootfs size can be
+// calculated by using the value given in the gadget YAML.
+func TestCalculateRootfsSizeBigSizeGadget(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// set a valid yaml file and load it in
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-big-rootfs.yaml")
+	// ensure unpack exists
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.calculateRootfsSize()
+	asserter.AssertErrNil(err, true)
+
+	// rootfs size will be slightly different in different environments
+	correctSizeLower, err := quantity.ParseSize("1G")
+	asserter.AssertErrNil(err, true)
+	correctSizeUpper := correctSizeLower + 100000 // 0.1 MB range
+	if stateMachine.RootfsSize > correctSizeUpper ||
+		stateMachine.RootfsSize < correctSizeLower {
+		t.Errorf("expected rootfs size between %s and %s, got %s",
+			correctSizeLower.IECString(),
+			correctSizeUpper.IECString(),
+			stateMachine.RootfsSize.IECString())
+	}
 }
 
 // TestCalculateRootfsSizeImageSize tests that the rootfs size can be
@@ -246,8 +281,16 @@ func TestCalculateRootfsSizeImageSize(t *testing.T) {
 		sizeArg      string
 		expectedSize quantity.Size
 	}{
-		{"one_image_size", "4G", 4240441344},
-		{"image_size_per_volume", "pc:4G", 4240441344},
+		{
+			name:         "one image size",
+			sizeArg:      "4G",
+			expectedSize: 4240441344,
+		},
+		{
+			name:         "image size per volume",
+			sizeArg:      "pc:4G",
+			expectedSize: 4240441344,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run("test_calculate_rootfs_size_image_size", func(t *testing.T) {
@@ -279,6 +322,82 @@ func TestCalculateRootfsSizeImageSize(t *testing.T) {
 
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 		})
+	}
+}
+
+// TestWarningRootfsSizeTooSmall tests that a warning is thrown if the structure size
+// for the rootfs specified in gadget.yaml is smaller than the calculated rootfs size.
+// It also ensures that the size is corrected in the structure struct
+func TestWarningRootfsSizeTooSmall(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_tree",
+		"meta", "gadget.yaml")
+
+	// need workdir and loaded gadget.yaml set up for this
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+
+	// set up a "rootfs" that we can calculate the size of
+	err = os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
+	asserter.AssertErrNil(err, true)
+	err = osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+	asserter.AssertErrNil(err, true)
+
+	// ensure volumes exists
+	err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// calculate the size of the rootfs
+	err = stateMachine.calculateRootfsSize()
+	asserter.AssertErrNil(err, true)
+
+	// manually set the size of the rootfs structure to 0
+	var volume *gadget.Volume = stateMachine.GadgetInfo.Volumes["pc"]
+	var rootfsStructure gadget.VolumeStructure
+	var rootfsStructureNumber int
+	for structureNumber, structure := range volume.Structure {
+		if structure.Role == gadget.SystemData {
+			structure.Size = 0
+			rootfsStructure = structure
+			rootfsStructureNumber = structureNumber
+		}
+	}
+
+	// capture stdout, run copy structure content, and ensure the warning was thrown
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	defer restoreStdout()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.copyStructureContent(volume,
+		rootfsStructure,
+		rootfsStructureNumber,
+		stateMachine.tempDirs.rootfs,
+		filepath.Join(stateMachine.tempDirs.volumes, "part0.img"))
+	asserter.AssertErrNil(err, true)
+
+	// restore stdout and check that the warning was printed
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
+
+	if !strings.Contains(string(readStdout), "WARNING: rootfs structure size 0 B smaller than actual rootfs contents") {
+		t.Errorf("Warning about structure size to small not present in stdout: \"%s\"", string(readStdout))
+	}
+
+	// check that the size was correctly updated in the volume
+	for _, structure := range volume.Structure {
+		if structure.Role == gadget.SystemData {
+			if structure.Size != stateMachine.RootfsSize {
+				t.Errorf("rootfs structure size %s is not equal to calculated size %s",
+					structure.Size.IECString(),
+					stateMachine.RootfsSize.IECString())
+			}
+		}
 	}
 }
 

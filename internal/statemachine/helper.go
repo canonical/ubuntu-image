@@ -157,6 +157,12 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 	return nil
 }
 
+// isRootfsStructure determine if the given structure is the one associated
+// to the rootfs
+func isRootfsStructure(s *gadget.VolumeStructure) bool {
+	return s.Role == gadget.SystemData
+}
+
 // shouldSkipStructure returns whether a structure should be skipped during certain processing
 func shouldSkipStructure(structure gadget.VolumeStructure, isSeeded bool) bool {
 	if isSeeded &&
