@@ -360,15 +360,16 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 			return err
 		}
 		for structIndex, structure := range volume.Structure {
+			if helper.ShouldSkipStructure(structure, stateMachine.IsSeeded) {
+				continue
+			}
+
 			var contentRoot string
 			if helper.IsRootfsStructure(&structure) || structure.Role == gadget.SystemSeed { //nolint:gosec,G301
 				contentRoot = stateMachine.tempDirs.rootfs
 			} else {
 				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
 					"part"+strconv.Itoa(structIndex))
-			}
-			if helper.ShouldSkipStructure(structure, stateMachine.IsSeeded) {
-				continue
 			}
 
 			// copy the data
@@ -384,6 +385,23 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 		stateMachine.handleContentSizes(quantity.Offset(volume.MinSize()), volumeName)
 	}
 	return nil
+}
+
+// handleContentSizes ensures that the sizes of the partitions are large enough and stores
+// safe values in the stateMachine struct for use during make_disk
+func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
+	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
+	volumeSize, found := stateMachine.ImageSizes[volumeName]
+	if !found {
+		stateMachine.ImageSizes[volumeName] = calculated
+	} else {
+		if volumeSize < calculated {
+			fmt.Printf("WARNING: ignoring image size smaller than "+
+				"minimum required size: vol:%s %d < %d\n",
+				volumeName, uint64(volumeSize), uint64(calculated))
+			stateMachine.ImageSizes[volumeName] = calculated
+		}
+	}
 }
 
 var makeDiskState = stateFunc{"make_disk", (*StateMachine).makeDisk}
