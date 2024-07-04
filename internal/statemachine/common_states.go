@@ -165,13 +165,14 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 
 	if foundDesiredSize {
 		if stateMachine.RootfsSize > desiredSize {
-			return fmt.Errorf("Error: calculated rootfs partition size %d is smaller "+
-				"than actual rootfs contents (%d). Try using a larger value of "+
+			fmt.Printf("WARNING: rootfs content %d is bigger "+
+				"than requested image size (%d). Try using a larger value of "+
 				"--image-size",
-				desiredSize, stateMachine.RootfsSize,
+				stateMachine.RootfsSize, desiredSize,
 			)
+		} else {
+			stateMachine.RootfsSize = desiredSize
 		}
-		stateMachine.RootfsSize = desiredSize
 	}
 
 	if rootfsStructure != nil {
