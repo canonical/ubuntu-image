@@ -14,6 +14,7 @@ import (
 	"github.com/snapcore/snapd/osutil"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/partition"
 )
 
 var setArtifactNamesState = stateFunc{"set_artifact_names", (*StateMachine).setArtifactNames}
@@ -232,7 +233,7 @@ func (stateMachine *StateMachine) getRootfsDesiredSize(rootfsVolume *gadget.Volu
 func calculateNoRootfsSize(v *gadget.Volume) quantity.Size {
 	var size quantity.Size
 	for _, s := range v.Structure {
-		if isRootfsStructure(&s) { //nolint:gosec,G301
+		if helper.IsRootfsStructure(&s) { //nolint:gosec,G301
 			continue
 		}
 		if s.Offset != nil && quantity.Size(*s.Offset) > size {
@@ -249,7 +250,7 @@ func (stateMachine *StateMachine) findRootfsVolumeStructure() (*gadget.Volume, s
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		for i := range volume.Structure {
 			s := &volume.Structure[i]
-			if isRootfsStructure(s) { //nolint:gosec,G301
+			if helper.IsRootfsStructure(s) { //nolint:gosec,G301
 				return volume, volumeName, s
 			}
 		}
@@ -360,13 +361,13 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 		}
 		for structIndex, structure := range volume.Structure {
 			var contentRoot string
-			if isRootfsStructure(&structure) || structure.Role == gadget.SystemSeed { //nolint:gosec,G301
+			if helper.IsRootfsStructure(&structure) || structure.Role == gadget.SystemSeed { //nolint:gosec,G301
 				contentRoot = stateMachine.tempDirs.rootfs
 			} else {
 				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
 					"part"+strconv.Itoa(structIndex))
 			}
-			if shouldSkipStructure(structure, stateMachine.IsSeeded) {
+			if helper.ShouldSkipStructure(structure, stateMachine.IsSeeded) {
 				continue
 			}
 
@@ -401,23 +402,27 @@ func (stateMachine *StateMachine) makeDisk() error {
 			return err
 		}
 
-		partitionTable, rootfsPartitionNumber := generatePartitionTable(volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
-
-		fmt.Printf("partitionTable: %+v\n", *partitionTable)
-
-		// Save the rootfs partition number, if found, for later use
-		if rootfsPartitionNumber != -1 {
-			stateMachine.RootfsVolName = volumeName
-			stateMachine.RootfsPartNum = rootfsPartitionNumber
+		partitionTable, rootfsPartitionNumber, err := partition.GeneratePartitionTable(volume, uint64(stateMachine.SectorSize), uint64(diskImg.Size), stateMachine.IsSeeded)
+		if err != nil {
+			return err
 		}
 
-		if err := diskImg.Partition(*partitionTable); err != nil {
+		fmt.Printf("partitionTable: %+v\n\n", partitionTable)
+
+		// Save the rootfs partition number, for later use
+		// Store in any case, even if value is -1 to make it clear later it was not found
+		stateMachine.RootfsPartNum = rootfsPartitionNumber
+		if rootfsPartitionNumber != -1 {
+			stateMachine.RootfsVolName = volumeName
+		}
+
+		if err := diskImg.Partition(partitionTable); err != nil {
 			return fmt.Errorf("Error partitioning image file: %s", err.Error())
 		}
 
 		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
 		// this function is a temporary workaround, but we should change upstream go-diskfs
-		if volume.Schema == schemaMBR {
+		if volume.Schema == partition.SchemaMBR {
 			err = fixDiskIDOnMBR(imgName)
 			if err != nil {
 				return err

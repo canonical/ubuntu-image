@@ -279,7 +279,7 @@ func (stateMachine *StateMachine) postProcessGadgetYaml() error {
 			structure := &volume.Structure[i]
 			stateMachine.warnUsageOfSystemLabel(volumeName, structure, i)
 
-			if isRootfsStructure(structure) {
+			if helper.IsRootfsStructure(structure) {
 				rootfsSeen = true
 			}
 
@@ -352,7 +352,7 @@ func checkStructureContent(structure *gadget.VolumeStructure) error {
 // content. This is needed to allow images such as raspberry pi to source their
 // kernel and initrd from the staged rootfs later in the build process.
 func (stateMachine *StateMachine) handleRootfsScheme(structure *gadget.VolumeStructure, volume *gadget.Volume, structIndex int) error {
-	if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
+	if helper.IsSystemBootStructure(structure) {
 		relativeRootfsPath, err := filepathRel(
 			filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
 			stateMachine.tempDirs.rootfs,

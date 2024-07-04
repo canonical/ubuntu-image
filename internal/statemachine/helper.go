@@ -13,9 +13,6 @@ import (
 	"strings"
 
 	"github.com/diskfs/go-diskfs/disk"
-	"github.com/diskfs/go-diskfs/partition"
-	"github.com/diskfs/go-diskfs/partition/gpt"
-	"github.com/diskfs/go-diskfs/partition/mbr"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/snapcore/snapd/gadget"
@@ -25,14 +22,6 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
-)
-
-const (
-	// schemaMBR identifies a Master Boot Record partitioning schema, or an
-	// MBR like role
-	schemaMBR = "mbr"
-	// schemaGPT identifies a GUID Partition Table partitioning schema
-	schemaGPT = "gpt"
 )
 
 var runCmd = helper.RunCmd
@@ -157,24 +146,6 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 	return nil
 }
 
-// isRootfsStructure determine if the given structure is the one associated
-// to the rootfs
-func isRootfsStructure(s *gadget.VolumeStructure) bool {
-	return s.Role == gadget.SystemData
-}
-
-// shouldSkipStructure returns whether a structure should be skipped during certain processing
-func shouldSkipStructure(structure gadget.VolumeStructure, isSeeded bool) bool {
-	if isSeeded &&
-		(structure.Role == gadget.SystemBoot ||
-			structure.Role == gadget.SystemData ||
-			structure.Role == gadget.SystemSave ||
-			structure.Label == gadget.SystemBoot) {
-		return true
-	}
-	return false
-}
-
 // copyStructureContent handles copying raw blobs or creating formatted filesystems
 func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 	structure gadget.VolumeStructure, structIndex int,
@@ -228,8 +199,8 @@ func copyStructureNoFS(unpackDir string, structure gadget.VolumeStructure, partI
 
 // prepareAndCreateFS prepares and creates a filesystem for the given structure
 func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int, contentRoot, partImg string) error {
-	blockSize := structure.Size
-	if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Size < stateMachine.RootfsSize {
+	partSize := structure.Size
+	if (helper.IsRootfsStructure(&structure) || structure.Role == gadget.SystemSeed) && structure.Size < stateMachine.RootfsSize {
 		// system-data and system-seed structures are not required to have
 		// an explicit size set in the yaml file
 		if !stateMachine.commonFlags.Quiet {
@@ -238,12 +209,12 @@ func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, stru
 				structure.Size.IECString(),
 				stateMachine.RootfsSize.IECString())
 		}
-		blockSize = stateMachine.RootfsSize
+		partSize = stateMachine.RootfsSize
 		structure.Size = stateMachine.RootfsSize
 		volume.Structure[structIndex] = structure
 	}
 
-	err := prepareDiskImg(structure, partImg, blockSize, stateMachine.RootfsSize)
+	err := prepareDiskImg(structure, partImg, partSize, stateMachine.RootfsSize)
 	if err != nil {
 		return err
 	}
@@ -252,8 +223,8 @@ func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, stru
 }
 
 // prepareDiskImg prepares a raw image
-func prepareDiskImg(structure gadget.VolumeStructure, partImg string, blockSize quantity.Size, rootfsSize quantity.Size) error {
-	if structure.Role == gadget.SystemData {
+func prepareDiskImg(structure gadget.VolumeStructure, partImg string, partSize quantity.Size, rootfsSize quantity.Size) error {
+	if helper.IsRootfsStructure(&structure) {
 		_, err := os.Create(partImg)
 		if err != nil {
 			return fmt.Errorf("unable to create partImg file: %w", err)
@@ -265,7 +236,7 @@ func prepareDiskImg(structure gadget.VolumeStructure, partImg string, blockSize 
 	} else {
 		// zero out the .img file
 		ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
-			"bs=" + strconv.FormatUint(uint64(blockSize), 10), "seek=1"}
+			"bs=" + strconv.FormatUint(uint64(partSize), 10), "seek=1"}
 		if err := helperCopyBlob(ddArgs); err != nil {
 			return fmt.Errorf("Error zeroing image file %s: %s",
 				partImg, err.Error())
@@ -452,114 +423,12 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	return offset2
 }
 
-// generatePartitionTable prepares the partition table for a structures in a volume and
-// returns it with the partition number of the root partition.
-func generatePartitionTable(volume *gadget.Volume, sectorSize uint64, isSeeded bool) (*partition.Table, int) {
-	var gptPartitions = make([]*gpt.Partition, 0)
-	var mbrPartitions = make([]*mbr.Partition, 0)
-	var partitionTable partition.Table
-	partitionNumber, rootfsPartitionNumber := 1, -1
-
-	for _, structure := range volume.Structure {
-		if !structure.IsPartition() || shouldSkipStructure(structure, isSeeded) {
-			continue
-		}
-
-		// Record the actual partition number of the root partition, as it
-		// might be useful for certain operations (like updating the bootloader)
-		if isRootfsStructure(&structure) { //nolint:gosec,G301
-			rootfsPartitionNumber = partitionNumber
-		}
-
-		structureType := getStructureType(structure, volume.Schema)
-
-		if volume.Schema == schemaMBR {
-			mbrPartition := mbrPartitionFromStruct(structure, sectorSize, structureType)
-			mbrPartitions = append(mbrPartitions, mbrPartition)
-		} else {
-			gptPartition := gptPartitionFromStruct(structure, sectorSize, structureType)
-			gptPartitions = append(gptPartitions, gptPartition)
-		}
-
-		partitionNumber++
-	}
-
-	if volume.Schema == schemaMBR {
-		partitionTable = &mbr.Table{
-			Partitions:         mbrPartitions,
-			LogicalSectorSize:  int(sectorSize),
-			PhysicalSectorSize: int(sectorSize),
-		}
-	} else {
-		partitionTable = &gpt.Table{
-			Partitions:         gptPartitions,
-			LogicalSectorSize:  int(sectorSize),
-			PhysicalSectorSize: int(sectorSize),
-			ProtectiveMBR:      true,
-		}
-	}
-
-	return &partitionTable, rootfsPartitionNumber
-}
-
-// getStructureType extracts the structure type from the structure.Type considering
-// the schema
-func getStructureType(structure gadget.VolumeStructure, schema string) string {
-	structureType := structure.Type
-	// Check for hybrid MBR/GPT
-	if !strings.Contains(structure.Type, ",") {
-		return structureType
-	}
-
-	types := strings.Split(structure.Type, ",")
-	structureType = types[0]
-
-	if schema == schemaGPT {
-		structureType = types[1]
-	}
-
-	return structureType
-}
-
-// mbrPartitionFromStruct prepares a mbr.Partition object from a gadget.VolumeStructure
-func mbrPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64, structureType string) *mbr.Partition {
-	bootable := false
-	if structure.Role == gadget.SystemBoot || structure.Label == gadget.SystemBoot {
-		bootable = true
-	}
-	// mbr.Type is a byte. snapd has already verified that this string
-	// is exactly two chars, so we can safely parse those two chars to a byte
-	partitionType, _ := strconv.ParseUint(structureType, 16, 8) // nolint: errcheck
-
-	return &mbr.Partition{
-		Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
-		Size:     uint32(math.Ceil(float64(structure.Size) / float64(sectorSize))),
-		Type:     mbr.Type(partitionType),
-		Bootable: bootable,
-	}
-}
-
-// gptPartitionFromStruct prepares a gpt.Partition object from a gadget.VolumeStructure
-func gptPartitionFromStruct(structure gadget.VolumeStructure, sectorSize uint64, structureType string) *gpt.Partition {
-	partitionName := structure.Name
-	if structure.Role == gadget.SystemData && structure.Name == "" {
-		partitionName = "writable"
-	}
-
-	return &gpt.Partition{
-		Start: uint64(math.Ceil(float64(*structure.Offset) / float64(sectorSize))),
-		Size:  uint64(structure.Size),
-		Type:  gpt.Type(structureType),
-		Name:  partitionName,
-	}
-}
-
 // copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
 func (stateMachine *StateMachine) copyDataToImage(volumeName string, volume *gadget.Volume, diskImg *disk.Disk) error {
 	// Resolve gadget information to on disk volume
 	onDisk := gadget.OnDiskStructsFromGadget(volume)
 	for structureNumber, structure := range volume.Structure {
-		if shouldSkipStructure(structure, stateMachine.IsSeeded) {
+		if helper.ShouldSkipStructure(structure, stateMachine.IsSeeded) {
 			continue
 		}
 		sectorSize := diskImg.LogicalBlocksize
