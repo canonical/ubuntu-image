@@ -547,27 +547,6 @@ func (stateMachine *StateMachine) writeMetadata(metadataFile string) error {
 	return nil
 }
 
-// handleContentSizes ensures that the sizes of the partitions are large enough and stores
-// safe values in the stateMachine struct for use during make_disk
-func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
-	// store volume sizes in the stateMachine Struct. These will be used during
-	// the make_disk step
-	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
-	volumeSize, found := stateMachine.ImageSizes[volumeName]
-	if !found {
-		stateMachine.ImageSizes[volumeName] = calculated
-	} else {
-		if volumeSize < calculated {
-			fmt.Printf("WARNING: ignoring image size smaller than "+
-				"minimum required size: vol:%s %d < %d\n",
-				volumeName, uint64(volumeSize), uint64(calculated))
-			stateMachine.ImageSizes[volumeName] = calculated
-		} else {
-			stateMachine.ImageSizes[volumeName] = volumeSize
-		}
-	}
-}
-
 // generate work directory file structure
 func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	// if no workdir was specified, open a /tmp dir
