@@ -23,13 +23,26 @@ const (
 
 	sectorSize512 uint64 = 512
 	sectorSize4k  uint64 = 4096
+
+	protectiveMBRSectors   uint64 = 1
+	partitionHeaderSectors uint64 = 1
 )
+
+func partitionEntriesSectors(sectorSize uint64) uint64 {
+	var partitionEntriesSectors uint64 = 32
+
+	if sectorSize == sectorSize4k {
+		partitionEntriesSectors = 4
+	}
+
+	return partitionEntriesSectors
+}
 
 // Table is light wrapper around partition.Table to properly add partitions
 // Some work is sadly duplicated because the go-diskfs lib does not expose
 // the needed data (first/last LBA)
 type Table interface {
-	AddPartition(structure gadget.VolumeStructure, structureType string) error
+	AddPartition(structurePair *gadget.OnDiskAndGadgetStructurePair, structureType string) error
 	GetConcreteTable() partition.Table
 }
 
@@ -61,7 +74,9 @@ func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize ui
 
 	partitionTable := NewPartitionTable(volume, sectorSize, imgSize)
 
-	for _, structure := range volume.Structure {
+	onDisk := gadget.OnDiskStructsFromGadget(volume)
+
+	for i, structure := range volume.Structure {
 		if !structure.IsPartition() || helper.ShouldSkipStructure(structure, isSeeded) {
 			continue
 		}
@@ -73,8 +88,12 @@ func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize ui
 		}
 
 		structureType := getStructureType(structure, volume.Schema)
+		structurePair := &gadget.OnDiskAndGadgetStructurePair{
+			DiskStructure:   onDisk[structure.YamlIndex],
+			GadgetStructure: &volume.Structure[i],
+		}
 
-		err := partitionTable.AddPartition(structure, structureType)
+		err := partitionTable.AddPartition(structurePair, structureType)
 		if err != nil {
 			return nil, rootfsPartitionNumber, err
 		}
@@ -109,16 +128,16 @@ type MBRTable struct {
 	diskSize      uint64
 }
 
-func (t *MBRTable) AddPartition(structure gadget.VolumeStructure, structureType string) error {
+func (t *MBRTable) AddPartition(structurePair *gadget.OnDiskAndGadgetStructurePair, structureType string) error {
 	// mbr.Type is a byte. snapd has already verified that this string
 	// is exactly two chars, so we can safely parse those two chars to a byte
 	partitionType, _ := strconv.ParseUint(structureType, 16, 8) // nolint: errcheck
 
 	t.concreteTable.Partitions = append(t.concreteTable.Partitions, &mbr.Partition{
-		Start:    uint32(math.Ceil(float64(*structure.Offset) / float64(t.concreteTable.LogicalSectorSize))),
-		Size:     uint32(math.Ceil(float64(structure.Size) / float64(t.concreteTable.LogicalSectorSize))),
+		Start:    uint32(math.Ceil(float64(structurePair.DiskStructure.StartOffset) / float64(t.concreteTable.LogicalSectorSize))),
+		Size:     uint32(math.Ceil(float64(structurePair.DiskStructure.Size) / float64(t.concreteTable.LogicalSectorSize))),
 		Type:     mbr.Type(partitionType),
-		Bootable: helper.IsSystemBootStructure(&structure),
+		Bootable: helper.IsSystemBootStructure(structurePair.GadgetStructure),
 	})
 
 	return nil
@@ -133,17 +152,17 @@ type GPTTable struct {
 	diskSize      uint64
 }
 
-func (t *GPTTable) AddPartition(structure gadget.VolumeStructure, structureType string) error {
-	startSector := uint64(math.Ceil(float64(*structure.Offset) / float64(t.concreteTable.LogicalSectorSize)))
-	size := uint64(structure.Size)
+func (t *GPTTable) AddPartition(structurePair *gadget.OnDiskAndGadgetStructurePair, structureType string) error {
+	startSector := uint64(math.Ceil(float64(structurePair.DiskStructure.StartOffset) / float64(t.concreteTable.LogicalSectorSize)))
+	size := uint64(structurePair.DiskStructure.Size)
 
 	if t.structureOverlaps(startSector, size) {
 		return fmt.Errorf("The structure \"%s\" overlaps GPT header or "+
-			"GPT partition table", structure.Name)
+			"GPT partition table", structurePair.DiskStructure.Name)
 	}
 
-	partitionName := structure.Name
-	if structure.Role == gadget.SystemData && structure.Name == "" {
+	partitionName := structurePair.DiskStructure.Name
+	if structurePair.GadgetStructure.Role == gadget.SystemData && structurePair.DiskStructure.Name == "" {
 		partitionName = "writable"
 	}
 
@@ -170,13 +189,7 @@ func (t *GPTTable) GetConcreteTable() partition.Table {
 // or equal to 6 (allowing 1 block for the Protective MBR, 1 block for the GPT
 // Header, and 4 blocks for the GPT Partition Entry Array)
 func (t *GPTTable) structureOverlaps(startSector uint64, size uint64) bool {
-	var protectiveMBRSectors uint64 = 1
-	var partitionHeaderSectors uint64 = 1
-	var partitionEntriesSectors uint64 = 32
-
-	if t.concreteTable.LogicalSectorSize == int(sectorSize4k) {
-		partitionEntriesSectors = 4
-	}
+	partitionEntriesSectors := partitionEntriesSectors(uint64(t.concreteTable.LogicalSectorSize))
 
 	var primaryGPTSectors uint64 = protectiveMBRSectors + partitionHeaderSectors + partitionEntriesSectors
 	var secondaryGPTSectors uint64 = partitionHeaderSectors + partitionEntriesSectors
