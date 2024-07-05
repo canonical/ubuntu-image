@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -57,7 +58,7 @@ func executeStateMachine(sm statemachine.SmInterface) error {
 		return err
 	}
 
-	if err := sm.Run(); err != nil {
+	if err := sm.Run(context.Background()); err != nil {
 		return err
 	}
 
