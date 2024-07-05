@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,7 +71,7 @@ func (b *basicChrooter) init() error {
 		return err
 	}
 
-	err = stateMachine.createChroot()
+	err = stateMachine.createChroot(context.Background())
 	if err != nil {
 		return err
 	}
@@ -127,8 +128,8 @@ func NewMockExecCommand() *mockExecCmd {
 	return &mockExecCmd{}
 }
 
-func (m *mockExecCmd) Command(cmd string, args ...string) *exec.Cmd {
+func (m *mockExecCmd) CommandContext(ctx context.Context, cmd string, args ...string) *exec.Cmd {
 	// Replace the command with an echo of it
 	//nolint:gosec,G204
-	return exec.Command("echo", append([]string{cmd}, args...)...)
+	return exec.CommandContext(ctx, "echo", append([]string{cmd}, args...)...)
 }
