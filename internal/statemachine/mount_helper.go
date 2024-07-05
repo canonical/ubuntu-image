@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,13 +21,13 @@ type mountPoint struct {
 
 // getMountCmd returns mount/umount commands to mount the given mountpoint
 // If the mountpoint does not exist, it will be created.
-func (m *mountPoint) getMountCmd() (mountCmds, umountCmds []*exec.Cmd, err error) {
+func (m *mountPoint) getMountCmd(ctx context.Context) (mountCmds, umountCmds []*exec.Cmd, err error) {
 	if m.bind && len(m.typ) > 0 {
 		return nil, nil, fmt.Errorf("invalid mount arguments. Cannot use --bind and -t at the same time.")
 	}
 
 	targetPath := filepath.Join(m.basePath, m.relpath)
-	mountCmd := execCommand("mount")
+	mountCmd := execCommandCtx(ctx, "mount")
 
 	if len(m.typ) > 0 {
 		mountCmd.Args = append(mountCmd.Args, "-t", m.typ)
@@ -49,23 +50,23 @@ func (m *mountPoint) getMountCmd() (mountCmds, umountCmds []*exec.Cmd, err error
 		}
 	}
 
-	umountCmds = getUnmountCmd(targetPath)
+	umountCmds = getUnmountCmd(ctx, targetPath)
 
 	return []*exec.Cmd{mountCmd}, umountCmds, nil
 }
 
 // getUnmountCmd generates unmount commands from a path
-func getUnmountCmd(targetPath string) []*exec.Cmd {
+func getUnmountCmd(ctx context.Context, targetPath string) []*exec.Cmd {
 	return []*exec.Cmd{
-		execCommand("mount", "--make-rprivate", targetPath),
-		execCommand("umount", "--recursive", targetPath),
+		execCommandCtx(ctx, "mount", "--make-rprivate", targetPath),
+		execCommandCtx(ctx, "umount", "--recursive", targetPath),
 	}
 }
 
 // teardownMount executed teardown commands after making sure every mountpoints matching the given path
 // are listed and will be properly unmounted
-func teardownMount(path string, mountPoints []*mountPoint, teardownCmds []*exec.Cmd, err error, debug bool) error {
-	addedUmountCmds, errAddedUmount := umountAddedMountPointsCmds(path, mountPoints)
+func teardownMount(ctx context.Context, path string, mountPoints []*mountPoint, teardownCmds []*exec.Cmd, err error, debug bool) error {
+	addedUmountCmds, errAddedUmount := umountAddedMountPointsCmds(ctx, path, mountPoints)
 	if errAddedUmount != nil {
 		err = fmt.Errorf("%s\n%s", err, errAddedUmount)
 	}
@@ -75,7 +76,7 @@ func teardownMount(path string, mountPoints []*mountPoint, teardownCmds []*exec.
 }
 
 // umountAddedMountPointsCmds generates umount commands for newly added mountpoints
-func umountAddedMountPointsCmds(path string, mountPoints []*mountPoint) (umountCmds []*exec.Cmd, err error) {
+func umountAddedMountPointsCmds(ctx context.Context, path string, mountPoints []*mountPoint) (umountCmds []*exec.Cmd, err error) {
 	currentMountPoints, err := listMounts(path)
 	if err != nil {
 		return nil, err
@@ -83,7 +84,7 @@ func umountAddedMountPointsCmds(path string, mountPoints []*mountPoint) (umountC
 	newMountPoints := diffMountPoints(mountPoints, currentMountPoints)
 	if len(newMountPoints) > 0 {
 		for _, m := range newMountPoints {
-			umountCmds = append(umountCmds, getUnmountCmd(m.path)...)
+			umountCmds = append(umountCmds, getUnmountCmd(ctx, m.path)...)
 		}
 	}
 

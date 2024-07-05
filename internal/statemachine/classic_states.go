@@ -31,10 +31,10 @@ var (
 	localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
 )
 
-var buildGadgetTreeState = stateFunc{"build_gadget_tree", (*StateMachine).buildGadgetTree}
+var buildGadgetTreeState = stateFunc{"build_gadget_tree", (*StateMachine).buildGadgetTree, nil}
 
 // Build the gadget tree
-func (stateMachine *StateMachine) buildGadgetTree() error {
+func (stateMachine *StateMachine) buildGadgetTree(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// make the gadget directory under scratch
@@ -45,7 +45,7 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 		return err
 	}
 
-	makeCmd := execCommand("make")
+	makeCmd := execCommandCtx(ctx, "make")
 
 	// if a make target was specified then add it to the command
 	if classicStateMachine.ImageDef.Gadget.GadgetTarget != "" {
@@ -106,10 +106,10 @@ func (classicStateMachine *ClassicStateMachine) prepareGadgetDir(gadgetDir strin
 	return nil
 }
 
-var prepareGadgetTreeState = stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree}
+var prepareGadgetTreeState = stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree, nil}
 
 // Prepare the gadget tree
-func (stateMachine *StateMachine) prepareGadgetTree() error {
+func (stateMachine *StateMachine) prepareGadgetTree(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 	gadgetDir := filepath.Join(classicStateMachine.tempDirs.unpack, "gadget")
 	err := osMkdirAll(gadgetDir, 0755)
@@ -160,18 +160,18 @@ func (stateMachine *StateMachine) fixHostname() error {
 	return nil
 }
 
-var createChrootState = stateFunc{"create_chroot", (*StateMachine).createChroot}
+var createChrootState = stateFunc{"create_chroot", (*StateMachine).createChroot, nil}
 
 // Bootstrap a chroot environment to install packages in. It will eventually
 // become the rootfs of the image
-func (stateMachine *StateMachine) createChroot() error {
+func (stateMachine *StateMachine) createChroot(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	if err := osMkdir(stateMachine.tempDirs.chroot, 0755); err != nil {
 		return fmt.Errorf("Failed to create chroot directory %s : %s", stateMachine.tempDirs.chroot, err.Error())
 	}
 
-	debootstrapCmd := generateDebootstrapCmd(classicStateMachine.ImageDef,
+	debootstrapCmd := generateDebootstrapCmd(ctx, classicStateMachine.ImageDef,
 		stateMachine.tempDirs.chroot,
 	)
 
@@ -205,10 +205,10 @@ func (stateMachine *StateMachine) createChroot() error {
 	return stateMachine.setLegacySourcesList(classicStateMachine.ImageDef.LegacyBuildSourcesList())
 }
 
-var addExtraPPAsState = stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs}
+var addExtraPPAsState = stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs, nil}
 
 // addExtraPPAs adds PPAs to the /etc/apt/sources.list.d directory
-func (stateMachine *StateMachine) addExtraPPAs() (err error) {
+func (stateMachine *StateMachine) addExtraPPAs(ctx context.Context) (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	for _, extraPPA := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
@@ -222,10 +222,10 @@ func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 	return nil
 }
 
-var cleanExtraPPAsState = stateFunc{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs}
+var cleanExtraPPAsState = stateFunc{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs, nil}
 
 // cleanExtraPPAs cleans previously added PPA to the source list
-func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
+func (stateMachine *StateMachine) cleanExtraPPAs(ctx context.Context) (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	for _, extraPPA := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
@@ -239,10 +239,10 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 	return nil
 }
 
-var installPackagesState = stateFunc{"install_packages", (*StateMachine).installPackages}
+var installPackagesState = stateFunc{"install_packages", (*StateMachine).installPackages, nil}
 
 // Install packages in the chroot environment
-func (stateMachine *StateMachine) installPackages() error {
+func (stateMachine *StateMachine) installPackages(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
@@ -262,7 +262,7 @@ func (stateMachine *StateMachine) installPackages() error {
 
 	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
-		err = teardownMount(stateMachine.tempDirs.chroot, mountPoints, teardownCmds, err, stateMachine.commonFlags.Debug)
+		err = teardownMount(ctx, stateMachine.tempDirs.chroot, mountPoints, teardownCmds, err, stateMachine.commonFlags.Debug)
 	}()
 
 	// mount some necessary partitions in the chroot
@@ -299,7 +299,7 @@ func (stateMachine *StateMachine) installPackages() error {
 		},
 	)
 
-	mountCmds, umountCmds, err := generateMountPointCmds(mountPoints, stateMachine.tempDirs.scratch)
+	mountCmds, umountCmds, err := generateMountPointCmds(ctx, mountPoints, stateMachine.tempDirs.scratch)
 	if err != nil {
 		return err
 	}
@@ -307,13 +307,13 @@ func (stateMachine *StateMachine) installPackages() error {
 	teardownCmds = append(umountCmds, teardownCmds...)
 
 	teardownCmds = append([]*exec.Cmd{
-		execCommand("udevadm", "settle"),
+		execCommandCtx(ctx, "udevadm", "settle"),
 	}, teardownCmds...)
 
 	policyRcDPath := filepath.Join(classicStateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d")
 
 	if osutil.FileExists(policyRcDPath) {
-		divertCmd, undivertCmd := divertPolicyRcD(stateMachine.tempDirs.chroot)
+		divertCmd, undivertCmd := divertPolicyRcD(ctx, stateMachine.tempDirs.chroot)
 		setupCmds = append(setupCmds, divertCmd)
 		teardownCmds = append([]*exec.Cmd{undivertCmd}, teardownCmds...)
 	}
@@ -354,7 +354,7 @@ func (stateMachine *StateMachine) installPackages() error {
 		}()
 	}
 
-	installPackagesCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+	installPackagesCmds := generateAptCmds(ctx, stateMachine.tempDirs.chroot, classicStateMachine.Packages)
 
 	err = helper.RunCmds(installPackagesCmds, classicStateMachine.commonFlags.Debug)
 	if err != nil {
@@ -380,7 +380,7 @@ func (stateMachine *StateMachine) gatherPackages(imageDef *imagedefinition.Image
 }
 
 // generateMountPointCmds generate lists of mount/umount commands for a list of mountpoints
-func generateMountPointCmds(mountPoints []*mountPoint, scratchDir string) (allMountCmds []*exec.Cmd, allUmountCmds []*exec.Cmd, err error) {
+func generateMountPointCmds(ctx context.Context, mountPoints []*mountPoint, scratchDir string) (allMountCmds []*exec.Cmd, allUmountCmds []*exec.Cmd, err error) {
 	for _, mp := range mountPoints {
 		var mountCmds, umountCmds []*exec.Cmd
 		var err error
@@ -394,7 +394,7 @@ func generateMountPointCmds(mountPoints []*mountPoint, scratchDir string) (allMo
 			}
 		}
 
-		mountCmds, umountCmds, err = mp.getMountCmd()
+		mountCmds, umountCmds, err = mp.getMountCmd(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mp.relpath,
@@ -408,11 +408,11 @@ func generateMountPointCmds(mountPoints []*mountPoint, scratchDir string) (allMo
 	return allMountCmds, allUmountCmds, err
 }
 
-var verifyArtifactNamesState = stateFunc{"verify_artifact_names", (*StateMachine).verifyArtifactNames}
+var verifyArtifactNamesState = stateFunc{"verify_artifact_names", (*StateMachine).verifyArtifactNames, nil}
 
 // Verify artifact names have volumes listed for multi-volume gadgets and set
 // the volume names in the struct
-func (stateMachine *StateMachine) verifyArtifactNames() error {
+func (stateMachine *StateMachine) verifyArtifactNames(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	if classicStateMachine.ImageDef.Artifacts == nil {
@@ -531,18 +531,18 @@ func (stateMachine *StateMachine) prepareQcow2ArtifactOneVolume(artifacts *image
 	}
 }
 
-var buildRootfsFromTasksState = stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks}
+var buildRootfsFromTasksState = stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks, nil}
 
 // Build a rootfs from a list of archive tasks
-func (stateMachine *StateMachine) buildRootfsFromTasks() error {
+func (stateMachine *StateMachine) buildRootfsFromTasks(ctx context.Context) error {
 	// currently a no-op pending implementation of the classic image redesign
 	return nil
 }
 
-var extractRootfsTarState = stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar}
+var extractRootfsTarState = stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar, nil}
 
 // Extract the rootfs from a tar archive
-func (stateMachine *StateMachine) extractRootfsTar() error {
+func (stateMachine *StateMachine) extractRootfsTar(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// make the chroot directory to which we will extract the tar
@@ -575,11 +575,11 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	return helper.ExtractTarArchive(tarPath, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 }
 
-var germinateState = stateFunc{"germinate", (*StateMachine).germinate}
+var germinateState = stateFunc{"germinate", (*StateMachine).germinate, nil}
 
 // germinate runs the germinate binary and parses the output to create
 // a list of packages from the seed section of the image definition
-func (stateMachine *StateMachine) germinate() error {
+func (stateMachine *StateMachine) germinate(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// create a scratch directory to run germinate in
@@ -589,7 +589,7 @@ func (stateMachine *StateMachine) germinate() error {
 		return fmt.Errorf("Error creating germinate directory: \"%s\"", err.Error())
 	}
 
-	germinateCmd := generateGerminateCmd(classicStateMachine.ImageDef)
+	germinateCmd := generateGerminateCmd(ctx, classicStateMachine.ImageDef)
 	germinateCmd.Dir = germinateDir
 
 	germinateOutput := helper.SetCommandOutput(germinateCmd, classicStateMachine.commonFlags.Debug)
@@ -677,10 +677,10 @@ func customizeCloudInitFile(customData string, seedPath string, fileName string,
 	return nil
 }
 
-var customizeCloudInitState = stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit}
+var customizeCloudInitState = stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit, nil}
 
 // Customize Cloud init with the values in the image definition YAML
-func (stateMachine *StateMachine) customizeCloudInit() error {
+func (stateMachine *StateMachine) customizeCloudInit(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	cloudInitCustomization := classicStateMachine.ImageDef.Customization.CloudInit
@@ -720,10 +720,10 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 	return err
 }
 
-var customizeFstabState = stateFunc{"customize_fstab", (*StateMachine).customizeFstab}
+var customizeFstabState = stateFunc{"customize_fstab", (*StateMachine).customizeFstab, nil}
 
 // Customize /etc/fstab based on values in the image definition
-func (stateMachine *StateMachine) customizeFstab() error {
+func (stateMachine *StateMachine) customizeFstab(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	fstabPath := filepath.Join(stateMachine.tempDirs.chroot, "etc", "fstab")
@@ -758,10 +758,10 @@ func (stateMachine *StateMachine) customizeFstab() error {
 	return err
 }
 
-var manualCustomizationState = stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization}
+var manualCustomizationState = stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization, nil}
 
 // Handle any manual customizations specified in the image definition
-func (stateMachine *StateMachine) manualCustomization() error {
+func (stateMachine *StateMachine) manualCustomization(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// copy /etc/resolv.conf from the host system into the chroot if it hasn't already been done
@@ -780,22 +780,22 @@ func (stateMachine *StateMachine) manualCustomization() error {
 		return err
 	}
 
-	err = manualExecute(classicStateMachine.ImageDef.Customization.Manual.Execute, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	err = manualExecute(ctx, classicStateMachine.ImageDef.Customization.Manual.Execute, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 	if err != nil {
 		return err
 	}
 
-	err = manualTouchFile(classicStateMachine.ImageDef.Customization.Manual.TouchFile, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	err = manualTouchFile(ctx, classicStateMachine.ImageDef.Customization.Manual.TouchFile, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 	if err != nil {
 		return err
 	}
 
-	err = manualAddGroup(classicStateMachine.ImageDef.Customization.Manual.AddGroup, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	err = manualAddGroup(ctx, classicStateMachine.ImageDef.Customization.Manual.AddGroup, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 	if err != nil {
 		return err
 	}
 
-	err = manualAddUser(classicStateMachine.ImageDef.Customization.Manual.AddUser, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
+	err = manualAddUser(ctx, classicStateMachine.ImageDef.Customization.Manual.AddUser, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 	if err != nil {
 		return err
 	}
@@ -803,10 +803,10 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	return nil
 }
 
-var prepareClassicImageState = stateFunc{"prepare_image", (*StateMachine).prepareClassicImage}
+var prepareClassicImageState = stateFunc{"prepare_image", (*StateMachine).prepareClassicImage, nil}
 
 // prepareClassicImage calls image.Prepare to stage snaps in classic images
-func (stateMachine *StateMachine) prepareClassicImage() error {
+func (stateMachine *StateMachine) prepareClassicImage(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 	imageOpts := &image.Options{}
 	var err error
@@ -822,7 +822,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	// plug/slot sanitization needed by provider handling
 	snap.SanitizePlugsSlots = builtin.SanitizePlugsSlots
 
-	err = resetPreseeding(imageOpts, classicStateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug, stateMachine.commonFlags.Verbose)
+	err = resetPreseeding(ctx, imageOpts, classicStateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug, stateMachine.commonFlags.Verbose)
 	if err != nil {
 		return err
 	}
@@ -864,7 +864,7 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 
 // resetPreseeding checks if the rootfs is already preseeded and reset if necessary.
 // This can happen when building from a rootfs tarball
-func resetPreseeding(imageOpts *image.Options, chroot string, debug, verbose bool) error {
+func resetPreseeding(ctx context.Context, imageOpts *image.Options, chroot string, debug, verbose bool) error {
 	if !osutil.FileExists(filepath.Join(chroot, "var", "lib", "snapd", "state.json")) {
 		return nil
 	}
@@ -895,7 +895,7 @@ func resetPreseeding(imageOpts *image.Options, chroot string, debug, verbose boo
 	}
 	// We need to use the snap-preseed binary for the reset as well, as using
 	// preseed.ClassicReset() might leave us in a chroot jail
-	cmd := execCommand("/usr/lib/snapd/snap-preseed", "--reset", chroot)
+	cmd := execCommandCtx(ctx, "/usr/lib/snapd/snap-preseed", "--reset", chroot)
 	err = cmd.Run()
 	if err != nil {
 		return fmt.Errorf("Error resetting preseeding in the chroot. Error is \"%s\"", err.Error())
@@ -969,10 +969,10 @@ func setModelFile(imageOpts *image.Options, modelAssertion string, confDefPath s
 	}
 }
 
-var preseedClassicImageState = stateFunc{"preseed_image", (*StateMachine).preseedClassicImage}
+var preseedClassicImageState = stateFunc{"preseed_image", (*StateMachine).preseedClassicImage, nil}
 
 // preseedClassicImage preseeds the snaps that have already been staged in the chroot
-func (stateMachine *StateMachine) preseedClassicImage() (err error) {
+func (stateMachine *StateMachine) preseedClassicImage(ctx context.Context) (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// preseedCmds should be filled as a FIFO list
@@ -1017,11 +1017,11 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 
 	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
-		err = teardownMount(stateMachine.tempDirs.chroot, mountPoints, teardownCmds, err, stateMachine.commonFlags.Debug)
+		err = teardownMount(ctx, stateMachine.tempDirs.chroot, mountPoints, teardownCmds, err, stateMachine.commonFlags.Debug)
 	}()
 
 	for _, mp := range mountPoints {
-		mountCmds, umountCmds, err := mp.getMountCmd()
+		mountCmds, umountCmds, err := mp.getMountCmd(ctx)
 		if err != nil {
 			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mp.relpath,
@@ -1033,7 +1033,7 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	}
 
 	teardownCmds = append([]*exec.Cmd{
-		execCommand("udevadm", "settle"),
+		execCommandCtx(ctx, "udevadm", "settle"),
 	}, teardownCmds...)
 
 	preseedCmds = append(preseedCmds,
@@ -1049,11 +1049,11 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	return nil
 }
 
-var populateClassicRootfsContentsState = stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents}
+var populateClassicRootfsContentsState = stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents, nil}
 
 // populateClassicRootfsContents copies over the staged rootfs
 // to rootfs. It also changes fstab and handles the --cloud-init flag
-func (stateMachine *StateMachine) populateClassicRootfsContents() error {
+func (stateMachine *StateMachine) populateClassicRootfsContents(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// if we backed up resolv.conf then restore it here
@@ -1081,12 +1081,12 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	return classicStateMachine.fixFstab()
 }
 
-var customizeSourcesListState = stateFunc{"customize_sources_list", (*StateMachine).customizeSourcesList}
+var customizeSourcesListState = stateFunc{"customize_sources_list", (*StateMachine).customizeSourcesList, nil}
 
 // customizeSourcesList customize the /etc/apt/sources.list file for the
 // resulting image. This state must be executed once packages installation
 // is done, and before other manual customization to let users modify it.
-func (stateMachine *StateMachine) customizeSourcesList() error {
+func (stateMachine *StateMachine) customizeSourcesList(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	if *classicStateMachine.ImageDef.Rootfs.SourcesListDeb822 {
@@ -1206,10 +1206,10 @@ func generateFstabLines(lines []string) []string {
 	return newLines
 }
 
-var setDefaultLocaleState = stateFunc{"set_default_locale", (*StateMachine).setDefaultLocale}
+var setDefaultLocaleState = stateFunc{"set_default_locale", (*StateMachine).setDefaultLocale, nil}
 
 // Set a default locale if one is not configured beforehand by other customizations
-func (stateMachine *StateMachine) setDefaultLocale() error {
+func (stateMachine *StateMachine) setDefaultLocale(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	defaultPath := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "default")
@@ -1231,16 +1231,16 @@ func (stateMachine *StateMachine) setDefaultLocale() error {
 	return nil
 }
 
-var generatePackageManifestState = stateFunc{"generate_package_manifest", (*StateMachine).generatePackageManifest}
+var generatePackageManifestState = stateFunc{"generate_package_manifest", (*StateMachine).generatePackageManifest, nil}
 
 // Generate the manifest
-func (stateMachine *StateMachine) generatePackageManifest() error {
+func (stateMachine *StateMachine) generatePackageManifest(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// This is basically just a wrapper around dpkg-query
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
 		classicStateMachine.ImageDef.Artifacts.Manifest.ManifestName)
-	cmd := execCommand("chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
+	cmd := execCommandCtx(ctx, "chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
 	cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
 
 	if err := cmd.Run(); err != nil {
@@ -1262,16 +1262,16 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	return nil
 }
 
-var generateFilelistState = stateFunc{"generate_filelist", (*StateMachine).generateFilelist}
+var generateFilelistState = stateFunc{"generate_filelist", (*StateMachine).generateFilelist, nil}
 
 // Generate the manifest
-func (stateMachine *StateMachine) generateFilelist() error {
+func (stateMachine *StateMachine) generateFilelist(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	// This is basically just a wrapper around find (similar to what we do in livecd-rootfs)
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
 		classicStateMachine.ImageDef.Artifacts.Filelist.FilelistName)
-	cmd := execCommand("chroot", stateMachine.tempDirs.rootfs, "find", "-xdev")
+	cmd := execCommandCtx(ctx, "chroot", stateMachine.tempDirs.rootfs, "find", "-xdev")
 	cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
 
 	if err := cmd.Run(); err != nil {
@@ -1293,10 +1293,10 @@ func (stateMachine *StateMachine) generateFilelist() error {
 	return nil
 }
 
-var generateRootfsTarballState = stateFunc{"generate_rootfs_tarball", (*StateMachine).generateRootfsTarball}
+var generateRootfsTarballState = stateFunc{"generate_rootfs_tarball", (*StateMachine).generateRootfsTarball, nil}
 
 // Generate the rootfs tarball
-func (stateMachine *StateMachine) generateRootfsTarball() error {
+func (stateMachine *StateMachine) generateRootfsTarball(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	tarDst := filepath.Join(
@@ -1311,16 +1311,16 @@ func (stateMachine *StateMachine) generateRootfsTarball() error {
 	)
 }
 
-var makeQcow2ImgState = stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img}
+var makeQcow2ImgState = stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img, nil}
 
 // makeQcow2Img converts raw .img artifacts into qcow2 artifacts
-func (stateMachine *StateMachine) makeQcow2Img() error {
+func (stateMachine *StateMachine) makeQcow2Img(ctx context.Context) error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
 	for _, qcow2 := range *classicStateMachine.ImageDef.Artifacts.Qcow2 {
 		backingFile := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[qcow2.Qcow2Volume])
 		resultingFile := filepath.Join(stateMachine.commonFlags.OutputDir, qcow2.Qcow2Name)
-		qemuImgCommand := execCommand("qemu-img",
+		qemuImgCommand := execCommandCtx(ctx, "qemu-img",
 			"convert",
 			"-c",
 			"-O",
@@ -1336,18 +1336,18 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 	return nil
 }
 
-var updateBootloaderState = stateFunc{"update_bootloader", (*StateMachine).updateBootloader}
+var updateBootloaderState = stateFunc{"update_bootloader", (*StateMachine).updateBootloader, nil}
 
 // updateBootloader determines the bootloader for each volume
 // and runs the correct helper function to update the bootloader
-func (stateMachine *StateMachine) updateBootloader() error {
+func (stateMachine *StateMachine) updateBootloader(ctx context.Context) error {
 	if stateMachine.RootfsPartNum == -1 || stateMachine.RootfsVolName == "" {
 		return fmt.Errorf("Error: could not determine partition number of the root filesystem")
 	}
 	volume := stateMachine.GadgetInfo.Volumes[stateMachine.RootfsVolName]
 	switch volume.Bootloader {
 	case "grub":
-		err := stateMachine.updateGrub(stateMachine.RootfsVolName, stateMachine.RootfsPartNum)
+		err := stateMachine.updateGrub(ctx, stateMachine.RootfsVolName, stateMachine.RootfsPartNum)
 		if err != nil {
 			return err
 		}
@@ -1359,11 +1359,11 @@ func (stateMachine *StateMachine) updateBootloader() error {
 	return nil
 }
 
-var cleanRootfsState = stateFunc{"clean_rootfs", (*StateMachine).cleanRootfs}
+var cleanRootfsState = stateFunc{"clean_rootfs", (*StateMachine).cleanRootfs, nil}
 
 // cleanRootfs cleans the created chroot from secrets/values generated
 // during the various preceding install steps
-func (stateMachine *StateMachine) cleanRootfs() error {
+func (stateMachine *StateMachine) cleanRootfs(ctx context.Context) error {
 	toDelete := []string{
 		filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
 	}

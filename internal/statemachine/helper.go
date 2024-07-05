@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -532,7 +533,7 @@ func parseSnapsAndChannels(snaps []string) (snapNames []string, snapChannels map
 
 // generateGerminateCmd creates the appropriate germinate command for the
 // values configured in the image definition yaml file
-func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec.Cmd {
+func generateGerminateCmd(ctx context.Context, imageDefinition imagedefinition.ImageDefinition) *exec.Cmd {
 	// determine the value for the seed-dist in the form of <archive>.<series>
 	seedDist := imageDefinition.Rootfs.Flavor
 	if imageDefinition.Rootfs.Seed.SeedBranch != "" {
@@ -541,7 +542,7 @@ func generateGerminateCmd(imageDefinition imagedefinition.ImageDefinition) *exec
 
 	seedSource := strings.Join(imageDefinition.Rootfs.Seed.SeedURLs, ",")
 
-	germinateCmd := execCommand(
+	germinateCmd := execCommandCtx(ctx,
 		"germinate",
 		"--mirror", imageDefinition.Rootfs.Mirror,
 		"--arch", imageDefinition.Architecture,
@@ -587,8 +588,8 @@ func cloneGitRepo(imageDefinition imagedefinition.ImageDefinition, workDir strin
 
 // generateDebootstrapCmd generates the debootstrap command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, targetDir string) *exec.Cmd {
-	debootstrapCmd := execCommand("debootstrap",
+func generateDebootstrapCmd(ctx context.Context, imageDefinition imagedefinition.ImageDefinition, targetDir string) *exec.Cmd {
+	debootstrapCmd := execCommandCtx(ctx, "debootstrap",
 		"--arch", imageDefinition.Architecture,
 		"--variant=minbase",
 	)
@@ -615,10 +616,10 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 
 // generateAptCmd generates the apt command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
-	updateCmd := execCommand("chroot", targetDir, "apt", "update")
+func generateAptCmds(ctx context.Context, targetDir string, packageList []string) []*exec.Cmd {
+	updateCmd := execCommandCtx(ctx, "chroot", targetDir, "apt", "update")
 
-	installCmd := execCommand("chroot", targetDir, "apt", "install",
+	installCmd := execCommandCtx(ctx, "chroot", targetDir, "apt", "install",
 		"--assume-yes",
 		"--quiet",
 		"--option=Dpkg::options::=--force-unsafe-io",
@@ -662,12 +663,12 @@ exit 101
 }
 
 // divertPolicyRcD dpkg-diverts policy-rc.d to keep it if it already exists
-func divertPolicyRcD(targetDir string) (*exec.Cmd, *exec.Cmd) {
-	return dpkgDivert(targetDir, "/usr/sbin/policy-rc.d")
+func divertPolicyRcD(ctx context.Context, targetDir string) (*exec.Cmd, *exec.Cmd) {
+	return dpkgDivert(ctx, targetDir, "/usr/sbin/policy-rc.d")
 }
 
 // dpkgDivert dpkg-diverts the given file in the given baseDir
-func dpkgDivert(baseDir string, target string) (*exec.Cmd, *exec.Cmd) {
+func dpkgDivert(ctx context.Context, baseDir string, target string) (*exec.Cmd, *exec.Cmd) {
 	dpkgDivert := "dpkg-divert"
 	targetDiverted := target + ".dpkg-divert"
 
@@ -682,7 +683,7 @@ func dpkgDivert(baseDir string, target string) (*exec.Cmd, *exec.Cmd) {
 	divert := append([]string{baseDir, dpkgDivert}, commonArgs...)
 	undivert := append([]string{baseDir, dpkgDivert, "--remove"}, commonArgs...)
 
-	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
+	return execCommandCtx(ctx, "chroot", divert...), execCommandCtx(ctx, "chroot", undivert...)
 }
 
 // backupReplaceStartStopDaemon backup start-stop-daemon and replace it with a fake one
@@ -767,9 +768,9 @@ func manualCopyFile(customizations []*imagedefinition.CopyFile, confDefPath stri
 }
 
 // manualExecute executes executable files in the chroot
-func manualExecute(customizations []*imagedefinition.Execute, targetDir string, debug bool) error {
+func manualExecute(ctx context.Context, customizations []*imagedefinition.Execute, targetDir string, debug bool) error {
 	for _, c := range customizations {
-		executeCmd := execCommand("chroot", targetDir, c.ExecutePath)
+		executeCmd := execCommandCtx(ctx, "chroot", targetDir, c.ExecutePath)
 		if debug {
 			fmt.Printf("Executing command \"%s\"\n", executeCmd.String())
 		}
@@ -784,7 +785,7 @@ func manualExecute(customizations []*imagedefinition.Execute, targetDir string, 
 }
 
 // manualTouchFile touches files in the chroot
-func manualTouchFile(customizations []*imagedefinition.TouchFile, targetDir string, debug bool) error {
+func manualTouchFile(ctx context.Context, customizations []*imagedefinition.TouchFile, targetDir string, debug bool) error {
 	for _, c := range customizations {
 		fullPath := filepath.Join(targetDir, c.TouchPath)
 		if debug {
@@ -799,9 +800,9 @@ func manualTouchFile(customizations []*imagedefinition.TouchFile, targetDir stri
 }
 
 // manualAddGroup adds groups in the chroot
-func manualAddGroup(customizations []*imagedefinition.AddGroup, targetDir string, debug bool) error {
+func manualAddGroup(ctx context.Context, customizations []*imagedefinition.AddGroup, targetDir string, debug bool) error {
 	for _, c := range customizations {
-		addGroupCmd := execCommand("chroot", targetDir, "groupadd", c.GroupName)
+		addGroupCmd := execCommandCtx(ctx, "chroot", targetDir, "groupadd", c.GroupName)
 		debugStatement := fmt.Sprintf("Adding group \"%s\"\n", c.GroupName)
 		if c.GroupID != "" {
 			addGroupCmd.Args = append(addGroupCmd.Args, []string{"--gid", c.GroupID}...)
@@ -821,12 +822,12 @@ func manualAddGroup(customizations []*imagedefinition.AddGroup, targetDir string
 }
 
 // manualAddUser adds users in the chroot
-func manualAddUser(customizations []*imagedefinition.AddUser, targetDir string, debug bool) error {
+func manualAddUser(ctx context.Context, customizations []*imagedefinition.AddUser, targetDir string, debug bool) error {
 	for _, c := range customizations {
 		debugStatement := fmt.Sprintf("Adding user \"%s\"\n", c.UserName)
 		var addUserCmds []*exec.Cmd
 
-		addUserCmd := execCommand("chroot", targetDir, "useradd", c.UserName)
+		addUserCmd := execCommandCtx(ctx, "chroot", targetDir, "useradd", c.UserName)
 		if c.UserID != "" {
 			addUserCmd.Args = append(addUserCmd.Args, []string{"--uid", c.UserID}...)
 			debugStatement = fmt.Sprintf("%s with UID %s\n", strings.TrimSpace(debugStatement), c.UserID)
@@ -835,7 +836,7 @@ func manualAddUser(customizations []*imagedefinition.AddUser, targetDir string, 
 		addUserCmds = append(addUserCmds, addUserCmd)
 
 		if c.Password != "" {
-			chPasswordCmd := execCommand("chroot", targetDir, "chpasswd")
+			chPasswordCmd := execCommandCtx(ctx, "chroot", targetDir, "chpasswd")
 
 			if c.PasswordType == "hash" {
 				chPasswordCmd.Args = append(chPasswordCmd.Args, "-e")
@@ -849,7 +850,7 @@ func manualAddUser(customizations []*imagedefinition.AddUser, targetDir string, 
 
 		debugStatement = fmt.Sprintf("%s, forcing reseting the password at first login\n", strings.TrimSpace(debugStatement))
 		addUserCmds = append(addUserCmds,
-			execCommand("chroot", targetDir, "passwd", "--expire", c.UserName),
+			execCommandCtx(ctx, "chroot", targetDir, "passwd", "--expire", c.UserName),
 		)
 
 		if debug {
@@ -902,9 +903,9 @@ func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error)
 
 // associateLoopDevice associates a file to a loop device and returns the loop device number
 // Also returns the command to detach the loop device during teardown
-func associateLoopDevice(path string, sectorSize quantity.Size) (string, *exec.Cmd, error) {
+func associateLoopDevice(ctx context.Context,path string, sectorSize quantity.Size) (string, *exec.Cmd, error) {
 	// run the losetup command and read the output to determine which loopback was used
-	losetupCmd := execCommand("losetup",
+	losetupCmd := execCommandCtx(ctx, "losetup",
 		"--find",
 		"--show",
 		"--partscan",
@@ -925,19 +926,19 @@ func associateLoopDevice(path string, sectorSize quantity.Size) (string, *exec.C
 	loopUsed := strings.TrimSpace(string(losetupOutput))
 
 	//nolint:gosec,G204
-	losetupDetachCmd := execCommand("losetup", "--detach", loopUsed)
+	losetupDetachCmd := execCommandCtx(ctx, "losetup", "--detach", loopUsed)
 
 	return loopUsed, losetupDetachCmd, nil
 }
 
 // divertOSProber divert GRUB's os-prober as we don't want to scan for other OSes on
 // the build system
-func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
-	return dpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
+func divertOSProber(ctx context.Context, mountDir string) (*exec.Cmd, *exec.Cmd) {
+	return dpkgDivert(ctx, mountDir, "/etc/grub.d/30_os-prober")
 }
 
 // updateGrub mounts the resulting image and runs update-grub
-func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) (err error) {
+func (stateMachine *StateMachine) updateGrub(ctx context.Context, rootfsVolName string, rootfsPartNum int) (err error) {
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
 	err = osMkdir(mountDir, 0755)
@@ -960,7 +961,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 
 	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
 
-	loopUsed, losetupDetachCmd, err := associateLoopDevice(imgPath, stateMachine.SectorSize)
+	loopUsed, losetupDetachCmd, err := associateLoopDevice(ctx, imgPath, stateMachine.SectorSize)
 	if err != nil {
 		return err
 	}
@@ -971,13 +972,13 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	updateGrubCmds = append(updateGrubCmds,
 		// mount the rootfs partition in which to run update-grub
 		//nolint:gosec,G204
-		execCommand("mount",
+		execCommandCtx(ctx, "mount",
 			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
 			mountDir,
 		),
 	)
 
-	teardownCmds = append([]*exec.Cmd{execCommand("umount", mountDir)}, teardownCmds...)
+	teardownCmds = append([]*exec.Cmd{execCommandCtx(ctx, "umount", mountDir)}, teardownCmds...)
 
 	// set up the mountpoints
 	mountPoints := []mountPoint{
@@ -1009,7 +1010,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	}
 
 	for _, mp := range mountPoints {
-		mountCmds, umountCmds, err := mp.getMountCmd()
+		mountCmds, umountCmds, err := mp.getMountCmd(ctx)
 		if err != nil {
 			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mp.relpath,
@@ -1021,17 +1022,17 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	}
 
 	teardownCmds = append([]*exec.Cmd{
-		execCommand("udevadm", "settle"),
+		execCommandCtx(ctx, "udevadm", "settle"),
 	}, teardownCmds...)
 
-	divert, undivert := divertOSProber(mountDir)
+	divert, undivert := divertOSProber(ctx, mountDir)
 
 	updateGrubCmds = append(updateGrubCmds, divert)
 	teardownCmds = append([]*exec.Cmd{undivert}, teardownCmds...)
 
 	// actually run update-grub
 	updateGrubCmds = append(updateGrubCmds,
-		execCommand("chroot",
+		execCommandCtx(ctx, "chroot",
 			mountDir,
 			"update-grub",
 		),

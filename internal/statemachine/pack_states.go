@@ -1,16 +1,17 @@
 package statemachine
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 )
 
-var preparePackState = stateFunc{"prepare_pack", (*StateMachine).preparePack}
+var preparePackState = stateFunc{"prepare_pack", (*StateMachine).preparePack, nil}
 
 // preparePack prepare the packStateMachine
 // This step must be run first
-func (stateMachine *StateMachine) preparePack() error {
+func (stateMachine *StateMachine) preparePack(ctx context.Context) error {
 	packStateMachine := stateMachine.parent.(*PackStateMachine)
 
 	packStateMachine.YamlFilePath = filepath.Join(packStateMachine.Opts.GadgetDir, gadgetYamlPathInTree)
@@ -18,10 +19,10 @@ func (stateMachine *StateMachine) preparePack() error {
 	return nil
 }
 
-var populateTemporaryDirectoriesState = stateFunc{"populate_temporary_directories", (*StateMachine).populateTemporaryDirectories}
+var populateTemporaryDirectoriesState = stateFunc{"populate_temporary_directories", (*StateMachine).populateTemporaryDirectories, nil}
 
 // populateTemporaryDirectories fills tempDirs with dirs given as Opts
-func (stateMachine *StateMachine) populateTemporaryDirectories() error {
+func (stateMachine *StateMachine) populateTemporaryDirectories(ctx context.Context) error {
 	packStateMachine := stateMachine.parent.(*PackStateMachine)
 
 	files, err := osReadDir(packStateMachine.Opts.RootfsDir)
