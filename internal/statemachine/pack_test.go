@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -138,7 +139,7 @@ func TestPackStateMachine_DryRun(t *testing.T) {
 		t.Errorf("Some files were created in the workdir but should not. Created files: %s", files)
 	}
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.Teardown()
@@ -266,7 +267,7 @@ func TestPack_populateTemporaryDirectories(t *testing.T) {
 				t.Cleanup(restoreMock)
 			}
 
-			err = stateMachine.populateTemporaryDirectories()
+			err = stateMachine.populateTemporaryDirectories(context.Background())
 			if err != nil || len(tc.expectedErr) != 0 {
 				asserter.AssertErrContains(err, tc.expectedErr)
 			}
@@ -326,7 +327,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 	)
 	asserter.AssertErrNil(err, true)
 
-	debootstrapCmd := execCommand("debootstrap",
+	debootstrapCmd := execCommandCtx(context.Background(), "debootstrap",
 		"--arch", "amd64",
 		"--variant=minbase",
 		"--include=grub2-common",
@@ -352,7 +353,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	t.Cleanup(func() {
@@ -424,7 +425,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		},
 	}
 	for _, mp := range mountPoints {
-		mountCmds, umountCmds, err := mp.getMountCmd()
+		mountCmds, umountCmds, err := mp.getMountCmd(context.Background())
 		if err != nil {
 			t.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mp.relpath,
