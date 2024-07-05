@@ -1,0 +1,125 @@
+package partition
+
+import (
+	"testing"
+
+	"github.com/diskfs/go-diskfs/partition"
+	"github.com/diskfs/go-diskfs/partition/gpt"
+	"github.com/snapcore/snapd/gadget"
+	"github.com/snapcore/snapd/gadget/quantity"
+
+	"github.com/canonical/ubuntu-image/internal/helper"
+)
+
+// helper function to define *quantity.Offsets inline
+func createOffsetPointer(x quantity.Offset) *quantity.Offset {
+	return &x
+}
+
+func TestGeneratePartitionTable(t *testing.T) {
+	type args struct {
+		volume     *gadget.Volume
+		sectorSize uint64
+		imgSize    uint64
+		isSeeded   bool
+	}
+
+	tests := []struct {
+		name                 string
+		args                 args
+		wantPartitionTable   partition.Table
+		wantRootfsPartNumber int
+		expectedError        string
+	}{
+		{
+			name: "happy path",
+			args: args{
+				volume: &gadget.Volume{
+					Schema:     "gpt",
+					Bootloader: "grub",
+					Structure: []gadget.VolumeStructure{
+						{
+							VolumeName: "pc",
+							Name:       "mbr",
+							Offset:     createOffsetPointer(0),
+							MinSize:    440,
+							Size:       440,
+							Type:       "mbr",
+							Role:       "mbr",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-boot.img",
+								},
+							},
+							Update: gadget.VolumeUpdate{Edition: 1},
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-seed",
+							Label:      "ubuntu-seed",
+							Offset:     createOffsetPointer(1048576),
+							MinSize:    1258291200,
+							Size:       1258291200,
+							Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+							Role:       "system-seed",
+							Filesystem: "vfat",
+							Content:    []gadget.VolumeContent{},
+							Update:     gadget.VolumeUpdate{Edition: 2},
+							YamlIndex:  1,
+						},
+						{
+							VolumeName: "",
+							Name:       "",
+							Label:      "writable",
+							Offset:     createOffsetPointer(1259339776),
+							MinSize:    1258291200,
+							Size:       1258291200,
+							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+							Role:       "system-data",
+							Filesystem: "ext4",
+							Content:    []gadget.VolumeContent{},
+							YamlIndex:  2,
+						},
+					},
+					Name: "pc",
+				},
+				sectorSize: sectorSize4k,
+				imgSize:    uint64(4 * quantity.SizeKiB),
+			},
+			wantRootfsPartNumber: 2,
+			wantPartitionTable: &gpt.Table{
+				LogicalSectorSize:  int(sectorSize512),
+				PhysicalSectorSize: int(sectorSize512),
+				ProtectiveMBR:      true,
+				Partitions: []*gpt.Partition{
+					{
+						Start: 2048,
+						Size:  1258291200,
+						Type:  "C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+						Name:  "ubuntu-seed",
+					},
+					{
+						Start: 2459648,
+						Size:  1258291200,
+						Type:  "0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+						Name:  "writable",
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asserter := &helper.Asserter{T: t}
+			gotPartitionTable, gotRootfsPartNumber, gotErr := GeneratePartitionTable(tt.args.volume, tt.args.sectorSize, tt.args.imgSize, tt.args.isSeeded)
+
+			if len(tt.expectedError) == 0 {
+				asserter.AssertErrNil(gotErr, true)
+				asserter.AssertEqual(tt.wantRootfsPartNumber, gotRootfsPartNumber)
+				asserter.AssertEqual(tt.wantPartitionTable, gotPartitionTable)
+			} else {
+				asserter.AssertErrContains(gotErr, tt.expectedError)
+			}
+		})
+	}
+}
