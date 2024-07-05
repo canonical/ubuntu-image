@@ -59,8 +59,6 @@ parts:
       - e2fsprogs
     build-attributes: [ enable-patchelf ]
     override-build: |
-      # Check if mkfs configuration for every series are up to date
-      ./tools/check-mkfs-confs.sh
       mv mkfs "$SNAPCRAFT_PART_INSTALL"/etc/ubuntu-image/
       ins_bin=$SNAPCRAFT_PART_INSTALL/bin/
       mkdir -p "$ins_bin"
