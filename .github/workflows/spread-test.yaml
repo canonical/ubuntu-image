@@ -3,8 +3,27 @@ name: Run a spread test of the generated snap
 on: [pull_request]
 
 jobs:
+  snap-builds:
+    runs-on: ubuntu-22.04
+    # Only build the snap for pull requests, it's not needed on release branches
+    # or on master since we have launchpad build recipes which do this already
+    if: ${{ github.event_name == 'pull_request' }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build ubuntu-image snap
+      uses: snapcore/action-build@v1
+
+    - name: Uploading ubuntu-image snap artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: snap
+        path: "*.snap"
+
   spread:
     runs-on: [self-hosted, ubuntu-image]
+    needs: snap-builds
     strategy:
       fail-fast: false
       matrix:
@@ -35,7 +54,13 @@ jobs:
         with:
           path: "${{ github.workspace }}/.test-results"
           key: "${{ github.job }}-results-${{ github.run_id }}-${{ matrix.group }}-${{ steps.get-previous-attempt.outputs.previous_attempt }}"
-    
+
+      # Needed for some older series we are unable to build the snap on anymore 
+      - name: Download previsouly build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: snap
+
       - name: Prepare test results env and vars
         id: prepare-test-results-env
         run: |
