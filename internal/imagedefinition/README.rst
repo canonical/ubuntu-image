@@ -250,14 +250,23 @@ The following specification defines what is supported in the YAML:
             # The location of the rootfs will be prepended to this
             # path automatically.
             path: <string>
-        # Chroots into the rootfs and executes an executable file.
+        # Chroots into the rootfs and executes comamnds and executables.
         # This customization state is run after the copy-files state,
         # so files that have been copied into the rootfs are valid
         # targets to be executed.
         execute: (optional)
           -
-            # Path inside the rootfs.
+            # Path to a executable inside the rootfs. This field only 
+            # supports a single path and not arguments. This field is
+            # deprecated. Use command instead.
             path: <string>
+            # Full command to execute, including arguments
+            command: <string>
+            # Environment variables to set before executing the command
+            # Format: ENV=VALUE
+            env: (optional)
+              - <string>
+              - <string>
         # Any additional users to add in the rootfs
         # We recommend using cloud-init when possible and fallback
         # on this method if not possible (e.g performance issues)
@@ -278,7 +287,7 @@ The following specification defines what is supported in the YAML:
             # The name of the group to create.
             name: <string>
             # The GID to assign to this group.
-            gid: <string> (optional)
+            id: <string> (optional)
       # Set a custom fstab. The existing one (if any) will be truncated.
       fstab: (optional)
         -
