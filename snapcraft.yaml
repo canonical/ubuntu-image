@@ -58,6 +58,10 @@ parts:
       - python3.12-minimal
       - e2fsprogs
     build-attributes: [ enable-patchelf ]
+    override-pull: |
+      # Ensure we don't have a dubious ownership error from git when building.
+      git config --global --add safe.directory $CRAFT_PROJECT_DIR/.git
+      craftctl default
     override-build: |
       mv mkfs "$SNAPCRAFT_PART_INSTALL"/etc/ubuntu-image/
       ins_bin=$SNAPCRAFT_PART_INSTALL/bin/
