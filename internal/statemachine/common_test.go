@@ -819,32 +819,36 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 // We also check various sector sizes while at it and rootfs placements
 func TestMakeDiskPartitionSchemes(t *testing.T) {
 	testCases := []struct {
-		name          string
-		tableType     string
-		sectorSize    string
-		rootfsVolName string
-		rootfsPartNum int
+		name              string
+		tableType         string
+		sectorSize        string
+		rootfsVolName     string
+		rootfsContentPath string
+		rootfsPartNum     int
 	}{
 		{
-			name:          "gpt",
-			tableType:     "gpt",
-			sectorSize:    "512",
-			rootfsVolName: "pc",
-			rootfsPartNum: 3,
+			name:              "gpt",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree"),
+			rootfsPartNum:     3,
 		},
 		{
-			name:          "mbr",
-			tableType:     "dos",
-			sectorSize:    "512",
-			rootfsVolName: "pc",
-			rootfsPartNum: 3,
+			name:              "mbr",
+			tableType:         "dos",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree"),
+			rootfsPartNum:     3,
 		},
 		{
-			name:          "hybrid",
-			tableType:     "gpt",
-			sectorSize:    "512",
-			rootfsVolName: "pc",
-			rootfsPartNum: 3,
+			name:              "hybrid",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree"),
+			rootfsPartNum:     3,
 		},
 		// {
 		// 	name:          "gpt4k",
@@ -854,11 +858,20 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 		// 	rootfsPartNum: 3,
 		// }, // PMBR still seems valid GPT
 		{
-			name:          "gpt-efi-only",
-			tableType:     "gpt",
-			sectorSize:    "512",
-			rootfsVolName: "pc",
-			rootfsPartNum: 2,
+			name:              "gpt-efi-only",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree"),
+			rootfsPartNum:     2,
+		},
+		{
+			name:              "small",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree_piboot"), // bigger than what was calculated based on the rootfs declared in the gadget.yaml
+			rootfsPartNum:     1,
 		},
 	}
 	for _, tc := range testCases {
@@ -897,7 +910,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			// set up a "rootfs" that we can eventually copy into the disk
 			err = os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
 			asserter.AssertErrNil(err, true)
-			err = osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+			err = osutil.CopySpecialFile(tc.rootfsContentPath, stateMachine.tempDirs.rootfs)
 			asserter.AssertErrNil(err, true)
 
 			// also need to set the rootfs size to avoid partition errors
@@ -1440,9 +1453,9 @@ func TestStateMachine_createDiskImage(t *testing.T) {
 				Writable:          true,
 				PhysicalBlocksize: 512,
 				LogicalBlocksize:  512,
-				Size:              2046820352,
+				Size:              2046854656,
 			},
-			wantImgSize: quantity.Size(2046820352),
+			wantImgSize: quantity.Size(2046854656),
 		},
 		{
 			name:       "basic case sector size 4k",
@@ -1456,9 +1469,9 @@ func TestStateMachine_createDiskImage(t *testing.T) {
 				Writable:          true,
 				PhysicalBlocksize: 4096,
 				LogicalBlocksize:  4096,
-				Size:              2046820352,
+				Size:              2046865408,
 			},
-			wantImgSize: quantity.Size(2046820352),
+			wantImgSize: quantity.Size(2046865408),
 		},
 		{
 			name:       "size to align to sector size 4k",
@@ -1472,9 +1485,9 @@ func TestStateMachine_createDiskImage(t *testing.T) {
 				Writable:          true,
 				PhysicalBlocksize: 4096,
 				LogicalBlocksize:  4096,
-				Size:              2046820352, // would be 2046820152 if unaligned
+				Size:              2046865408, // would be 2046820152 if unaligned
 			},
-			wantImgSize: quantity.Size(2046820352),
+			wantImgSize: quantity.Size(2046865408),
 		},
 	}
 	for _, tc := range tests {
