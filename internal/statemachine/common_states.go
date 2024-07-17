@@ -468,10 +468,12 @@ func (stateMachine *StateMachine) makeDisk() error {
 // createDiskImage creates a disk image and makes sure the size respects the configuration and
 // the SectorSize
 func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gadget.Volume, imgName string) (*diskutils.Disk, error) {
-	imgSize, found := stateMachine.ImageSizes[volumeName]
-	if !found {
-		// Calculate the minimum size that would be valid according to gadget.yaml.
-		imgSize = volume.MinSize()
+	// Calculate the minimum size that would be needed according to gadget.yaml.
+	imgSize := volume.MinSize()
+
+	desiredImgSize, found := stateMachine.ImageSizes[volumeName]
+	if found && desiredImgSize > imgSize {
+		imgSize = desiredImgSize
 	}
 	if err := osRemoveAll(imgName); err != nil {
 		return nil, fmt.Errorf("Error removing old disk image: %s", err.Error())
@@ -480,7 +482,13 @@ func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gad
 	sectorSizeDiskfs := diskfs.SectorSize(int(stateMachine.SectorSize))
 	imgSize = stateMachine.alignToSectorSize(imgSize)
 
-	diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw, sectorSizeDiskfs)
+	// Create a temp partition table to get its size
+	// The value is already a multiple of the sector size, so no need to align again
+	tempPartitionTable := partition.NewPartitionTable(volume, uint64(stateMachine.SectorSize), 0)
+
+	totalImgSize := int64(imgSize) + int64(tempPartitionTable.PartitionTableSize())
+
+	diskImg, err := diskfsCreate(imgName, totalImgSize, diskfs.Raw, sectorSizeDiskfs)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating disk image: %s", err.Error())
 	}
