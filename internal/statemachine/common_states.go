@@ -177,7 +177,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	}
 
 	if rootfsStructure != nil {
-		rootfsStructure.Size = stateMachine.RootfsSize
+		rootfsStructure.MinSize = stateMachine.RootfsSize
 	}
 
 	return nil
