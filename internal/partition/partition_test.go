@@ -16,6 +16,56 @@ func createOffsetPointer(x quantity.Offset) *quantity.Offset {
 	return &x
 }
 
+var gadgetGPT = &gadget.Volume{
+	Schema:     "gpt",
+	Bootloader: "grub",
+	Structure: []gadget.VolumeStructure{
+		{
+			VolumeName: "pc",
+			Name:       "mbr",
+			Offset:     createOffsetPointer(0),
+			MinSize:    440,
+			Size:       440,
+			Type:       "mbr",
+			Role:       "mbr",
+			Content: []gadget.VolumeContent{
+				{
+					Image: "pc-boot.img",
+				},
+			},
+			Update: gadget.VolumeUpdate{Edition: 1},
+		},
+		{
+			VolumeName: "pc",
+			Name:       "ubuntu-seed",
+			Label:      "ubuntu-seed",
+			Offset:     createOffsetPointer(1048576),
+			MinSize:    1258291200,
+			Size:       1258291200,
+			Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+			Role:       "system-seed",
+			Filesystem: "vfat",
+			Content:    []gadget.VolumeContent{},
+			Update:     gadget.VolumeUpdate{Edition: 2},
+			YamlIndex:  1,
+		},
+		{
+			VolumeName: "",
+			Name:       "",
+			Label:      "writable",
+			Offset:     createOffsetPointer(1259339776),
+			MinSize:    1258291200,
+			Size:       1258291200,
+			Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+			Role:       "system-data",
+			Filesystem: "ext4",
+			Content:    []gadget.VolumeContent{},
+			YamlIndex:  2,
+		},
+	},
+	Name: "pc",
+}
+
 func TestGeneratePartitionTable(t *testing.T) {
 	type args struct {
 		volume     *gadget.Volume
@@ -32,58 +82,10 @@ func TestGeneratePartitionTable(t *testing.T) {
 		expectedError        string
 	}{
 		{
-			name: "happy path",
+			name: "happy path 512 sector size",
 			args: args{
-				volume: &gadget.Volume{
-					Schema:     "gpt",
-					Bootloader: "grub",
-					Structure: []gadget.VolumeStructure{
-						{
-							VolumeName: "pc",
-							Name:       "mbr",
-							Offset:     createOffsetPointer(0),
-							MinSize:    440,
-							Size:       440,
-							Type:       "mbr",
-							Role:       "mbr",
-							Content: []gadget.VolumeContent{
-								{
-									Image: "pc-boot.img",
-								},
-							},
-							Update: gadget.VolumeUpdate{Edition: 1},
-						},
-						{
-							VolumeName: "pc",
-							Name:       "ubuntu-seed",
-							Label:      "ubuntu-seed",
-							Offset:     createOffsetPointer(1048576),
-							MinSize:    1258291200,
-							Size:       1258291200,
-							Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
-							Role:       "system-seed",
-							Filesystem: "vfat",
-							Content:    []gadget.VolumeContent{},
-							Update:     gadget.VolumeUpdate{Edition: 2},
-							YamlIndex:  1,
-						},
-						{
-							VolumeName: "",
-							Name:       "",
-							Label:      "writable",
-							Offset:     createOffsetPointer(1259339776),
-							MinSize:    1258291200,
-							Size:       1258291200,
-							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
-							Role:       "system-data",
-							Filesystem: "ext4",
-							Content:    []gadget.VolumeContent{},
-							YamlIndex:  2,
-						},
-					},
-					Name: "pc",
-				},
-				sectorSize: sectorSize4k,
+				volume:     gadgetGPT,
+				sectorSize: sectorSize512,
 				imgSize:    uint64(4 * quantity.SizeKiB),
 			},
 			wantRootfsPartNumber: 2,
@@ -93,13 +95,41 @@ func TestGeneratePartitionTable(t *testing.T) {
 				ProtectiveMBR:      true,
 				Partitions: []*gpt.Partition{
 					{
-						Start: 2048,
+						Start: 2048, // the Offset (1048576) divided by the sector size
 						Size:  1258291200,
 						Type:  "C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
 						Name:  "ubuntu-seed",
 					},
 					{
 						Start: 2459648,
+						Size:  1258291200,
+						Type:  "0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+						Name:  "writable",
+					},
+				},
+			},
+		},
+		{
+			name: "happy path 4k sector size",
+			args: args{
+				volume:     gadgetGPT,
+				sectorSize: sectorSize4k,
+				imgSize:    uint64(4 * quantity.SizeKiB),
+			},
+			wantRootfsPartNumber: 2,
+			wantPartitionTable: &gpt.Table{
+				LogicalSectorSize:  int(sectorSize4k),
+				PhysicalSectorSize: int(sectorSize4k),
+				ProtectiveMBR:      true,
+				Partitions: []*gpt.Partition{
+					{
+						Start: 256, // the Offset (1048576) divided by the sector size
+						Size:  1258291200,
+						Type:  "C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+						Name:  "ubuntu-seed",
+					},
+					{
+						Start: 307456,
 						Size:  1258291200,
 						Type:  "0FC63DAF-8483-4772-8E79-3D69D8477DE4",
 						Name:  "writable",

@@ -28,22 +28,13 @@ const (
 	partitionHeaderSectors uint64 = 1
 )
 
-func partitionEntriesSectors(sectorSize uint64) uint64 {
-	var partitionEntriesSectors uint64 = 32
-
-	if sectorSize == sectorSize4k {
-		partitionEntriesSectors = 4
-	}
-
-	return partitionEntriesSectors
-}
-
 // Table is a light wrapper around partition.Table to properly add partitions
 // Some work is sadly duplicated because the go-diskfs lib does not expose
 // the needed data (first/last LBA)
 type Table interface {
 	AddPartition(structurePair *gadget.OnDiskAndGadgetStructurePair, structureType string) error
 	GetConcreteTable() partition.Table
+	PartitionTableSize() uint64
 }
 
 // NewPartitionTable creates a partition table for a given volume
@@ -147,6 +138,11 @@ func (t *MBRTable) GetConcreteTable() partition.Table {
 	return t.concreteTable
 }
 
+// PartitionTableSize returns the total size in bytes of the partition table
+func (t *MBRTable) PartitionTableSize() uint64 {
+	return uint64(t.concreteTable.LogicalSectorSize)
+}
+
 type GPTTable struct {
 	concreteTable *gpt.Table
 	diskSize      uint64
@@ -180,6 +176,30 @@ func (t *GPTTable) GetConcreteTable() partition.Table {
 	return t.concreteTable
 }
 
+func gptPartitionEntriesSectors(sectorSize uint64) uint64 {
+	var partitionEntriesSectors uint64 = 32
+
+	if sectorSize == sectorSize4k {
+		partitionEntriesSectors = 4
+	}
+
+	return partitionEntriesSectors
+}
+
+// primaryGPTSectors returns how many sectors the primary GPT header uses
+func (t *GPTTable) primaryGPTSectors() uint64 {
+	return protectiveMBRSectors + partitionHeaderSectors + gptPartitionEntriesSectors(uint64(t.concreteTable.LogicalSectorSize))
+}
+
+// primaryGPTSectors returns how many sectors the secondary GPT header uses
+func (t *GPTTable) secondaryGPTSectors() uint64 {
+	return partitionHeaderSectors + gptPartitionEntriesSectors(uint64(t.concreteTable.LogicalSectorSize))
+}
+
+func (t *GPTTable) sizeToSectors(size uint64) uint64 {
+	return uint64(math.Ceil(float64(size) / float64(t.concreteTable.LogicalSectorSize)))
+}
+
 // structureOverlaps checks if a given structure overlaps the GPT table (either the primary
 // or secondary one)
 // If the block size is 512, the First Usable LBA must be greater than or equal
@@ -189,13 +209,13 @@ func (t *GPTTable) GetConcreteTable() partition.Table {
 // or equal to 6 (allowing 1 block for the Protective MBR, 1 block for the GPT
 // Header, and 4 blocks for the GPT Partition Entry Array)
 func (t *GPTTable) structureOverlaps(startSector uint64, size uint64) bool {
-	partitionEntriesSectors := partitionEntriesSectors(uint64(t.concreteTable.LogicalSectorSize))
+	diskSectors := t.sizeToSectors(t.diskSize)
+	structureSectors := t.sizeToSectors(size)
 
-	var primaryGPTSectors uint64 = protectiveMBRSectors + partitionHeaderSectors + partitionEntriesSectors
-	var secondaryGPTSectors uint64 = partitionHeaderSectors + partitionEntriesSectors
+	return startSector < t.primaryGPTSectors() || startSector+structureSectors > diskSectors-t.secondaryGPTSectors()
+}
 
-	diskSectors := uint64(math.Ceil(float64(t.diskSize) / float64(t.concreteTable.LogicalSectorSize)))
-	structureSectors := uint64(math.Ceil(float64(size) / float64(t.concreteTable.LogicalSectorSize)))
-
-	return startSector < primaryGPTSectors || startSector+structureSectors > diskSectors-secondaryGPTSectors
+// PartitionTableSize returns the total size in bytes of the partition table
+func (t *GPTTable) PartitionTableSize() uint64 {
+	return (t.primaryGPTSectors() + t.secondaryGPTSectors()) * uint64(t.concreteTable.LogicalSectorSize)
 }
