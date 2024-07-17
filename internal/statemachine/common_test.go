@@ -427,8 +427,22 @@ func TestFailedCalculateRootfsSize(t *testing.T) {
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrNil(err, true)
 
+	// capture stdout, run copy structure content, and ensure the warning was thrown
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	defer restoreStdout()
+	asserter.AssertErrNil(err, true)
+
 	err = stateMachine.calculateRootfsSize()
-	asserter.AssertErrContains(err, "smaller than actual rootfs contents")
+	asserter.AssertErrNil(err, true)
+
+	// restore stdout and check that the warning was printed
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
+
+	if !strings.Contains(string(readStdout), "WARNING: rootfs content 8394752 is bigger than requested image size (0). Try using a larger value of --image-size") {
+		t.Errorf("Warning about rootfs content size not present in stdout: \"%s\"", string(readStdout))
+	}
 }
 
 // TestPopulateBootfsContents tests a successful run of the populateBootfsContents state
