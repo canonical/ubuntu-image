@@ -38,7 +38,7 @@ func partitionEntriesSectors(sectorSize uint64) uint64 {
 	return partitionEntriesSectors
 }
 
-// Table is light wrapper around partition.Table to properly add partitions
+// Table is a light wrapper around partition.Table to properly add partitions
 // Some work is sadly duplicated because the go-diskfs lib does not expose
 // the needed data (first/last LBA)
 type Table interface {
@@ -67,7 +67,7 @@ func NewPartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64)
 	}
 }
 
-// GeneratePartitionTable prepares the partition table for a structures in a volume and
+// GeneratePartitionTable prepares the partition table for structures in a volume and
 // returns it with the partition number of the root partition.
 func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64, isSeeded bool) (partition.Table, int, error) {
 	partitionNumber, rootfsPartitionNumber := 1, -1
