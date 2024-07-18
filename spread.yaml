@@ -76,6 +76,11 @@ backends:
 path: /home/ubuntu-image
 
 prepare: |
+  # Make sure there is a hostname file because it could be missing
+  # We will need it to have debootstrap properly run
+  if [ ! -f /etc/hostname ]; then
+      echo "hostname" > /etc/hostname
+  fi
   # NOTE: This part of the code needs to be in spread.yaml as it runs before
   # the rest of the source code (including the tests/lib directory) is
   # around. The purpose of this code is to fix some connectivity issues and
