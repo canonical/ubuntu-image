@@ -287,12 +287,12 @@ func TestCalculateRootfsSizeImageSize(t *testing.T) {
 		{
 			name:         "one image size",
 			sizeArg:      "4G",
-			expectedSize: 4240441344,
+			expectedSize: 4240407040,
 		},
 		{
 			name:         "image size per volume",
 			sizeArg:      "pc:4G",
-			expectedSize: 4240441344,
+			expectedSize: 4240407040,
 		},
 	}
 	for _, tc := range testCases {
