@@ -209,7 +209,7 @@ func (stateMachine *StateMachine) getGadgetRootfsMinSize(rootfsStructure *gadget
 }
 
 // getRootfsDesiredSize subtracts the size and offsets of the existing structures
-// from the requested image size to determine how much room is left for the rootfs
+// from the requested image size to determine the maximum possible size of the rootfs
 func (stateMachine *StateMachine) getRootfsDesiredSize(rootfsVolume *gadget.Volume, rootfsVolumeName string) (quantity.Size, bool) {
 	if rootfsVolume == nil {
 		return quantity.Size(0), false
@@ -222,6 +222,11 @@ func (stateMachine *StateMachine) getRootfsDesiredSize(rootfsVolume *gadget.Volu
 	}
 
 	reservedSize := calculateNoRootfsSize(rootfsVolume)
+	// Create a temp partition table to get its size
+	// The value is already a multiple of the sector size, so no need to align again
+	tempPartitionTable := partition.NewPartitionTable(rootfsVolume, uint64(stateMachine.SectorSize), 0)
+	reservedSize += quantity.Size(tempPartitionTable.PartitionTableSize())
+
 	desiredSize = helper.SafeQuantitySubtraction(desiredSize, reservedSize)
 	desiredSize = stateMachine.alignToSectorSize(desiredSize)
 
