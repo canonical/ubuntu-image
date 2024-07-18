@@ -420,22 +420,8 @@ func (stateMachine *StateMachine) makeDisk() error {
 			return err
 		}
 
-		partitionTable, rootfsPartitionNumber, err := partition.GeneratePartitionTable(volume, uint64(stateMachine.SectorSize), uint64(diskImg.Size), stateMachine.IsSeeded)
-		if err != nil {
+		if err := stateMachine.partitionDisk(diskImg, volume, volumeName); err != nil {
 			return err
-		}
-
-		fmt.Printf("partitionTable: %+v\n\n", partitionTable)
-
-		// Save the rootfs partition number, for later use
-		// Store in any case, even if value is -1 to make it clear later it was not found
-		stateMachine.RootfsPartNum = rootfsPartitionNumber
-		if rootfsPartitionNumber != -1 {
-			stateMachine.RootfsVolName = volumeName
-		}
-
-		if err := diskImg.Partition(partitionTable); err != nil {
-			return fmt.Errorf("Error partitioning image file: %s", err.Error())
 		}
 
 		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
@@ -456,11 +442,6 @@ func (stateMachine *StateMachine) makeDisk() error {
 		if err := writeOffsetValues(volume, imgName, uint64(stateMachine.SectorSize), uint64(diskImg.Size)); err != nil {
 			return err
 		}
-		p, err := diskImg.GetPartitionTable()
-		if err != nil {
-			fmt.Printf("partition table error: %+v\n", err)
-		}
-		fmt.Printf("partitionTable after: %+v\n", p)
 	}
 	return nil
 }
@@ -494,4 +475,24 @@ func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gad
 	}
 
 	return diskImg, nil
+}
+
+// partitionDisk generates a partition table and applies it to the disk
+func (stateMachine *StateMachine) partitionDisk(diskImg *diskutils.Disk, volume *gadget.Volume, volumeName string) error {
+	partitionTable, rootfsPartitionNumber, err := partition.GeneratePartitionTable(volume, uint64(stateMachine.SectorSize), uint64(diskImg.Size), stateMachine.IsSeeded)
+	if err != nil {
+		return err
+	}
+
+	// Save the rootfs partition number, for later use
+	// Store in any case, even if value is -1 to make it clear later it was not found
+	stateMachine.RootfsPartNum = rootfsPartitionNumber
+	if rootfsPartitionNumber != -1 {
+		stateMachine.RootfsVolName = volumeName
+	}
+
+	if err := diskImg.Partition(partitionTable); err != nil {
+		return fmt.Errorf("Error partitioning image file: %s", err.Error())
+	}
+	return nil
 }
