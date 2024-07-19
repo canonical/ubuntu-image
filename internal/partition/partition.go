@@ -67,14 +67,15 @@ func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize ui
 
 	onDisk := gadget.OnDiskStructsFromGadget(volume)
 
-	for i, structure := range volume.Structure {
+	for i := range volume.Structure {
+		structure := &volume.Structure[i]
 		if !structure.IsPartition() || helper.ShouldSkipStructure(structure, isSeeded) {
 			continue
 		}
 
 		// Record the actual partition number of the root partition, as it
 		// might be useful for certain operations (like updating the bootloader)
-		if helper.IsRootfsStructure(&structure) { //nolint:gosec,G301
+		if helper.IsRootfsStructure(structure) { //nolint:gosec,G301
 			rootfsPartitionNumber = partitionNumber
 		}
 
@@ -97,7 +98,7 @@ func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize ui
 
 // getStructureType extracts the structure type from the structure.Type considering
 // the schema
-func getStructureType(structure gadget.VolumeStructure, schema string) string {
+func getStructureType(structure *gadget.VolumeStructure, schema string) string {
 	structureType := structure.Type
 	// Check for hybrid MBR/GPT
 	if !strings.Contains(structure.Type, ",") {

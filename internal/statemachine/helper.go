@@ -148,7 +148,7 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 
 // copyStructureContent handles copying raw blobs or creating formatted filesystems
 func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
-	structure gadget.VolumeStructure, structIndex int,
+	structure *gadget.VolumeStructure, structIndex int,
 	contentRoot, partImg string) error {
 
 	if !structure.HasFilesystem() {
@@ -169,7 +169,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 // copyStructureNoFS copies the contents to the new location.
 // It first zeros it out. Structures without filesystem specified in the gadget
 // yaml must have the size specified, so the bs= argument below is valid
-func copyStructureNoFS(unpackDir string, structure gadget.VolumeStructure, partImg string) error {
+func copyStructureNoFS(unpackDir string, structure *gadget.VolumeStructure, partImg string) error {
 	ddArgs := []string{"if=/dev/zero", "of=" + partImg, "count=0",
 		"bs=" + strconv.FormatUint(uint64(structure.Size), 10),
 		"seek=1"}
@@ -198,9 +198,9 @@ func copyStructureNoFS(unpackDir string, structure gadget.VolumeStructure, partI
 }
 
 // prepareAndCreateFS prepares and creates a filesystem for the given structure
-func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, structure gadget.VolumeStructure, structIndex int, contentRoot, partImg string) error {
+func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int, contentRoot, partImg string) error {
 	partSize := structure.Size
-	if (helper.IsRootfsStructure(&structure) || structure.Role == gadget.SystemSeed) && structure.Size < stateMachine.RootfsSize {
+	if (helper.IsRootfsStructure(structure) || structure.Role == gadget.SystemSeed) && structure.Size < stateMachine.RootfsSize {
 		// system-data and system-seed structures are not required to have
 		// an explicit size set in the yaml file
 		if !stateMachine.commonFlags.Quiet {
@@ -210,8 +210,8 @@ func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, stru
 				stateMachine.RootfsSize.IECString())
 		}
 		partSize = stateMachine.RootfsSize
-		structure.Size = stateMachine.RootfsSize
-		volume.Structure[structIndex] = structure
+		setStructureSize(structure, stateMachine.RootfsSize)
+		volume.Structure[structIndex] = *structure
 	}
 
 	err := prepareDiskImg(structure, partImg, partSize, stateMachine.RootfsSize)
@@ -223,8 +223,8 @@ func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, stru
 }
 
 // prepareDiskImg prepares a raw image
-func prepareDiskImg(structure gadget.VolumeStructure, partImg string, partSize quantity.Size, rootfsSize quantity.Size) error {
-	if helper.IsRootfsStructure(&structure) {
+func prepareDiskImg(structure *gadget.VolumeStructure, partImg string, partSize quantity.Size, rootfsSize quantity.Size) error {
+	if helper.IsRootfsStructure(structure) {
 		_, err := os.Create(partImg)
 		if err != nil {
 			return fmt.Errorf("unable to create partImg file: %w", err)
@@ -246,7 +246,7 @@ func prepareDiskImg(structure gadget.VolumeStructure, partImg string, partSize q
 }
 
 // makeFS actually creates the filesystem for the given structure
-func makeFS(structure gadget.VolumeStructure, contentRoot string, partImg string, sectorSize quantity.Size, series string) error {
+func makeFS(structure *gadget.VolumeStructure, contentRoot string, partImg string, sectorSize quantity.Size, series string) error {
 	hasC, err := hasContent(structure, contentRoot)
 	if err != nil {
 		return err
@@ -276,7 +276,7 @@ func makeFS(structure gadget.VolumeStructure, contentRoot string, partImg string
 }
 
 // hasContent checks if the structure or the contentRoot dir contains anything
-func hasContent(structure gadget.VolumeStructure, contentRoot string) (bool, error) {
+func hasContent(structure *gadget.VolumeStructure, contentRoot string) (bool, error) {
 	contentFiles, err := osReadDir(contentRoot)
 	if err != nil && !os.IsNotExist(err) {
 		return false, fmt.Errorf("Error listing contents of volume \"%s\": %s",
@@ -423,11 +423,19 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	return offset2
 }
 
+// setStructureSize sets both Size and MinSize to the same value on a structure
+// It helps make sure whatever value is used in snapd, it is set to the size we need
+func setStructureSize(s *gadget.VolumeStructure, size quantity.Size) {
+	s.MinSize = size
+	s.Size = size
+}
+
 // copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
 func (stateMachine *StateMachine) copyDataToImage(volumeName string, volume *gadget.Volume, diskImg *disk.Disk) error {
 	// Resolve gadget information to on disk volume
 	onDisk := gadget.OnDiskStructsFromGadget(volume)
-	for structureNumber, structure := range volume.Structure {
+	for structureNumber := range volume.Structure {
+		structure := &volume.Structure[structureNumber]
 		if helper.ShouldSkipStructure(structure, stateMachine.IsSeeded) {
 			continue
 		}

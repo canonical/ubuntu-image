@@ -177,7 +177,7 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 	}
 
 	if rootfsStructure != nil {
-		rootfsStructure.MinSize = stateMachine.RootfsSize
+		setStructureSize(rootfsStructure, stateMachine.RootfsSize)
 	}
 
 	return nil
@@ -364,13 +364,14 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 		if err := stateMachine.handleLkBootloader(volume); err != nil {
 			return err
 		}
-		for structIndex, structure := range volume.Structure {
+		for structIndex := range volume.Structure {
+			structure := &volume.Structure[structIndex]
 			if helper.ShouldSkipStructure(structure, stateMachine.IsSeeded) {
 				continue
 			}
 
 			var contentRoot string
-			if helper.IsRootfsStructure(&structure) || structure.Role == gadget.SystemSeed { //nolint:gosec,G301
+			if helper.IsRootfsStructure(structure) || structure.Role == gadget.SystemSeed { //nolint:gosec,G301
 				contentRoot = stateMachine.tempDirs.rootfs
 			} else {
 				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
