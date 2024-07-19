@@ -377,7 +377,7 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.copyStructureContent(volume,
-		rootfsStructure,
+		&rootfsStructure,
 		rootfsStructureNumber,
 		stateMachine.tempDirs.rootfs,
 		filepath.Join(stateMachine.tempDirs.volumes, "part0.img"))

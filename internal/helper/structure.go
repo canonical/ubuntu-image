@@ -22,7 +22,7 @@ func IsSystemBootStructure(s *gadget.VolumeStructure) bool {
 }
 
 // ShouldSkipStructure returns whether a structure should be skipped during certain processing
-func ShouldSkipStructure(structure gadget.VolumeStructure, isSeeded bool) bool {
+func ShouldSkipStructure(structure *gadget.VolumeStructure, isSeeded bool) bool {
 	if isSeeded &&
 		(structure.Role == gadget.SystemBoot ||
 			structure.Role == gadget.SystemData ||
