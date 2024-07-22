@@ -62,9 +62,7 @@ func NewPartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64)
 // returns it with the partition number of the root partition.
 func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64, isSeeded bool) (partition.Table, int, error) {
 	partitionNumber, rootfsPartitionNumber := 1, -1
-
 	partitionTable := NewPartitionTable(volume, sectorSize, imgSize)
-
 	onDisk := gadget.OnDiskStructsFromGadget(volume)
 
 	for i := range volume.Structure {
@@ -79,12 +77,12 @@ func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize ui
 			rootfsPartitionNumber = partitionNumber
 		}
 
-		structureType := getStructureType(structure, volume.Schema)
 		structurePair := &gadget.OnDiskAndGadgetStructurePair{
 			DiskStructure:   onDisk[structure.YamlIndex],
 			GadgetStructure: &volume.Structure[i],
 		}
 
+		structureType := getStructureType(structure, volume.Schema)
 		err := partitionTable.AddPartition(structurePair, structureType)
 		if err != nil {
 			return nil, rootfsPartitionNumber, err
