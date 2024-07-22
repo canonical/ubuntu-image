@@ -549,31 +549,6 @@ func TestGetHostSuite(t *testing.T) {
 	}
 }
 
-// TestGetQemuStaticForArch unit tests the getQemuStaticForArch function
-func TestGetQemuStaticForArch(t *testing.T) {
-	t.Parallel()
-	testCases := []struct {
-		arch     string
-		expected string
-	}{
-		{"amd64", ""},
-		{"armhf", "qemu-arm-static"},
-		{"arm64", "qemu-aarch64-static"},
-		{"ppc64el", "qemu-ppc64le-static"},
-		{"s390x", ""},
-		{"riscv64", ""},
-	}
-	for _, tc := range testCases {
-		t.Run("test_get_qemu_static_for_"+tc.arch, func(t *testing.T) {
-			qemuStatic := getQemuStaticForArch(tc.arch)
-			if qemuStatic != tc.expected {
-				t.Errorf("Expected qemu static \"%s\" for arch \"%s\", instead got \"%s\"",
-					tc.expected, tc.arch, qemuStatic)
-			}
-		})
-	}
-}
-
 // TestGenerateGerminateCmd unit tests the generateGerminateCmd function
 func TestGenerateGerminateCmd(t *testing.T) {
 	t.Parallel()

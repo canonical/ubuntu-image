@@ -386,19 +386,6 @@ func getHostSuite() string {
 	return strings.TrimSpace(string(outputBytes))
 }
 
-// getQemuStaticForArch returns the name of the qemu binary for the specified arch
-func getQemuStaticForArch(arch string) string {
-	archs := map[string]string{
-		"armhf":   "qemu-arm-static",
-		"arm64":   "qemu-aarch64-static",
-		"ppc64el": "qemu-ppc64le-static",
-	}
-	if static, exists := archs[arch]; exists {
-		return static
-	}
-	return ""
-}
-
 // maxOffset returns the maximum of two quantity.Offset types
 func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	if offset1 > offset2 {
