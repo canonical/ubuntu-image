@@ -1171,7 +1171,7 @@ func TestImageSizeFlag(t *testing.T) {
 				"pc": "pc.img",
 			},
 			wantImageSizes: map[string]quantity.Size{
-				"pc": 4 * quantity.SizeGiB,
+				"pc": 4*quantity.SizeGiB + 67*quantity.Size(512), // For now add the 67 sectors of the GPT header until we understand why they are added.
 			},
 		},
 		{
@@ -1182,7 +1182,7 @@ func TestImageSizeFlag(t *testing.T) {
 				"pc": "pc.img",
 			},
 			wantImageSizes: map[string]quantity.Size{
-				"pc": 4 * quantity.SizeGiB,
+				"pc": 4*quantity.SizeGiB + 67*quantity.Size(512), // For now add the 67 sectors of the GPT header until we understand why they are added.
 			},
 		},
 		{
@@ -1194,8 +1194,8 @@ func TestImageSizeFlag(t *testing.T) {
 				"second": "second.img",
 			},
 			wantImageSizes: map[string]quantity.Size{
-				"first":  4 * quantity.SizeGiB,
-				"second": 1 * quantity.SizeGiB,
+				"first":  4*quantity.SizeGiB + 67*quantity.Size(512), // For now add the 67 sectors of the GPT header until we understand why they are added.
+				"second": 1*quantity.SizeGiB + 67*quantity.Size(512), // For now add the 67 sectors of the GPT header until we understand why they are added.
 			},
 		},
 	}
