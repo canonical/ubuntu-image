@@ -606,22 +606,35 @@ func TestFailedParseImageSizes(t *testing.T) {
 	}
 }
 
-// TestHandleContentSizes ensures that using --image-size with a few different values
+// TestGrowImageSize ensures that using --image-size with a few different values
 // results in the correct sizes in stateMachine.ImageSizes
-func TestHandleContentSizes(t *testing.T) {
+func TestGrowImageSize(t *testing.T) {
 	testCases := []struct {
 		name   string
 		size   string
 		result map[string]quantity.Size
 	}{
-		{"size_not_specified", "", map[string]quantity.Size{"pc": 17825792}},
-		{"size_smaller_than_content", "pc:123", map[string]quantity.Size{"pc": 17825792}},
-		{"size_bigger_than_content", "pc:4G", map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
+		{
+			name:   "size_not_specified",
+			size:   "",
+			result: map[string]quantity.Size{"pc": 54525952},
+		},
+		{
+			name:   "size_smaller_than_content",
+			size:   "pc:123",
+			result: map[string]quantity.Size{"pc": 54525952},
+		},
+		{
+			name:   "size_bigger_than_content",
+			size:   "pc:4G",
+			result: map[string]quantity.Size{"pc": 4 * quantity.SizeGiB},
+		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_handle_content_sizes_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
+			volumeName := "pc"
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.commonFlags.Size = tc.size
 			stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_tree",
@@ -634,7 +647,12 @@ func TestHandleContentSizes(t *testing.T) {
 			err = stateMachine.loadGadgetYaml()
 			asserter.AssertErrNil(err, false)
 
-			stateMachine.handleContentSizes(0, "pc")
+			v, found := stateMachine.GadgetInfo.Volumes[volumeName]
+			if !found {
+				t.Fatalf("no volume names pc in the gadget")
+			}
+
+			stateMachine.growImageSize(v.MinSize(), volumeName)
 			// ensure the correct size was set
 			for volumeName := range stateMachine.GadgetInfo.Volumes {
 				setSize := stateMachine.ImageSizes[volumeName]

@@ -122,7 +122,8 @@ type StateMachine struct {
 	// imported from snapd, the info parsed from gadget.yaml
 	GadgetInfo *gadget.Info
 
-	// image sizes for parsing the --image-size flags
+	// Initially filled with the parsing of --image-size flags
+	// Will then track the required size
 	ImageSizes  map[string]quantity.Size
 	VolumeOrder []string
 
