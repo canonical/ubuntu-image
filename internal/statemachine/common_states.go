@@ -386,26 +386,24 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 				return err
 			}
 		}
-		// Set the image size values to be used by make_disk, by using
-		// the minimum size that would be valid according to gadget.yaml.
-		stateMachine.handleContentSizes(quantity.Offset(volume.MinSize()), volumeName)
+		// Make sure the register image size grows with the content
+		stateMachine.growImageSize(volume.MinSize(), volumeName)
 	}
 	return nil
 }
 
-// handleContentSizes ensures that the sizes of the partitions are large enough and stores
-// safe values in the stateMachine struct for use during make_disk
-func (stateMachine *StateMachine) handleContentSizes(farthestOffset quantity.Offset, volumeName string) {
-	calculated := quantity.Size((farthestOffset/quantity.OffsetMiB + 17) * quantity.OffsetMiB)
-	volumeSize, found := stateMachine.ImageSizes[volumeName]
+// growImageSize checks if the current size still fits in the requested
+// image size and grows it if necessary
+func (stateMachine *StateMachine) growImageSize(currentSize quantity.Size, volumeName string) {
+	desiredMinSize, found := stateMachine.ImageSizes[volumeName]
 	if !found {
-		stateMachine.ImageSizes[volumeName] = calculated
+		stateMachine.ImageSizes[volumeName] = currentSize
 	} else {
-		if volumeSize < calculated {
+		if desiredMinSize < currentSize {
 			fmt.Printf("WARNING: ignoring image size smaller than "+
 				"minimum required size: vol:%s %d < %d\n",
-				volumeName, uint64(volumeSize), uint64(calculated))
-			stateMachine.ImageSizes[volumeName] = calculated
+				volumeName, uint64(desiredMinSize), uint64(currentSize))
+			stateMachine.ImageSizes[volumeName] = currentSize
 		}
 	}
 }
