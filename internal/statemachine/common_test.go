@@ -366,6 +366,7 @@ func TestWarningRootfsSizeTooSmall(t *testing.T) {
 	for structureNumber, structure := range volume.Structure {
 		if structure.Role == gadget.SystemData {
 			structure.Size = 0
+			structure.MinSize = 0
 			rootfsStructure = structure
 			rootfsStructureNumber = structureNumber
 		}
