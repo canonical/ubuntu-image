@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/jessevdk/go-flags"
 
@@ -55,7 +58,7 @@ func executeStateMachine(sm statemachine.SmInterface) error {
 		return err
 	}
 
-	if err := sm.Run(); err != nil {
+	if err := sm.Run(context.Background()); err != nil {
 		return err
 	}
 
@@ -190,6 +193,16 @@ func main() { //nolint: gocyclo
 	if parser.Command.Active != nil {
 		imageType = parser.Command.Active.Name
 	}
+
+	// Properly handle signals to execute defered functions and make sure
+	// mounted dir are unmounted
+	ch := make(chan os.Signal, 2)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-ch
+		osExit(1)
+	}()
 
 	// init the state machine
 	sm, err := initStateMachine(imageType, commonOpts, stateMachineOpts, ubuntuImageCommand)
