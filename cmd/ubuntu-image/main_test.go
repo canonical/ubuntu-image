@@ -349,7 +349,7 @@ func TestExecuteStateMachine(t *testing.T) {
 
 			gotErr := executeStateMachine(&mockedStateMachine{
 				whenToFail: tc.whenToFail,
-			})
+			}, context.Background())
 			asserter.AssertErrContains(gotErr, tc.expectedError)
 		})
 	}
