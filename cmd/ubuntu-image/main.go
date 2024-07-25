@@ -53,12 +53,12 @@ func initStateMachine(imageType string, commonOpts *commands.CommonOpts, stateMa
 	return stateMachine, nil
 }
 
-func executeStateMachine(sm statemachine.SmInterface) error {
+func executeStateMachine(sm statemachine.SmInterface, ctx context.Context) error {
 	if err := sm.Setup(); err != nil {
 		return err
 	}
 
-	if err := sm.Run(context.Background()); err != nil {
+	if err := sm.Run(ctx); err != nil {
 		return err
 	}
 
@@ -198,8 +198,11 @@ func main() { //nolint: gocyclo
 	// mounted dir are unmounted
 	ch := make(chan os.Signal, 2)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
+		<-ch
+		cancel()
 		<-ch
 		osExit(1)
 	}()
@@ -213,7 +216,7 @@ func main() { //nolint: gocyclo
 	}
 
 	// let the state machine handle the image build
-	err = executeStateMachine(sm)
+	err = executeStateMachine(sm, ctx)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
