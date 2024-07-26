@@ -147,9 +147,7 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 }
 
 // copyStructureContent handles copying raw blobs or creating formatted filesystems
-func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
-	structure *gadget.VolumeStructure, structIndex int,
-	contentRoot, partImg string) error {
+func (stateMachine *StateMachine) copyStructureContent(structure *gadget.VolumeStructure, contentRoot, partImg string) error {
 
 	if !structure.HasFilesystem() {
 		// binary blobs like eg. raw bootloader images
@@ -158,7 +156,7 @@ func (stateMachine *StateMachine) copyStructureContent(volume *gadget.Volume,
 			return err
 		}
 	} else {
-		err := stateMachine.prepareAndCreateFS(volume, structure, structIndex, contentRoot, partImg)
+		err := stateMachine.prepareAndCreateFS(structure, contentRoot, partImg)
 		if err != nil {
 			return err
 		}
@@ -198,23 +196,8 @@ func copyStructureNoFS(unpackDir string, structure *gadget.VolumeStructure, part
 }
 
 // prepareAndCreateFS prepares and creates a filesystem for the given structure
-func (stateMachine *StateMachine) prepareAndCreateFS(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int, contentRoot, partImg string) error {
-	partSize := structure.Size
-	if (helper.IsRootfsStructure(structure) || structure.Role == gadget.SystemSeed) && structure.Size < stateMachine.RootfsSize {
-		// system-data and system-seed structures are not required to have
-		// an explicit size set in the yaml file
-		if !stateMachine.commonFlags.Quiet {
-			fmt.Printf("WARNING: rootfs structure size %s smaller "+
-				"than actual rootfs contents %s\n",
-				structure.Size.IECString(),
-				stateMachine.RootfsSize.IECString())
-		}
-		partSize = stateMachine.RootfsSize
-		setStructureSize(structure, stateMachine.RootfsSize)
-		volume.Structure[structIndex] = *structure
-	}
-
-	err := prepareDiskImg(structure, partImg, partSize, stateMachine.RootfsSize)
+func (stateMachine *StateMachine) prepareAndCreateFS(structure *gadget.VolumeStructure, contentRoot, partImg string) error {
+	err := prepareDiskImg(structure, partImg, structure.Size, stateMachine.RootfsSize)
 	if err != nil {
 		return err
 	}
