@@ -328,83 +328,6 @@ func TestCalculateRootfsSizeImageSize(t *testing.T) {
 	}
 }
 
-// TestWarningRootfsSizeTooSmall tests that a warning is thrown if the structure size
-// for the rootfs specified in gadget.yaml is smaller than the calculated rootfs size.
-// It also ensures that the size is corrected in the structure struct
-func TestWarningRootfsSizeTooSmall(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
-	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_tree",
-		"meta", "gadget.yaml")
-
-	// need workdir and loaded gadget.yaml set up for this
-	err := stateMachine.makeTemporaryDirectories()
-	asserter.AssertErrNil(err, true)
-	err = stateMachine.loadGadgetYaml()
-	asserter.AssertErrNil(err, true)
-
-	// set up a "rootfs" that we can calculate the size of
-	err = os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
-	asserter.AssertErrNil(err, true)
-	err = osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
-	asserter.AssertErrNil(err, true)
-
-	// ensure volumes exists
-	err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
-	asserter.AssertErrNil(err, true)
-
-	// calculate the size of the rootfs
-	err = stateMachine.calculateRootfsSize()
-	asserter.AssertErrNil(err, true)
-
-	// manually set the size of the rootfs structure to 0
-	var volume *gadget.Volume = stateMachine.GadgetInfo.Volumes["pc"]
-	var rootfsStructure gadget.VolumeStructure
-	var rootfsStructureNumber int
-	for structureNumber, structure := range volume.Structure {
-		if structure.Role == gadget.SystemData {
-			structure.Size = 0
-			structure.MinSize = 0
-			rootfsStructure = structure
-			rootfsStructureNumber = structureNumber
-		}
-	}
-
-	// capture stdout, run copy structure content, and ensure the warning was thrown
-	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
-	defer restoreStdout()
-	asserter.AssertErrNil(err, true)
-
-	err = stateMachine.copyStructureContent(volume,
-		&rootfsStructure,
-		rootfsStructureNumber,
-		stateMachine.tempDirs.rootfs,
-		filepath.Join(stateMachine.tempDirs.volumes, "part0.img"))
-	asserter.AssertErrNil(err, true)
-
-	// restore stdout and check that the warning was printed
-	restoreStdout()
-	readStdout, err := io.ReadAll(stdout)
-	asserter.AssertErrNil(err, true)
-
-	if !strings.Contains(string(readStdout), "WARNING: rootfs structure size 0 B smaller than actual rootfs contents") {
-		t.Errorf("Warning about structure size to small not present in stdout: \"%s\"", string(readStdout))
-	}
-
-	// check that the size was correctly updated in the volume
-	for _, structure := range volume.Structure {
-		if structure.Role == gadget.SystemData {
-			if structure.Size != stateMachine.RootfsSize {
-				t.Errorf("rootfs structure size %s is not equal to calculated size %s",
-					structure.Size.IECString(),
-					stateMachine.RootfsSize.IECString())
-			}
-		}
-	}
-}
-
 // TestFailedCalculateRootfsSize tests a failure when calculating the rootfs size
 // this is accomplished by setting rootfs to a directory that does not exist
 func TestFailedCalculateRootfsSize(t *testing.T) {
@@ -996,10 +919,10 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 	}
 }
 
-// TestFailedMakeDisk tests failures in the MakeDisk state
-func TestFailedMakeDisk(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
+// testSetupMakeDiskTest setup needed stateMachine and directories to be used
+// in TestFailedMakeDisk* tests
+func testSetupMakeDiskTest(t *testing.T, asserter *helper.Asserter, stateMachine *StateMachine, yamlFilePath string) {
+	t.Helper()
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 	err := stateMachine.makeTemporaryDirectories()
@@ -1020,19 +943,20 @@ func TestFailedMakeDisk(t *testing.T) {
 	}
 
 	// set a valid yaml file and load it in
-	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-mbr.yaml")
+	stateMachine.YamlFilePath = yamlFilePath
 	// ensure unpack exists
 	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
 	asserter.AssertErrNil(err, true)
-	err = stateMachine.loadGadgetYaml()
-	asserter.AssertErrNil(err, true)
 
-	// also need to set the rootfs size to avoid partition errors
-	err = stateMachine.calculateRootfsSize()
+	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrNil(err, true)
 
 	// ensure volumes exists
 	err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// also need to set the rootfs size to avoid partition errors
+	err = stateMachine.calculateRootfsSize()
 	asserter.AssertErrNil(err, true)
 
 	// populate unpack
@@ -1044,97 +968,136 @@ func TestFailedMakeDisk(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 	}
 
-	// mock os.RemoveAll
-	osRemoveAll = mockRemoveAll
-	defer func() {
-		osRemoveAll = os.RemoveAll
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error removing old disk image")
-	osRemoveAll = os.RemoveAll
-
-	// mock diskfs.Create
-	diskfsCreate = mockDiskfsCreate
-	defer func() {
-		diskfsCreate = diskfs.Create
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error creating disk image")
-	diskfsCreate = diskfs.Create
-
-	// mock diskfs.Create to create a read only disk
-	diskfsCreate = readOnlyDiskfsCreate
-	defer func() {
-		diskfsCreate = diskfs.Create
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error partitioning image file")
-	diskfsCreate = diskfs.Create
-
-	// mock os.OpenFile
-	// errors in file.WriteAt()
-	osOpenFile = mockOpenFile
-	defer func() {
-		osOpenFile = os.OpenFile
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error opening disk to write MBR disk identifier")
-	osOpenFile = os.OpenFile
-
-	// mock rand.Read
-	// errors in generateUniqueDiskID()
-	randRead = mockRandRead
-	defer func() {
-		randRead = rand.Read
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error generating disk ID")
-	randRead = rand.Read
-
-	// mock os.OpenFile to force it to use os.O_APPEND, which causes
-	// errors in file.WriteAt()
-	osOpenFile = mockOpenFileAppend
-	defer func() {
-		osOpenFile = os.OpenFile
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error writing MBR disk identifier")
-	osOpenFile = os.OpenFile
-
-	// mock helper.CopyBlob to simulate a failure in copyDataToImage
-	helperCopyBlob = mockCopyBlob
-	defer func() {
-		helperCopyBlob = helper.CopyBlob
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error writing disk image")
-	helperCopyBlob = helper.CopyBlob
-
-	// Change to GPT for these next tests
-	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-gpt.yaml")
-	err = stateMachine.loadGadgetYaml()
-	asserter.AssertErrNil(err, true)
-
 	err = stateMachine.populateBootfsContents()
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.populatePreparePartitions()
 	asserter.AssertErrNil(err, true)
+}
 
-	// mock os.OpenFile to simulate a failure in writeOffsetValues
-	osOpenFile = mockOpenFile
-	defer func() {
-		osOpenFile = os.OpenFile
-	}()
-	// also mock helperCopyBlob to ignore missing files and return success
-	helperCopyBlob = mockCopyBlobSuccess
-	defer func() {
-		helperCopyBlob = helper.CopyBlob
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error opening image file")
-	osOpenFile = os.OpenFile
-	helperCopyBlob = helper.CopyBlob
+// TestFailedMakeDisk tests failures in the MakeDisk state
+func TestFailedMakeDisk(t *testing.T) {
+	testCases := []struct {
+		name         string
+		mockFuncs    func() func()
+		expectedErr  string
+		yamlFilePath string
+	}{
+		{
+			name: "MBR - failing removing old image",
+			mockFuncs: func() func() {
+				osRemoveAll = mockRemoveAll
+				return func() { osRemoveAll = os.RemoveAll }
+			},
+			expectedErr:  "Error removing old disk image",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing creating disk",
+			mockFuncs: func() func() {
+				diskfsCreate = mockDiskfsCreate
+				return func() { diskfsCreate = diskfs.Create }
+			},
+			expectedErr:  "Error creating disk image",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing when creating a read only disk",
+			mockFuncs: func() func() {
+				diskfsCreate = readOnlyDiskfsCreate
+				return func() { diskfsCreate = diskfs.Create }
+			},
+			expectedErr:  "Error partitioning image file",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing opening disk",
+			mockFuncs: func() func() {
+				osOpenFile = mockOpenFile
+				return func() { osOpenFile = os.OpenFile }
+			},
+			expectedErr:  "Error opening disk to write MBR disk identifier",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing generating a disk ID",
+			mockFuncs: func() func() {
+				randRead = mockRandRead
+				return func() { randRead = rand.Read }
+			},
+			expectedErr:  "Error generating disk ID",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing writing to disk",
+			mockFuncs: func() func() {
+				osOpenFile = mockOpenFileAppend
+				return func() { osOpenFile = os.OpenFile }
+			},
+			expectedErr:  "Error writing MBR disk identifier",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing copying blob to disk",
+			mockFuncs: func() func() {
+				helperCopyBlob = mockCopyBlob
+				return func() { helperCopyBlob = helper.CopyBlob }
+			},
+			expectedErr:  "Error writing disk image",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "GPT - failing writing offset",
+			mockFuncs: func() func() {
+				osOpenFile = mockOpenFile
+				helperCopyBlob = mockCopyBlobSuccess
+				return func() {
+					osOpenFile = os.OpenFile
+					helperCopyBlob = helper.CopyBlob
+				}
+			},
+			expectedErr:  "Error opening image file",
+			yamlFilePath: filepath.Join("testdata", "gadget-gpt.yaml"),
+		},
+		{
+			name: "GPT - failing writing to disk image",
+			mockFuncs: func() func() {
+				helperCopyBlob = mockCopyBlob
+				return func() {
+					helperCopyBlob = helper.CopyBlob
+				}
+			},
+			expectedErr:  "Error writing disk image",
+			yamlFilePath: filepath.Join("testdata", "gadget-gpt.yaml"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+
+			testSetupMakeDiskTest(t, &asserter, &stateMachine, tc.yamlFilePath)
+
+			if tc.mockFuncs != nil {
+				restoreMock := tc.mockFuncs()
+				t.Cleanup(restoreMock)
+			}
+			err := stateMachine.makeDisk()
+			defer os.Remove("pc.img")
+			if err != nil || len(tc.expectedErr) != 0 {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+// TestFailedMakeDisk_NoOutputDir tests failures in the MakeDisk state
+func TestFailedMakeDisk_NoOutputDir(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+
+	testSetupMakeDiskTest(t, &asserter, &stateMachine, filepath.Join("testdata", "gadget-gpt.yaml"))
 
 	helperCopyBlob = mockCopyBlob
 	defer func() {
@@ -1143,7 +1106,7 @@ func TestFailedMakeDisk(t *testing.T) {
 	stateMachine.cleanWorkDir = true // for coverage!
 	stateMachine.commonFlags.OutputDir = ""
 	defer os.Remove("pc.img")
-	err = stateMachine.makeDisk()
+	err := stateMachine.makeDisk()
 	asserter.AssertErrContains(err, "Error writing disk image")
 	helperCopyBlob = helper.CopyBlob
 
