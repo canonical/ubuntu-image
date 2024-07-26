@@ -262,7 +262,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	t.Cleanup(func() {
 		helperCopyBlob = helper.CopyBlob
 	})
-	err = stateMachine.copyStructureContent(volume, &mbrStruct, 0, "",
+	err = stateMachine.copyStructureContent(&mbrStruct, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error zeroing partition")
 	helperCopyBlob = helper.CopyBlob
@@ -272,7 +272,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	t.Cleanup(func() {
 		blockSize = "1"
 	})
-	err = stateMachine.copyStructureContent(volume, &mbrStruct, 0, "",
+	err = stateMachine.copyStructureContent(&mbrStruct, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error copying image blob")
 	blockSize = "1"
@@ -282,7 +282,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	t.Cleanup(func() {
 		helperCopyBlob = helper.CopyBlob
 	})
-	err = stateMachine.copyStructureContent(volume, &rootfsStruct, 0, "",
+	err = stateMachine.copyStructureContent(&rootfsStruct, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error zeroing image file")
 	helperCopyBlob = helper.CopyBlob
@@ -292,7 +292,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	t.Cleanup(func() {
 		osReadDir = os.ReadDir
 	})
-	err = stateMachine.copyStructureContent(volume, &rootfsStruct, 0, "",
+	err = stateMachine.copyStructureContent(&rootfsStruct, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error listing contents of volume")
 	osReadDir = os.ReadDir
@@ -311,7 +311,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		MKE2FS_BASE_PATH = OLD_MKE2FS_BASE_PATH
 	})
 
-	err = stateMachine.copyStructureContent(volume, &rootfsStruct, 0, "",
+	err = stateMachine.copyStructureContent(&rootfsStruct, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error preparing env for mkfs")
 	MKE2FS_CONFIG_ENV = OLD_MKE2FS_CONFIG_ENV
@@ -322,7 +322,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	t.Cleanup(func() {
 		mkfsMakeWithContent = mkfs.MakeWithContent
 	})
-	err = stateMachine.copyStructureContent(volume, &rootfsStruct, 0, "",
+	err = stateMachine.copyStructureContent(&rootfsStruct, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error running mkfs with content")
 	mkfsMakeWithContent = mkfs.MakeWithContent
@@ -333,7 +333,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	t.Cleanup(func() {
 		mkfsMake = mkfs.Make
 	})
-	err = stateMachine.copyStructureContent(volume, &rootfsStruct, 0, "",
+	err = stateMachine.copyStructureContent(&rootfsStruct, "",
 		filepath.Join("/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error running mkfs")
 	mkfsMake = mkfs.Make
@@ -443,9 +443,7 @@ func TestStructureContentNonFSStructure(t *testing.T) {
 		mkfsMake = mkfs.Make
 	})
 
-	err = stateMachine.copyStructureContent(volume,
-		&nonFSStructure,
-		nonFSStructureNumber,
+	err = stateMachine.copyStructureContent(&nonFSStructure,
 		stateMachine.tempDirs.rootfs,
 		filepath.Join(stateMachine.tempDirs.volumes, "part0.img"))
 	asserter.AssertErrNil(err, true)
@@ -1018,7 +1016,7 @@ func TestLP1981720(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// now execute copyStructureContent
-	err = stateMachine.copyStructureContent(volume, &bootStruct, 0, contentRoot,
+	err = stateMachine.copyStructureContent(&bootStruct, contentRoot,
 		contentRoot+".img")
 	asserter.AssertErrNil(err, true)
 

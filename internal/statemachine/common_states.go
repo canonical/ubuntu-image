@@ -379,8 +379,8 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 			// copy the data
 			partImg := filepath.Join(stateMachine.tempDirs.volumes, volumeName,
 				"part"+strconv.Itoa(structIndex)+".img")
-			if err := stateMachine.copyStructureContent(volume, structure,
-				structIndex, contentRoot, partImg); err != nil {
+			if err := stateMachine.copyStructureContent(structure,
+				contentRoot, partImg); err != nil {
 				return err
 			}
 		}
