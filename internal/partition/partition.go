@@ -37,8 +37,8 @@ type Table interface {
 	PartitionTableSize() uint64
 }
 
-// NewPartitionTable creates a partition table for a given volume
-func NewPartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64) Table {
+// newPartitionTable creates a partition table for a given volume
+func newPartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64) Table {
 	if volume.Schema == SchemaMBR {
 		return &MBRTable{
 			diskSize: imgSize,
@@ -62,7 +62,7 @@ func NewPartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64)
 // returns it with the partition number of the root partition.
 func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64, isSeeded bool) (partition.Table, int, error) {
 	partitionNumber, rootfsPartitionNumber := 1, -1
-	partitionTable := NewPartitionTable(volume, sectorSize, imgSize)
+	partitionTable := newPartitionTable(volume, sectorSize, imgSize)
 	onDisk := gadget.OnDiskStructsFromGadget(volume)
 
 	for i := range volume.Structure {
@@ -111,6 +111,12 @@ func getStructureType(structure *gadget.VolumeStructure, schema string) string {
 	}
 
 	return structureType
+}
+
+// PartitionTableSizeFromVolume returns the total size in bytes of the partition table
+func PartitionTableSizeFromVolume(volume *gadget.Volume, sectorSize uint64, imgSize uint64) uint64 {
+	t := newPartitionTable(volume, sectorSize, imgSize)
+	return t.PartitionTableSize()
 }
 
 type MBRTable struct {

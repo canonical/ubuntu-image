@@ -343,3 +343,51 @@ func TestGPTTable_PartitionTableSize(t *testing.T) {
 		})
 	}
 }
+
+func TestPartitionTableSizeFromVolume(t *testing.T) {
+	type args struct {
+		volume     *gadget.Volume
+		sectorSize uint64
+		imgSize    uint64
+	}
+	tests := []struct {
+		name     string
+		args     args
+		wantSize uint64
+	}{
+		{
+			name: "gpt 512 sector size",
+			args: args{
+				sectorSize: sectorSize512,
+				volume:     gadgetGPT,
+				imgSize:    uint64(4 * quantity.SizeKiB),
+			},
+			wantSize: (1 + (1+32)*2) * sectorSize512,
+		},
+		{
+			name: "gpt 4k sector size",
+			args: args{
+				sectorSize: sectorSize4k,
+				volume:     gadgetGPT,
+				imgSize:    uint64(4 * quantity.SizeKiB),
+			},
+			wantSize: (1 + (1+4)*2) * sectorSize4k,
+		},
+		{
+			name: "MBR 512 sector size",
+			args: args{
+				sectorSize: sectorSize512,
+				volume:     gadgetMBR,
+				imgSize:    uint64(4 * quantity.SizeKiB),
+			},
+			wantSize: sectorSize512,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asserter := &helper.Asserter{T: t}
+			gotSize := PartitionTableSizeFromVolume(tt.args.volume, tt.args.sectorSize, tt.args.imgSize)
+			asserter.AssertEqual(tt.wantSize, gotSize)
+		})
+	}
+}
