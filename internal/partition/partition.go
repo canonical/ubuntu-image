@@ -156,14 +156,14 @@ type GPTTable struct {
 func (t *GPTTable) AddPartition(structurePair *gadget.OnDiskAndGadgetStructurePair, structureType string) error {
 	startSector := uint64(math.Ceil(float64(structurePair.DiskStructure.StartOffset) / float64(t.concreteTable.LogicalSectorSize)))
 	size := uint64(structurePair.DiskStructure.Size)
+	partitionName := structurePair.DiskStructure.Name
 
 	if t.structureOverlaps(startSector, size) {
 		return fmt.Errorf("The structure \"%s\" overlaps GPT header or "+
-			"GPT partition table", structurePair.DiskStructure.Name)
+			"GPT partition table", partitionName)
 	}
 
-	partitionName := structurePair.DiskStructure.Name
-	if structurePair.GadgetStructure.Role == gadget.SystemData && structurePair.DiskStructure.Name == "" {
+	if helper.IsSystemDataStructure(structurePair.GadgetStructure) && partitionName == "" {
 		partitionName = "writable"
 	}
 
