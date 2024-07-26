@@ -155,14 +155,14 @@ func (stateMachine *StateMachine) calculateRootfsSize() error {
 
 	stateMachine.RootfsSize = rootfsMinSize
 
-	rootfsVolume, rootfsVolumeName, rootfsStructure := stateMachine.findRootfsVolumeStructure()
+	rootfsVolume, rootfsStructure := stateMachine.findRootfsVolumeStructure()
 
 	gadgetRootfsMinSize := stateMachine.getGadgetRootfsMinSize(rootfsStructure)
 	if gadgetRootfsMinSize > stateMachine.RootfsSize {
 		stateMachine.RootfsSize = gadgetRootfsMinSize
 	}
 
-	desiredSize, foundDesiredSize := stateMachine.getRootfsDesiredSize(rootfsVolume, rootfsVolumeName)
+	desiredSize, foundDesiredSize := stateMachine.getRootfsDesiredSize(rootfsVolume)
 
 	if foundDesiredSize {
 		if stateMachine.RootfsSize > desiredSize {
@@ -210,15 +210,15 @@ func (stateMachine *StateMachine) getGadgetRootfsMinSize(rootfsStructure *gadget
 
 // getRootfsDesiredSize subtracts the size and offsets of the existing structures
 // from the requested image size to determine the maximum possible size of the rootfs
-func (stateMachine *StateMachine) getRootfsDesiredSize(rootfsVolume *gadget.Volume, rootfsVolumeName string) (quantity.Size, bool) {
+func (stateMachine *StateMachine) getRootfsDesiredSize(rootfsVolume *gadget.Volume) (quantity.Size, bool) {
 	if rootfsVolume == nil {
 		return quantity.Size(0), false
 	}
 
-	desiredSize, found := stateMachine.ImageSizes[rootfsVolumeName]
+	desiredSize, found := stateMachine.ImageSizes[rootfsVolume.Name]
 	if !found {
 		// So far we do not know of a desired size for the rootfs
-		return quantity.Size(0), found
+		return quantity.Size(0), false
 	}
 
 	reservedSize := calculateNoRootfsSize(rootfsVolume)
@@ -249,16 +249,16 @@ func calculateNoRootfsSize(v *gadget.Volume) quantity.Size {
 }
 
 // findRootfsVolumeStructure finds the volume and the structure associated to the rootfs
-func (stateMachine *StateMachine) findRootfsVolumeStructure() (*gadget.Volume, string, *gadget.VolumeStructure) {
-	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
+func (stateMachine *StateMachine) findRootfsVolumeStructure() (*gadget.Volume, *gadget.VolumeStructure) {
+	for _, volume := range stateMachine.GadgetInfo.Volumes {
 		for i := range volume.Structure {
 			s := &volume.Structure[i]
 			if helper.IsRootfsStructure(s) { //nolint:gosec,G301
-				return volume, volumeName, s
+				return volume, s
 			}
 		}
 	}
-	return nil, "", nil
+	return nil, nil
 }
 
 // alignToSectorSize align the given size to the SectorSize of the stateMachine
