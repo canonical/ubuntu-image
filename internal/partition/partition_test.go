@@ -51,7 +51,7 @@ var gadgetGPT = &gadget.Volume{
 			YamlIndex:  1,
 		},
 		{
-			VolumeName: "",
+			VolumeName: "pc",
 			Name:       "",
 			Label:      "writable",
 			Offset:     createOffsetPointer(1259339776),
