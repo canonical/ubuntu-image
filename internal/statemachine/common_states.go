@@ -369,7 +369,7 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 			}
 
 			var contentRoot string
-			if helper.IsRootfsStructure(structure) || structure.Role == gadget.SystemSeed { //nolint:gosec,G301
+			if helper.IsRootfsStructure(structure) || helper.IsSystemSeedStructure(structure) { //nolint:gosec,G301
 				contentRoot = stateMachine.tempDirs.rootfs
 			} else {
 				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,

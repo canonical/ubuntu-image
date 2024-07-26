@@ -324,7 +324,7 @@ func (stateMachine *StateMachine) warnUsageOfSystemLabel(volumeName string, stru
 
 // handleSystemSeed checks if the structure is a system-seed one and fixes the Label if needed
 func (stateMachine *StateMachine) handleSystemSeed(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
-	if structure.Role != gadget.SystemSeed {
+	if !helper.IsSystemSeedStructure(structure) {
 		return
 	}
 	stateMachine.IsSeeded = true
@@ -377,7 +377,7 @@ func (stateMachine *StateMachine) handleRootfsScheme(structure *gadget.VolumeStr
 // copyStructureContent() skip the rootfs copying later.
 // So we need to make an empty slice here to avoid this situation.
 func fixMissingContent(volume *gadget.Volume, structure *gadget.VolumeStructure, structIndex int) {
-	if (structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed) && structure.Content == nil {
+	if (helper.IsRootfsStructure(structure) || helper.IsSystemSeedStructure(structure)) && structure.Content == nil {
 		structure.Content = make([]gadget.VolumeContent, 0)
 	}
 
