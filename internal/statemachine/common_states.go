@@ -222,10 +222,8 @@ func (stateMachine *StateMachine) getRootfsDesiredSize(rootfsVolume *gadget.Volu
 	}
 
 	reservedSize := calculateNoRootfsSize(rootfsVolume)
-	// Create a temp partition table to get its size
-	// The value is already a multiple of the sector size, so no need to align again
-	tempPartitionTable := partition.NewPartitionTable(rootfsVolume, uint64(stateMachine.SectorSize), 0)
-	reservedSize += quantity.Size(tempPartitionTable.PartitionTableSize())
+	partitionSize := partition.PartitionTableSizeFromVolume(rootfsVolume, uint64(stateMachine.SectorSize), 0)
+	reservedSize += quantity.Size(partitionSize)
 
 	desiredSize = helper.SafeQuantitySubtraction(desiredSize, reservedSize)
 	desiredSize = stateMachine.alignToSectorSize(desiredSize)
@@ -467,11 +465,8 @@ func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gad
 	sectorSizeDiskfs := diskfs.SectorSize(int(stateMachine.SectorSize))
 	imgSize = stateMachine.alignToSectorSize(imgSize)
 
-	// Create a temp partition table to get its size
-	// The value is already a multiple of the sector size, so no need to align again
-	tempPartitionTable := partition.NewPartitionTable(volume, uint64(stateMachine.SectorSize), 0)
-
-	totalImgSize := int64(imgSize) + int64(tempPartitionTable.PartitionTableSize())
+	partitionSize := partition.PartitionTableSizeFromVolume(volume, uint64(stateMachine.SectorSize), 0)
+	totalImgSize := int64(imgSize) + int64(partitionSize)
 
 	diskImg, err := diskfsCreate(imgName, totalImgSize, diskfs.Raw, sectorSizeDiskfs)
 	if err != nil {
