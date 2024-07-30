@@ -252,7 +252,11 @@ func (p *BasePPA) ensureFingerprint(baseURL string) error {
 }
 
 func (p *BasePPA) createTmpGPGDir(basePath string) (string, error) {
-	tmpGPGDir := filepath.Join(basePath, "tmp", "u-i-gpg")
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("Error getting working directory")
+	}
+	tmpGPGDir := filepath.Join(wd, basePath, "tmp", "u-i-gpg")
 
 	// dirmngr cannot handle a homedir path length of 100 or above
 	// Until this is fixed, return a user-friendly error.
@@ -261,7 +265,7 @@ func (p *BasePPA) createTmpGPGDir(basePath string) (string, error) {
 		return "", fmt.Errorf("dirmngr cannot handle a homedir path length of 100 or above. Please move your workdir somewhere else to have a shorter path. Current path: %s", tmpGPGDir)
 	}
 
-	err := osMkdirAll(tmpGPGDir, 0755)
+	err = osMkdirAll(tmpGPGDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		return "", fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
 	}
