@@ -158,7 +158,7 @@ func (t *GPTTable) AddPartition(structurePair *gadget.OnDiskAndGadgetStructurePa
 	size := uint64(structurePair.DiskStructure.Size)
 	partitionName := structurePair.DiskStructure.Name
 
-	if t.structureOverlaps(startSector, size) {
+	if t.structureOverlapsTable(startSector, size) {
 		return fmt.Errorf("The structure \"%s\" overlaps GPT header or "+
 			"GPT partition table", partitionName)
 	}
@@ -205,7 +205,7 @@ func (t *GPTTable) sizeToSectors(size uint64) uint64 {
 	return uint64(math.Ceil(float64(size) / float64(t.concreteTable.LogicalSectorSize)))
 }
 
-// structureOverlaps checks if a given structure overlaps the GPT table (either the primary
+// structureOverlapsTable checks if a given structure overlaps the GPT table (either the primary
 // or secondary one)
 // If the block size is 512, the First Usable LBA must be greater than or equal
 // to 34 (allowing 1 block for the Protective MBR, 1 block for the Partition
@@ -213,7 +213,7 @@ func (t *GPTTable) sizeToSectors(size uint64) uint64 {
 // If the logical block size is 4096, the First Useable LBA must be greater than
 // or equal to 6 (allowing 1 block for the Protective MBR, 1 block for the GPT
 // Header, and 4 blocks for the GPT Partition Entry Array)
-func (t *GPTTable) structureOverlaps(startSector uint64, size uint64) bool {
+func (t *GPTTable) structureOverlapsTable(startSector uint64, size uint64) bool {
 	diskSectors := t.sizeToSectors(t.diskSize)
 	structureSectors := t.sizeToSectors(size)
 

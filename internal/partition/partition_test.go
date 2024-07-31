@@ -330,7 +330,7 @@ func TestGPTTable_PartitionTableSize(t *testing.T) {
 			want: (1 + (1+4)*2) * sectorSize4k,
 		},
 	}
-	// See doc on structureOverlaps to understand the math of the resulting wanted size
+	// See doc on structureOverlapsTable to understand the math of the resulting wanted size
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := &helper.Asserter{T: t}
