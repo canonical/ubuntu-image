@@ -185,7 +185,7 @@ func validateImageDefinition(imageDefinition *imagedefinition.ImageDefinition) e
 	return nil
 }
 
-// validateCustomization validates the Gadget section of the image definition
+// validateGadget validates the Gadget section of the image definition
 func validateGadget(imageDefinition *imagedefinition.ImageDefinition, result *gojsonschema.Result) error {
 	// Do custom validation for gadgetURL being required if gadget is not pre-built
 	if imageDefinition.Gadget != nil {
@@ -204,7 +204,7 @@ func validateGadget(imageDefinition *imagedefinition.ImageDefinition, result *go
 				errDetail,
 			)
 		}
-	} else {
+	} else if imageDefinition.Artifacts != nil {
 		diskUsed, err := helperCheckTags(imageDefinition.Artifacts, "is_disk")
 		if err != nil {
 			return fmt.Errorf("Error checking struct tags for Artifacts: \"%s\"", err.Error())

@@ -68,6 +68,7 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		expectedError   string
 	}{
 		{"valid_image_definition", "test_raspi.yaml", true, ""},
+		{"valid_image_definition_no_gadget_no_artifact", "test_image_without_gadget_artifact.yaml", true, ""},
 		{"invalid_class", "test_bad_class.yaml", false, "Class must be one of the following"},
 		{"invalid_url", "test_bad_url.yaml", false, "Does not match format 'uri'"},
 		{"invalid_model_assertion_url", "test_invalid_model_assertion_url.yaml", false, "Does not match format 'uri'"},
