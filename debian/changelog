@@ -6,6 +6,8 @@ ubuntu-image (3.5) UNRELEASED; urgency=medium
   * Improve validation and overall handling of volumes from the
     gadget.yaml. 
   * Migrate to core24 and bump minimum series to build to 20.04
+  * Make sure an image definition without gadget nor artifacts
+    section is valid.
 
   [ Maciej Borzecki ]
   * Improve handling of structures without a filesystem.
