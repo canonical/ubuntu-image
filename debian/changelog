@@ -8,6 +8,8 @@ ubuntu-image (3.5) UNRELEASED; urgency=medium
   * Migrate to core24 and bump minimum series to build to 20.04
   * Make sure an image definition without gadget nor artifacts
     section is valid.
+  * Rework partitions handling to avoid overridding GPT header
+    and get the image size mostly right.
 
   [ Maciej Borzecki ]
   * Improve handling of structures without a filesystem.
