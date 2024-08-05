@@ -63,7 +63,8 @@ parts:
       git config --global --add safe.directory $CRAFT_PROJECT_DIR/.git
       craftctl default
     override-build: |
-      mv mkfs "$SNAPCRAFT_PART_INSTALL"/etc/ubuntu-image/
+      mkdir -p "$SNAPCRAFT_PART_INSTALL"/etc/ubuntu-image/
+      mv mkfs/confs "$SNAPCRAFT_PART_INSTALL"/etc/ubuntu-image/mkfs
       ins_bin=$SNAPCRAFT_PART_INSTALL/bin/
       mkdir -p "$ins_bin"
       # Make ubuntu-image statically compiled to avoid libc deps.
