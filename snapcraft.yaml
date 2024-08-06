@@ -35,6 +35,7 @@ parts:
     stage-packages:
       - binfmt-support
       - dirmngr
+      - dosfstools
       - fdisk
       - gdisk
       - fakeroot
