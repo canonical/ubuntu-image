@@ -25,3 +25,6 @@ vendor/
 
 # snap
 ubuntu-image*.snap
+
+# Work dirs
+tmp/
