@@ -13,6 +13,7 @@ ubuntu-image (3.5) UNRELEASED; urgency=medium
   * Test running ubuntu-image on noble
   * Make sure the mkfs conf is copied at the right place when building
     the snap.
+  * Add dosfstools to the snap.
 
   [ Maciej Borzecki ]
   * Improve handling of structures without a filesystem.
