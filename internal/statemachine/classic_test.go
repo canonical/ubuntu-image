@@ -5354,6 +5354,10 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key.pub"),
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key"),
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_ecdsa_key.pub"),
+		filepath.Join(stateMachine.tempDirs.chroot, "dev", "stderr"),
+		filepath.Join(stateMachine.tempDirs.chroot, "dev", "stdin"),
+		filepath.Join(stateMachine.tempDirs.chroot, "dev", "stdout"),
+		filepath.Join(stateMachine.tempDirs.chroot, "dev", "fd"),
 	}
 	for _, file := range cleaned {
 		_, err := os.Stat(file)
@@ -5397,6 +5401,9 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "udev", "rules.d", "test2-persistent-net.rules"),
 				filepath.Join("var", "cache", "debconf", "test-old"),
 				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
+				filepath.Join("dev", "stderr"),
+				filepath.Join("dev", "stdin"),
+				filepath.Join("dev", "stdout"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                    0,
@@ -5421,6 +5428,9 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
 				filepath.Join("var", "cache", "debconf", "test-old"),
 				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
+				filepath.Join("dev", "stderr"),
+				filepath.Join("dev", "stdin"),
+				filepath.Join("dev", "stdout"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                   sampleSize,
@@ -5428,6 +5438,9 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
 				filepath.Join("var", "cache", "debconf", "test-old"):                 sampleSize,
 				filepath.Join("var", "lib", "dpkg", "testdpkg-old"):                  sampleSize,
+				filepath.Join("dev", "stderr"):                                       sampleSize,
+				filepath.Join("dev", "stdin"):                                        sampleSize,
+				filepath.Join("dev", "stdout"):                                       sampleSize,
 			},
 		},
 		{

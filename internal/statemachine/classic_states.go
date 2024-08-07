@@ -1351,6 +1351,7 @@ func (stateMachine *StateMachine) cleanRootfs() error {
 			filepath.Join("etc", "ssh", "ssh_host_*_key"),
 			filepath.Join("var", "cache", "debconf", "*-old"),
 			filepath.Join("var", "lib", "dpkg", "*-old"),
+			filepath.Join("dev", "*"),
 		})
 	if err != nil {
 		return err
