@@ -26,6 +26,7 @@ type OSMockConf struct {
 	OsutilCopySpecialFileThreshold uint
 	ReadDirThreshold               uint
 	RemoveThreshold                uint
+	RemoveAllThreshold             uint
 	TruncateThreshold              uint
 	OpenFileThreshold              uint
 	MkdirAllThreshold              uint
@@ -42,6 +43,7 @@ type osMock struct {
 	beforeOsutilCopySpecialFileFail uint
 	beforeReadDirFail               uint
 	beforeRemoveFail                uint
+	beforeRemoveAllFail             uint
 	beforeTruncateFail              uint
 	beforeOpenFileFail              uint
 	beforeMkdirAllFail              uint
@@ -75,6 +77,15 @@ func (o *osMock) Remove(name string) error {
 		return fmt.Errorf("Remove fail")
 	}
 	o.beforeRemoveFail++
+
+	return nil
+}
+
+func (o *osMock) RemoveAll(name string) error {
+	if o.beforeRemoveAllFail >= o.conf.RemoveAllThreshold {
+		return fmt.Errorf("RemoveAll fail")
+	}
+	o.beforeRemoveAllFail++
 
 	return nil
 }

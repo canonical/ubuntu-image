@@ -5358,6 +5358,10 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 		filepath.Join(stateMachine.tempDirs.chroot, "dev", "stdin"),
 		filepath.Join(stateMachine.tempDirs.chroot, "dev", "stdout"),
 		filepath.Join(stateMachine.tempDirs.chroot, "dev", "fd"),
+		filepath.Join(stateMachine.tempDirs.chroot, "sys", "kernel", "security"),
+		filepath.Join(stateMachine.tempDirs.chroot, "sys", "fs", "cgroup"),
+		filepath.Join(stateMachine.tempDirs.chroot, "run", "mount", "utab.lock"),
+		filepath.Join(stateMachine.tempDirs.chroot, "run", "lock"),
 	}
 	for _, file := range cleaned {
 		_, err := os.Stat(file)
@@ -5404,6 +5408,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("dev", "stderr"),
 				filepath.Join("dev", "stdin"),
 				filepath.Join("dev", "stdout"),
+				filepath.Join("sys", "kernel", "security"),
+				filepath.Join("run", "mount", "utab.lock"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                    0,
@@ -5418,8 +5424,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 					&testhelper.OSMockConf{},
 				)
 
-				osRemove = mock.Remove
-				return func() { osRemove = os.Remove }
+				osRemoveAll = mock.RemoveAll
+				return func() { osRemoveAll = os.RemoveAll }
 			},
 			expectedErr: "Error removing",
 			initialRootfsContent: []string{
@@ -5431,6 +5437,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("dev", "stderr"),
 				filepath.Join("dev", "stdin"),
 				filepath.Join("dev", "stdout"),
+				filepath.Join("sys", "kernel", "security"),
+				filepath.Join("run", "mount", "utab.lock"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                   sampleSize,
@@ -5441,6 +5449,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("dev", "stderr"):                                       sampleSize,
 				filepath.Join("dev", "stdin"):                                        sampleSize,
 				filepath.Join("dev", "stdout"):                                       sampleSize,
+				filepath.Join("sys", "kernel", "security"):                           sampleSize,
+				filepath.Join("run", "mount", "utab.lock"):                           sampleSize,
 			},
 		},
 		{
