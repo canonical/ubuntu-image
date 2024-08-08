@@ -1352,6 +1352,8 @@ func (stateMachine *StateMachine) cleanRootfs() error {
 			filepath.Join("var", "cache", "debconf", "*-old"),
 			filepath.Join("var", "lib", "dpkg", "*-old"),
 			filepath.Join("dev", "*"),
+			filepath.Join("sys", "*"),
+			filepath.Join("run", "*"),
 		})
 	if err != nil {
 		return err
@@ -1394,7 +1396,7 @@ func listWithPatterns(chroot string, patterns []string) ([]string, error) {
 // doDeleteFiles deletes the given list of files
 func doDeleteFiles(toDelete []string) error {
 	for _, f := range toDelete {
-		err := osRemove(f)
+		err := osRemoveAll(f)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error removing %s: %s", f, err.Error())
 		}
