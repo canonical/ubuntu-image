@@ -86,6 +86,8 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"invalid_paths_in_manual_touch_file", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (../../malicious)"},
 		{"invalid_paths_in_manual_touch_file_bug", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (/../../malicious)"},
 		{"img_specified_without_gadget", "test_image_without_gadget.yaml", false, "Key img cannot be used without key gadget:"},
+		{"manual_execute_path_and_cmd", "test_manual_execute_path_and_cmd.yaml", false, "Key customization:manual:execute:execute-path cannot be used with key customization:manual:execute:execute-command"},
+		{"manual_execute_no_cmd", "test_manual_execute_no_cmd.yaml", false, "No path or command where defined in the manual execute entry"},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

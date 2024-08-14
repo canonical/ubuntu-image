@@ -1,0 +1,38 @@
+name: ubuntu-server-amd64
+display-name: Ubuntu Server amd64
+revision: 1
+architecture: amd64
+series: jammy
+class: preinstalled
+kernel: linux-image-generic
+gadget:
+  url: "https://github.com/snapcore/pc-gadget.git"
+  branch: classic
+  type: "git"
+rootfs:
+  components:
+    - main
+    - universe
+    - restricted
+  sources-list-deb822: true
+  seed:
+    urls:
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+    branch: jammy
+    names:
+      - server
+      - minimal
+      - standard
+      - cloud-image
+customization:
+  manual:
+    execute:
+      - env: 
+        - "ENV_VAR_TEST=/etc/executefeature"
+  components:
+    - main
+    - universe
+    - restricted
+    - multiverse
+  pocket: proposed
