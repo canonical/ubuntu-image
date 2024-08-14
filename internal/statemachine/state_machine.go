@@ -610,36 +610,75 @@ func (stateMachine *StateMachine) Run(ctx context.Context) error {
 	if stateMachine.commonFlags.DryRun {
 		return nil
 	}
-	// iterate through the states
-	for i := 0; i < len(stateMachine.stateFuncs); i++ {
-		stateFunc := stateMachine.stateFuncs[i]
-		stateMachine.CurrentStep = stateFunc.name
-		if stateFunc.name == stateMachine.stateMachineFlags.Until {
-			break
-		}
-		if !stateMachine.commonFlags.Quiet {
-			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
-		}
-		start := time.Now()
-		err := stateFunc.function(stateMachine, ctx)
-		if stateMachine.commonFlags.Debug {
-			fmt.Printf("duration: %v\n", time.Since(start))
-		}
-		if err != nil {
-			// clean up work dir on error
-			cleanupErr := stateMachine.cleanup()
-			if cleanupErr != nil {
-				return fmt.Errorf("error during cleanup: %s while cleaning after stateFunc error: %w", cleanupErr.Error(), err)
+
+	stateChan := make(chan stateFunc, 1)
+	go stateMachine.queueStateFuncs(stateChan)
+
+	currentState := stateFunc{}
+
+out:
+	for {
+		select {
+		case <-ctx.Done():
+			for _, cancelFunc := range currentState.cancelFuncs {
+				err := cancelFunc(stateMachine)
+				// for now print the error and continue
+				if err != nil {
+					fmt.Printf("unable to properly cancel the execution: %s", err.Error())
+				}
 			}
-			return err
-		}
-		stateMachine.StepsTaken++
-		if stateFunc.name == stateMachine.stateMachineFlags.Thru {
-			break
+			return nil
+		default:
+			stateFunc, done := <-stateChan
+			err := stateMachine.runState(ctx, stateFunc)
+			if err != nil {
+				return err
+			}
+			if done {
+				break out
+			}
 		}
 	}
 	fmt.Println("Build successful")
 	return nil
+}
+
+func (stateMachine *StateMachine) runState(ctx context.Context, stateFunc stateFunc) error {
+	stateMachine.CurrentStep = stateFunc.name
+	if stateFunc.name == stateMachine.stateMachineFlags.Until {
+		return nil
+	}
+	if !stateMachine.commonFlags.Quiet {
+		fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
+	}
+
+	stateStart := time.Now()
+	err := stateFunc.function(stateMachine, ctx)
+	if stateMachine.commonFlags.Debug {
+		fmt.Printf("state duration: %v\n", time.Since(stateStart))
+	}
+	if err != nil {
+		// clean up work dir on error
+		cleanupErr := stateMachine.cleanup()
+		if cleanupErr != nil {
+			return fmt.Errorf("error during cleanup: %s while cleaning after stateFunc error: %w", cleanupErr.Error(), err)
+		}
+		return err
+	}
+
+	stateMachine.StepsTaken++
+	if stateFunc.name == stateMachine.stateMachineFlags.Thru {
+		return nil
+	}
+	return nil
+}
+
+// queueStateFuncs send 
+func (stateMachine *StateMachine) queueStateFuncs(ch chan stateFunc) {
+	for i := 0; i < len(stateMachine.stateFuncs); i++ {
+		ch <- stateMachine.stateFuncs[i]
+	}
+	close(ch)
 }
 
 // Teardown handles anything else that needs to happen after the states have finished running
