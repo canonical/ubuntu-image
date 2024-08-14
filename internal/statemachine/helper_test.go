@@ -849,7 +849,7 @@ func TestStateMachine_manualExecute(t *testing.T) {
 						Env:            []string{"VAR1=value1", "VAR2=value2"},
 					},
 					{
-						ExecuteCommand: "/execute/path2 arg21 arg22",
+						ExecuteCommand: `/execute/path2 "arg21" > arg22`,
 						Env:            []string{"VAR1=value21", "VAR2=value22"},
 					},
 					{
@@ -869,7 +869,7 @@ func TestStateMachine_manualExecute(t *testing.T) {
 					},
 				},
 				{
-					cmd: "/usr/sbin/chroot test /execute/path2 arg21 arg22",
+					cmd: `/usr/sbin/chroot test /execute/path2 "arg21" > arg22`,
 					env: []string{
 						"VAR1=value21",
 						"VAR2=value22",
