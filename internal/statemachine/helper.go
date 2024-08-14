@@ -3,6 +3,7 @@ package statemachine
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io/fs"
 	"math"
@@ -723,7 +724,7 @@ func execTeardownCmds(teardownCmds []*exec.Cmd, debug bool, prevErr error) (err 
 		err = fmt.Errorf("teardown failed: %s", strings.Join(errs, "\n"))
 		if prevErr != nil {
 			errs := append([]string{prevErr.Error()}, errs...)
-			err = fmt.Errorf(strings.Join(errs, "\n"))
+			err = errors.New(strings.Join(errs, "\n"))
 		}
 	}
 
