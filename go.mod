@@ -16,6 +16,7 @@ require (
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
@@ -37,7 +38,7 @@ require (
 
 require (
 	github.com/snapcore/secboot v0.0.0-20240411101434-f3ad7c92552a // indirect
-	github.com/snapcore/snapd v0.0.0-20240618105125-0d60393deebb
+	github.com/snapcore/snapd v0.0.0-20240911193218-25e66bfc4669
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
