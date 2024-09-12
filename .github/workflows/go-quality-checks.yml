@@ -21,7 +21,7 @@ jobs:
         run: FMT=`go fmt ./...` && [ -z "$FMT" ]
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         id: lint
         with:
           version: latest
