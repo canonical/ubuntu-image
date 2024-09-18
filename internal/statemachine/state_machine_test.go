@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -34,21 +35,21 @@ var testDir = "ubuntu-image-0615c8dd-d3af-4074-bfcb-c3d3c8392b06"
 
 // for tests where we don't want to run actual states
 var testStates = []stateFunc{
-	{"test_succeed", func(*StateMachine) error { return nil }},
+	{"test_succeed", func(*StateMachine, context.Context) error { return nil }, nil},
 }
 
 // for tests where we want to run all the states
 var allTestStates = []stateFunc{
-	{prepareGadgetTreeState.name, func(statemachine *StateMachine) error { return nil }},
-	{prepareClassicImageState.name, func(statemachine *StateMachine) error { return nil }},
-	{loadGadgetYamlState.name, func(statemachine *StateMachine) error { return nil }},
-	{populateClassicRootfsContentsState.name, func(statemachine *StateMachine) error { return nil }},
-	{generateDiskInfoState.name, func(statemachine *StateMachine) error { return nil }},
-	{calculateRootfsSizeState.name, func(statemachine *StateMachine) error { return nil }},
-	{populateBootfsContentsState.name, func(statemachine *StateMachine) error { return nil }},
-	{populatePreparePartitionsState.name, func(statemachine *StateMachine) error { return nil }},
-	{makeDiskState.name, func(statemachine *StateMachine) error { return nil }},
-	{generatePackageManifestState.name, func(statemachine *StateMachine) error { return nil }},
+	{prepareGadgetTreeState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
+	{prepareClassicImageState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
+	{loadGadgetYamlState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
+	{populateClassicRootfsContentsState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
+	{generateDiskInfoState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
+	{calculateRootfsSizeState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
+	{populateBootfsContentsState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
+	{populatePreparePartitionsState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
+	{makeDiskState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
+	{generatePackageManifestState.name, func(statemachine *StateMachine, ctx context.Context) error { return nil }, nil},
 }
 
 func ptrToOffset(offset quantity.Offset) *quantity.Offset {
@@ -174,7 +175,7 @@ func readOnlyDiskfsCreate(diskName string, size int64, format diskfs.Format, sec
 // Fake exec command helper
 var testCaseName string
 
-func fakeExecCommand(command string, args ...string) *exec.Cmd {
+func fakeExecCommandContext(ctx context.Context, command string, args ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestExecHelperProcess", "--", command}
 	cs = append(cs, args...)
 	//nolint:gosec,G204
@@ -248,7 +249,7 @@ type testStateMachine struct {
 // testStateMachine needs its own setup
 func (TestStateMachine *testStateMachine) Setup() error {
 	// set the states that will be used for this image type
-	TestStateMachine.states = allTestStates
+	TestStateMachine.stateFuncs = allTestStates
 
 	// do the validation common to all image types
 	if err := TestStateMachine.validateInput(); err != nil {
@@ -294,7 +295,7 @@ func TestUntilThru(t *testing.T) {
 				err := partialStateMachine.Setup()
 				asserter.AssertErrNil(err, false)
 
-				err = partialStateMachine.Run()
+				err = partialStateMachine.Run(context.Background())
 				asserter.AssertErrNil(err, false)
 
 				err = partialStateMachine.Teardown()
@@ -309,7 +310,7 @@ func TestUntilThru(t *testing.T) {
 				err = resumeStateMachine.Setup()
 				asserter.AssertErrNil(err, false)
 
-				err = resumeStateMachine.Run()
+				err = resumeStateMachine.Run(context.Background())
 				asserter.AssertErrNil(err, false)
 
 				err = resumeStateMachine.Teardown()
@@ -340,11 +341,11 @@ func TestDebug(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// just use the one state
-	stateMachine.states = testStates
+	stateMachine.stateFuncs = testStates
 	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	// restore stdout and check that the debug info was printed
@@ -352,8 +353,8 @@ func TestDebug(t *testing.T) {
 	readStdout, err := io.ReadAll(stdout)
 	asserter.AssertErrNil(err, true)
 
-	if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
-		t.Errorf("Expected state name \"%s\" to appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
+	if !strings.Contains(string(readStdout), stateMachine.stateFuncs[0].name) {
+		t.Errorf("Expected state name \"%s\" to appear in output \"%s\"\n", stateMachine.stateFuncs[0].name, string(readStdout))
 	}
 }
 
@@ -376,19 +377,19 @@ func TestDryRun(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// just use the one state
-	stateMachine.states = testStates
+	stateMachine.stateFuncs = testStates
 	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	restoreStdout()
 	readStdout, err := io.ReadAll(stdout)
 	asserter.AssertErrNil(err, true)
 
-	if strings.Contains(string(readStdout), stateMachine.states[0].name) {
-		t.Errorf("Expected state name \"%s\" to not appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
+	if strings.Contains(string(readStdout), stateMachine.stateFuncs[0].name) {
+		t.Errorf("Expected state name \"%s\" to not appear in output \"%s\"\n", stateMachine.stateFuncs[0].name, string(readStdout))
 	}
 }
 
@@ -399,11 +400,11 @@ func TestFunctionErrors(t *testing.T) {
 		overrideState int
 		newStateFunc  stateFunc
 	}{
-		{"error_state_func", 0, stateFunc{"test_error_state_func", func(stateMachine *StateMachine) error { return fmt.Errorf("Test Error") }}},
-		{"error_write_metadata", 8, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
+		{"error_state_func", 0, stateFunc{"test_error_state_func", func(stateMachine *StateMachine, ctx context.Context) error { return fmt.Errorf("Test Error") }, nil}},
+		{"error_write_metadata", 8, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine, ctx context.Context) error {
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 			return nil
-		}}},
+		}, nil}},
 	}
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
@@ -421,12 +422,12 @@ func TestFunctionErrors(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			// override the function, but save the old one
-			oldStateFunc := stateMachine.states[tc.overrideState]
-			stateMachine.states[tc.overrideState] = tc.newStateFunc
+			oldStateFunc := stateMachine.stateFuncs[tc.overrideState]
+			stateMachine.stateFuncs[tc.overrideState] = tc.newStateFunc
 			defer func() {
-				stateMachine.states[tc.overrideState] = oldStateFunc
+				stateMachine.stateFuncs[tc.overrideState] = oldStateFunc
 			}()
-			if err := stateMachine.Run(); err == nil {
+			if err := stateMachine.Run(context.Background()); err == nil {
 				if err := stateMachine.Teardown(); err == nil {
 					t.Errorf("Expected an error but there was none")
 				}
@@ -553,7 +554,7 @@ func TestParseImageSizes(t *testing.T) {
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, false)
 
-			err = stateMachine.loadGadgetYaml()
+			err = stateMachine.loadGadgetYaml(context.Background())
 			asserter.AssertErrNil(err, false)
 
 			err = stateMachine.parseImageSizes()
@@ -595,7 +596,7 @@ func TestFailedParseImageSizes(t *testing.T) {
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, false)
 
-			err = stateMachine.loadGadgetYaml()
+			err = stateMachine.loadGadgetYaml(context.Background())
 			asserter.AssertErrNil(err, false)
 
 			// run parseImage size and make sure it failed
@@ -644,7 +645,7 @@ func TestGrowImageSize(t *testing.T) {
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, false)
 
-			err = stateMachine.loadGadgetYaml()
+			err = stateMachine.loadGadgetYaml(context.Background())
 			asserter.AssertErrNil(err, false)
 
 			v, found := stateMachine.GadgetInfo.Volumes[volumeName]
@@ -1091,7 +1092,7 @@ func TestStateMachine_postProcessGadgetYaml_fail(t *testing.T) {
 	// ensure unpack exists
 	err = os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
 	asserter.AssertErrNil(err, true)
-	err = stateMachine.loadGadgetYaml()
+	err = stateMachine.loadGadgetYaml(context.Background())
 	asserter.AssertErrNil(err, false)
 
 	// mock filepath.Rel
@@ -1114,7 +1115,7 @@ func TestStateMachine_postProcessGadgetYaml_fail(t *testing.T) {
 
 	// use a gadget with a disallowed string in the content field
 	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_invalid_content.yaml")
-	err = stateMachine.loadGadgetYaml()
+	err = stateMachine.loadGadgetYaml(context.Background())
 	asserter.AssertErrContains(err, "disallowed for security purposes")
 }
 
@@ -1159,7 +1160,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 				IsSeeded:     true,
 				SectorSize:   quantity.Size(512),
 				RootfsSize:   quantity.Size(775915520),
-				states:       allTestStates[2:],
+				stateFuncs:   allTestStates[2:],
 				GadgetInfo: &gadget.Info{
 					Volumes: map[string]*gadget.Volume{
 						"pc": {
@@ -1246,7 +1247,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 					Resume:  false,
 					WorkDir: filepath.Join(testDataDir, "metadata"),
 				},
-				states: allTestStates,
+				stateFuncs: allTestStates,
 			},
 			shouldPass:    true,
 			expectedError: "error reading metadata file",
@@ -1270,7 +1271,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 					Resume:  tc.args.resume,
 					WorkDir: filepath.Join(testDataDir, "metadata"),
 				},
-				states: allTestStates,
+				stateFuncs: allTestStates,
 			}
 
 			err := gotStateMachine.readMetadata(tc.args.metadataFile)
@@ -1304,7 +1305,7 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 				IsSeeded:     true,
 				SectorSize:   quantity.Size(512),
 				RootfsSize:   quantity.Size(775915520),
-				states:       allTestStates[2:],
+				stateFuncs:   allTestStates[2:],
 				GadgetInfo: &gadget.Info{
 					Volumes: map[string]*gadget.Volume{
 						"pc": {
@@ -1419,7 +1420,7 @@ func TestMinSize(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, false)
-	err = stateMachine.loadGadgetYaml()
+	err = stateMachine.loadGadgetYaml(context.Background())
 	asserter.AssertErrNil(err, false)
 }
 
@@ -1597,7 +1598,7 @@ Continuing
 			s := &StateMachine{
 				commonFlags:       tt.fields.commonFlags,
 				stateMachineFlags: tt.fields.stateMachineFlags,
-				states:            tt.fields.states,
+				stateFuncs:        tt.fields.states,
 			}
 			s.displayStates()
 
