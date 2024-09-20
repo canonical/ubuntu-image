@@ -56,6 +56,10 @@ func (mockSM *mockedStateMachine) SetSeries() error {
 	return nil
 }
 
+func (mockSM *mockedStateMachine) Architecture() (string, error) {
+	return "", nil
+}
+
 // TestValidCommands tests that certain valid commands are parsed correctly
 func TestValidCommands(t *testing.T) {
 	t.Parallel()

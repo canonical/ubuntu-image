@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,6 +87,15 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 func (classicStateMachine *ClassicStateMachine) SetSeries() error {
 	classicStateMachine.series = classicStateMachine.ImageDef.Series
 	return nil
+}
+
+func (classicStateMachine *ClassicStateMachine) Architecture() (string, error) {
+	arch := classicStateMachine.ImageDef.Architecture
+	if len(arch) == 0 {
+		return "", errors.New("unable to identify the arch")
+	}
+
+	return arch, nil
 }
 
 // parseImageDefinition parses the provided yaml file and ensures it is valid
@@ -507,7 +517,7 @@ func (stateMachine *StateMachine) addImgStates(states *[]stateFunc) {
 
 	*states = append(*states,
 		makeDiskState,
-		updateBootloaderState,
+		setupBootloaderState,
 	)
 }
 
@@ -522,7 +532,7 @@ func (stateMachine *StateMachine) addQcow2States(states *[]stateFunc) {
 	if !found {
 		*states = append(*states,
 			makeDiskState,
-			updateBootloaderState,
+			setupBootloaderState,
 		)
 	}
 	*states = append(*states, makeQcow2ImgState)
