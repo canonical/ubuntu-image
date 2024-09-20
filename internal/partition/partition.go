@@ -60,20 +60,30 @@ func newPartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64)
 
 // GeneratePartitionTable prepares the partition table for structures in a volume and
 // returns it with the partition number of the root partition.
-func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64, isSeeded bool) (partition.Table, int, error) {
-	partitionNumber, rootfsPartitionNumber := 1, -1
+func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64, isSeeded bool) (partition.Table, int, int, error) {
+	partitionNumber, rootfsPartitionNumber, bootPartitionNumber := 1, -1, -1
 	partitionTable := newPartitionTable(volume, sectorSize, imgSize)
 	onDisk := gadget.OnDiskStructsFromGadget(volume)
 
 	for i := range volume.Structure {
 		structure := &volume.Structure[i]
-		if !structure.IsPartition() || helper.ShouldSkipStructure(structure, isSeeded) {
+		if !structure.IsPartition() {
+			continue
+		}
+
+		// Record the actual partition number of the boot partition, as it
+		// might be useful for certain operations (like updating the bootloader)
+		if helper.IsSystemBootStructure(structure) {
+			bootPartitionNumber = partitionNumber
+		}
+
+		if helper.ShouldSkipStructure(structure, isSeeded) {
 			continue
 		}
 
 		// Record the actual partition number of the root partition, as it
 		// might be useful for certain operations (like updating the bootloader)
-		if helper.IsRootfsStructure(structure) { //nolint:gosec,G301
+		if helper.IsRootfsStructure(structure) {
 			rootfsPartitionNumber = partitionNumber
 		}
 
@@ -85,13 +95,13 @@ func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize ui
 		structureType := getStructureType(structure, volume.Schema)
 		err := partitionTable.AddPartition(structurePair, structureType)
 		if err != nil {
-			return nil, rootfsPartitionNumber, err
+			return nil, rootfsPartitionNumber, bootPartitionNumber, err
 		}
 
 		partitionNumber++
 	}
 
-	return partitionTable.GetConcreteTable(), rootfsPartitionNumber, nil
+	return partitionTable.GetConcreteTable(), rootfsPartitionNumber, bootPartitionNumber, nil
 }
 
 // getStructureType extracts the structure type from the structure.Type considering
