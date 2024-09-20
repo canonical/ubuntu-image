@@ -617,15 +617,25 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 
 // generateAptCmd generates the apt command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
+func generateAptCmds(targetDir string, packageList []string, installRecommends bool) []*exec.Cmd {
 	updateCmd := execCommand("chroot", targetDir, "apt", "update")
 
+	return []*exec.Cmd{updateCmd, aptInstallCmd(targetDir, packageList, installRecommends)}
+}
+
+// generateAptCmd generates the apt command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func aptInstallCmd(targetDir string, packageList []string, installRecommends bool) *exec.Cmd {
 	installCmd := execCommand("chroot", targetDir, "apt", "install",
 		"--assume-yes",
 		"--quiet",
 		"--option=Dpkg::options::=--force-unsafe-io",
 		"--option=Dpkg::Options::=--force-confold",
 	)
+
+	if !installRecommends {
+		installCmd.Args = append(installCmd.Args, "--no-install-recommends")
+	}
 
 	installCmd.Args = append(installCmd.Args, packageList...)
 
@@ -636,7 +646,7 @@ func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
 	}
 	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
 
-	return []*exec.Cmd{updateCmd, installCmd}
+	return installCmd
 }
 
 func setDenyingPolicyRcD(path string) (func(error) error, error) {

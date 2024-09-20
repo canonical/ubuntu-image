@@ -354,7 +354,7 @@ func (stateMachine *StateMachine) installPackages() error {
 		}()
 	}
 
-	installPackagesCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
+	installPackagesCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages, true)
 
 	err = helper.RunCmds(installPackagesCmds, classicStateMachine.commonFlags.Debug)
 	if err != nil {
