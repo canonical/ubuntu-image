@@ -15,7 +15,7 @@ var packStates = []stateFunc{
 	populateBootfsContentsState,
 	populatePreparePartitionsState,
 	makeDiskState,
-	updateBootloaderState,
+	setupBootloaderState,
 }
 
 // PackStateMachine embeds StateMachine and adds the command line flags specific to pack images

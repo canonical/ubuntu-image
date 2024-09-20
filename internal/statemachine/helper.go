@@ -21,6 +21,7 @@ import (
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
@@ -948,22 +949,27 @@ func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
 	return dpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
 }
 
-// updateGrub mounts the resulting image and runs update-grub
-func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) (err error) {
-	// create a directory in which to mount the rootfs
+// setupGrub mounts the resulting image and runs update-grub
+func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum int, bootPartNum int, architecture string) (err error) {
+	// create directories in which to mount the rootfs and the boot partition
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
 	err = osMkdir(mountDir, 0755)
 	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
+		return fmt.Errorf("Error creating scratch/loopback/boot/efi directory: %s", err.Error())
+	}
+
+	target, grubPackages := stateMachine.confFromArch(architecture)
+	if len(target) == 0 {
+		return fmt.Errorf("no valid efi target for the provided architecture")
 	}
 
 	// Slice used to store all the commands that need to be run
-	// to properly update grub.cfg in the chroot
-	// updateGrubCmds should be filled as a FIFO list
-	var updateGrubCmds []*exec.Cmd
+	// to setup grub in the chroot
+	// setupGrubCmds should be filled as a FIFO list
+	var setupGrubCmds []*exec.Cmd
 	// Slice used to store all the commands that need to be run
-	// to properly cleanup everything after the update of grub.cfg
-	// updateGrubCmds should be filled as a LIFO list (so new entries should added at the start of the slice)
+	// to cleanup everything after the setup of grub
+	// teardownCmds should be filled as a LIFO list (so new entries should added at the start of the slice)
 	var teardownCmds []*exec.Cmd
 
 	defer func() {
@@ -977,22 +983,26 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 		return err
 	}
 
-	// detach the loopback device
-	teardownCmds = append(teardownCmds, losetupDetachCmd)
+	teardownCmds = append([]*exec.Cmd{losetupDetachCmd}, teardownCmds...)
 
-	updateGrubCmds = append(updateGrubCmds,
-		// mount the rootfs partition in which to run update-grub
-		//nolint:gosec,G204
-		execCommand("mount",
-			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
-			mountDir,
-		),
-	)
-
-	teardownCmds = append([]*exec.Cmd{execCommand("umount", mountDir)}, teardownCmds...)
+	teardownPrepareCmds, err := prepareGrubMountDir(mountDir, rootfsPartNum, bootPartNum, loopUsed, stateMachine.commonFlags.Debug)
+	teardownCmds = append(teardownPrepareCmds, teardownCmds...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		tmpErr := helperRestoreResolvConf(mountDir)
+		if tmpErr != nil {
+			if err != nil {
+				err = fmt.Errorf("%s after previous error: %w", tmpErr.Error(), err)
+			} else {
+				err = fmt.Errorf("Error restoring /etc/resolv.conf in the chroot: \"%s\"", tmpErr.Error())
+			}
+		}
+	}()
 
 	// set up the mountpoints
-	mountPoints := []mountPoint{
+	mountPoints := []*mountPoint{
 		{
 			src:      "devtmpfs-build",
 			basePath: mountDir,
@@ -1018,31 +1028,59 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 			relpath:  "/sys",
 			typ:      "sysfs",
 		},
+		{
+			basePath: mountDir,
+			relpath:  "/run",
+			bind:     true,
+		},
 	}
 
-	for _, mp := range mountPoints {
-		mountCmds, umountCmds, err := mp.getMountCmd()
-		if err != nil {
-			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
-				mp.relpath,
-				err.Error(),
-			)
-		}
-		updateGrubCmds = append(updateGrubCmds, mountCmds...)
-		teardownCmds = append(umountCmds, teardownCmds...)
+	mountCmds, umountCmds, err := generateMountPointCmds(mountPoints, stateMachine.tempDirs.scratch)
+	if err != nil {
+		return err
 	}
+
+	setupGrubCmds = append(setupGrubCmds, mountCmds...)
+	teardownCmds = append(umountCmds, teardownCmds...)
 
 	teardownCmds = append([]*exec.Cmd{
 		execCommand("udevadm", "settle"),
 	}, teardownCmds...)
 
+	// udev needed to have grub-install properly work
+	grubPackages = append(grubPackages, "udev")
+
+	setupGrubCmds = append(setupGrubCmds,
+		aptInstallCmd(mountDir, grubPackages, false),
+		execCommand("chroot",
+			mountDir,
+			"grub-install",
+			loopUsed,
+			"--boot-directory=/boot",
+			"--efi-directory=/boot/efi",
+			fmt.Sprintf("--target=%s", target),
+			"--uefi-secure-boot",
+			"--no-nvram",
+		),
+	)
+
+	if architecture == arch.AMD64 {
+		setupGrubCmds = append(setupGrubCmds,
+			execCommand("chroot",
+				mountDir,
+				"grub-install",
+				loopUsed,
+				"--target=i386-pc",
+			),
+		)
+	}
+
 	divert, undivert := divertOSProber(mountDir)
 
-	updateGrubCmds = append(updateGrubCmds, divert)
+	setupGrubCmds = append(setupGrubCmds, divert)
 	teardownCmds = append([]*exec.Cmd{undivert}, teardownCmds...)
 
-	// actually run update-grub
-	updateGrubCmds = append(updateGrubCmds,
+	setupGrubCmds = append(setupGrubCmds,
 		execCommand("chroot",
 			mountDir,
 			"update-grub",
@@ -1050,10 +1088,61 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 	)
 
 	// now run all the commands
-	err = helper.RunCmds(updateGrubCmds, stateMachine.commonFlags.Debug)
+	return helper.RunCmds(setupGrubCmds, stateMachine.commonFlags.Debug)
+}
+
+func (stateMachine *StateMachine) confFromArch(architecture string) (string, []string) {
+	switch architecture {
+	case arch.AMD64:
+		return "x86_64-efi", []string{"grub-pc", "shim-signed"}
+	case arch.ARM64:
+		return "arm64-efi", []string{"grub-efi-arm64", "grub-efi-arm64-bin"}
+	case arch.ARMHF:
+		return "arm-efi", []string{"grub-efi-arm", "grub-efi-arm-bin"}
+	default:
+		return "", nil
+	}
+}
+
+// prepareGrubMountDir prepares a directory to run the grub installation process
+func prepareGrubMountDir(mountDir string, rootfsPartNum int, bootPartNum int, loopUsed string, debug bool) ([]*exec.Cmd, error) {
+	bootDir := filepath.Join(mountDir, "boot", "efi")
+	// Slice used to store all the commands that need to be run
+	// first to properly prepare the chroot
+	// setupGrubCmds should be filled as a FIFO list
+	var prepareCmds []*exec.Cmd
+	teardownCmds := []*exec.Cmd{
+		execCommand("umount", bootDir),
+		execCommand("umount", mountDir),
+	}
+	prepareCmds = append(prepareCmds,
+		// Try to make sure udev is not racing with losetup and briefly
+		// vanishing device files. See LP: #2045586
+		execCommand("udevadm", "settle"),
+		// mount the rootfs partition in which to run update-grub
+		//nolint:gosec,G204
+		execCommand("mount",
+			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
+			mountDir,
+		),
+		execCommand("mkdir", "-p", bootDir),
+		// mount the boot partition
+		//nolint:gosec,G204
+		execCommand("mount",
+			fmt.Sprintf("%sp%d", loopUsed, bootPartNum),
+			bootDir,
+		),
+	)
+
+	err := helper.RunCmds(prepareCmds, debug)
 	if err != nil {
-		return err
+		return teardownCmds, err
 	}
 
-	return nil
+	err = helperBackupAndCopyResolvConf(mountDir)
+	if err != nil {
+		return teardownCmds, fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
+	}
+
+	return teardownCmds, nil
 }

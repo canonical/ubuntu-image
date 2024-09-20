@@ -1107,13 +1107,21 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 }
 
-// TestStateMachine_updateGrub_checkcmds checks commands to update grub order is ok
-func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
+// TestStateMachine_setupGrub_checkcmds checks commands to update grub order is ok
+func TestStateMachine_setupGrub_checkcmds(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
+	var stateMachine ClassicStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.commonFlags.Debug = true
 	stateMachine.commonFlags.OutputDir = testhelper.DefaultTmpDir
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: "amd64",
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+	}
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
@@ -1129,7 +1137,17 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { restoreStdout() })
 
-	err = stateMachine.updateGrub("", 2)
+	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfSuccess
+	t.Cleanup(func() {
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+	})
+
+	helperRestoreResolvConf = mockRestoreResolvConfSuccess
+	t.Cleanup(func() {
+		helperRestoreResolvConf = helper.RestoreResolvConf
+	})
+
+	err = stateMachine.setupGrub("", 2, 1, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrNil(err, true)
 
 	restoreStdout()
@@ -1137,15 +1155,24 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	expectedCmds := []*regexp.Regexp{
+		regexp.MustCompile("^udevadm settle$"),
 		regexp.MustCompile("^mount .*p2 .*/scratch/loopback$"),
+		regexp.MustCompile("^mkdir -p .*/scratch/loopback/boot/efi$"),
+		regexp.MustCompile("^mount .*p1 .*/scratch/loopback/boot/efi$"),
 		regexp.MustCompile("^mount -t devtmpfs devtmpfs-build .*/scratch/loopback/dev$"),
 		regexp.MustCompile("^mount -t devpts devpts-build -o nodev,nosuid .*/scratch/loopback/dev/pts$"),
 		regexp.MustCompile("^mount -t proc proc-build .*/scratch/loopback/proc$"),
 		regexp.MustCompile("^mount -t sysfs sysfs-build .*/scratch/loopback/sys$"),
+		regexp.MustCompile("^mount --bind .*/run.*$"),
+		regexp.MustCompile("^chroot .*/scratch/loopback apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold --no-install-recommends grub-pc shim-signed"),
+		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --boot-directory=/boot --efi-directory=/boot/efi --target=x86_64-efi --uefi-secure-boot --no-nvram$"),
+		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --target=i386-pc$"),
 		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert"),
 		regexp.MustCompile("^chroot .*/scratch/loopback update-grub$"),
 		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert --remove"),
 		regexp.MustCompile("^udevadm settle$"),
+		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/run$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/run$"),
 		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/sys$"),
 		regexp.MustCompile("^umount --recursive .*scratch/loopback/sys$"),
 		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/proc$"),
@@ -1154,6 +1181,7 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 		regexp.MustCompile("^umount --recursive .*scratch/loopback/dev/pts$"),
 		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/dev$"),
 		regexp.MustCompile("^umount --recursive .*scratch/loopback/dev$"),
+		regexp.MustCompile("^umount .*scratch/loopback/boot/efi$"),
 		regexp.MustCompile("^umount .*scratch/loopback$"),
 		regexp.MustCompile("^losetup --detach .* /var/tmp$"),
 	}
@@ -1172,11 +1200,19 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 	}
 }
 
-// TestFailedUpdateGrub tests failures in the updateGrub function
-func TestFailedUpdateGrub(t *testing.T) {
+// TestStateMachine_setupGrub_failed tests failures in the updateGrub function
+func TestStateMachine_setupGrub_failed(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
+	var stateMachine ClassicStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: "amd64",
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+	}
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
@@ -1188,8 +1224,8 @@ func TestFailedUpdateGrub(t *testing.T) {
 	t.Cleanup(func() {
 		osMkdir = os.Mkdir
 	})
-	err = stateMachine.updateGrub("", 0)
-	asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
+	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	asserter.AssertErrContains(err, "Error creating scratch/loopback/boot/efi directory")
 	osMkdir = os.Mkdir
 
 	// Setup the exec.Command mock to mock losetup
@@ -1198,14 +1234,30 @@ func TestFailedUpdateGrub(t *testing.T) {
 	t.Cleanup(func() {
 		execCommand = exec.Command
 	})
-	err = stateMachine.updateGrub("", 0)
+	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrContains(err, "Error running losetup command")
 
 	// now test a command failure that isn't losetup
 	testCaseName = "TestFailedUpdateGrubOther"
-	err = stateMachine.updateGrub("", 0)
+	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrContains(err, "Error running command")
 	execCommand = exec.Command
+
+	err = stateMachine.setupGrub("", 0, 0, "unknown")
+	asserter.AssertErrContains(err, "no valid efi target for the provided architecture")
+
+	// Test failing helperBackupAndCopyResolvConf
+	mockCmder := NewMockExecCommand()
+
+	execCommand = mockCmder.Command
+	t.Cleanup(func() { execCommand = exec.Command })
+	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfFail
+	t.Cleanup(func() {
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+	})
+	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
+	helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 }
 
 func TestStateMachine_setConfDefDir(t *testing.T) {
