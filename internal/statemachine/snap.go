@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -85,6 +86,20 @@ func (snapStateMachine *SnapStateMachine) SetSeries() error {
 	snapStateMachine.series = fmt.Sprintf("%s.04", model.Series())
 
 	return nil
+}
+
+func (snapStateMachine *SnapStateMachine) Architecture() (string, error) {
+	model, err := snapStateMachine.decodeModelAssertion()
+	if err != nil {
+		return "", err
+	}
+
+	arch := model.Architecture()
+	if len(arch) == 0 {
+		return "", errors.New("unable to identify the arch")
+	}
+
+	return arch, nil
 }
 
 // decodeModelAssertion() was copied and slightly adapted from image/image_linux.go
