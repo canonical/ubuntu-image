@@ -417,6 +417,42 @@ func Test_initStateMachine(t *testing.T) {
 			},
 		},
 		{
+			name: "init a pack state machine, no arch",
+			args: args{
+				imageType:        "pack",
+				commonOpts:       &commands.CommonOpts{},
+				stateMachineOpts: &commands.StateMachineOpts{},
+				ubuntuImageCommand: &commands.UbuntuImageCommand{
+					Pack: commands.PackCommand{
+						PackOptsPassed: commands.PackOpts{},
+					},
+				},
+			},
+			want: &statemachine.PackStateMachine{
+				StateMachine: statemachine.StateMachine{},
+				Opts:         commands.PackOpts{Architecture: "amd64"},
+			},
+		},
+		{
+			name: "init a pack state machine, with arch",
+			args: args{
+				imageType:        "pack",
+				commonOpts:       &commands.CommonOpts{},
+				stateMachineOpts: &commands.StateMachineOpts{},
+				ubuntuImageCommand: &commands.UbuntuImageCommand{
+					Pack: commands.PackCommand{
+						PackOptsPassed: commands.PackOpts{
+							Architecture: "arm64",
+						},
+					},
+				},
+			},
+			want: &statemachine.PackStateMachine{
+				StateMachine: statemachine.StateMachine{},
+				Opts:         commands.PackOpts{Architecture: "arm64"},
+			},
+		},
+		{
 			name: "fail to init an unknown statemachine",
 			args: args{
 				imageType:          "unknown",

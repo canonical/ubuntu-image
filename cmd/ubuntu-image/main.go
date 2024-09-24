@@ -18,6 +18,7 @@ import (
 
 	"github.com/jessevdk/go-flags"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/statemachine"
@@ -49,6 +50,9 @@ func initStateMachine(imageType string, commonOpts *commands.CommonOpts, stateMa
 			Args: ubuntuImageCommand.Classic.ClassicArgsPassed,
 		}
 	case "pack":
+		if ubuntuImageCommand.Pack.PackOptsPassed.Architecture == "" {
+			ubuntuImageCommand.Pack.PackOptsPassed.Architecture = arch.GetHostArch()
+		}
 		stateMachine = &statemachine.PackStateMachine{
 			Opts: ubuntuImageCommand.Pack.PackOptsPassed,
 		}
