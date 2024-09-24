@@ -26,6 +26,7 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 	"gopkg.in/yaml.v2"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 	"github.com/canonical/ubuntu-image/internal/testhelper"
@@ -727,7 +728,7 @@ func TestPrepareGadgetTree(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget:       &imagedefinition.Gadget{},
 	}
@@ -768,7 +769,7 @@ func TestPrepareGadgetTreePrebuilt(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget: &imagedefinition.Gadget{
 			GadgetType: "prebuilt",
@@ -799,7 +800,7 @@ func TestFailedPrepareGadgetTree(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget:       &imagedefinition.Gadget{},
 	}
@@ -1195,7 +1196,7 @@ func TestVerifyArtifactNames(t *testing.T) {
 
 			stateMachine.YamlFilePath = filepath.Join("testdata", tc.gadgetYAML)
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
-				Architecture: getHostArch(),
+				Architecture: arch.GetHostArch(),
 				Series:       getHostSuite(),
 				Rootfs: &imagedefinition.Rootfs{
 					Archive: "ubuntu",
@@ -1328,7 +1329,7 @@ func TestExtractRootfsTar(t *testing.T) {
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
-				Architecture: getHostArch(),
+				Architecture: arch.GetHostArch(),
 				Series:       getHostSuite(),
 				Rootfs: &imagedefinition.Rootfs{
 					Tarball: &imagedefinition.Tarball{
@@ -1369,7 +1370,7 @@ func TestFailedExtractRootfsTar(t *testing.T) {
 	stateMachine.parent = &stateMachine
 	tarPath := filepath.Join("testdata", "rootfs_tarballs", "rootfs.tar")
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Tarball: &imagedefinition.Tarball{
@@ -1756,7 +1757,7 @@ func TestStateMachine_manualCustomization(t *testing.T) {
 	stateMachine.parent = &stateMachine
 
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -1966,7 +1967,7 @@ func TestStateMachine_manualCustomization_fail(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -2025,7 +2026,7 @@ func TestPrepareClassicImage(t *testing.T) {
 	stateMachine.Snaps = []string{"core20"}
 	stateMachine.commonFlags.Channel = "stable"
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Customization: &imagedefinition.Customization{
 			ExtraSnaps: []*imagedefinition.Snap{
 				{
@@ -2097,7 +2098,7 @@ func TestClassicSnapRevisions(t *testing.T) {
 	stateMachine.Snaps = []string{"lxd"}
 	stateMachine.commonFlags.Channel = "stable"
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Customization: &imagedefinition.Customization{
 			ExtraSnaps: []*imagedefinition.Snap{
 				{
@@ -2165,7 +2166,7 @@ func TestFailedPrepareClassicImage(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Customization: &imagedefinition.Customization{
 			ExtraSnaps: []*imagedefinition.Snap{},
 		},
@@ -2253,7 +2254,7 @@ func TestStateMachine_PopulateClassicRootfsContents(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -2318,7 +2319,7 @@ func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -2594,7 +2595,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
-				Architecture: getHostArch(),
+				Architecture: arch.GetHostArch(),
 				Series:       series,
 				Rootfs: &imagedefinition.Rootfs{
 					SourcesListDeb822: helper.BoolPtr(tc.deb822Format),
@@ -2707,7 +2708,7 @@ UUID=1234-5678	/	ext4	defaults	0	0
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
-				Architecture:  getHostArch(),
+				Architecture:  arch.GetHostArch(),
 				Series:        getHostSuite(),
 				Rootfs:        &imagedefinition.Rootfs{},
 				Customization: &imagedefinition.Customization{},
@@ -2768,7 +2769,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 	stateMachine.parent = &stateMachine
 	stateMachine.commonFlags.OutputDir = outputDir
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -2808,7 +2809,7 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -2874,7 +2875,7 @@ func TestGenerateFilelist(t *testing.T) {
 	stateMachine.parent = &stateMachine
 	stateMachine.commonFlags.OutputDir = outputDir
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -2920,7 +2921,7 @@ func TestFailedGenerateFilelist(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -3544,7 +3545,7 @@ func TestGerminate(t *testing.T) {
 
 			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-			hostArch := getHostArch()
+			hostArch := arch.GetHostArch()
 			series := "noble"
 			imageDef := imagedefinition.ImageDefinition{
 				Architecture: hostArch,
@@ -3623,7 +3624,7 @@ func TestFailedGerminate(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// create a valid imageDefinition
-	hostArch := getHostArch()
+	hostArch := arch.GetHostArch()
 	hostSuite := getHostSuite()
 	imageDef := imagedefinition.ImageDefinition{
 		Architecture: hostArch,
@@ -3697,7 +3698,7 @@ func TestBuildGadgetTreeGit(t *testing.T) {
 	sourcePath := filepath.Join(d, "testdata", "gadget_source")
 	sourcePath = "file://" + sourcePath
 	imageDef := imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget: &imagedefinition.Gadget{
 			GadgetURL:  sourcePath,
@@ -3712,7 +3713,7 @@ func TestBuildGadgetTreeGit(t *testing.T) {
 
 	// test the git method
 	imageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget: &imagedefinition.Gadget{
 			GadgetURL:    "https://github.com/snapcore/pc-gadget",
@@ -3765,7 +3766,7 @@ func TestBuildGadgetTreeDirectory(t *testing.T) {
 
 	// now set up the image definition to build from this directory
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget: &imagedefinition.Gadget{
 			GadgetURL:  fmt.Sprintf("file://%s", gadgetDir),
@@ -3879,7 +3880,7 @@ func TestStateMachine_buildGadgetTree_paths(t *testing.T) {
 
 			// now set up the image definition to build from this directory
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
-				Architecture: getHostArch(),
+				Architecture: arch.GetHostArch(),
 				Series:       getHostSuite(),
 				Gadget: &imagedefinition.Gadget{
 					GadgetURL:  fmt.Sprintf("file://%s", tc.gadgetDir),
@@ -3939,7 +3940,7 @@ func TestGadgetGadgetTargets(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 			gadgetSrc := filepath.Join(wd, "testdata", "gadget_source")
 			imageDef := imagedefinition.ImageDefinition{
-				Architecture: getHostArch(),
+				Architecture: arch.GetHostArch(),
 				Series:       getHostSuite(),
 				Gadget: &imagedefinition.Gadget{
 					GadgetURL:    fmt.Sprintf("file://%s", gadgetSrc),
@@ -3996,7 +3997,7 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 
 	// try to clone a repo that doesn't exist
 	imageDef := imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget: &imagedefinition.Gadget{
 			GadgetURL:  "http://fakerepo.git",
@@ -4010,7 +4011,7 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 
 	// try to copy a file that doesn't exist
 	imageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget: &imagedefinition.Gadget{
 			GadgetURL:  "file:///fake/file/that/does/not/exist",
@@ -4024,7 +4025,7 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 
 	// mock osutil.CopySpecialFile and run with /tmp as the gadget source
 	imageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget: &imagedefinition.Gadget{
 			GadgetURL:  "file:///tmp",
@@ -4053,7 +4054,7 @@ func TestFailedBuildGadgetTree(t *testing.T) {
 	sourcePath := filepath.Join(wd, "testdata", "gadget_source")
 	sourcePath = "file://" + sourcePath
 	imageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget: &imagedefinition.Gadget{
 			GadgetURL:  sourcePath,
@@ -4082,7 +4083,7 @@ func TestCreateChroot(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Pocket:            "proposed",
@@ -4196,7 +4197,7 @@ func TestFailedCreateChroot(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			SourcesListDeb822: helper.BoolPtr(false),
@@ -4424,7 +4425,7 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs:       &imagedefinition.Rootfs{},
 		Customization: &imagedefinition.Customization{
@@ -4613,7 +4614,7 @@ LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
-				Architecture: getHostArch(),
+				Architecture: arch.GetHostArch(),
 				Series:       getHostSuite(),
 				Rootfs:       &imagedefinition.Rootfs{},
 				Customization: &imagedefinition.Customization{
@@ -4665,7 +4666,7 @@ func TestStateMachine_customizeFstab_fail(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs:       &imagedefinition.Rootfs{},
 		Customization: &imagedefinition.Customization{
@@ -4748,7 +4749,7 @@ func TestGenerateRootfsTarball(t *testing.T) {
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
-				Architecture: getHostArch(),
+				Architecture: arch.GetHostArch(),
 				Series:       getHostSuite(),
 				Rootfs:       &imagedefinition.Rootfs{},
 				Artifacts: &imagedefinition.Artifact{
@@ -4826,7 +4827,7 @@ func TestFailedMakeQcow2Img(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Artifacts: &imagedefinition.Artifact{
 			Qcow2: &[]imagedefinition.Qcow2{
@@ -4866,7 +4867,7 @@ func TestPreseedResetChroot(t *testing.T) {
 	stateMachine.Snaps = []string{"lxd"}
 	stateMachine.commonFlags.Channel = "stable"
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -4919,7 +4920,7 @@ func TestPreseedResetChroot(t *testing.T) {
 
 	// set up a new set of snaps to be installed
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Customization: &imagedefinition.Customization{
 			ExtraSnaps: []*imagedefinition.Snap{
 				{
@@ -4955,7 +4956,7 @@ func TestStateMachine_setupBootloader_fail(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget:       &imagedefinition.Gadget{},
 	}
@@ -5009,7 +5010,7 @@ func TestStateMachine_setupBootloader_fail(t *testing.T) {
 	stateMachine.ImageDef.Architecture = ""
 	err = stateMachine.setupBootloader()
 	asserter.AssertErrContains(err, "unable to identify the arch")
-	stateMachine.ImageDef.Architecture = getHostArch()
+	stateMachine.ImageDef.Architecture = arch.GetHostArch()
 
 	// parse gadget.yaml and run updateBootloader with the mocked os.Mkdir
 	err = stateMachine.prepareGadgetTree()
@@ -5036,7 +5037,7 @@ func TestStateMachine_setupBootloader_warning(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Gadget:       &imagedefinition.Gadget{},
 	}
@@ -5111,7 +5112,7 @@ func TestPreseedClassicImage(t *testing.T) {
 	stateMachine.Snaps = []string{"lxd"}
 	stateMachine.commonFlags.Channel = "stable"
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
@@ -5329,7 +5330,7 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 	stateMachine.commonFlags.Channel = "stable"
 	stateMachine.commonFlags.Debug = true
 	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: getHostArch(),
+		Architecture: arch.GetHostArch(),
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			Archive: "ubuntu",
