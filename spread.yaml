@@ -108,25 +108,27 @@ prepare: |
   if [[ ! "$SPREAD_BACKEND" == *-arm ]]; then
       apt install -y gcc-multilib binfmt-support qemu-user-static
   fi
-  
+
   snap install core24
   snap install yq
   snap install snapcraft --classic
-  
+
   # Setup lxd
   # Make sure we use the snap version 
   apt remove -y lxd
   snap install lxd
   lxd init --auto
-  
+
   # Build and install the snap  
   rm -rf ubuntu-image_*.snap || true
   snapcraft
-  
+
   snap install --classic --dangerous ubuntu-image_*.snap
-  
+
   unset SHELL
   git clone -b $SERIES https://git.launchpad.net/ubuntu-images
+  git clone https://github.com/canonical/risc-v-gadget
+  mv risc-v-gadget/image-definition.yaml ubuntu-images/ubuntu-server-riscv64.yaml 
   git clone https://github.com/snapcore/models
 
 debug: |
@@ -140,6 +142,7 @@ suites:
     backends: [google, qemu]
     environment:
       IMG/ubuntu_server_pc_amd64: ubuntu-server-pc-amd64
+      IMG/ubuntu_server_riscv64: ubuntu-server-riscv64
       IMG/ubuntu_server_pi_arm64: ubuntu-server-pi-arm64
   tests/arm64/:
     summary: Integration tests for ubuntu-image on arm64
