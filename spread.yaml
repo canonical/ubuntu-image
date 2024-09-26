@@ -104,7 +104,7 @@ prepare: |
   fi
 
   apt update
-  apt install -y snapd libc6-dev git
+  apt install -y snapd libc6-dev git ubuntu-dev-tools
   if [[ ! "$SPREAD_BACKEND" == *-arm ]]; then
       apt install -y gcc-multilib binfmt-support qemu-user-static
   fi
