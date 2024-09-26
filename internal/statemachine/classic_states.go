@@ -600,30 +600,59 @@ func (stateMachine *StateMachine) germinate() error {
 			germinateCmd.String(), err.Error(), germinateOutput.String())
 	}
 
-	packageMap := make(map[string]*[]string)
-	packageMap[".seed"] = &classicStateMachine.Packages
-	packageMap[".snaps"] = &classicStateMachine.Snaps
-	for fileExtension, packageList := range packageMap {
-		for _, fileName := range classicStateMachine.ImageDef.Rootfs.Seed.Names {
-			seedFilePath := filepath.Join(germinateDir, fileName+fileExtension)
-			seedFile, err := osOpen(seedFilePath)
-			if err != nil {
-				return fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
-			}
-			defer seedFile.Close()
+	pkgsFromSeed, err := packagesFromSeed(".seed", classicStateMachine.ImageDef.Rootfs.Seed.Names, germinateDir)
+	if err != nil {
+		return err
+	}
+	classicStateMachine.Packages = append(classicStateMachine.Packages, pkgsFromSeed...)
 
-			seedScanner := bufio.NewScanner(seedFile)
-			for seedScanner.Scan() {
-				seedLine := seedScanner.Bytes()
-				if seedVersionRegex.Match(seedLine) {
-					packageName := strings.Split(string(seedLine), " ")[0]
-					*packageList = append(*packageList, packageName)
-				}
+	snapsFromSeed, err := packagesFromSeed(".snaps", classicStateMachine.ImageDef.Rootfs.Seed.Names, germinateDir)
+	if err != nil {
+		return err
+	}
+
+	classicStateMachine.Snaps = addUniqueSnaps(classicStateMachine.Snaps, snapsFromSeed)
+
+	return nil
+}
+
+// packagesFromSeed returns a list of packages/snaps from a germinated seed
+func packagesFromSeed(ext string, seedNames []string, germinateDir string) ([]string, error) {
+	var pkgs []string
+	for _, fileName := range seedNames {
+		seedFilePath := filepath.Join(germinateDir, fileName+ext)
+		seedFile, err := osOpen(seedFilePath)
+		if err != nil {
+			return pkgs, fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
+		}
+		defer seedFile.Close()
+
+		seedScanner := bufio.NewScanner(seedFile)
+		for seedScanner.Scan() {
+			seedLine := seedScanner.Bytes()
+			if seedVersionRegex.Match(seedLine) {
+				packageName := strings.Split(string(seedLine), " ")[0]
+				pkgs = append(pkgs, packageName)
 			}
 		}
 	}
+	return pkgs, nil
+}
 
-	return nil
+// addUniqueSnaps returns a list of unique snaps
+func addUniqueSnaps(currentSnaps []string, newSnaps []string) []string {
+	m := make(map[string]bool)
+	snaps := []string{}
+	toDuplicate := append(currentSnaps, newSnaps...)
+
+	for _, s := range toDuplicate {
+		if m[s] {
+			continue
+		}
+		m[s] = true
+		snaps = append(snaps, s)
+	}
+	return snaps
 }
 
 // customizeCloudInitFile customizes a cloud-init data file with the given content
