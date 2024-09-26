@@ -5498,3 +5498,96 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 		})
 	}
 }
+
+func Test_addUniqueSnaps(t *testing.T) {
+	type args struct {
+		currentSnaps []string
+		newSnaps     []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{
+			name: "no duplicate",
+			args: args{
+				currentSnaps: []string{
+					"a",
+					"b",
+				},
+				newSnaps: []string{
+					"c",
+					"d",
+				},
+			},
+			want: []string{
+				"a",
+				"b",
+				"c",
+				"d",
+			},
+		},
+		{
+			name: "current empty",
+			args: args{
+				currentSnaps: nil,
+				newSnaps: []string{
+					"c",
+					"d",
+				},
+			},
+			want: []string{
+
+				"c",
+				"d",
+			},
+		},
+		{
+			name: "new empty",
+			args: args{
+				currentSnaps: []string{
+					"a",
+					"b",
+				},
+				newSnaps: nil,
+			},
+			want: []string{
+				"a",
+				"b",
+			},
+		},
+		{
+			name: "with duplicates, conserve order",
+			args: args{
+				currentSnaps: []string{
+					"a",
+					"b",
+					"e",
+					"f",
+				},
+				newSnaps: []string{
+					"c",
+					"d",
+					"e",
+					"f",
+				},
+			},
+			want: []string{
+				"a",
+				"b",
+				"e",
+				"f",
+				"c",
+				"d",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			got := addUniqueSnaps(tt.args.currentSnaps, tt.args.newSnaps)
+			asserter.AssertEqual(tt.want, got)
+		})
+	}
+}
