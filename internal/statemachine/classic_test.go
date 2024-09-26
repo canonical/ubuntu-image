@@ -3478,16 +3478,16 @@ func TestGerminate(t *testing.T) {
 			[]string{"git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"},
 			[]string{"server", "minimal", "standard", "cloud-image"},
 			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
-			[]string{"lxd"},
+			[]string{},
 			true,
 		},
 		{
 			"http",
 			"ubuntu",
 			[]string{"https://people.canonical.com/~ubuntu-archive/seeds/"},
-			[]string{"server", "minimal", "standard", "cloud-image"},
+			[]string{"server", "minimal", "standard", "cloud-image", "desktop"},
 			[]string{"python3", "sudo", "cloud-init", "ubuntu-server"},
-			[]string{"lxd"},
+			[]string{"thunderbird"},
 			false,
 		},
 		{
@@ -3499,7 +3499,7 @@ func TestGerminate(t *testing.T) {
 			},
 			[]string{"desktop", "desktop-common", "standard", "minimal"},
 			[]string{"xorg", "wget", "ubuntu-minimal"},
-			[]string{},
+			[]string{"thunderbird"},
 			true,
 		},
 	}
@@ -3519,16 +3519,16 @@ func TestGerminate(t *testing.T) {
 			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			hostArch := getHostArch()
-			hostSuite := getHostSuite()
+			series := "noble"
 			imageDef := imagedefinition.ImageDefinition{
 				Architecture: hostArch,
-				Series:       hostSuite,
+				Series:       series,
 				Rootfs: &imagedefinition.Rootfs{
 					Flavor: tc.flavor,
 					Mirror: "http://archive.ubuntu.com/ubuntu/",
 					Seed: &imagedefinition.Seed{
 						SeedURLs:   tc.seedURLs,
-						SeedBranch: hostSuite,
+						SeedBranch: series,
 						Names:      tc.seedNames,
 						Vcs:        helper.BoolPtr(tc.vcs),
 					},
