@@ -148,7 +148,7 @@ Then check the configurations and the `./mkfs/db` file were updated. Commit the 
 
 ubuntu-image is released as a snap on the [Snap Store](https://snapcraft.io/ubuntu-image).
 
-When changes are merged in the `main` branch, a new snap is automatically built and pushed to the `latest/edge` channel.
+When changes are merged in the `main` branch, a new snap is automatically built and pushed to the `latest/edge` channel by Launchpad.
 
 When we think we have a "stable enough" version that we don't want to break with future merges in `main`, we promote it to `latest/candidate`. 
 
@@ -168,3 +168,15 @@ This way, our users can choose between:
 - The `latest/edge` channel update as soon as we merge changes.
 - The `latest/candidate` channel with new features/bugfixes but with potentially some newly introduced bug. This channel would be good to let users test requested features.
 - The `latest/stable` channel that should hopefully contain a rather "bug-free" version because it was tested in more various situations.
+
+
+## Rebuilding stable snaps
+
+To fix vulnerabilities in dependencies pulled when building the snap, we have to rebuild the snap.
+
+To do so:
+1. Get the git tag associated to the published snap
+2. Update the `Source` on the `ubuntu-image-rebuild` snap recipe on Launchpad with the tag.
+3. Request a build.
+4. (optional) Check the build was triggered from the same commit as the snap you want to replace
+5. Promote the build from `latest/beta` to `latest/stable`.
