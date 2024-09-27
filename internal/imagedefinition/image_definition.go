@@ -25,7 +25,7 @@ type ImageDefinition struct {
 	Rootfs         *Rootfs        `yaml:"rootfs"          json:"Rootfs"`
 	Customization  *Customization `yaml:"customization"   json:"Customization,omitempty"`
 	Artifacts      *Artifact      `yaml:"artifacts"       json:"Artifacts,omitempty"`
-	Class          string         `yaml:"class"           json:"Class"                    jsonschema:"enum=preinstalled,enum=cloud,enum=installer"`
+	Class          string         `yaml:"class"           json:"Class"                    jsonschema:"enum=preinstalled,cloud,installer"`
 }
 
 // Gadget defines the gadget section of the image definition file
@@ -33,7 +33,7 @@ type Gadget struct {
 	Ref          string `yaml:"ref"    json:"Ref,omitempty"`
 	GadgetTarget string `yaml:"target" json:"GadgetTarget,omitempty"`
 	GadgetBranch string `yaml:"branch" json:"GadgetBranch,omitempty"`
-	GadgetType   string `yaml:"type"   json:"GadgetType"             jsonschema:"enum=git,enum=directory,enum=prebuilt"`
+	GadgetType   string `yaml:"type"   json:"GadgetType"             jsonschema:"enum=git,directory,prebuilt"`
 	GadgetURL    string `yaml:"url"    json:"GadgetURL,omitempty"    jsonschema:"type=string,format=uri"`
 }
 
@@ -43,7 +43,7 @@ type Rootfs struct {
 	Archive           string   `yaml:"archive"       json:"Archive"                default:"ubuntu"`
 	Flavor            string   `yaml:"flavor"        json:"Flavor"                 default:"ubuntu"`
 	Mirror            string   `yaml:"mirror"        json:"Mirror"                 default:"http://archive.ubuntu.com/ubuntu/"`
-	Pocket            string   `yaml:"pocket"        json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
+	Pocket            string   `yaml:"pocket"        json:"Pocket"                 jsonschema:"enum=release,Release,updates,Updates,security,Security,proposed,Proposed" default:"release"`
 	Seed              *Seed    `yaml:"seed"          json:"Seed,omitempty"         jsonschema:"oneof_required=Seed"`
 	Tarball           *Tarball `yaml:"tarball"       json:"Tarball,omitempty"      jsonschema:"oneof_required=Tarball"`
 	ArchiveTasks      []string `yaml:"archive-tasks" json:"ArchiveTasks,omitempty" jsonschema:"oneof_required=ArchiveTasks"`
@@ -70,7 +70,7 @@ type Tarball struct {
 // Customization defines the customization section of the image definition file.
 type Customization struct {
 	Components    []string   `yaml:"components"     json:"Components,omitempty"   default:"main,restricted,universe"`
-	Pocket        string     `yaml:"pocket"         json:"Pocket"                 jsonschema:"enum=release,enum=Release,enum=updates,enum=Updates,enum=security,enum=Security,enum=proposed,enum=Proposed" default:"release"`
+	Pocket        string     `yaml:"pocket"         json:"Pocket"                 jsonschema:"enum=release,Release,updates,Updates,security,Security,proposed,Proposed" default:"release"`
 	Installer     *Installer `yaml:"installer"      json:"Installer,omitempty"`
 	CloudInit     *CloudInit `yaml:"cloud-init"     json:"CloudInit,omitempty"`
 	ExtraPPAs     []*PPA     `yaml:"extra-ppas"     json:"ExtraPPAs,omitempty"`
@@ -167,7 +167,7 @@ type AddUser struct {
 	UserName     string `yaml:"name"          json:"UserName"`
 	UserID       string `yaml:"id"            json:"UserID,omitempty"`
 	Password     string `yaml:"password"      json:"Password,omitempty"`
-	PasswordType string `yaml:"password-type" json:"PasswordType"        default:"hash" jsonschema:"enum=text,enum=hash"`
+	PasswordType string `yaml:"password-type" json:"PasswordType"        default:"hash" jsonschema:"enum=text,hash"`
 }
 
 // Artifact contains information about the files that are created
@@ -227,7 +227,7 @@ type Changelog struct {
 // rootfs build steps and the compression to use on it
 type RootfsTar struct {
 	RootfsTarName string `yaml:"name"        json:"RootfsTarName"`
-	Compression   string `yaml:"compression" json:"Compression"   jsonschema:"enum=uncompressed,enum=bzip2,enum=gzip,enum=xz,enum=zstd" default:"uncompressed"`
+	Compression   string `yaml:"compression" json:"Compression"   jsonschema:"enum=uncompressed,bzip2,gzip,xz,zstd" default:"uncompressed"`
 }
 
 // NewMissingURLError fails the image definition parsing when a dict
