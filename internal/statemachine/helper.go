@@ -943,7 +943,7 @@ func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
 }
 
 // setupGrub mounts the resulting image and runs update-grub
-func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum int, bootPartNum int, architecture string) (err error) {
+func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum int, efiPartNum int, architecture string) (err error) {
 	// create directories in which to mount the rootfs and the boot partition
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
 	err = osMkdir(mountDir, 0755)
@@ -978,7 +978,7 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 
 	teardownCmds = append([]*exec.Cmd{losetupDetachCmd}, teardownCmds...)
 
-	teardownPrepareCmds, err := prepareGrubMountDir(mountDir, rootfsPartNum, bootPartNum, loopUsed, stateMachine.commonFlags.Debug)
+	teardownPrepareCmds, err := prepareGrubMountDir(mountDir, rootfsPartNum, efiPartNum, loopUsed, stateMachine.commonFlags.Debug)
 	teardownCmds = append(teardownPrepareCmds, teardownCmds...)
 	if err != nil {
 		return err
