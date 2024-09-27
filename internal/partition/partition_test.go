@@ -168,6 +168,7 @@ func TestGeneratePartitionTable(t *testing.T) {
 		args                 args
 		wantPartitionTable   partition.Table
 		wantRootfsPartNumber int
+		wantBootPartNumber   int
 		expectedError        string
 	}{
 		{
@@ -178,6 +179,7 @@ func TestGeneratePartitionTable(t *testing.T) {
 				imgSize:    uint64(4 * quantity.SizeKiB),
 			},
 			wantRootfsPartNumber: 2,
+			wantBootPartNumber:   -1,
 			wantPartitionTable: &gpt.Table{
 				LogicalSectorSize:  int(sectorSize512),
 				PhysicalSectorSize: int(sectorSize512),
@@ -206,6 +208,7 @@ func TestGeneratePartitionTable(t *testing.T) {
 				imgSize:    uint64(4 * quantity.SizeKiB),
 			},
 			wantRootfsPartNumber: 2,
+			wantBootPartNumber:   -1,
 			wantPartitionTable: &gpt.Table{
 				LogicalSectorSize:  int(sectorSize4k),
 				PhysicalSectorSize: int(sectorSize4k),
@@ -234,6 +237,7 @@ func TestGeneratePartitionTable(t *testing.T) {
 				imgSize:    uint64(4 * quantity.SizeKiB),
 			},
 			wantRootfsPartNumber: 2,
+			wantBootPartNumber:   -1,
 			wantPartitionTable: &gpt.Table{
 				LogicalSectorSize:  int(sectorSize512),
 				PhysicalSectorSize: int(sectorSize512),
@@ -262,6 +266,7 @@ func TestGeneratePartitionTable(t *testing.T) {
 				imgSize:    uint64(4 * quantity.SizeKiB),
 			},
 			wantRootfsPartNumber: 2,
+			wantBootPartNumber:   -1,
 			expectedError:        `The structure "writable" overlaps GPT header or GPT partition table`,
 		},
 		{
@@ -272,6 +277,7 @@ func TestGeneratePartitionTable(t *testing.T) {
 				imgSize:    uint64(4 * quantity.SizeKiB),
 			},
 			wantRootfsPartNumber: -1,
+			wantBootPartNumber:   -1,
 			wantPartitionTable: &mbr.Table{
 				Partitions: []*mbr.Partition{
 					{
@@ -288,11 +294,12 @@ func TestGeneratePartitionTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			asserter := &helper.Asserter{T: t}
-			gotPartitionTable, gotRootfsPartNumber, gotErr := GeneratePartitionTable(tt.args.volume, tt.args.sectorSize, tt.args.imgSize, tt.args.isSeeded)
+			gotPartitionTable, gotRootfsPartNumber, gotBootPartNumber, gotErr := GeneratePartitionTable(tt.args.volume, tt.args.sectorSize, tt.args.imgSize, tt.args.isSeeded)
 
 			if len(tt.expectedError) == 0 {
 				asserter.AssertErrNil(gotErr, true)
 				asserter.AssertEqual(tt.wantRootfsPartNumber, gotRootfsPartNumber)
+				asserter.AssertEqual(tt.wantBootPartNumber, gotBootPartNumber)
 				asserter.AssertEqual(tt.wantPartitionTable, gotPartitionTable)
 			} else {
 				asserter.AssertErrContains(gotErr, tt.expectedError)

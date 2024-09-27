@@ -56,6 +56,10 @@ func (mockSM *mockedStateMachine) SetSeries() error {
 	return nil
 }
 
+func (mockSM *mockedStateMachine) Architecture() (string, error) {
+	return "", nil
+}
+
 // TestValidCommands tests that certain valid commands are parsed correctly
 func TestValidCommands(t *testing.T) {
 	t.Parallel()
@@ -410,6 +414,42 @@ func Test_initStateMachine(t *testing.T) {
 			},
 			want: &statemachine.ClassicStateMachine{
 				Args: commands.ClassicArgs{},
+			},
+		},
+		{
+			name: "init a pack state machine, no arch",
+			args: args{
+				imageType:        "pack",
+				commonOpts:       &commands.CommonOpts{},
+				stateMachineOpts: &commands.StateMachineOpts{},
+				ubuntuImageCommand: &commands.UbuntuImageCommand{
+					Pack: commands.PackCommand{
+						PackOptsPassed: commands.PackOpts{},
+					},
+				},
+			},
+			want: &statemachine.PackStateMachine{
+				StateMachine: statemachine.StateMachine{},
+				Opts:         commands.PackOpts{Architecture: "amd64"},
+			},
+		},
+		{
+			name: "init a pack state machine, with arch",
+			args: args{
+				imageType:        "pack",
+				commonOpts:       &commands.CommonOpts{},
+				stateMachineOpts: &commands.StateMachineOpts{},
+				ubuntuImageCommand: &commands.UbuntuImageCommand{
+					Pack: commands.PackCommand{
+						PackOptsPassed: commands.PackOpts{
+							Architecture: "arm64",
+						},
+					},
+				},
+			},
+			want: &statemachine.PackStateMachine{
+				StateMachine: statemachine.StateMachine{},
+				Opts:         commands.PackOpts{Architecture: "arm64"},
 			},
 		},
 		{

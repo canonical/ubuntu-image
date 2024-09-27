@@ -9,6 +9,7 @@ import (
 
 	"github.com/snapcore/snapd/osutil"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/testhelper"
@@ -307,8 +308,9 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 	stateMachine.commonFlags.OutputDir = outputDir
 
 	stateMachine.Opts = commands.PackOpts{
-		RootfsDir: rootfsDir,
-		GadgetDir: filepath.Join(gadgetDir, "gadget"),
+		RootfsDir:    rootfsDir,
+		GadgetDir:    filepath.Join(gadgetDir, "gadget"),
+		Architecture: arch.AMD64,
 	}
 
 	gadgetSource := filepath.Join("testdata", "gadget_tree")
@@ -365,6 +367,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+	bootUEFIDir := filepath.Join(mountDir, "boot", "efi")
 	var mountImageCmds []*exec.Cmd
 	var umountImageCmds []*exec.Cmd
 
@@ -408,7 +411,9 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 
 	mountImageCmds = append(mountImageCmds,
 		//nolint:gosec,G204
-		exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3"), mountDir), // with this example the rootfs is partition 3 mountDir
+		exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3"), mountDir), // with this example the rootfs is partition 3
+		//nolint:gosec,G204
+		exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p2"), bootUEFIDir), // with this example the boot partition is partition 2
 	)
 
 	umountImageCmds = append([]*exec.Cmd{
@@ -471,5 +476,6 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		}
 	}
 
+	testHelperCheckUEFIConfig(t, mountDir)
 	testHelperCheckGrubConfig(t, mountDir)
 }
