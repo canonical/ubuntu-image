@@ -1,3 +1,11 @@
+ubuntu-image (3.4.1) UNRELEASED; urgency=medium
+
+  [ Paul Mars ]
+  * Deduplicate snaps from seeds
+
+ -- Paul Mars <paul.mars@canonical.com>  Mon, 30 Sep 2024 08:28:18 +0200
+
+
 ubuntu-image (3.4) UNRELEASED; urgency=medium
 
   [ Paul Mars ]
