@@ -3,7 +3,7 @@ name: Tests
 on: [pull_request]
 
 jobs:
-  snap-builds:
+  snap-build:
     runs-on: ubuntu-24.04
     # Only build the snap for pull requests, it's not needed on release branches
     # or on master since we have launchpad build recipes which do this already
@@ -23,8 +23,9 @@ jobs:
         if-no-files-found: error
 
   spread:
+    name: Build a ${{ matrix.series }} image on ${{ matrix.group }} (${{ matrix.systems }})
     runs-on: [self-hosted, ubuntu-image]
-    needs: snap-builds
+    needs: snap-build
     strategy:
       fail-fast: false
       matrix:
