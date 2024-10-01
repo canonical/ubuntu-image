@@ -4973,21 +4973,6 @@ func TestStateMachine_setupBootloader_fail(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	// first, test that updateBootloader fails when the rootfs partition
-	// has not been found in earlier steps
-	stateMachine.RootfsPartNum = -1
-	stateMachine.RootfsVolName = ""
-	err = stateMachine.setupBootloader()
-	asserter.AssertErrContains(err, "Error: could not determine partition number of the root filesystem")
-
-	// Test that updateBootloader fails when the bootfs partition
-	// has not been found in earlier steps
-	stateMachine.BootPartNum = -1
-	stateMachine.RootfsPartNum = 3
-	stateMachine.RootfsVolName = "pc"
-	err = stateMachine.setupBootloader()
-	asserter.AssertErrContains(err, "Error: could not determine partition number of the boot filesystem")
-
 	// place a test gadget tree in the scratch directory so we don't
 	// have to build one
 	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
@@ -5006,6 +4991,31 @@ func TestStateMachine_setupBootloader_fail(t *testing.T) {
 	)
 	asserter.AssertErrNil(err, true)
 
+	err = stateMachine.prepareGadgetTree()
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+
+	// first, test that setupBootloader fails when the rootfs partition
+	// has not been found in earlier steps
+	stateMachine.RootfsPartNum = -1
+	stateMachine.RootfsVolName = ""
+	err = stateMachine.setupBootloader()
+	asserter.AssertErrContains(err, "no volume to setup bootloader for")
+
+	stateMachine.RootfsPartNum = -1
+	stateMachine.RootfsVolName = "pc"
+	err = stateMachine.setupBootloader()
+	asserter.AssertErrContains(err, "could not determine partition number of the root filesystem")
+
+	// Test that setupBootloader fails when the bootfs partition
+	// has not been found in earlier steps
+	stateMachine.BootPartNum = -1
+	stateMachine.RootfsPartNum = 3
+	stateMachine.RootfsVolName = "pc"
+	err = stateMachine.setupBootloader()
+	asserter.AssertErrContains(err, "could not determine partition number of the boot filesystem")
+
 	// prepare state in such a way that the rootfs/bootfs partition was found in
 	// earlier steps
 	stateMachine.RootfsPartNum = 3
@@ -5018,11 +5028,6 @@ func TestStateMachine_setupBootloader_fail(t *testing.T) {
 	asserter.AssertErrContains(err, "unable to identify the arch")
 	stateMachine.ImageDef.Architecture = arch.GetHostArch()
 
-	// parse gadget.yaml and run updateBootloader with the mocked os.Mkdir
-	err = stateMachine.prepareGadgetTree()
-	asserter.AssertErrNil(err, true)
-	err = stateMachine.loadGadgetYaml()
-	asserter.AssertErrNil(err, true)
 	osMkdir = mockMkdir
 	t.Cleanup(func() {
 		osMkdir = os.Mkdir
