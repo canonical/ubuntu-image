@@ -1341,20 +1341,23 @@ var setupBootloaderState = stateFunc{"setup_bootloader", (*StateMachine).setupBo
 // setupBootloader determines the bootloader for each volume
 // and runs the correct helper function to install/update the bootloader
 func (stateMachine *StateMachine) setupBootloader() error {
-	if stateMachine.RootfsPartNum == -1 || stateMachine.RootfsVolName == "" {
-		return fmt.Errorf("Error: could not determine partition number of the root filesystem")
+	volume, found := stateMachine.GadgetInfo.Volumes[stateMachine.RootfsVolName]
+	if !found {
+		return fmt.Errorf("no volume to setup bootloader for")
 	}
-	if stateMachine.BootPartNum == -1 {
-		return fmt.Errorf("Error: could not determine partition number of the boot filesystem")
-	}
-	arch, err := stateMachine.parent.Architecture()
-	if err != nil {
-		return err
-	}
-	volume := stateMachine.GadgetInfo.Volumes[stateMachine.RootfsVolName]
 	switch volume.Bootloader {
 	case "grub":
-		err := stateMachine.setupGrub(
+		if stateMachine.RootfsPartNum == -1 {
+			return fmt.Errorf("could not determine partition number of the root filesystem")
+		}
+		if stateMachine.BootPartNum == -1 {
+			return fmt.Errorf("could not determine partition number of the boot filesystem")
+		}
+		arch, err := stateMachine.parent.Architecture()
+		if err != nil {
+			return err
+		}
+		err = stateMachine.setupGrub(
 			stateMachine.RootfsVolName,
 			stateMachine.RootfsPartNum,
 			stateMachine.BootPartNum,
