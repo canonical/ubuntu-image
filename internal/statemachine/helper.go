@@ -407,11 +407,15 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	return offset2
 }
 
-// setStructureSize sets both Size and MinSize to the same value on a structure
+// setStructureSize raise both Size and MinSize to at least the given size
 // It helps make sure whatever value is used in snapd, it is set to the size we need
 func setStructureSize(s *gadget.VolumeStructure, size quantity.Size) {
-	s.MinSize = size
-	s.Size = size
+	if s.MinSize < size {
+		s.MinSize = size
+	}
+	if s.Size < size {
+		s.Size = size
+	}
 }
 
 // copyDataToImage runs dd commands to copy the raw data to the final image with appropriate offsets
