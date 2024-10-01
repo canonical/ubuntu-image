@@ -57,6 +57,8 @@ jobs:
           name: ubuntu-image-coverage-${{ matrix.test-scenario }}
           path: .coverage/coverage-*.out
           retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: true
 
   mkfs-conf:
     runs-on: ubuntu-latest
