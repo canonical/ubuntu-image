@@ -11,6 +11,7 @@ environment:
   LANGUAGE: "en"
   # build the snap with lxd
   SNAPCRAFT_BUILD_ENVIRONMENT: lxd
+  SERIES: '$(HOST: echo "${SERIES:-noble}")'
 
 
 backends:
@@ -140,7 +141,7 @@ prepare: |
   snap install --classic --dangerous ubuntu-image_*.snap
   
   unset SHELL
-  git clone -b noble https://git.launchpad.net/ubuntu-images
+  git clone -b $SERIES https://git.launchpad.net/ubuntu-images
   git clone https://github.com/snapcore/models
 
 debug: |

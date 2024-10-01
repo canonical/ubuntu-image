@@ -1,10 +1,10 @@
-name: Run a spread test of the generated snap
+name: Tests
 
 on: [pull_request]
 
 jobs:
   snap-builds:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # Only build the snap for pull requests, it's not needed on release branches
     # or on master since we have launchpad build recipes which do this already
     if: ${{ github.event_name == 'pull_request' }}
@@ -20,6 +20,7 @@ jobs:
       with:
         name: snap
         path: "*.snap"
+        if-no-files-found: error
 
   spread:
     runs-on: [self-hosted, ubuntu-image]
@@ -28,10 +29,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - group: ubuntu-arm
-            systems: 'ubuntu-20.04-arm-64 ubuntu-22.04-arm-64 ubuntu-24.04-arm-64'
-          - group: ubuntu
+          - group: ubuntu-devel
+            series: oracular
+            systems: 'ubuntu-24.04-64'
+          - group: ubuntu-latest
+            series: noble
             systems: 'ubuntu-18.04-64 ubuntu-20.04-64 ubuntu-22.04-64 ubuntu-23.10-64 ubuntu-24.04-64'
+          - group: ubuntu-old
+            series: noble
+            systems: 'ubuntu-18.04-64 ubuntu-20.04-64 ubuntu-22.04-64 ubuntu-23.10-64'
+          - group: ubuntu-arm-devel
+            series: oracular
+            systems: 'ubuntu-24.04-arm-64'
+          - group: ubuntu-arm-latest
+            series: noble
+            systems: 'ubuntu-20.04-arm-64 ubuntu-22.04-arm-64 ubuntu-24.04-arm-64'
+          - group: ubuntu-arm-old
+            series: noble
+            systems: 'ubuntu-20.04-arm-64 ubuntu-22.04-arm-64'
+
     steps:
       - name: Cleanup job workspace
         id: cleanup-job-workspace
@@ -97,6 +113,7 @@ jobs:
   
             BACKEND=google
             SPREAD=spread
+            SERIES=${{ matrix.series }}
 
             if [[ "${{ matrix.systems }}" =~ -arm- ]]; then
               BACKEND=google-arm
@@ -127,7 +144,7 @@ jobs:
             spread -discard -reuse-pid="$(echo "$r" | grep -o -E '[0-9]+')";
           done
 
-      - name: analyze spread test results
+      - name: Analyze spread test results
         if: always()
         run: |
             if [ -f spread.log ]; then
@@ -158,7 +175,7 @@ jobs:
                 touch "$FAILED_TESTS_FILE"
             fi
 
-      - name: save spread test results to cache
+      - name: Save spread test results to cache
         if: always()
         uses: actions/cache/save@v4
         with:
