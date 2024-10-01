@@ -949,7 +949,7 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 		return fmt.Errorf("Error creating scratch/loopback/boot/efi directory: %s", err.Error())
 	}
 
-	target, grubPackages := confFromArch(architecture)
+	target, grubPackages := grubTargetAndPkgsFromArch(architecture)
 	if len(target) == 0 {
 		return fmt.Errorf("no valid efi target for the provided architecture")
 	}
@@ -1082,7 +1082,9 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 	return helper.RunCmds(setupGrubCmds, stateMachine.commonFlags.Debug)
 }
 
-func confFromArch(architecture string) (string, []string) {
+// grubTargetAndPkgsFromArch returns the proper grub-install target and packages to
+// install based on the given architecture.
+func grubTargetAndPkgsFromArch(architecture string) (string, []string) {
 	switch architecture {
 	case arch.AMD64:
 		return "x86_64-efi", []string{"grub-pc", "shim-signed"}
