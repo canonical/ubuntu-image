@@ -530,7 +530,7 @@ func (s *StateMachine) displayStates() {
 // partial state machine run
 func (stateMachine *StateMachine) writeMetadata(metadataFile string) error {
 	jsonfilePath := filepath.Join(stateMachine.stateMachineFlags.WorkDir, metadataFile)
-	jsonfile, err := os.OpenFile(jsonfilePath, os.O_CREATE|os.O_WRONLY, 0644)
+	jsonfile, err := os.OpenFile(jsonfilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("error opening JSON metadata file for writing: %s", jsonfilePath)
 	}
