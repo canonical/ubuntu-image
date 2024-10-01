@@ -2398,6 +2398,7 @@ func TestStateMachine_FailedPopulateClassicRootfsContents(t *testing.T) {
 
 // TestSateMachine_customizeSourcesList tests functionality of the customizeSourcesList state function
 func TestSateMachine_customizeSourcesList(t *testing.T) {
+	series := getHostSuite()
 	testCases := []struct {
 		name                      string
 		deb822Format              bool
@@ -2414,10 +2415,10 @@ func TestSateMachine_customizeSourcesList(t *testing.T) {
 			deb822Format:        false,
 			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
 			customization:       &imagedefinition.Customization{},
-			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+			expectedSourcesList: fmt.Sprintf(`# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
 # newer versions of the distribution.
-deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
-`,
+deb http://archive.ubuntu.com/ubuntu/ %s main restricted universe
+`, series),
 		},
 		{
 			name:                "set less components sources.list",
@@ -2426,10 +2427,10 @@ deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
 			customization: &imagedefinition.Customization{
 				Components: []string{"main"},
 			},
-			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+			expectedSourcesList: fmt.Sprintf(`# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
 # newer versions of the distribution.
-deb http://archive.ubuntu.com/ubuntu/ jammy main
-`,
+deb http://archive.ubuntu.com/ubuntu/ %s main
+`, series),
 		},
 		{
 			name:                "set components and pocket sources.list",
@@ -2439,11 +2440,11 @@ deb http://archive.ubuntu.com/ubuntu/ jammy main
 				Components: []string{"main"},
 				Pocket:     "security",
 			},
-			expectedSourcesList: `# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+			expectedSourcesList: fmt.Sprintf(`# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
 # newer versions of the distribution.
-deb http://archive.ubuntu.com/ubuntu/ jammy main
-deb http://security.ubuntu.com/ubuntu/ jammy-security main
-`,
+deb http://archive.ubuntu.com/ubuntu/ %[1]s main
+deb http://security.ubuntu.com/ubuntu/ %[1]s-security main
+`, series),
 		},
 		{
 			name:                "fail to write sources.list",
@@ -2470,15 +2471,15 @@ deb http://security.ubuntu.com/ubuntu/ jammy-security main
 			name:                "set default ubuntu.sources and commented sources.list",
 			deb822Format:        true,
 			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
-			existingDeb822SourcesList: `Types: deb
+			existingDeb822SourcesList: fmt.Sprintf(`Types: deb
 URIs: http://archive.ubuntu.com/
-Suites: jammy
+Suites: %s
 Components: main universe restricted multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-`,
+`, series),
 			customization:       &imagedefinition.Customization{},
 			expectedSourcesList: imagedefinition.LegacySourcesListComment,
-			expectedDeb822SourcesList: `## Ubuntu distribution repository
+			expectedDeb822SourcesList: fmt.Sprintf(`## Ubuntu distribution repository
 ##
 ## The following settings can be adjusted to configure which packages to use from Ubuntu.
 ## Mirror your choices (except for URIs and Suites) in the security section below to
@@ -2508,7 +2509,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 ## See the sources.list(5) manual page for further settings.
 Types: deb
 URIs: http://archive.ubuntu.com/ubuntu/
-Suites: jammy
+Suites: %[1]s
 Components: main restricted
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
@@ -2516,30 +2517,30 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 ## this should mirror your choices in the previous section.
 Types: deb
 URIs: http://security.ubuntu.com/ubuntu/
-Suites: jammy-security
+Suites: %[1]s-security
 Components: main restricted
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
-`,
+`, series),
 		},
 		{
 			name:                "fail to write ubuntu.sources and commented sources.list",
 			deb822Format:        true,
 			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
-			existingDeb822SourcesList: `Types: deb
+			existingDeb822SourcesList: fmt.Sprintf(`Types: deb
 URIs: http://archive.ubuntu.com/
-Suites: jammy
+Suites: %s
 Components: main universe restricted multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-`,
+`, series),
 			customization:       &imagedefinition.Customization{},
 			expectedSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
-			expectedDeb822SourcesList: `Types: deb
+			expectedDeb822SourcesList: fmt.Sprintf(`Types: deb
 URIs: http://archive.ubuntu.com/
-Suites: jammy
+Suites: %s
 Components: main universe restricted multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-`,
+`, series),
 			expectedErr: "unable to open ubuntu.sources file",
 			mockFuncs: func() func() {
 				mock := testhelper.NewOSMock(
@@ -2556,20 +2557,20 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 			name:                "fail to create sources.list.d",
 			deb822Format:        true,
 			existingSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
-			existingDeb822SourcesList: `Types: deb
+			existingDeb822SourcesList: fmt.Sprintf(`Types: deb
 URIs: http://archive.ubuntu.com/
-Suites: jammy
+Suites: %s
 Components: main universe restricted multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-`,
+`, series),
 			customization:       &imagedefinition.Customization{},
 			expectedSourcesList: "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted",
-			expectedDeb822SourcesList: `Types: deb
+			expectedDeb822SourcesList: fmt.Sprintf(`Types: deb
 URIs: http://archive.ubuntu.com/
-Suites: jammy
+Suites: %s
 Components: main universe restricted multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-`,
+`, series),
 			expectedErr: "Error /etc/apt/sources.list.d directory",
 			mockFuncs: func() func() {
 				mock := testhelper.NewOSMock(
@@ -2595,7 +2596,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 			stateMachine.parent = &stateMachine
 			stateMachine.ImageDef = imagedefinition.ImageDefinition{
 				Architecture: getHostArch(),
-				Series:       getHostSuite(),
+				Series:       series,
 				Rootfs: &imagedefinition.Rootfs{
 					SourcesListDeb822: helper.BoolPtr(tc.deb822Format),
 				},
