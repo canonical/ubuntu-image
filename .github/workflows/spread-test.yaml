@@ -35,16 +35,17 @@ jobs:
             systems: 'ubuntu-24.04-64'
           - group: ubuntu-latest
             series: noble
-            systems: 'ubuntu-18.04-64 ubuntu-20.04-64 ubuntu-22.04-64 ubuntu-23.10-64 ubuntu-24.04-64'
+            systems: 'ubuntu-24.04-64'
           - group: ubuntu-old
             series: noble
             systems: 'ubuntu-18.04-64 ubuntu-20.04-64 ubuntu-22.04-64 ubuntu-23.10-64'
+
           - group: ubuntu-arm-devel
             series: oracular
             systems: 'ubuntu-24.04-arm-64'
           - group: ubuntu-arm-latest
             series: noble
-            systems: 'ubuntu-20.04-arm-64 ubuntu-22.04-arm-64 ubuntu-24.04-arm-64'
+            systems: 'ubuntu-24.04-arm-64'
           - group: ubuntu-arm-old
             series: noble
             systems: 'ubuntu-20.04-arm-64 ubuntu-22.04-arm-64'
