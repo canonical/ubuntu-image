@@ -152,11 +152,10 @@ suites:
     summary: Common integration tests for ubuntu-image
   tests/amd64/:
     summary: Integration tests for ubuntu-image on amd64
-    backends: [google]
+    backends: [google, qemu]
     environment:
       IMG/ubuntu_server_pc_amd64: ubuntu-server-pc-amd64
       IMG/ubuntu_server_pi_arm64: ubuntu-server-pi-arm64
-
   tests/arm64/:
     summary: Integration tests for ubuntu-image on arm64
     backends: [google-arm]
