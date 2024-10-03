@@ -21,9 +21,6 @@ backends:
     plan: n2-standard-2
     halt-timeout: 2h
     systems:
-      - ubuntu-18.04-64:
-          storage: 45G
-          workers: 1
       - ubuntu-20.04-64:
           storage: 45G
           workers: 1
@@ -58,9 +55,6 @@ backends:
   qemu:
     memory: 4G
     systems:
-      - ubuntu-18.04-64:
-            username: ubuntu
-            password: ubuntu
       - ubuntu-20.04-64:
             username: ubuntu
             password: ubuntu
@@ -131,12 +125,9 @@ prepare: |
   snap install lxd
   lxd init --auto
   
-  # Build and install the snap except for series older than 20.04
-  # In this case we expect to find a already built snap in the current dir 
-  if [[ "$SPREAD_SYSTEM" != ubuntu-1* ]]; then
-    rm -rf ubuntu-image_*.snap || true
-    snapcraft
-  fi
+  # Build and install the snap  
+  rm -rf ubuntu-image_*.snap || true
+  snapcraft
   
   snap install --classic --dangerous ubuntu-image_*.snap
   
