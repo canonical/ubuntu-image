@@ -17,7 +17,7 @@ The following specification defines what is supported in the YAML:
     revision: <int> (optional)
     # The architecture of the image to create.
     architecture: amd64 | armhf | arm64 | s390x | ppc64el | riscv64
-    # The Ubuntu codename to use as apt sources. Example: jammy
+    # The Ubuntu codename to use as apt sources. Example: noble
     series: <string>
     # The classification for this image.
     class: cloud | installer | preinstalled
@@ -408,13 +408,13 @@ series
 ======
 
 This mandatory field specifies the Ubuntu release name as it should appear in
-apt sources. For example, to produce an image for the 20.04 release, this
-should be "focal". Example values include:
+apt sources. For example, to produce an image for the 24.04 release, this
+should be "noble". Example values include:
 
-* bionic
+* noble
+* oracular
 * focal
 * jammy
-* kinetic
 
 Please consult the `Releases <https://wiki.ubuntu.com/Releases>`_ page for
 currently valid release names, but bear in mind that release names must be
@@ -425,7 +425,7 @@ For example:
 
 .. code:: yaml
 
-    series: jammy
+    series: noble
 
 
 class

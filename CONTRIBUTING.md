@@ -10,7 +10,7 @@ This document covers the following topics:
 
 ## Setting up
 
-Ubuntu 20.04 LTS or later is recommended for ubuntu-image development.
+Ubuntu 22.04 LTS or later is recommended for ubuntu-image development.
 Usually, the [latest LTS](https://releases.ubuntu.com/) would be the best choice.
 
 Go 1.21 [(or later)](https://snapcraft.io/go) is required to build ubuntu-image.
@@ -75,7 +75,7 @@ mkdir -p ~/.spread/qemu
 cd ~/.spread/qemu
 ```
 
-Run the following to build a 64-bit Ubuntu 16.04 LTS (or later):
+Run the following to build a 64-bit Ubuntu 22.04 LTS (or later):
 ```
 autopkgtest-buildvm-ubuntu-cloud -r <release-short-name>
 mv autopkgtest-<release-short-name>-amd64.img ubuntu-<release-version>-64.img  
@@ -95,25 +95,21 @@ Alternatively, instead of building the QEMU images manually, you can download un
 
 #### Running Spread with QEMU
 
-Finally, you can run the Spread tests for Ubuntu 20.04 LTS 64-bit with:
+Finally, you can run the Spread tests for Ubuntu 22.04 LTS 64-bit with:
 ```
-spread -v qemu:ubuntu-20.04-64
+spread -v qemu:ubuntu-22.04-64
 ```
 
-* To run for a different system, replace `ubuntu-20.04-64` with a different system name, which should be a basename of the [built](#building-spread-vm-images) or [downloaded](#downloading-spread-vm-images) Ubuntu image file.
+* To run for a different system, replace `ubuntu-22.04-64` with a different system name, which should be a basename of the [built](#building-spread-vm-images) or [downloaded](#downloading-spread-vm-images) Ubuntu image file.
 
 For quick reuse, run:
 ```
-spread -reuse qemu:ubuntu-20.04-64
+spread -reuse qemu:ubuntu-22.04-64
 ```
 
 It prints how to reuse the systems. Run `export REUSE_PROJECT=1` in your environment, too.
 
 * Spread tests can be exercised on Ubuntu Core 20 and higher but need UEFI. UEFI support with a QEMU backend for Spread requires a BIOS from the [OVMF](https://wiki.ubuntu.com/UEFI/OVMF) package, which can be installed with `sudo apt install ovmf`.
-
-> [!NOTE] 
-> For series older than 20.04 a snap build (built on a 20.04 or onward) of the tool must be available in the current directory.
-> The tool cannot be built on 18.04 or older.
 
 
 ### Maintaining test helpers
