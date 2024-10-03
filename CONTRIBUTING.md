@@ -84,13 +84,7 @@ mv autopkgtest-<release-short-name>-amd64.img ubuntu-<release-version>-64.img
 For the correct values of `<release-short-name>` and `<release-version>`, see the official list of [Ubuntu releases](https://wiki.ubuntu.com/Releases). 
 
 * `<release-short-name>` is the first word in the release's full name, 
-e.g. for "Bionic Beaver" it is `bionic`.
-
-If you are running Ubuntu 16.04 LTS, use `adt-buildvm-ubuntu-cloud` instead of `autopkgtest-buildvm-ubuntu-cloud` (the latter replaced the former in 18.04):
-```
-adt-buildvm-ubuntu-cloud -r xenial
-mv adt-<release-name>-amd64-cloud.img ubuntu-<release-version>-64.img
-```
+e.g. for "Noble Numbat" it is `noble`.
 
 #### Downloading Spread VM images
 
