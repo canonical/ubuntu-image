@@ -235,6 +235,61 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 }
 
+func TestSuccessfulSnapCore20WithComponents(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	asserter := helper.Asserter{T: t}
+	restoreCWD := testhelper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine SnapStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	// note that we must use a dangerous model here, since we're testing
+	// explicitly adding components
+	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20Dangerous")
+	stateMachine.Opts.FactoryImage = true
+	stateMachine.Opts.Snaps = []string{"core24", "test-snap-with-components"}
+	stateMachine.Opts.Components = []string{"test-snap-with-components+one", "test-snap-with-components+two"}
+	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+	stateMachine.stateMachineFlags.WorkDir = workDir
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	for _, glob := range []string{"test-snap-with-components+one_*.comp", "test-snap-with-components+two_*.comp", "test-snap-with-components_*.snap"} {
+		matches, err := filepath.Glob(filepath.Join(
+			stateMachine.tempDirs.rootfs,
+			"systems/*/snaps/",
+			glob,
+		))
+		asserter.AssertErrNil(err, true)
+
+		if len(matches) != 1 {
+			t.Errorf("Expected exactly one match for %s, got %d", glob, len(matches))
+		}
+	}
+
+	// make sure the "factory" boot flag was set
+	grubenvFile := filepath.Join(stateMachine.tempDirs.rootfs,
+		"EFI", "ubuntu", "grubenv")
+	grubenvBytes, err := os.ReadFile(grubenvFile)
+	asserter.AssertErrNil(err, true)
+
+	if !strings.Contains(string(grubenvBytes), "snapd_boot_flags=factory") {
+		t.Errorf("grubenv file does not have factory boot flag set")
+	}
+
+	err = stateMachine.Teardown()
+	asserter.AssertErrNil(err, true)
+}
+
 // TestSuccessfulSnapCore18 builds a core 18 image with a few special options
 func TestSuccessfulSnapCore18(t *testing.T) {
 	if testing.Short() {
