@@ -381,9 +381,9 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 
 // CreateTarArchive places all of the files from a source directory into a tar.
 // Currently supported are uncompressed tar archives and the following
-// compression types: zip, gzip, xz bzip2, zstd
+// compression types: gzip, xz bzip2, zstd
 func CreateTarArchive(src, dest, compression string, verbose, debug bool) error {
-	tarCommand := *exec.Command(
+	tarCommand := exec.Command(
 		"tar",
 		"--directory",
 		src,
@@ -412,21 +412,14 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 	default:
 		return fmt.Errorf("Unknown compression type: \"%s\"", compression)
 	}
-
-	tarOutput := SetCommandOutput(&tarCommand, debug)
-	if err := tarCommand.Run(); err != nil {
-		return fmt.Errorf("Error running \"tar\" command \"%s\". "+
-			"Error is \"%s\". Full output below:\n%s",
-			tarCommand.String(), err.Error(), tarOutput.String())
-	}
-	return nil
+	return RunCmd(tarCommand, debug)
 }
 
 // ExtractTarArchive extracts all the files from a tar. Currently supported are
 // uncompressed tar archives and the following compression types: zip, gzip, xz
 // bzip2, zstd
 func ExtractTarArchive(src, dest string, verbose, debug bool) error {
-	tarCommand := *exec.Command(
+	tarCommand := exec.Command(
 		"tar",
 		"--xattrs",
 		"--xattrs-include=*",
@@ -439,13 +432,7 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 	if debug {
 		tarCommand.Args = append(tarCommand.Args, "--verbose")
 	}
-	tarOutput := SetCommandOutput(&tarCommand, debug)
-	if err := tarCommand.Run(); err != nil {
-		return fmt.Errorf("Error running \"tar\" command \"%s\". "+
-			"Error is \"%s\". Full output below:\n%s",
-			tarCommand.String(), err.Error(), tarOutput.String())
-	}
-	return nil
+	return RunCmd(tarCommand, debug)
 }
 
 // CalculateSHA256 calculates the SHA256 sum of the file provided as an argument
