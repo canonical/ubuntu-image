@@ -4,12 +4,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/invopop/jsonschema"
+	"github.com/pkg/xattr"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 // define some mocked versions of go package functions
@@ -512,5 +516,66 @@ func TestBackupReplace(t *testing.T) {
 	asserter.AssertErrContains(err, "Error moving file")
 
 	osRename = os.Rename
+}
 
+// TestTarXattrs sets an xattr on a file, puts it in a tar archive,
+// extracts the tar archive and ensures the xattr is still present
+func TestTarXattrs(t *testing.T) {
+	asserter := Asserter{T: t}
+	restoreCWD := testhelper.SaveCWD()
+	defer restoreCWD()
+
+	// create a file with xattrs in a temporary directory
+	xattrBytes := []byte("ui-test")
+	testDir, err := os.MkdirTemp("/tmp", "ubuntu-image-xattr-test")
+	asserter.AssertErrNil(err, true)
+	extractDir, err := os.MkdirTemp("/tmp", "ubuntu-image-xattr-test")
+	asserter.AssertErrNil(err, true)
+	testFile, err := os.CreateTemp(testDir, "test-xattrs-")
+	asserter.AssertErrNil(err, true)
+	testFileName := filepath.Base(testFile.Name())
+	t.Cleanup(func() { os.RemoveAll(testDir) })
+	t.Cleanup(func() { os.RemoveAll(extractDir) })
+
+	err = xattr.FSet(testFile, "user.test", xattrBytes)
+	asserter.AssertErrNil(err, true)
+
+	// now run the helper tar creation and extraction functions
+	tarPath := filepath.Join(testDir, "test-xattrs.tar")
+	err = CreateTarArchive(testDir, tarPath, "uncompressed", false, false)
+	asserter.AssertErrNil(err, true)
+
+	err = ExtractTarArchive(tarPath, extractDir, false, false)
+	asserter.AssertErrNil(err, true)
+
+	// now read the extracted file's extended attributes
+	finalXattrs, err := xattr.List(filepath.Join(extractDir, testFileName))
+	asserter.AssertErrNil(err, true)
+
+	if !reflect.DeepEqual(finalXattrs, []string{"user.test"}) {
+		t.Errorf("test file \"%s\" does not have correct xattrs set", testFile.Name())
+	}
+}
+
+// TestPingXattrs runs the ExtractTarArchive file on a pre-made test file that contains /bin/ping
+// and ensures that the security.capability extended attribute is still present
+func TestPingXattrs(t *testing.T) {
+	asserter := Asserter{T: t}
+	restoreCWD := testhelper.SaveCWD()
+	defer restoreCWD()
+
+	testDir, err := os.MkdirTemp("/tmp", "ubuntu-image-ping-xattr-test")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(testDir) })
+	testFile := filepath.Join("testdata", "rootfs_tarballs", "ping.tar")
+
+	err = ExtractTarArchive(testFile, testDir, true, true)
+	asserter.AssertErrNil(err, true)
+
+	binPing := filepath.Join(testDir, "bin", "ping")
+	pingXattrs, err := xattr.List(binPing)
+	asserter.AssertErrNil(err, true)
+	if !reflect.DeepEqual(pingXattrs, []string{"security.capability"}) {
+		t.Error("ping has lost the security.capability xattr after tar extraction")
+	}
 }
