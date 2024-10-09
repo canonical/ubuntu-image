@@ -389,6 +389,7 @@ func CreateTarArchive(src, dest, compression string, debug bool) error {
 		src,
 		"--xattrs",
 		"--xattrs-include=*",
+		"--sparse",
 		"--create",
 		"--file",
 		dest,

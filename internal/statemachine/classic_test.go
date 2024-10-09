@@ -4666,37 +4666,51 @@ func TestStateMachine_customizeFstab_fail(t *testing.T) {
 }
 
 // TestGenerateRootfsTarball tests that a rootfs tarball is generated
-// when appropriate and that it contains the correct files
+// when appropriate
 func TestGenerateRootfsTarball(t *testing.T) {
 	testCases := []struct {
 		name     string // the name will double as the compression type
 		tarPath  string
 		fileType string
+		// Define an interval since we cannot predict the exact
+		// size of the resulting archive due to changing atime/ctime
+		minArchiveSize int64
+		maxArchiveSize int64
 	}{
 		{
-			"uncompressed",
-			"test_generate_rootfs_tarball.tar",
-			"tar archive",
+			name:           "uncompressed",
+			tarPath:        "test_generate_rootfs_tarball.tar",
+			fileType:       "tar archive",
+			minArchiveSize: 61440,
+			maxArchiveSize: 61440, // 92160 without --sparse option
 		},
 		{
-			"bzip2",
-			"test_generate_rootfs_tarball.tar.bz2",
-			"bzip2 compressed data",
+			name:           "bzip2",
+			tarPath:        "test_generate_rootfs_tarball.tar.bz2",
+			fileType:       "bzip2 compressed data",
+			minArchiveSize: 32100,
+			maxArchiveSize: 32300,
 		},
 		{
-			"gzip",
-			"test_generate_rootfs_tarball.tar.gz",
-			"gzip compressed data",
+			name:           "gzip",
+			tarPath:        "test_generate_rootfs_tarball.tar.gz",
+			fileType:       "gzip compressed data",
+			minArchiveSize: 31600,
+			maxArchiveSize: 31900,
 		},
 		{
-			"xz",
-			"test_generate_rootfs_tarball.tar.xz",
-			"XZ compressed data",
+			name:           "xz",
+			tarPath:        "test_generate_rootfs_tarball.tar.xz",
+			fileType:       "XZ compressed data",
+			minArchiveSize: 31700,
+			maxArchiveSize: 31910,
 		},
 		{
-			"zstd",
-			"test_generate_rootfs_tarball.tar.zst",
-			"Zstandard compressed data",
+			name:           "zstd",
+			tarPath:        "test_generate_rootfs_tarball.tar.zst",
+			fileType:       "Zstandard compressed data",
+			minArchiveSize: 31400,
+			maxArchiveSize: 31700,
 		},
 	}
 	for _, tc := range testCases {
@@ -4724,6 +4738,27 @@ func TestGenerateRootfsTarball(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
 
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+			// Copy a rootfs so the tar is not empty
+			rootfsSource := filepath.Join("testdata", "rootfs", "root")
+			err = osutilCopyFile(rootfsSource, stateMachine.stateMachineFlags.WorkDir, osutil.CopyFlagPreserveAll)
+			asserter.AssertErrNil(err, true)
+
+			// Make sure the root dir contains a sparse file
+			sparseFilePath := filepath.Join(stateMachine.tempDirs.rootfs, "bin", "sparseablefile")
+			sparseFilePathTemp := filepath.Join(stateMachine.tempDirs.rootfs, "bin", "sparseablefiletmp")
+			sparsifyOutputStep1, err := exec.Command("cp", "--sparse=always", sparseFilePath, sparseFilePathTemp).CombinedOutput()
+			if err != nil {
+				t.Error(string(sparsifyOutputStep1))
+				asserter.AssertErrNil(err, true)
+			}
+			sparsifyOutputStep2, err := exec.Command("mv", sparseFilePathTemp, sparseFilePath).CombinedOutput()
+			if err != nil {
+				t.Error(string(sparsifyOutputStep2))
+				asserter.AssertErrNil(err, true)
+			}
+
 			err = stateMachine.generateRootfsTarball()
 			asserter.AssertErrNil(err, true)
 
@@ -4734,12 +4769,23 @@ func TestGenerateRootfsTarball(t *testing.T) {
 			}
 
 			fullPath := filepath.Join(stateMachine.commonFlags.OutputDir, tc.tarPath)
-			fileCommand := *exec.Command("file", fullPath)
+			fileCommand := exec.Command("file", fullPath)
 			cmdOutput, err := fileCommand.CombinedOutput()
 			asserter.AssertErrNil(err, true)
 			if !strings.Contains(string(cmdOutput), tc.fileType) {
 				t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
 					fullPath, tc.fileType, string(cmdOutput))
+			}
+
+			fileInfo, err := os.Stat(fullPath)
+			asserter.AssertErrNil(err, true)
+
+			if fileInfo.Size() < tc.minArchiveSize {
+				asserter.Errorf("Archive too small.\ngot: %d\nwant a minimum of: %d", fileInfo.Size(), tc.minArchiveSize)
+			}
+
+			if fileInfo.Size() > tc.maxArchiveSize {
+				asserter.Errorf("Archive too big.\ngot: %d\nwant a maximum of: %d", fileInfo.Size(), tc.maxArchiveSize)
 			}
 		})
 	}
