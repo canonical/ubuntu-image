@@ -382,7 +382,7 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 // CreateTarArchive places all of the files from a source directory into a tar.
 // Currently supported are uncompressed tar archives and the following
 // compression types: gzip, xz bzip2, zstd
-func CreateTarArchive(src, dest, compression string, verbose, debug bool) error {
+func CreateTarArchive(src, dest, compression string, debug bool) error {
 	tarCommand := exec.Command(
 		"tar",
 		"--directory",
@@ -418,7 +418,7 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 // ExtractTarArchive extracts all the files from a tar. Currently supported are
 // uncompressed tar archives and the following compression types: zip, gzip, xz
 // bzip2, zstd
-func ExtractTarArchive(src, dest string, verbose, debug bool) error {
+func ExtractTarArchive(src, dest string, debug bool) error {
 	tarCommand := exec.Command(
 		"tar",
 		"--xattrs",

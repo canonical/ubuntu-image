@@ -542,10 +542,10 @@ func TestTarXattrs(t *testing.T) {
 
 	// now run the helper tar creation and extraction functions
 	tarPath := filepath.Join(testDir, "test-xattrs.tar")
-	err = CreateTarArchive(testDir, tarPath, "uncompressed", false, false)
+	err = CreateTarArchive(testDir, tarPath, "uncompressed", false)
 	asserter.AssertErrNil(err, true)
 
-	err = ExtractTarArchive(tarPath, extractDir, false, false)
+	err = ExtractTarArchive(tarPath, extractDir, false)
 	asserter.AssertErrNil(err, true)
 
 	// now read the extracted file's extended attributes
@@ -569,7 +569,7 @@ func TestPingXattrs(t *testing.T) {
 	t.Cleanup(func() { os.RemoveAll(testDir) })
 	testFile := filepath.Join("testdata", "rootfs_tarballs", "ping.tar")
 
-	err = ExtractTarArchive(testFile, testDir, true, true)
+	err = ExtractTarArchive(testFile, testDir, true)
 	asserter.AssertErrNil(err, true)
 
 	binPing := filepath.Join(testDir, "bin", "ping")
