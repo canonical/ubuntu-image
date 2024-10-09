@@ -19,7 +19,7 @@ backends:
     key: '$(HOST: echo "$SPREAD_GOOGLE_KEY")'
     location: snapd-spread/us-east1-b
     plan: n2-standard-2
-    halt-timeout: 3h
+    halt-timeout: 2h
     systems:
       - ubuntu-20.04-64:
           storage: 45G
@@ -119,10 +119,7 @@ prepare: |
   snap install lxd
   lxd init --auto
 
-  # Build and install the snap  
-  rm -rf ubuntu-image_*.snap || true
-  snapcraft
-
+  # Install the snap  
   snap install --classic --dangerous ubuntu-image_*.snap
 
   unset SHELL
@@ -142,6 +139,10 @@ suites:
     backends: [google, qemu]
     environment:
       IMG/ubuntu_server_pc_amd64: ubuntu-server-pc-amd64
+  tests/amd64-crossbuild/:
+    summary: Integration tests for ubuntu-image on amd64
+    backends: [google, qemu]
+    environment:
       IMG/ubuntu_server_riscv64: ubuntu-server-riscv64
       IMG/ubuntu_server_pi_arm64: ubuntu-server-pi-arm64
   tests/arm64/:
@@ -151,5 +152,5 @@ suites:
       IMG/ubuntu_server_pi_arm64: ubuntu-server-pi-arm64
       IMG/ubuntu_server_pc_arm64: ubuntu-server-pc-arm64
       IMG/ubuntu_pi_arm64: ubuntu-pi-arm64
-      
+    
 kill-timeout: 30m
