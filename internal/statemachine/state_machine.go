@@ -87,11 +87,11 @@ type stateFunc struct {
 
 // temporaryDirectories organizes the state machines, rootfs, unpack, and volumes dirs
 type temporaryDirectories struct {
-	rootfs  string
-	unpack  string
-	volumes string
-	chroot  string
-	scratch string
+	rootfs  string // finale location of the built rootfs
+	unpack  string // directory holding the unpacked gadget tree (and thus boot assets)
+	volumes string // directory holding resulting partial images associated to volumes declared in the gadget.yaml
+	chroot  string // place where the rootfs is built and modified
+	scratch string // place to build and mount some directories at various stage
 }
 
 // StateMachine will hold the command line data, track the current state, and handle all function calls
