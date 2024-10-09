@@ -572,8 +572,7 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	}
 
 	// now extract the archive
-	return helper.ExtractTarArchive(tarPath, stateMachine.tempDirs.chroot,
-		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
+	return helper.ExtractTarArchive(tarPath, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 }
 
 var germinateState = stateFunc{"germinate", (*StateMachine).germinate}
