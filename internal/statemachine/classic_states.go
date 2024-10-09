@@ -1299,13 +1299,16 @@ var generateRootfsTarballState = stateFunc{"generate_rootfs_tarball", (*StateMac
 func (stateMachine *StateMachine) generateRootfsTarball() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// first create a vanilla uncompressed tar archive
-	rootfsSrc := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
-	rootfsDst := filepath.Join(stateMachine.commonFlags.OutputDir,
-		classicStateMachine.ImageDef.Artifacts.RootfsTar.RootfsTarName)
-	return helper.CreateTarArchive(rootfsSrc, rootfsDst,
+	tarDst := filepath.Join(
+		stateMachine.commonFlags.OutputDir,
+		classicStateMachine.ImageDef.Artifacts.RootfsTar.RootfsTarName,
+	)
+	return helper.CreateTarArchive(
+		stateMachine.tempDirs.rootfs,
+		tarDst,
 		classicStateMachine.ImageDef.Artifacts.RootfsTar.Compression,
-		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
+		stateMachine.commonFlags.Debug,
+	)
 }
 
 var makeQcow2ImgState = stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img}
