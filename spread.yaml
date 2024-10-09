@@ -19,7 +19,7 @@ backends:
     key: '$(HOST: echo "$SPREAD_GOOGLE_KEY")'
     location: snapd-spread/us-east1-b
     plan: n2-standard-2
-    halt-timeout: 2h
+    halt-timeout: 3h
     systems:
       - ubuntu-20.04-64:
           storage: 45G
