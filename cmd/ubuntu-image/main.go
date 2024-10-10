@@ -1,3 +1,14 @@
+// Package ubuntu-image provides a tool used for generating bootable images.
+// You can use it to build two types of Ubuntu images:
+//
+// * Snap-based Ubuntu Core images from model assertions
+// * Classical preinstalled Ubuntu images using image definitions
+//
+// ubuntu-image is intended to be used as Snap package available from
+// https://snapcraft.io/ubuntu-image
+//
+// See the project README for more details:
+// https://github.com/canonical/ubuntu-image
 package main
 
 import (
