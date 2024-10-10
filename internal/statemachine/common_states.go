@@ -448,26 +448,11 @@ func (stateMachine *StateMachine) makeDisk() error {
 	return nil
 }
 
-// VolumeMaxSize get the max size of a volume from its structures
-// TODO remove once https://github.com/canonical/snapd/pull/14561 is merged
-func VolumeMaxSize(v *gadget.Volume) quantity.Size {
-	endVol := quantity.Offset(0)
-	for _, s := range v.Structure {
-		if s.Offset != nil {
-			endVol = *s.Offset + quantity.Offset(s.Size)
-		} else {
-			endVol += quantity.Offset(s.Size)
-		}
-	}
-
-	return quantity.Size(endVol)
-}
-
 // createDiskImage creates a disk image and makes sure the size respects the configuration and
 // the SectorSize
 func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gadget.Volume, imgName string) (*diskutils.Disk, error) {
 	// Calculate the minimum size that would be needed according to gadget.yaml.
-	imgSize := VolumeMaxSize(volume)
+	imgSize := volume.Size()
 
 	desiredImgSize, found := stateMachine.ImageSizes[volumeName]
 	if found && desiredImgSize > imgSize {
