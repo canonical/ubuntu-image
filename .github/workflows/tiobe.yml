@@ -1,0 +1,79 @@
+name: "TIOBE/TiCS"
+
+on:
+  schedule:
+    - cron: '0 0 * * TUE'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: build go binary
+        run: CGO_ENABLED=0 go build ./...
+
+      - name: apt-update
+        run: sudo apt update
+
+      - name: install-test-dependencies
+        run: sudo apt install -y snapd germinate e2fsprogs mtools debootstrap eatmydata fdisk gdisk qemu-system-aarch64 qemu-user-static ubuntu-dev-tools
+
+      - name: run tests
+        run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -coverpkg $(go list ./... 2> /dev/null | tr '\n' ",") -covermode=atomic ./...
+
+      - name: Upload coverage report to artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-image-coverage-long
+          path: .coverage/coverage-*.out
+          retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: true
+  
+  tics-report:
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ github.repository == 'canonical/ubuntu-image' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Download coverage report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ubuntu-image-coverage-long
+          path: .coverage
+
+      - name: Install tools
+        run: |
+          go install github.com/axw/gocov/gocov@latest
+          go install github.com/AlekSi/gocov-xml@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Convert report to xml
+        run: |
+          cd .coverage && \
+          gocov convert coverage-long.out > coverage.json && \
+          gocov-xml < coverage.json > coverage-go.xml
+
+      - name: TICS analysis and report
+        run: |
+          export TICSAUTHTOKEN=${{ secrets.TICSAUTHTOKEN }}
+
+          set -x
+          # Install the TICS and staticcheck
+          curl --silent --show-error "https://canonical.tiobe.com/tiobeweb/TICS/api/public/v1/fapi/installtics/Script?cfg=default&platform=linux&url=https://canonical.tiobe.com/tiobeweb/TICS/" > install_tics.sh
+          . ./install_tics.sh
+          TICSQServer -project ubuntu-image -tmpdir /tmp/tics -branchdir .
