@@ -572,8 +572,7 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	}
 
 	// now extract the archive
-	return helper.ExtractTarArchive(tarPath, stateMachine.tempDirs.chroot,
-		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
+	return helper.ExtractTarArchive(tarPath, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 }
 
 var germinateState = stateFunc{"germinate", (*StateMachine).germinate}
@@ -1300,13 +1299,16 @@ var generateRootfsTarballState = stateFunc{"generate_rootfs_tarball", (*StateMac
 func (stateMachine *StateMachine) generateRootfsTarball() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// first create a vanilla uncompressed tar archive
-	rootfsSrc := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
-	rootfsDst := filepath.Join(stateMachine.commonFlags.OutputDir,
-		classicStateMachine.ImageDef.Artifacts.RootfsTar.RootfsTarName)
-	return helper.CreateTarArchive(rootfsSrc, rootfsDst,
+	tarDst := filepath.Join(
+		stateMachine.commonFlags.OutputDir,
+		classicStateMachine.ImageDef.Artifacts.RootfsTar.RootfsTarName,
+	)
+	return helper.CreateTarArchive(
+		stateMachine.tempDirs.rootfs,
+		tarDst,
 		classicStateMachine.ImageDef.Artifacts.RootfsTar.Compression,
-		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
+		stateMachine.commonFlags.Debug,
+	)
 }
 
 var makeQcow2ImgState = stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img}
@@ -1323,16 +1325,12 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 			"-c",
 			"-O",
 			"qcow2",
-			"-o",
-			"compat=0.10",
 			backingFile,
 			resultingFile,
 		)
-		qemuOutput := helper.SetCommandOutput(qemuImgCommand, classicStateMachine.commonFlags.Debug)
-		if err := qemuImgCommand.Run(); err != nil {
-			return fmt.Errorf("Error creating qcow2 artifact with command \"%s\". "+
-				"Error is \"%s\". Full output below:\n%s",
-				qemuImgCommand.String(), err.Error(), qemuOutput.String())
+		err := helper.RunCmd(qemuImgCommand, classicStateMachine.commonFlags.Debug)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
