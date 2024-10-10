@@ -452,7 +452,7 @@ func (stateMachine *StateMachine) makeDisk() error {
 // the SectorSize
 func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gadget.Volume, imgName string) (*diskutils.Disk, error) {
 	// Calculate the minimum size that would be needed according to gadget.yaml.
-	imgSize := volume.MinSize()
+	imgSize := volume.Size()
 
 	desiredImgSize, found := stateMachine.ImageSizes[volumeName]
 	if found && desiredImgSize > imgSize {
