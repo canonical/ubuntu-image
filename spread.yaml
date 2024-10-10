@@ -30,6 +30,16 @@ backends:
       - ubuntu-24.04-64:
           storage: 45G
           workers: 1
+  google-crossbuild:
+    type: google
+    key: '$(HOST: echo "$SPREAD_GOOGLE_KEY")'
+    location: snapd-spread/us-east1-b
+    plan: n2-standard-4
+    halt-timeout: 2h
+    systems:
+      - ubuntu-24.04-64:
+          storage: 45G
+          workers: 1
   google-arm:
     type: google
     key: '$(HOST: echo "$SPREAD_GOOGLE_KEY")'
@@ -141,7 +151,7 @@ suites:
       IMG/ubuntu_server_pc_amd64: ubuntu-server-pc-amd64
   tests/amd64-crossbuild/:
     summary: Integration tests for ubuntu-image on amd64
-    backends: [google, qemu]
+    backends: [google-crossbuild, qemu]
     environment:
       IMG/ubuntu_server_riscv64: ubuntu-server-riscv64
       IMG/ubuntu_server_pi_arm64: ubuntu-server-pi-arm64
