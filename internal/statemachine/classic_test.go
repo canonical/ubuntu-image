@@ -2967,8 +2967,8 @@ func TestFailedGenerateFilelist(t *testing.T) {
 }
 
 // TestSuccessfulClassicRun runs through a full classic state machine run and ensures
-// it is successful. It creates a .img and a .qcow2 file and ensures they are the
-// correct file types it also mounts the resulting .img and ensures grub was updated
+// it is successful. It creates a .img and a .qcow2 file, ensures they are the
+// correct file types, it mounts the resulting .img and ensures grub was updated
 func TestSuccessfulClassicRun(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
