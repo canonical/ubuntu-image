@@ -159,6 +159,8 @@ jobs:
 
             if [[ "${{ matrix.systems }}" =~ -arm- ]]; then
               BACKEND=google-arm
+            elif [[ "${{ matrix.group }}" =~ -crossbuild ]]; then
+              BACKEND=google-crossbuild
             fi
             
             RUN_TESTS=""
