@@ -1328,11 +1328,9 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 			backingFile,
 			resultingFile,
 		)
-		qemuOutput := helper.SetCommandOutput(qemuImgCommand, classicStateMachine.commonFlags.Debug)
-		if err := qemuImgCommand.Run(); err != nil {
-			return fmt.Errorf("Error creating qcow2 artifact with command \"%s\". "+
-				"Error is \"%s\". Full output below:\n%s",
-				qemuImgCommand.String(), err.Error(), qemuOutput.String())
+		err := helper.RunCmd(qemuImgCommand, classicStateMachine.commonFlags.Debug)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
