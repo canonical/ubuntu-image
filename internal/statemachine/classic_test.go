@@ -4820,7 +4820,8 @@ func TestFailedMakeQcow2Img(t *testing.T) {
 	}()
 
 	err := stateMachine.makeQcow2Img()
-	asserter.AssertErrContains(err, "Error creating qcow2 artifact")
+	asserter.AssertErrContains(err, "Error running command")
+	asserter.AssertErrContains(err, "qemu-img convert")
 }
 
 // TestPreseedResetChroot tests that calling prepareClassicImage on a
