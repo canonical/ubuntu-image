@@ -1325,8 +1325,6 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 			"-c",
 			"-O",
 			"qcow2",
-			"-o",
-			"compat=0.10",
 			backingFile,
 			resultingFile,
 		)
