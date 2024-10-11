@@ -365,11 +365,11 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
-	var mountImageCmds []*exec.Cmd
-	var umountImageCmds []*exec.Cmd
+	var setupImageCmds []*exec.Cmd
+	var teardownImageCmds []*exec.Cmd
 
 	t.Cleanup(func() {
-		for _, teardownCmd := range umountImageCmds {
+		for _, teardownCmd := range teardownImageCmds {
 			if tmpErr := teardownCmd.Run(); tmpErr != nil {
 				if err != nil {
 					err = fmt.Errorf("%s after previous error: %w", tmpErr, err)
@@ -380,44 +380,20 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		}
 	})
 
-	// set up the loopback
-	mountImageCmds = append(mountImageCmds,
+	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img")
+
+	// set up the loopback device
+	loopUsed, losetupDetachCmd, err := associateLoopDevice(imgPath, stateMachine.SectorSize)
+	asserter.AssertErrNil(err, true)
+
+	teardownImageCmds = append(teardownImageCmds, losetupDetachCmd)
+
+	setupImageCmds = append(setupImageCmds,
 		//nolint:gosec,G204
-		exec.Command("losetup",
-			filepath.Join("/dev", "loop99"),
-			filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img"),
-		),
+		exec.Command("mount", fmt.Sprintf("%sp3", loopUsed), mountDir), // with this example the rootfs is partition 3 mountDir
 	)
 
-	// unset the loopback
-	umountImageCmds = append(umountImageCmds,
-		//nolint:gosec,G204
-		exec.Command("losetup", "--detach", filepath.Join("/dev", "loop99")),
-	)
-
-	mountImageCmds = append(mountImageCmds,
-		//nolint:gosec,G204
-		exec.Command("kpartx", "-a", filepath.Join("/dev", "loop99")),
-	)
-
-	umountImageCmds = append([]*exec.Cmd{
-		//nolint:gosec,G204
-		exec.Command("kpartx", "-d", filepath.Join("/dev", "loop99")),
-	}, umountImageCmds...,
-	)
-
-	mountImageCmds = append(mountImageCmds,
-		//nolint:gosec,G204
-		exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3"), mountDir), // with this example the rootfs is partition 3 mountDir
-	)
-
-	umountImageCmds = append([]*exec.Cmd{
-		//nolint:gosec,G204
-		exec.Command("mount", "--make-rprivate", filepath.Join("/dev", "mapper", "loop99p3")),
-		//nolint:gosec,G204
-		exec.Command("umount", "--recursive", filepath.Join("/dev", "mapper", "loop99p3")),
-	}, umountImageCmds...,
-	)
+	teardownImageCmds = append([]*exec.Cmd{exec.Command("umount", "--recursive", mountDir)}, teardownImageCmds...)
 
 	// set up the mountpoints
 	mountPoints := []mountPoint{
@@ -455,14 +431,14 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 				err.Error(),
 			)
 		}
-		mountImageCmds = append(mountImageCmds, mountCmds...)
-		umountImageCmds = append(umountCmds, umountImageCmds...)
+		setupImageCmds = append(setupImageCmds, mountCmds...)
+		teardownImageCmds = append(umountCmds, teardownImageCmds...)
 	}
-	// make sure to unmount the disk too
-	umountImageCmds = append([]*exec.Cmd{exec.Command("umount", "--recursive", mountDir)}, umountImageCmds...)
+
+	teardownImageCmds = append([]*exec.Cmd{execCommand("udevadm", "settle")}, teardownImageCmds...)
 
 	// now run all the commands to mount the image
-	for _, cmd := range mountImageCmds {
+	for _, cmd := range setupImageCmds {
 		outPut := helper.SetCommandOutput(cmd, true)
 		err := cmd.Run()
 		if err != nil {
