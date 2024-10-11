@@ -902,14 +902,14 @@ func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error)
 
 // associateLoopDevice associates a file to a loop device and returns the loop device number
 // Also returns the command to detach the loop device during teardown
-func (stateMachine *StateMachine) associateLoopDevice(path string) (string, *exec.Cmd, error) {
+func associateLoopDevice(path string, sectorSize quantity.Size) (string, *exec.Cmd, error) {
 	// run the losetup command and read the output to determine which loopback was used
 	losetupCmd := execCommand("losetup",
 		"--find",
 		"--show",
 		"--partscan",
 		"--sector-size",
-		stateMachine.SectorSize.String(),
+		sectorSize.String(),
 		path,
 	)
 	var losetupOutput []byte
@@ -960,7 +960,7 @@ func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum
 
 	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
 
-	loopUsed, losetupDetachCmd, err := stateMachine.associateLoopDevice(imgPath)
+	loopUsed, losetupDetachCmd, err := associateLoopDevice(imgPath, stateMachine.SectorSize)
 	if err != nil {
 		return err
 	}
