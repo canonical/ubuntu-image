@@ -720,11 +720,15 @@ func TestClassicMachine_manualMakeDirs_fail(t *testing.T) {
 		},
 	}
 
+	tmpDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
 	// Create a file where we will then try to create a directory
-	_, err := osCreate("/tmp/test")
+	_, err = osCreate(filepath.Join(tmpDir, "test"))
 	asserter.AssertErrNil(err, true)
 
-	err = manualMakeDirs(mkdirs, "/tmp", true)
+	err = manualMakeDirs(mkdirs, tmpDir, true)
 	asserter.AssertErrContains(err, "Error creating directory")
 }
 
