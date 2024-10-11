@@ -3010,7 +3010,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 	artifacts := map[string]string{
 		"pc-amd64.img":            "DOS/MBR boot sector",
-		"pc-amd64.qcow2":          "QEMU QCOW",
+		"pc-amd64.qcow2":          "QEMU QCOW2 Image (v3)",
 		"filesystem-manifest.txt": "text",
 		"filesystem-filelist.txt": "text",
 	}
