@@ -189,7 +189,7 @@ func TestSnapStateMachine_DryRun(t *testing.T) {
 		t.Errorf("Some files were created in the workdir but should not. Created files: %s", files)
 	}
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.Teardown()
@@ -218,7 +218,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 	err = stateMachine.Setup()
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	// make sure the "factory" boot flag was set
@@ -260,7 +260,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 	err = stateMachine.Setup()
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	// make sure cloud-init user-data was placed correctly
@@ -323,7 +323,7 @@ func TestFailedPrepareImage(t *testing.T) {
 		err := stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
 
-		err = stateMachine.Run()
+		err = stateMachine.Run(context.Background())
 		fmt.Print(err)
 		asserter.AssertErrContains(err, "Error preparing image")
 
@@ -347,7 +347,7 @@ func TestFailedPrepareImage(t *testing.T) {
 		err := stateMachine.Setup()
 		asserter.AssertErrNil(err, true)
 
-		err = stateMachine.Run()
+		err = stateMachine.Run(context.Background())
 		fmt.Print(err)
 		asserter.AssertErrContains(err, "error dealing with snap revision")
 
@@ -392,7 +392,7 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 			err = stateMachine.Setup()
 			asserter.AssertErrNil(err, true)
 
-			err = stateMachine.Run()
+			err = stateMachine.Run(context.Background())
 			asserter.AssertErrNil(err, true)
 
 			for _, file := range tc.fileList {
@@ -466,7 +466,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 				}
 			}
 
-			err = stateMachine.generateSnapManifest()
+			err = stateMachine.generateSnapManifest(context.Background())
 			asserter.AssertErrNil(err, false)
 
 			// Check if manifests got generated and if they have expected contents
@@ -516,10 +516,10 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 	err = stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.prepareImage()
+	err = stateMachine.prepareImage(context.Background())
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.loadGadgetYaml()
+	err = stateMachine.loadGadgetYaml(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	// mock os.MkdirAll
@@ -527,7 +527,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 	defer func() {
 		osMkdirAll = os.MkdirAll
 	}()
-	err = stateMachine.populateSnapRootfsContents()
+	err = stateMachine.populateSnapRootfsContents(context.Background())
 	asserter.AssertErrContains(err, "Error creating boot dir")
 	osMkdirAll = os.MkdirAll
 
@@ -536,7 +536,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 	defer func() {
 		osReadDir = os.ReadDir
 	}()
-	err = stateMachine.populateSnapRootfsContents()
+	err = stateMachine.populateSnapRootfsContents(context.Background())
 	asserter.AssertErrContains(err, "Error reading unpack dir")
 	osReadDir = os.ReadDir
 
@@ -545,7 +545,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 	defer func() {
 		osRename = os.Rename
 	}()
-	err = stateMachine.populateSnapRootfsContents()
+	err = stateMachine.populateSnapRootfsContents(context.Background())
 	asserter.AssertErrContains(err, "Error moving rootfs")
 	osRename = os.Rename
 }
@@ -575,7 +575,7 @@ func TestFailedGenerateSnapManifest(t *testing.T) {
 	stateMachine.IsSeeded = false
 	stateMachine.commonFlags.OutputDir = "/test/path"
 
-	err := stateMachine.generateSnapManifest()
+	err := stateMachine.generateSnapManifest(context.Background())
 	asserter.AssertErrContains(err, "Error creating manifest file")
 }
 
@@ -620,7 +620,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 			err = stateMachine.Setup()
 			asserter.AssertErrNil(err, true)
 
-			err = stateMachine.Run()
+			err = stateMachine.Run(context.Background())
 
 			if tc.valid {
 				// check Run() ended without errors
@@ -711,7 +711,7 @@ func TestSnapRevisions(t *testing.T) {
 	err = stateMachine.Setup()
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	for snapName, expectedRevision := range stateMachine.Opts.Revisions {
@@ -762,7 +762,7 @@ func TestValidationFlag(t *testing.T) {
 	err = stateMachine.Setup()
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	// make sure the correct revision of the snap exists
@@ -802,7 +802,7 @@ func TestGadgetEdgeCases(t *testing.T) {
 	err = stateMachine.Setup()
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.Teardown()
@@ -839,7 +839,7 @@ func TestPreseedFlag(t *testing.T) {
 	err = stateMachine.Setup()
 	asserter.AssertErrNil(err, true)
 
-	err = stateMachine.Run()
+	err = stateMachine.Run(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	if calledOpts == nil {
