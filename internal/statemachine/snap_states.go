@@ -28,6 +28,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 		PrepareDir:                snapStateMachine.tempDirs.unpack,
 		Channel:                   snapStateMachine.commonFlags.Channel,
 		Customizations:            snapStateMachine.imageOptsCustomizations(),
+		Components:                snapStateMachine.Opts.Components,
 	}
 
 	var err error
