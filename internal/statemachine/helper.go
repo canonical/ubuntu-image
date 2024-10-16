@@ -407,9 +407,9 @@ func maxOffset(offset1, offset2 quantity.Offset) quantity.Offset {
 	return offset2
 }
 
-// setStructureSize raise both Size and MinSize to at least the given size
+// raiseStructureSizes raise both Size and MinSize to at least the given size
 // It helps make sure whatever value is used in snapd, it is set to the size we need
-func setStructureSize(s *gadget.VolumeStructure, size quantity.Size) {
+func raiseStructureSizes(s *gadget.VolumeStructure, size quantity.Size) {
 	if s.MinSize < size {
 		s.MinSize = size
 	}
