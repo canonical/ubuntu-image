@@ -17,6 +17,7 @@ ubuntu-image (3.5) UNRELEASED; urgency=medium
   * Clean /dev/ to avoid issues when booting or moving the chroot around
   * Use the proper size from the volume to determine the minimum image
     size.
+  * Improve sparse file handling when producing tar and qcow2 output
 
   [ Maciej Borzecki ]
   * Improve handling of structures without a filesystem.
