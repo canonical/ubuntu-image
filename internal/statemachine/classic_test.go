@@ -3010,7 +3010,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 	artifacts := map[string]string{
 		"pc-amd64.img":            "DOS/MBR boot sector",
-		"pc-amd64.qcow2":          "QEMU QCOW2 Image (v3)",
+		"pc-amd64.qcow2":          `QEMU QCOW2? Image \(v3\)`,
 		"filesystem-manifest.txt": "text",
 		"filesystem-filelist.txt": "text",
 	}
@@ -3171,7 +3171,10 @@ func testHelperCheckArtifacts(t *testing.T, asserter *helper.Asserter, outputDir
 		fileCommand := *exec.Command("file", fullPath)
 		cmdOutput, err := fileCommand.CombinedOutput()
 		asserter.AssertErrNil(err, true)
-		if !strings.Contains(string(cmdOutput), fileType) {
+
+		fileTypeRegex := regexp.MustCompile(fileType)
+
+		if !fileTypeRegex.Match([]byte(cmdOutput)) {
 			t.Errorf("File \"%s\" is the wrong file type. Expected \"%s\" but got \"%s\"",
 				fullPath, fileType, string(cmdOutput))
 		}
