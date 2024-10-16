@@ -157,8 +157,6 @@ func (p *BasePPA) importKey(basePath string, ppaFileName string, ascii bool, deb
 		"--batch",
 		"--homedir",
 		tmpGPGDir,
-		"--secret-keyring",
-		filepath.Join(tmpGPGDir, "tempring.gpg"),
 		"--keyserver",
 		"hkp://keyserver.ubuntu.com:80",
 	}
