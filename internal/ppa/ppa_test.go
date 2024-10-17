@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -81,6 +80,10 @@ func mockMkdirAll(string, os.FileMode) error {
 	return fmt.Errorf("os.MkdirAll error")
 }
 
+func mockMkdirTemp(string, string) (string, error) {
+	return "", fmt.Errorf("os.MkdirTemp error")
+}
+
 func mockOpenFile(string, int, os.FileMode) (*os.File, error) {
 	return nil, fmt.Errorf("os.OenFile error")
 }
@@ -91,6 +94,14 @@ func mockRemove(string) error {
 
 func mockRemoveAll(string) error {
 	return fmt.Errorf("os.RemoveAll error")
+}
+
+// wrapMkdirTemp returns a os.MkdirTemp wrapper to make sure tests will not create
+// dirs outside of the test tmp dir
+func wrapMkdirTemp(constDir string) func(string, string) (string, error) {
+	return func(dir, pattern string) (string, error) {
+		return os.MkdirTemp(constDir, pattern)
+	}
 }
 
 var cmpOpts = []cmp.Option{
@@ -346,13 +357,10 @@ func TestAdd_fail(t *testing.T) {
 	err = os.MkdirAll(gpgDir, 0755)
 	asserter.AssertErrNil(err, true)
 
-	longName := strings.Repeat("a", 100)
-	longTmpDirPath, err := os.MkdirTemp("/tmp", longName)
-	asserter.AssertErrNil(err, true)
-	t.Cleanup(func() { os.RemoveAll(longTmpDirPath) })
-
-	err = p.Add(longTmpDirPath, true)
-	asserter.AssertErrContains(err, "dirmngr cannot handle a homedir path length of 100 or above")
+	osMkdirTemp = wrapMkdirTemp(tmpDirPath)
+	t.Cleanup(func() {
+		osMkdirTemp = os.MkdirTemp
+	})
 
 	osMkdirAll = mockMkdirAll
 	t.Cleanup(func() {
@@ -361,6 +369,14 @@ func TestAdd_fail(t *testing.T) {
 	err = p.Add(tmpDirPath, true)
 	asserter.AssertErrContains(err, "Failed to create apt sources.list.d")
 	osMkdirAll = os.MkdirAll
+
+	osMkdirTemp = mockMkdirTemp
+	t.Cleanup(func() {
+		osMkdirTemp = os.MkdirTemp
+	})
+	err = p.Add(tmpDirPath, true)
+	asserter.AssertErrContains(err, "Error creating temp dir for gpg imports")
+	osMkdirTemp = os.MkdirTemp
 
 	osOpenFile = mockOpenFile
 	t.Cleanup(func() {
