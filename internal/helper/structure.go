@@ -40,12 +40,9 @@ func IsSystemSeedStructure(s *gadget.VolumeStructure) bool {
 
 // ShouldSkipStructure returns whether a structure should be skipped during certain processing
 func ShouldSkipStructure(structure *gadget.VolumeStructure, isSeeded bool) bool {
-	if isSeeded &&
+	return isSeeded &&
 		(structure.Role == gadget.SystemBoot ||
 			structure.Label == gadget.SystemBoot ||
 			structure.Role == gadget.SystemData ||
-			structure.Role == gadget.SystemSave) {
-		return true
-	}
-	return false
+			structure.Role == gadget.SystemSave)
 }
