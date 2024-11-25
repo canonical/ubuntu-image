@@ -1,3 +1,10 @@
+ubuntu-image (3.6.0) UNRELEASED; urgency=medium
+
+  [ Andrew Phelps ]
+  * Add support for builing core images with components
+
+ -- Andrew Phelps <andrew.phelps@canonical.com>  Mon, 25 Nov 2024 10:30:04 -0500
+
 ubuntu-image (3.5.1) UNRELEASED; urgency=medium
 
   [ Paul Mars ]
