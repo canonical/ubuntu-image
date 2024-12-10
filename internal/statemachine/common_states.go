@@ -359,6 +359,12 @@ var populatePreparePartitionsState = stateFunc{"populate_prepare_partitions", (*
 func (stateMachine *StateMachine) populatePreparePartitions() error {
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
+
+		// eMMC volumes do not have their own disk image
+		if volume.Schema == helper.SchemaEMMC {
+			continue
+		}
+
 		if err := stateMachine.handleLkBootloader(volume); err != nil {
 			return err
 		}
@@ -415,8 +421,16 @@ func (stateMachine *StateMachine) makeDisk() error {
 		if !found {
 			continue
 		}
-		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[volumeName])
 
+		// eMMC volumes should not have its own disk image, these are treated specially
+		// as they consist only of fixed content images that needs to be written during
+		// runtime (i.e gadget install or gadget update). The contents of the image are
+		// part of the gadget snap
+		if volume.Schema == helper.SchemaEMMC {
+			continue
+		}
+
+		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[volumeName])
 		diskImg, err := stateMachine.createDiskImage(volumeName, volume, imgName)
 		if err != nil {
 			return err
