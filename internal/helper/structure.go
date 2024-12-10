@@ -2,6 +2,10 @@ package helper
 
 import "github.com/snapcore/snapd/gadget"
 
+const (
+	SchemaEMMC = "emmc"
+)
+
 // IsRootfsStructure determines if the given structure is the one associated
 // to the rootfs
 func IsRootfsStructure(s *gadget.VolumeStructure) bool {

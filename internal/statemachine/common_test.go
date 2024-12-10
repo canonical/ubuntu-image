@@ -1241,6 +1241,71 @@ func TestImageSizeFlag(t *testing.T) {
 	}
 }
 
+// TestPopulateGadgetWithEMMC performs a successful run with a gadget.yaml that has,
+// besides regular partitions, one emmc partition and makes sure that no partition image
+// has been created.
+func TestPopulateGadgetWithEMMC(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// set a valid yaml file and load it in
+	stateMachine.YamlFilePath = filepath.Join("testdata",
+		"gadget_tree_emmc", "meta", "gadget.yaml")
+	// ensure unpack exists
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+
+	// ensure volumes exists
+	err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// populate unpack
+	files, err := os.ReadDir(filepath.Join("testdata", "gadget_tree_emmc"))
+	asserter.AssertErrNil(err, true)
+	for _, srcFile := range files {
+		srcFile := filepath.Join("testdata", "gadget_tree_emmc", srcFile.Name())
+		err = osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+		asserter.AssertErrNil(err, true)
+	}
+
+	// populate bootfs contents to ensure no failures there
+	err = stateMachine.populateBootfsContents()
+	asserter.AssertErrNil(err, true)
+
+	// calculate rootfs size so the partition sizes can be set correctly
+	err = stateMachine.calculateRootfsSize()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.populatePreparePartitions()
+	asserter.AssertErrNil(err, true)
+
+	// ensure the .img files were created
+	for ii := 0; ii < 3; ii++ {
+		partImg := filepath.Join(stateMachine.tempDirs.volumes,
+			"pc", "part"+strconv.Itoa(ii)+".img")
+		if _, err := os.Stat(partImg); err != nil {
+			t.Errorf("File %s should exist, but does not", partImg)
+		}
+	}
+
+	// ensure emmc .img files were not created
+	emmcImg := filepath.Join(stateMachine.tempDirs.volumes, "my-emmc")
+	entries, err := os.ReadDir(emmcImg)
+	asserter.AssertErrNil(err, true)
+	if len(entries) != 0 {
+		for _, e := range entries {
+			t.Errorf("File %s should not exist", e.Name())
+		}
+	}
+}
+
 var volume1 = &gadget.Volume{
 	Schema:     "gpt",
 	Bootloader: "grub",
