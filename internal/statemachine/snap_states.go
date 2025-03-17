@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/interfaces/builtin"
@@ -29,6 +30,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 		Channel:                   snapStateMachine.commonFlags.Channel,
 		Customizations:            snapStateMachine.imageOptsCustomizations(),
 		Components:                snapStateMachine.Opts.Components,
+		AutoImport:                snapStateMachine.Opts.AutoImport,
 	}
 
 	var err error
@@ -54,6 +56,22 @@ func (stateMachine *StateMachine) prepareImage() error {
 		defer func() {
 			image.Stdout = oldImageStdout
 		}()
+	}
+
+	//obtain absolute path of auto-assertion if relative path is specified
+	if strings.HasPrefix(imageOpts.AutoImport, "/") {
+		ex, err := os.Executable()
+		if err != nil {
+			panic(err)
+		}
+		exPath := filepath.Dir(ex)
+		fmt.Println(exPath)
+		imageOpts.AutoImport = filepath.Join(exPath, imageOpts.AutoImport)
+	}
+	//if relative path has "./" remove it.
+	if strings.HasPrefix(imageOpts.AutoImport, "./") {
+		t := strings.Replace(imageOpts.AutoImport, "./", "", -1)
+		imageOpts.AutoImport = t
 	}
 
 	if err := imagePrepare(imageOpts); err != nil {
