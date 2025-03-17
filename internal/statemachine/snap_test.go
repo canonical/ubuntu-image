@@ -19,6 +19,7 @@ import (
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/store"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/testhelper"
@@ -65,6 +66,53 @@ func TestSnapStateMachine_Setup_Fail_SetSeries(t *testing.T) {
 	err := stateMachine.Setup()
 	asserter.AssertErrContains(err, "cannot read model assertion")
 	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+}
+
+func TestSnapStateMachine_Architecture(t *testing.T) {
+	tests := []struct {
+		name           string
+		modelAssertion string
+		wantArch       string
+		expectedError  string
+		shouldPass     bool
+	}{
+		{
+			name:           "succeed returning the arch",
+			modelAssertion: filepath.Join("testdata", "modelAssertion18"),
+			shouldPass:     true,
+			wantArch:       arch.AMD64,
+		},
+		{
+			name:           "empty arch from model assertion",
+			modelAssertion: filepath.Join("testdata", "modelAssertionNoArch"),
+			shouldPass:     false,
+			expectedError:  "unable to identify the arch",
+		},
+		{
+			name:           "fail to decode empty model assertion",
+			modelAssertion: filepath.Join("testdata", "modelAssertionEmpty"),
+			shouldPass:     false,
+			expectedError:  "cannot decode model assertion",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+
+			snapStateMachine := &SnapStateMachine{
+				Args: commands.SnapArgs{
+					ModelAssertion: tt.modelAssertion,
+				},
+			}
+			gotArch, err := snapStateMachine.Architecture()
+			t.Logf("arch: %s", gotArch)
+			if tt.shouldPass {
+				asserter.AssertEqual(tt.wantArch, gotArch)
+			} else {
+				asserter.AssertErrContains(err, tt.expectedError)
+			}
+		})
+	}
 }
 
 // TestFailedValidateInputSnap tests a failure in the Setup() function when validating common input

@@ -15,7 +15,7 @@ var packStates = []stateFunc{
 	populateBootfsContentsState,
 	populatePreparePartitionsState,
 	makeDiskState,
-	updateBootloaderState,
+	setupBootloaderState,
 }
 
 // PackStateMachine embeds StateMachine and adds the command line flags specific to pack images
@@ -61,4 +61,8 @@ func (packStateMachine *PackStateMachine) Setup() error {
 // Placeholder method to satisfy the interface. This is not used when packing.
 func (packStateMachine *PackStateMachine) SetSeries() error {
 	return nil
+}
+
+func (packStateMachine *PackStateMachine) Architecture() (string, error) {
+	return packStateMachine.Opts.Architecture, nil
 }

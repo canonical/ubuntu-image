@@ -9,12 +9,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/osutil"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 var basicImageDef = imagedefinition.ImageDefinition{
-	Architecture: getHostArch(),
+	Architecture: arch.GetHostArch(),
 	Series:       getHostSuite(),
 	Rootfs: &imagedefinition.Rootfs{
 		Archive:           "ubuntu",
