@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -12,10 +13,10 @@ import (
 	"github.com/snapcore/snapd/snap"
 )
 
-var prepareImageState = stateFunc{"prepare_image", (*StateMachine).prepareImage}
+var prepareImageState = stateFunc{"prepare_image", (*StateMachine).prepareImage, nil}
 
 // Prepare the image
-func (stateMachine *StateMachine) prepareImage() error {
+func (stateMachine *StateMachine) prepareImage(ctx context.Context) error {
 	snapStateMachine := stateMachine.parent.(*SnapStateMachine)
 
 	imageOpts := &image.Options{
@@ -98,10 +99,10 @@ func (snapStateMachine *SnapStateMachine) imageOptsCustomizations() image.Custom
 	return customizations
 }
 
-var populateSnapRootfsContentsState = stateFunc{"populate_rootfs_contents", (*StateMachine).populateSnapRootfsContents}
+var populateSnapRootfsContentsState = stateFunc{"populate_rootfs_contents", (*StateMachine).populateSnapRootfsContents, nil}
 
 // populateSnapRootfsContents populates the rootfs
-func (stateMachine *StateMachine) populateSnapRootfsContents() error {
+func (stateMachine *StateMachine) populateSnapRootfsContents(ctx context.Context) error {
 	var src, dst string
 	if stateMachine.IsSeeded {
 		// For now, since we only create the system-seed partition for
@@ -139,10 +140,10 @@ func (stateMachine *StateMachine) populateSnapRootfsContents() error {
 	return nil
 }
 
-var generateSnapManifestState = stateFunc{"generate_snap_manifest", (*StateMachine).generateSnapManifest}
+var generateSnapManifestState = stateFunc{"generate_snap_manifest", (*StateMachine).generateSnapManifest, nil}
 
 // Generate the manifest
-func (stateMachine *StateMachine) generateSnapManifest() error {
+func (stateMachine *StateMachine) generateSnapManifest(ctx context.Context) error {
 	// We could use snapd's seed.Open() to generate the manifest here, but
 	// actually it doesn't make things much easier than doing it manually -
 	// like we did in the past. So let's just go with this.

@@ -3,6 +3,7 @@
 package statemachine
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -60,7 +61,7 @@ var osGetenv = os.Getenv
 var osSetenv = os.Setenv
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
-var execCommand = exec.Command
+var execCommandCtx = exec.CommandContext
 var mkfsMakeWithContent = mkfs.MakeWithContent
 var mkfsMake = mkfs.Make
 var diskfsCreate = diskfs.Create
@@ -73,7 +74,7 @@ var filepathRel = filepath.Rel
 // SmInterface allows different image types to implement their own setup/run/teardown functions
 type SmInterface interface {
 	Setup() error
-	Run() error
+	Run(ctx context.Context) error
 	Teardown() error
 	SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts)
 	SetSeries() error
@@ -81,8 +82,9 @@ type SmInterface interface {
 
 // stateFunc allows us easy access to the function names, which will help with --resume and debug statements
 type stateFunc struct {
-	name     string
-	function func(*StateMachine) error
+	name        string
+	function    func(*StateMachine, context.Context) error
+	cancelFuncs []func(*StateMachine) error
 }
 
 // temporaryDirectories organizes the state machines, rootfs, unpack, and volumes dirs
@@ -114,7 +116,7 @@ type StateMachine struct {
 	commonFlags       *commands.CommonOpts
 	stateMachineFlags *commands.StateMachineOpts
 
-	states []stateFunc // the state functions
+	stateFuncs []stateFunc // the state functions
 
 	// used to access image type specific variables from state functions
 	parent SmInterface
@@ -442,12 +444,12 @@ func (stateMachine *StateMachine) readMetadata(metadataFile string) error {
 func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) error {
 	stateMachine.StepsTaken = partialStateMachine.StepsTaken
 
-	if stateMachine.StepsTaken > len(stateMachine.states) {
-		return fmt.Errorf("invalid steps taken count (%d). The state machine only have %d steps", stateMachine.StepsTaken, len(stateMachine.states))
+	if stateMachine.StepsTaken > len(stateMachine.stateFuncs) {
+		return fmt.Errorf("invalid steps taken count (%d). The state machine only have %d steps", stateMachine.StepsTaken, len(stateMachine.stateFuncs))
 	}
 
 	// delete all of the stateFuncs that have already run
-	stateMachine.states = stateMachine.states[stateMachine.StepsTaken:]
+	stateMachine.stateFuncs = stateMachine.stateFuncs[stateMachine.StepsTaken:]
 
 	stateMachine.CurrentStep = partialStateMachine.CurrentStep
 	stateMachine.YamlFilePath = partialStateMachine.YamlFilePath
@@ -509,7 +511,7 @@ func (s *StateMachine) displayStates() {
 	}
 	fmt.Printf("\nFollowing states %s be executed:\n", verb)
 
-	for i, state := range s.states {
+	for i, state := range s.stateFuncs {
 		if state.name == s.stateMachineFlags.Until {
 			break
 		}
@@ -604,13 +606,13 @@ func (stateMachine *StateMachine) determineOutputDirectory() error {
 }
 
 // Run iterates through the state functions, stopping when appropriate based on --until and --thru
-func (stateMachine *StateMachine) Run() error {
+func (stateMachine *StateMachine) Run(ctx context.Context) error {
 	if stateMachine.commonFlags.DryRun {
 		return nil
 	}
 	// iterate through the states
-	for i := 0; i < len(stateMachine.states); i++ {
-		stateFunc := stateMachine.states[i]
+	for i := 0; i < len(stateMachine.stateFuncs); i++ {
+		stateFunc := stateMachine.stateFuncs[i]
 		stateMachine.CurrentStep = stateFunc.name
 		if stateFunc.name == stateMachine.stateMachineFlags.Until {
 			break
@@ -619,7 +621,7 @@ func (stateMachine *StateMachine) Run() error {
 			fmt.Printf("[%d] %s\n", stateMachine.StepsTaken, stateFunc.name)
 		}
 		start := time.Now()
-		err := stateFunc.function(stateMachine)
+		err := stateFunc.function(stateMachine, ctx)
 		if stateMachine.commonFlags.Debug {
 			fmt.Printf("duration: %v\n", time.Since(start))
 		}

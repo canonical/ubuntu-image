@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -93,7 +94,7 @@ func Test_getMountCmd(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			gotMountCmds, gotUmountCmds, err := tc.mp.getMountCmd()
+			gotMountCmds, gotUmountCmds, err := tc.mp.getMountCmd(context.Background())
 
 			if len(tc.expectedError) == 0 {
 				asserter.AssertErrNil(err, true)
@@ -134,7 +135,7 @@ func Test_getMountCmd_fail(t *testing.T) {
 		src:      "src",
 	}
 
-	gotMountCmds, gotUmountCmds, err := mp.getMountCmd()
+	gotMountCmds, gotUmountCmds, err := mp.getMountCmd(context.Background())
 	asserter.AssertErrContains(err, "Error creating mountpoint")
 	if gotMountCmds != nil {
 		asserter.Errorf("gotMountCmds should be nil but is %s", gotMountCmds)
