@@ -62,7 +62,7 @@ func (b *basicChrooter) init() error {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = basicImageDef
-	path := filepath.Join("/tmp", "ubuntu-image-chroot-"+uuid.NewString())
+	path := filepath.Join("/var/tmp", "ubuntu-image-chroot-"+uuid.NewString())
 	stateMachine.tempDirs.chroot = path
 
 	err := helper.SetDefaults(&stateMachine.ImageDef)

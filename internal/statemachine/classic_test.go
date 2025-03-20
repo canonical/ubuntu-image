@@ -581,7 +581,7 @@ func TestClassicStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
 	var stateMachine ClassicStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-	tmpDirPath := filepath.Join("/tmp", "test_failed_set_conf_dir")
+	tmpDirPath := filepath.Join("/var/tmp", "test_failed_set_conf_dir")
 	err := os.Mkdir(tmpDirPath, 0755)
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDirPath)
@@ -667,7 +667,7 @@ func TestClassicStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 		"test_amd64.yaml")
-	stateMachine.commonFlags.OutputDir = "/tmp/test"
+	stateMachine.commonFlags.OutputDir = "/var/tmp/test"
 
 	// mock os.MkdirAll
 	osMkdirAll = mockMkdirAll
@@ -2759,7 +2759,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 		execCommand = exec.Command
 	})
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -2822,7 +2822,7 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 	}
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 	stateMachine.commonFlags.OutputDir = outputDir
@@ -2865,7 +2865,7 @@ func TestGenerateFilelist(t *testing.T) {
 		execCommand = exec.Command
 	})
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -2934,7 +2934,7 @@ func TestFailedGenerateFilelist(t *testing.T) {
 	}
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 	stateMachine.commonFlags.OutputDir = outputDir
@@ -2979,7 +2979,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -3344,7 +3344,7 @@ func TestSuccessfulClassicRunNoArtifact(t *testing.T) {
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -3386,7 +3386,7 @@ func TestSuccessfulRootfsGeneration(t *testing.T) {
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -4228,7 +4228,7 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.commonFlags.Debug = true
 	stateMachine.parent = &stateMachine
-	stateMachine.commonFlags.OutputDir = "/tmp"
+	stateMachine.commonFlags.OutputDir = "/var/tmp"
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
@@ -4275,26 +4275,26 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	expectedCmds := []*regexp.Regexp{
-		regexp.MustCompile("^mount -t devtmpfs devtmpfs-build /tmp.*/chroot/dev$"),
-		regexp.MustCompile("^mount -t devpts devpts-build -o nodev,nosuid /tmp.*/chroot/dev/pts$"),
-		regexp.MustCompile("^mount -t proc proc-build /tmp.*/chroot/proc$"),
-		regexp.MustCompile("^mount -t sysfs sysfs-build /tmp.*/chroot/sys$"),
+		regexp.MustCompile("^mount -t devtmpfs devtmpfs-build /var/tmp.*/chroot/dev$"),
+		regexp.MustCompile("^mount -t devpts devpts-build -o nodev,nosuid /var/tmp.*/chroot/dev/pts$"),
+		regexp.MustCompile("^mount -t proc proc-build /var/tmp.*/chroot/proc$"),
+		regexp.MustCompile("^mount -t sysfs sysfs-build /var/tmp.*/chroot/sys$"),
 		regexp.MustCompile("^mount --bind .*/scratch/run.* .*/chroot/run$"),
-		regexp.MustCompile("^chroot /tmp.*/chroot dpkg-divert"),
-		regexp.MustCompile("^chroot /tmp.*/chroot apt update$"),
-		regexp.MustCompile("^chroot /tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold$"),
-		regexp.MustCompile("^chroot /tmp.*/chroot dpkg-divert --remove"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot apt update$"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold$"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --remove"),
 		regexp.MustCompile("^udevadm settle$"),
-		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/run$"),
-		regexp.MustCompile("^umount --recursive /tmp.*/chroot/run$"),
-		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/sys$"),
-		regexp.MustCompile("^umount --recursive /tmp.*/chroot/sys$"),
-		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/proc$"),
-		regexp.MustCompile("^umount --recursive /tmp.*/chroot/proc$"),
-		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/dev/pts$"),
-		regexp.MustCompile("^umount --recursive /tmp.*/chroot/dev/pts$"),
-		regexp.MustCompile("^mount --make-rprivate /tmp.*/chroot/dev$"),
-		regexp.MustCompile("^umount --recursive /tmp.*/chroot/dev$"),
+		regexp.MustCompile("^mount --make-rprivate /var/tmp.*/chroot/run$"),
+		regexp.MustCompile("^umount --recursive /var/tmp.*/chroot/run$"),
+		regexp.MustCompile("^mount --make-rprivate /var/tmp.*/chroot/sys$"),
+		regexp.MustCompile("^umount --recursive /var/tmp.*/chroot/sys$"),
+		regexp.MustCompile("^mount --make-rprivate /var/tmp.*/chroot/proc$"),
+		regexp.MustCompile("^umount --recursive /var/tmp.*/chroot/proc$"),
+		regexp.MustCompile("^mount --make-rprivate /var/tmp.*/chroot/dev/pts$"),
+		regexp.MustCompile("^umount --recursive /var/tmp.*/chroot/dev/pts$"),
+		regexp.MustCompile("^mount --make-rprivate /var/tmp.*/chroot/dev$"),
+		regexp.MustCompile("^umount --recursive /var/tmp.*/chroot/dev$"),
 	}
 
 	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
@@ -4318,7 +4318,7 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.commonFlags.Debug = true
 	stateMachine.parent = &stateMachine
-	stateMachine.commonFlags.OutputDir = "/tmp"
+	stateMachine.commonFlags.OutputDir = "/var/tmp"
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
@@ -4459,7 +4459,7 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 func Test_generateMountPointCmds_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 
-	tmpDirPath := filepath.Join("/tmp", "test_failed_set_conf_dir")
+	tmpDirPath := filepath.Join("/var/tmp", "test_failed_set_conf_dir")
 	err := os.Mkdir(tmpDirPath, 0755)
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDirPath)

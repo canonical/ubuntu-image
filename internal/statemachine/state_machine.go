@@ -552,7 +552,7 @@ func (stateMachine *StateMachine) writeMetadata(metadataFile string) error {
 func (stateMachine *StateMachine) makeTemporaryDirectories() error {
 	// if no workdir was specified, open a /tmp dir
 	if stateMachine.stateMachineFlags.WorkDir == "" {
-		stateMachine.stateMachineFlags.WorkDir = filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
+		stateMachine.stateMachineFlags.WorkDir = filepath.Join("/var/tmp", "ubuntu-image-"+uuid.NewString())
 		if err := osMkdir(stateMachine.stateMachineFlags.WorkDir, 0755); err != nil {
 			return fmt.Errorf("Failed to create temporary directory: %s", err.Error())
 		}
