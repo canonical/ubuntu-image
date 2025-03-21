@@ -4121,7 +4121,7 @@ func TestCreateChroot(t *testing.T) {
 ## See the sources.list(5) manual page for further settings.
 Types: deb
 URIs: http://archive.ubuntu.com/ubuntu/
-Suites: jammy jammy-updates jammy-proposed
+Suites: noble noble-updates noble-proposed
 Components: main restricted
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
@@ -4129,7 +4129,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 ## this should mirror your choices in the previous section.
 Types: deb
 URIs: http://security.ubuntu.com/ubuntu/
-Suites: jammy-security
+Suites: noble-security
 Components: main restricted
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
