@@ -129,7 +129,7 @@ func Test_getMountCmd_fail(t *testing.T) {
 
 	mp := mountPoint{
 		typ:      "devtmps",
-		basePath: "/tmp",
+		basePath: "/var/tmp",
 		relpath:  "1234567",
 		src:      "src",
 	}

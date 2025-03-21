@@ -38,7 +38,7 @@ func TestLoadGadgetYaml(t *testing.T) {
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
 
-	preserveDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
+	preserveDir := filepath.Join("/var/tmp", "ubuntu-image-"+uuid.NewString())
 	os.Setenv("UBUNTU_IMAGE_PRESERVE_UNPACK", preserveDir)
 	defer func() {
 		os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
@@ -117,7 +117,7 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrContains(err, "Error creating volume dir")
 
-	preserveDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
+	preserveDir := filepath.Join("/var/tmp", "ubuntu-image-"+uuid.NewString())
 	os.Setenv("UBUNTU_IMAGE_PRESERVE_UNPACK", preserveDir)
 	defer func() {
 		os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
@@ -812,7 +812,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			// also set up an output directory
-			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			outDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() { os.RemoveAll(outDir) })
 			stateMachine.commonFlags.OutputDir = outDir
@@ -930,7 +930,7 @@ func testSetupMakeDiskTest(t *testing.T, asserter *helper.Asserter, stateMachine
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// also set up an output directory
-	outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	outDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outDir) })
 	stateMachine.commonFlags.OutputDir = outDir
@@ -1175,7 +1175,7 @@ func TestImageSizeFlag(t *testing.T) {
 			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			// also set up an output directory
-			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			outDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() { os.RemoveAll(outDir) })
 			stateMachine.commonFlags.OutputDir = outDir
@@ -1463,7 +1463,7 @@ func TestStateMachine_createDiskImage(t *testing.T) {
 				ImageSizes: tc.imageSizes,
 			}
 
-			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			outDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() { os.RemoveAll(outDir) })
 

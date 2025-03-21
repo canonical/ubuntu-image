@@ -249,7 +249,7 @@ func TestLegacyAddRemove(t *testing.T) {
 			},
 		},
 	}
-	tmpDirPath, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	tmpDirPath, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(tmpDirPath) })
 
@@ -283,7 +283,7 @@ func TestLegacyAddRemove(t *testing.T) {
 func TestDeb822PPA(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 
-	tmpDirPath, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	tmpDirPath, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(tmpDirPath) })
 
@@ -319,7 +319,7 @@ func TestDeb822AddRemove(t *testing.T) {
 			},
 		},
 	}
-	tmpDirPath, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	tmpDirPath, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(tmpDirPath) })
 	err = p.Add(tmpDirPath, true)
@@ -349,7 +349,7 @@ func TestAdd_fail(t *testing.T) {
 			},
 		},
 	}
-	tmpDirPath, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	tmpDirPath, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(tmpDirPath) })
 
@@ -402,7 +402,7 @@ func TestAdd_fail(t *testing.T) {
 
 func TestRemove_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
-	tmpDirPath, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	tmpDirPath, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(tmpDirPath) })
 

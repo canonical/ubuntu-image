@@ -32,7 +32,7 @@ func TestRestoreResolvConf(t *testing.T) {
 	t.Parallel()
 	asserter := Asserter{T: t}
 	// Prepare temporary directory
-	workDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
+	workDir := filepath.Join("/var/tmp", "ubuntu-image-"+uuid.NewString())
 	err := os.Mkdir(workDir, 0755)
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
@@ -88,7 +88,7 @@ func TestRestoreResolvConf(t *testing.T) {
 func TestFailedRestoreResolvConf(t *testing.T) {
 	asserter := Asserter{T: t}
 	// Prepare temporary directory
-	workDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
+	workDir := filepath.Join("/var/tmp", "ubuntu-image-"+uuid.NewString())
 	err := os.Mkdir(workDir, 0755)
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
@@ -449,7 +449,7 @@ func prepareBackupFile(content string, mainTargetPath string) (string, error) {
 func TestBackupReplace(t *testing.T) {
 	asserter := Asserter{T: t}
 	// Prepare temporary directory
-	workDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
+	workDir := filepath.Join("/var/tmp", "ubuntu-image-"+uuid.NewString())
 	err := os.Mkdir(workDir, 0755)
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
@@ -527,9 +527,9 @@ func TestTarXattrs(t *testing.T) {
 
 	// create a file with xattrs in a temporary directory
 	xattrBytes := []byte("ui-test")
-	testDir, err := os.MkdirTemp("/tmp", "ubuntu-image-xattr-test")
+	testDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-xattr-test")
 	asserter.AssertErrNil(err, true)
-	extractDir, err := os.MkdirTemp("/tmp", "ubuntu-image-xattr-test")
+	extractDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-xattr-test")
 	asserter.AssertErrNil(err, true)
 	testFile, err := os.CreateTemp(testDir, "test-xattrs-")
 	asserter.AssertErrNil(err, true)
@@ -564,7 +564,7 @@ func TestPingXattrs(t *testing.T) {
 	restoreCWD := testhelper.SaveCWD()
 	defer restoreCWD()
 
-	testDir, err := os.MkdirTemp("/tmp", "ubuntu-image-ping-xattr-test")
+	testDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-ping-xattr-test")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(testDir) })
 	testFile := filepath.Join("testdata", "rootfs_tarballs", "ping.tar")

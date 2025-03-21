@@ -278,7 +278,7 @@ func TestUntilThru(t *testing.T) {
 				// run a partial state machine
 				var partialStateMachine testStateMachine
 				partialStateMachine.commonFlags, partialStateMachine.stateMachineFlags = helper.InitCommonOpts()
-				tempDir := filepath.Join("/tmp", "ubuntu-image-"+tc.name)
+				tempDir := filepath.Join("/var/tmp", "ubuntu-image-"+tc.name)
 				if err := os.Mkdir(tempDir, 0755); err != nil {
 					t.Errorf("Could not create workdir: %s\n", err.Error())
 				}
@@ -408,7 +408,7 @@ func TestFunctionErrors(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			workDir := filepath.Join("/tmp", "ubuntu-image-"+tc.name)
+			workDir := filepath.Join("/var/tmp", "ubuntu-image-"+tc.name)
 			err := os.Mkdir(workDir, 0755)
 			asserter.AssertErrNil(err, true)
 
@@ -1363,7 +1363,7 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 				},
 				CurrentStep:  "",
 				StepsTaken:   2,
-				YamlFilePath: "/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
+				YamlFilePath: "/var/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
 			},
 			shouldPass:    false,
 			expectedError: "failed to JSON encode metadata",
@@ -1377,7 +1377,7 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 				},
 				CurrentStep:  "",
 				StepsTaken:   2,
-				YamlFilePath: "/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
+				YamlFilePath: "/var/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
 			},
 			shouldPass:    false,
 			expectedError: "error opening JSON metadata file for writing",
@@ -1617,7 +1617,7 @@ func TestMakeTemporaryDirectories(t *testing.T) {
 		name    string
 		workdir string
 	}{
-		{"with_workdir", "/tmp/make_temporary_directories-" + uuid.NewString()},
+		{"with_workdir", "/var/tmp/make_temporary_directories-" + uuid.NewString()},
 		{"without_workdir", ""},
 	}
 	for _, tc := range testCases {
@@ -1674,8 +1674,8 @@ func TestFailedMakeTemporaryDirectories(t *testing.T) {
 
 // TestDetermineOutputDirectory unit tests the determineOutputDirectory function
 func TestDetermineOutputDirectory(t *testing.T) {
-	testDir1 := "/tmp/determine_output_dir-" + uuid.NewString()
-	testDir2 := "/tmp/determine_output_dir-" + uuid.NewString()
+	testDir1 := "/var/tmp/determine_output_dir-" + uuid.NewString()
+	testDir2 := "/var/tmp/determine_output_dir-" + uuid.NewString()
 	cwd, _ := os.Getwd() // nolint: errcheck
 	testCases := []struct {
 		name              string

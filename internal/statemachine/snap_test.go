@@ -34,7 +34,7 @@ func TestSnapStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 
-	tmpDirPath := filepath.Join("/tmp", "test_failed_set_conf_dir")
+	tmpDirPath := filepath.Join("/var/tmp", "test_failed_set_conf_dir")
 	err := os.Mkdir(tmpDirPath, 0755)
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDirPath)
@@ -149,7 +149,7 @@ func TestSnapStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
-	stateMachine.commonFlags.OutputDir = "/tmp/test"
+	stateMachine.commonFlags.OutputDir = "/var/tmp/test"
 
 	// mock os.MkdirAll
 	osMkdirAll = mockMkdirAll
@@ -210,7 +210,7 @@ func TestSuccessfulSnapCore20(t *testing.T) {
 	stateMachine.parent = &stateMachine
 	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20")
 	stateMachine.Opts.FactoryImage = true
-	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
@@ -252,7 +252,7 @@ func TestSuccessfulSnapCore20WithComponents(t *testing.T) {
 	stateMachine.Opts.FactoryImage = true
 	stateMachine.Opts.Snaps = []string{"core24", "test-snap-with-components"}
 	stateMachine.Opts.Components = []string{"test-snap-with-components+one", "test-snap-with-components+two"}
-	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
@@ -307,7 +307,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 	stateMachine.commonFlags.Channel = "stable"
 	stateMachine.Opts.CloudInit = filepath.Join("testdata", "user-data")
 	stateMachine.Opts.Snaps = []string{"hello-world"}
-	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
@@ -434,7 +434,7 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 			defer restoreCWD()
 
 			var stateMachine SnapStateMachine
-			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() { os.RemoveAll(workDir) })
 
@@ -480,7 +480,7 @@ func TestGenerateSnapManifest(t *testing.T) {
 			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
-			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() { os.RemoveAll(workDir) })
 			var stateMachine SnapStateMachine
@@ -556,7 +556,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 
 	asserter := helper.Asserter{T: t}
 
-	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
 	var stateMachine SnapStateMachine
@@ -666,7 +666,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 			// use core18 because it builds the fastest
 			stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 			stateMachine.Opts.Snaps = tc.snapArgs
-			workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() { os.RemoveAll(workDir) })
 			stateMachine.stateMachineFlags.WorkDir = workDir
@@ -757,7 +757,7 @@ func TestSnapRevisions(t *testing.T) {
 		"hello": 38,
 		"core":  14784,
 	}
-	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
@@ -807,7 +807,7 @@ func TestValidationFlag(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
-	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
@@ -846,7 +846,7 @@ func TestGadgetEdgeCases(t *testing.T) {
 	stateMachine.parent = &stateMachine
 	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion20Dangerous")
 	stateMachine.Opts.FactoryImage = true
-	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir
@@ -882,7 +882,7 @@ func TestPreseedFlag(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
-	workDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	workDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
 	stateMachine.stateMachineFlags.WorkDir = workDir

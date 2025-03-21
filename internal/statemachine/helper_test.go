@@ -263,7 +263,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		helperCopyBlob = helper.CopyBlob
 	})
 	err = stateMachine.copyStructureContent(&mbrStruct, "",
-		filepath.Join("/tmp", uuid.NewString()+".img"))
+		filepath.Join("/var/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error zeroing partition")
 	helperCopyBlob = helper.CopyBlob
 
@@ -273,7 +273,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		blockSize = "1"
 	})
 	err = stateMachine.copyStructureContent(&mbrStruct, "",
-		filepath.Join("/tmp", uuid.NewString()+".img"))
+		filepath.Join("/var/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error copying image blob")
 	blockSize = "1"
 
@@ -283,7 +283,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		helperCopyBlob = helper.CopyBlob
 	})
 	err = stateMachine.copyStructureContent(&rootfsStruct, "",
-		filepath.Join("/tmp", uuid.NewString()+".img"))
+		filepath.Join("/var/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error zeroing image file")
 	helperCopyBlob = helper.CopyBlob
 
@@ -293,7 +293,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		osReadDir = os.ReadDir
 	})
 	err = stateMachine.copyStructureContent(&rootfsStruct, "",
-		filepath.Join("/tmp", uuid.NewString()+".img"))
+		filepath.Join("/var/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error listing contents of volume")
 	osReadDir = os.ReadDir
 
@@ -312,7 +312,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	})
 
 	err = stateMachine.copyStructureContent(&rootfsStruct, "",
-		filepath.Join("/tmp", uuid.NewString()+".img"))
+		filepath.Join("/var/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error preparing env for mkfs")
 	MKE2FS_CONFIG_ENV = OLD_MKE2FS_CONFIG_ENV
 	MKE2FS_BASE_PATH = OLD_MKE2FS_BASE_PATH
@@ -323,7 +323,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		mkfsMakeWithContent = mkfs.MakeWithContent
 	})
 	err = stateMachine.copyStructureContent(&rootfsStruct, "",
-		filepath.Join("/tmp", uuid.NewString()+".img"))
+		filepath.Join("/var/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error running mkfs with content")
 	mkfsMakeWithContent = mkfs.MakeWithContent
 
@@ -334,7 +334,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 		mkfsMake = mkfs.Make
 	})
 	err = stateMachine.copyStructureContent(&rootfsStruct, "",
-		filepath.Join("/tmp", uuid.NewString()+".img"))
+		filepath.Join("/var/tmp", uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error running mkfs")
 	mkfsMake = mkfs.Make
 }
@@ -720,7 +720,7 @@ func TestClassicMachine_manualMakeDirs_fail(t *testing.T) {
 		},
 	}
 
-	tmpDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	tmpDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(tmpDir) })
 
@@ -743,7 +743,7 @@ func TestFailedManualCopyFile(t *testing.T) {
 			Source: "/test/does/not/exist",
 		},
 	}
-	err := manualCopyFile(copyFiles, "/tmp", "/fakedir", true)
+	err := manualCopyFile(copyFiles, "/var/tmp", "/fakedir", true)
 	asserter.AssertErrContains(err, "Error copying file")
 }
 
@@ -958,7 +958,7 @@ func TestManifestRevisionFormat(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 
 	// generate temporary directory
-	tempDir := filepath.Join("/tmp", "manifest-revision-format-"+uuid.NewString())
+	tempDir := filepath.Join("/var/tmp", "manifest-revision-format-"+uuid.NewString())
 	err := os.Mkdir(tempDir, 0755)
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(tempDir) })
@@ -1009,7 +1009,7 @@ func TestLP1981720(t *testing.T) {
 	}
 
 	// create a temporary file for contentRoot
-	contentRoot := filepath.Join("/tmp", uuid.NewString())
+	contentRoot := filepath.Join("/var/tmp", uuid.NewString())
 	err = os.Mkdir(contentRoot, 0755)
 	t.Cleanup(func() { os.RemoveAll(contentRoot) })
 	asserter.AssertErrNil(err, true)
@@ -1099,7 +1099,7 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 	var stateMachine StateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.commonFlags.Debug = true
-	stateMachine.commonFlags.OutputDir = "/tmp"
+	stateMachine.commonFlags.OutputDir = "/var/tmp"
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
@@ -1141,7 +1141,7 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/dev$"),
 		regexp.MustCompile("^umount --recursive .*scratch/loopback/dev$"),
 		regexp.MustCompile("^umount .*scratch/loopback$"),
-		regexp.MustCompile("^losetup --detach .* /tmp$"),
+		regexp.MustCompile("^losetup --detach .* /var/tmp$"),
 	}
 
 	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
@@ -1205,17 +1205,17 @@ func TestStateMachine_setConfDefDir(t *testing.T) {
 		{
 			name:        "simple case",
 			confFileArg: "ubuntu-server.yaml",
-			wantPath:    "/tmp/simple_case",
+			wantPath:    "/var/tmp/simple_case",
 		},
 		{
 			name:        "conf in subdir",
 			confFileArg: "subdir/ubuntu-server.yaml",
-			wantPath:    "/tmp/conf_in_subdir/subdir",
+			wantPath:    "/var/tmp/conf_in_subdir/subdir",
 		},
 		{
 			name:        "conf in parent",
 			confFileArg: "../ubuntu-server.yaml",
-			wantPath:    "/tmp",
+			wantPath:    "/var/tmp",
 		},
 		{
 			name:        "conf at root",
@@ -1235,7 +1235,7 @@ func TestStateMachine_setConfDefDir(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			tName := strings.ReplaceAll(tc.name, " ", "_")
 
-			tmpDirPath := filepath.Join("/tmp", tName)
+			tmpDirPath := filepath.Join("/var/tmp", tName)
 			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 
