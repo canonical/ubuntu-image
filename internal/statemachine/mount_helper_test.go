@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 func Test_getMountCmd(t *testing.T) {
@@ -129,7 +130,7 @@ func Test_getMountCmd_fail(t *testing.T) {
 
 	mp := mountPoint{
 		typ:      "devtmps",
-		basePath: "/var/tmp",
+		basePath: testhelper.DefaultTmpDir,
 		relpath:  "1234567",
 		src:      "src",
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 var basicImageDef = imagedefinition.ImageDefinition{
@@ -62,7 +63,7 @@ func (b *basicChrooter) init() error {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = basicImageDef
-	path := filepath.Join("/var/tmp", "ubuntu-image-chroot-"+uuid.NewString())
+	path := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-chroot-"+uuid.NewString())
 	stateMachine.tempDirs.chroot = path
 
 	err := helper.SetDefaults(&stateMachine.ImageDef)

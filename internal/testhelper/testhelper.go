@@ -10,6 +10,8 @@ import (
 	"os"
 )
 
+const DefaultTmpDir = "/var/tmp"
+
 // SaveCWD gets the current working directory and returns a function to go back to it
 // nolint: errcheck
 func SaveCWD() func() {

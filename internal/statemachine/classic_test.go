@@ -581,7 +581,7 @@ func TestClassicStateMachine_Setup_Fail_setConfDefDir(t *testing.T) {
 	var stateMachine ClassicStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-	tmpDirPath := filepath.Join("/var/tmp", "test_failed_set_conf_dir")
+	tmpDirPath := filepath.Join(testhelper.DefaultTmpDir, "test_failed_set_conf_dir")
 	err := os.Mkdir(tmpDirPath, 0755)
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDirPath)
@@ -667,7 +667,7 @@ func TestClassicStateMachine_Setup_Fail_determineOutputDirectory(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 		"test_amd64.yaml")
-	stateMachine.commonFlags.OutputDir = "/var/tmp/test"
+	stateMachine.commonFlags.OutputDir = filepath.Join(testhelper.DefaultTmpDir, "test")
 
 	// mock os.MkdirAll
 	osMkdirAll = mockMkdirAll
@@ -2762,7 +2762,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 		execCommand = exec.Command
 	})
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -2825,7 +2825,7 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 	}
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 	stateMachine.commonFlags.OutputDir = outputDir
@@ -2868,7 +2868,7 @@ func TestGenerateFilelist(t *testing.T) {
 		execCommand = exec.Command
 	})
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -2937,7 +2937,7 @@ func TestFailedGenerateFilelist(t *testing.T) {
 	}
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 	stateMachine.commonFlags.OutputDir = outputDir
@@ -2982,7 +2982,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -3347,7 +3347,7 @@ func TestSuccessfulClassicRunNoArtifact(t *testing.T) {
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -3389,7 +3389,7 @@ func TestSuccessfulRootfsGeneration(t *testing.T) {
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
@@ -4231,7 +4231,7 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.commonFlags.Debug = true
 	stateMachine.parent = &stateMachine
-	stateMachine.commonFlags.OutputDir = "/var/tmp"
+	stateMachine.commonFlags.OutputDir = testhelper.DefaultTmpDir
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
@@ -4321,7 +4321,7 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.commonFlags.Debug = true
 	stateMachine.parent = &stateMachine
-	stateMachine.commonFlags.OutputDir = "/var/tmp"
+	stateMachine.commonFlags.OutputDir = testhelper.DefaultTmpDir
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
@@ -4462,7 +4462,7 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 func Test_generateMountPointCmds_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 
-	tmpDirPath := filepath.Join("/var/tmp", "test_failed_set_conf_dir")
+	tmpDirPath := filepath.Join(testhelper.DefaultTmpDir, "test_failed_set_conf_dir")
 	err := os.Mkdir(tmpDirPath, 0755)
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDirPath)
