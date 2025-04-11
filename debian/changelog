@@ -1,3 +1,11 @@
+ubuntu-image (3.6.1) UNRELEASED; urgency=medium
+
+  [ Paul Mars ]
+  * add mkfs configuration for plucky
+  * use /var/tmp as the default workdir
+
+ -- Paul Mars <paul.mars@canonical.com>  Fri, 11 Apr 2025 14:21:14 +0100
+
 ubuntu-image (3.6.0) UNRELEASED; urgency=medium
 
   [ Andrew Phelps ]
