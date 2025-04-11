@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"io"
@@ -35,7 +36,7 @@ func (mockSM *mockedStateMachine) Setup() error {
 	return nil
 }
 
-func (mockSM *mockedStateMachine) Run() error {
+func (mockSM *mockedStateMachine) Run(ctx context.Context) error {
 	if mockSM.whenToFail == "Run" {
 		return ErrAtRun
 	}
