@@ -29,6 +29,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 		Channel:                   snapStateMachine.commonFlags.Channel,
 		Customizations:            snapStateMachine.imageOptsCustomizations(),
 		Components:                snapStateMachine.Opts.Components,
+		ExtraAssertionsFiles:      snapStateMachine.Opts.ExtraAssertionFilenames,
 	}
 
 	var err error
