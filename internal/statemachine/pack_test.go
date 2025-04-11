@@ -287,15 +287,15 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 	t.Cleanup(restoreCWD)
 
 	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-")
+	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outputDir) })
 
-	gadgetDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-gadget-")
+	gadgetDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-gadget-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(gadgetDir) })
 
-	rootfsDir, err := os.MkdirTemp("/var/tmp", "ubuntu-image-rootfs-")
+	rootfsDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-rootfs-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(rootfsDir) })
 
