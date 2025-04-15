@@ -974,3 +974,62 @@ func TestSnapStateMachine_decodeModelAssertion(t *testing.T) {
 		})
 	}
 }
+
+// TestAssertionFlag tests that paths passed to the `--assert` flag are copied
+// in the image.Options struct that is used as argument for snapd's image.Prepare
+func TestAssertionFlag(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	testCases := []struct {
+		name          string
+		assertionArgs []string
+		expectedArgs  []string
+	}{
+		{"no_assertions", []string{}, []string{}},
+		{"one_assertion", []string{"/path/to/assertion"}, []string{"/path/to/assertion"}},
+		{"multiple_assertions", []string{"/path/to/assertion1", "/path/to/assertion2"}, []string{"/path/to/assertion1", "/path/to/assertion2"}},
+	}
+
+	var calledOpts *image.Options
+	imagePrepare = func(opts *image.Options) error {
+		calledOpts = opts
+		return nil
+	}
+	defer func() {
+		imagePrepare = image.Prepare
+	}()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			restoreCWD := testhelper.SaveCWD()
+			defer restoreCWD()
+
+			var stateMachine SnapStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidation")
+			workDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
+			asserter.AssertErrNil(err, true)
+			t.Cleanup(func() { os.RemoveAll(workDir) })
+			stateMachine.stateMachineFlags.WorkDir = workDir
+			stateMachine.stateMachineFlags.Thru = "prepare_image"
+			stateMachine.Opts.Preseed = true
+			stateMachine.Opts.AppArmorKernelFeaturesDir = "/some/path"
+			stateMachine.Opts.PreseedSignKey = "akey"
+			stateMachine.Opts.ExtraAssertionFilenames = tc.assertionArgs
+
+			err = stateMachine.Setup()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.Run()
+			asserter.AssertErrNil(err, true)
+
+			asserter.AssertEqual(tc.expectedArgs, calledOpts.ExtraAssertionsFiles)
+		})
+	}
+}
