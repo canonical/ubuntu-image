@@ -17,7 +17,7 @@ type SnapOpts struct {
 	CloudInit                 string         `long:"cloud-init" description:"cloud-config data to be copied to the image" value-name:"USER-DATA-FILE"`
 	Revisions                 map[string]int `long:"revision" description:"The revision of a specific snap to install in the image." value-name:"REVISION"`
 	SysfsOverlay              string         `long:"sysfs-overlay" description:"The optional sysfs overlay to used for preseeding. Directories from /sys/class/* and /sys/devices/platform will be bind-mounted to the chroot when preseeding"`
-	ExtraAssertionFilenames   []string       `long:"assert" description:"The name of a file containing an assertion that needs to be included in the built image."`
+	ExtraAssertionFilenames   []string       `long:"assertion" description:"Include extra assertions. Each usage indicates the path to a file containing the assertions. The paths are passed through to \"snap-prepare-image\" that validates their contents." value-name:"ASSERTION-FILE"`
 }
 
 type SnapCommand struct {
