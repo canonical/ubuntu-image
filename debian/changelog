@@ -1,3 +1,11 @@
+ubuntu-image (3.7.0) UNRELEASED; urgency=medium
+
+  [ Lorenzo Medici ]
+  * add new CLI option "--assertion" to include assertions from files when
+    building Ubuntu images
+
+ -- Lorenzo Medici <lorenzo.medici@canonical.com>  Wed, 16 Apr 2025 14:57:15 +0200
+
 ubuntu-image (3.6.1) UNRELEASED; urgency=medium
 
   [ Paul Mars ]
