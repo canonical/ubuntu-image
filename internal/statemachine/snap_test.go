@@ -978,9 +978,6 @@ func TestSnapStateMachine_decodeModelAssertion(t *testing.T) {
 // TestAssertionFlag tests that paths passed to the `--assert` flag are copied
 // in the image.Options struct that is used as argument for snapd's image.Prepare
 func TestAssertionFlag(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
 	testCases := []struct {
 		name          string
 		assertionArgs []string
@@ -1007,8 +1004,6 @@ func TestAssertionFlag(t *testing.T) {
 			defer restoreCWD()
 
 			var stateMachine SnapStateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.parent = &stateMachine
 
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.parent = &stateMachine
