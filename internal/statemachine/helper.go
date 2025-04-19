@@ -766,20 +766,36 @@ func manualCopyFile(customizations []*imagedefinition.CopyFile, confDefPath stri
 	return nil
 }
 
-// manualExecute executes executable files in the chroot
+// manualExecute executes commands or executables in the chroot
 func manualExecute(customizations []*imagedefinition.Execute, targetDir string, debug bool) error {
 	for _, c := range customizations {
-		executeCmd := execCommand("chroot", targetDir, c.ExecutePath)
+		args := toExecute(c)
+
+		executeCmd := execCommand("chroot", append([]string{targetDir}, args...)...)
 		if debug {
 			fmt.Printf("Executing command \"%s\"\n", executeCmd.String())
 		}
-		executeOutput := helper.SetCommandOutput(executeCmd, debug)
-		err := executeCmd.Run()
+		executeCmd.Env = append(executeCmd.Env, c.Env...)
+
+		err := runCmd(executeCmd, debug)
 		if err != nil {
-			return fmt.Errorf("Error running script \"%s\". Error is %s. Full output below:\n%s",
-				executeCmd.String(), err.Error(), executeOutput.String())
+			return err
 		}
 	}
+	return nil
+}
+
+// toExecute returns the slice of commands/parameters to execute
+func toExecute(e *imagedefinition.Execute) []string {
+	// We already checked both cannot be set at the same time
+	if len(e.ExecutePath) != 0 {
+		return []string{e.ExecutePath}
+	}
+
+	if len(e.ExecuteCommand) != 0 {
+		return strings.Split(e.ExecuteCommand, " ")
+	}
+
 	return nil
 }
 
