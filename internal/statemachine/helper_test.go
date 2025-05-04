@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -242,7 +243,7 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	// need workdir and loaded gadget.yaml set up for this
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	err = stateMachine.loadGadgetYaml()
+	err = stateMachine.loadGadgetYaml(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	// separate out the volumeStructures to test different scenarios
@@ -383,7 +384,7 @@ func TestFailedWriteOffsetValues(t *testing.T) {
 	// need workdir and loaded gadget.yaml set up for this
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	err = stateMachine.loadGadgetYaml()
+	err = stateMachine.loadGadgetYaml(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	// create an empty pc.img
@@ -422,7 +423,7 @@ func TestStructureContentNonFSStructure(t *testing.T) {
 	// need workdir and loaded gadget.yaml set up for this
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	err = stateMachine.loadGadgetYaml()
+	err = stateMachine.loadGadgetYaml(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	// manually set the size of the rootfs structure to 0
@@ -623,7 +624,7 @@ func TestGenerateGerminateCmd(t *testing.T) {
 					Components: []string{"main", "universe"},
 				},
 			}
-			germinateCmd := generateGerminateCmd(imageDef)
+			germinateCmd := generateGerminateCmd(context.Background(), imageDef)
 			fmt.Print(germinateCmd)
 
 			if !strings.Contains(germinateCmd.String(), tc.mirror) {
@@ -757,7 +758,7 @@ func TestFailedManualTouchFile(t *testing.T) {
 			TouchPath: "/test/does/not/exist",
 		},
 	}
-	err := manualTouchFile(touchFiles, "/fakedir", true)
+	err := manualTouchFile(context.Background(), touchFiles, "/fakedir", true)
 	asserter.AssertErrContains(err, "Error creating file")
 }
 
@@ -771,7 +772,7 @@ func TestFailedManualExecute(t *testing.T) {
 			ExecutePath: "/test/does/not/exist",
 		},
 	}
-	err := manualExecute(executes, "fakedir", true)
+	err := manualExecute(context.Background(), executes, "fakedir", true)
 	asserter.AssertErrContains(err, "Error running script")
 }
 
@@ -786,7 +787,7 @@ func TestFailedManualAddGroup(t *testing.T) {
 			GroupID:   "123",
 		},
 	}
-	err := manualAddGroup(addGroups, "fakedir", true)
+	err := manualAddGroup(context.Background(), addGroups, "fakedir", true)
 	asserter.AssertErrContains(err, "Error adding group")
 }
 
@@ -889,7 +890,7 @@ func Test_manualAddUser(t *testing.T) {
 			runCmd = mockCmder.runCmd
 			t.Cleanup(func() { runCmd = helper.RunCmd })
 
-			err := manualAddUser(tc.addUsers, "fakedir", true)
+			err := manualAddUser(context.Background(), tc.addUsers, "fakedir", true)
 			if len(tc.expectedError) == 0 {
 				asserter.AssertErrNil(err, true)
 			} else {
@@ -926,7 +927,7 @@ func TestFailedManualAddUser(t *testing.T) {
 			UserID:   "123",
 		},
 	}
-	err := manualAddUser(addUsers, "fakedir", true)
+	err := manualAddUser(context.Background(), addUsers, "fakedir", true)
 	asserter.AssertErrContains(err, "Error running command")
 }
 
@@ -944,7 +945,7 @@ func TestGenerateAptCmds(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
-			aptCmds := generateAptCmds(tc.targetDir, tc.packageList)
+			aptCmds := generateAptCmds(context.Background(), tc.targetDir, tc.packageList)
 			if !strings.Contains(aptCmds[1].String(), tc.expected) {
 				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmds[1].String())
 			}
@@ -997,7 +998,7 @@ func TestLP1981720(t *testing.T) {
 	// need workdir and loaded gadget.yaml set up for this
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
-	err = stateMachine.loadGadgetYaml()
+	err = stateMachine.loadGadgetYaml(context.Background())
 	asserter.AssertErrNil(err, true)
 
 	var bootStruct gadget.VolumeStructure
@@ -1108,14 +1109,14 @@ func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
 
 	mockCmder := NewMockExecCommand()
 
-	execCommand = mockCmder.Command
-	t.Cleanup(func() { execCommand = exec.Command })
+	execCommandCtx = mockCmder.CommandContext
+	t.Cleanup(func() { execCommandCtx = exec.CommandContext })
 
 	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { restoreStdout() })
 
-	err = stateMachine.updateGrub("", 2)
+	err = stateMachine.updateGrub(context.Background(), "", 2)
 	asserter.AssertErrNil(err, true)
 
 	restoreStdout()
@@ -1174,24 +1175,24 @@ func TestFailedUpdateGrub(t *testing.T) {
 	t.Cleanup(func() {
 		osMkdir = os.Mkdir
 	})
-	err = stateMachine.updateGrub("", 0)
+	err = stateMachine.updateGrub(context.Background(), "", 0)
 	asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
 	osMkdir = os.Mkdir
 
 	// Setup the exec.Command mock to mock losetup
 	testCaseName = "TestFailedUpdateGrubLosetup"
-	execCommand = fakeExecCommand
+	execCommandCtx = fakeExecCommandContext
 	t.Cleanup(func() {
-		execCommand = exec.Command
+		execCommandCtx = exec.CommandContext
 	})
-	err = stateMachine.updateGrub("", 0)
+	err = stateMachine.updateGrub(context.Background(), "", 0)
 	asserter.AssertErrContains(err, "Error running losetup command")
 
 	// now test a command failure that isn't losetup
 	testCaseName = "TestFailedUpdateGrubOther"
-	err = stateMachine.updateGrub("", 0)
+	err = stateMachine.updateGrub(context.Background(), "", 0)
 	asserter.AssertErrContains(err, "Error running command")
-	execCommand = exec.Command
+	execCommandCtx = exec.CommandContext
 }
 
 func TestStateMachine_setConfDefDir(t *testing.T) {

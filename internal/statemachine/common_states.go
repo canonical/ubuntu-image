@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -17,11 +18,11 @@ import (
 	"github.com/canonical/ubuntu-image/internal/partition"
 )
 
-var setArtifactNamesState = stateFunc{"set_artifact_names", (*StateMachine).setArtifactNames}
+var setArtifactNamesState = stateFunc{"set_artifact_names", (*StateMachine).setArtifactNames, nil}
 
 // for snap/core image builds, the image name is always <volume-name>.img for
 // each volume in the gadget. This function stores that info in the struct
-func (stateMachine *StateMachine) setArtifactNames() error {
+func (stateMachine *StateMachine) setArtifactNames(ctx context.Context) error {
 	stateMachine.VolumeNames = make(map[string]string)
 	for volumeName := range stateMachine.GadgetInfo.Volumes {
 		stateMachine.VolumeNames[volumeName] = volumeName + ".img"
@@ -29,10 +30,10 @@ func (stateMachine *StateMachine) setArtifactNames() error {
 	return nil
 }
 
-var loadGadgetYamlState = stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml}
+var loadGadgetYamlState = stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml, nil}
 
 // Load gadget.yaml, do some validation, and store the relevant info in the StateMachine struct
-func (stateMachine *StateMachine) loadGadgetYaml() error {
+func (stateMachine *StateMachine) loadGadgetYaml(ctx context.Context) error {
 	gadgetYamlDst := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "gadget.yaml")
 	if err := osutilCopyFile(stateMachine.YamlFilePath,
 		gadgetYamlDst, osutil.CopyFlagOverwrite); err != nil {
@@ -116,10 +117,10 @@ func (stateMachine *StateMachine) validateVolumes() error {
 	return nil
 }
 
-var generateDiskInfoState = stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo}
+var generateDiskInfoState = stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo, nil}
 
 // If --disk-info was used, copy the provided file to the correct location
-func (stateMachine *StateMachine) generateDiskInfo() error {
+func (stateMachine *StateMachine) generateDiskInfo(ctx context.Context) error {
 	if stateMachine.commonFlags.DiskInfo != "" {
 		diskInfoDir := filepath.Join(stateMachine.tempDirs.rootfs, ".disk")
 		if err := osMkdir(diskInfoDir, 0755); err != nil {
@@ -142,12 +143,12 @@ const ext4FudgeFactor = 1.5
 // metadata, so use 8MB as a minimum padding
 const ext4Padding = 8 * quantity.SizeMiB
 
-var calculateRootfsSizeState = stateFunc{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize}
+var calculateRootfsSizeState = stateFunc{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize, nil}
 
 // calculateRootfsSize calculates the size needed by the root filesystem.
 // If an image size was specified, make sure it is big enough to contain the
 // rootfs and try to allocate it to the rootfs
-func (stateMachine *StateMachine) calculateRootfsSize() error {
+func (stateMachine *StateMachine) calculateRootfsSize(ctx context.Context) error {
 	rootfsMinSize, err := stateMachine.getRootfsMinSize()
 	if err != nil {
 		return err
@@ -267,10 +268,10 @@ func (stateMachine *StateMachine) alignToSectorSize(size quantity.Size) quantity
 		quantity.Size(stateMachine.SectorSize)
 }
 
-var populateBootfsContentsState = stateFunc{"populate_bootfs_contents", (*StateMachine).populateBootfsContents}
+var populateBootfsContentsState = stateFunc{"populate_bootfs_contents", (*StateMachine).populateBootfsContents, nil}
 
 // Populate the Bootfs Contents by using snapd's MountedFilesystemWriter
-func (stateMachine *StateMachine) populateBootfsContents() error {
+func (stateMachine *StateMachine) populateBootfsContents(ctx context.Context) error {
 	var preserve []string
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
@@ -349,14 +350,14 @@ func (stateMachine *StateMachine) populateBootfsLayoutStructure(laidOutStructure
 	return nil
 }
 
-var populatePreparePartitionsState = stateFunc{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions}
+var populatePreparePartitionsState = stateFunc{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions, nil}
 
 // populatePreparePartitions populates and prepares the partitions. For partitions without
 // "filesystem:" specified in gadget.yaml, this involves using dd to copy the content blobs
 // into a .img file. For partitions that do have "filesystem:" specified, we use the Mkfs
 // functions from snapd.
 // Throughout this process, the offset is tracked to ensure partitions are not overlapping.
-func (stateMachine *StateMachine) populatePreparePartitions() error {
+func (stateMachine *StateMachine) populatePreparePartitions(ctx context.Context) error {
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
 		if err := stateMachine.handleLkBootloader(volume); err != nil {
@@ -406,10 +407,10 @@ func (stateMachine *StateMachine) growImageSize(currentSize quantity.Size, volum
 	}
 }
 
-var makeDiskState = stateFunc{"make_disk", (*StateMachine).makeDisk}
+var makeDiskState = stateFunc{"make_disk", (*StateMachine).makeDisk, nil}
 
 // makeDisk makes the disk image
-func (stateMachine *StateMachine) makeDisk() error {
+func (stateMachine *StateMachine) makeDisk(ctx context.Context) error {
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		_, found := stateMachine.VolumeNames[volumeName]
 		if !found {
