@@ -30,6 +30,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 		Customizations:            snapStateMachine.imageOptsCustomizations(),
 		Components:                snapStateMachine.Opts.Components,
 		ExtraAssertionsFiles:      snapStateMachine.Opts.ExtraAssertionFilenames,
+		AllowSnapdKernelMismatch:  snapStateMachine.Opts.AllowSnapdKernelMismatch,
 	}
 
 	var err error
