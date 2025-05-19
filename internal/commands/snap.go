@@ -18,6 +18,7 @@ type SnapOpts struct {
 	Revisions                 map[string]int `long:"revision" description:"The revision of a specific snap to install in the image." value-name:"REVISION"`
 	SysfsOverlay              string         `long:"sysfs-overlay" description:"The optional sysfs overlay to used for preseeding. Directories from /sys/class/* and /sys/devices/platform will be bind-mounted to the chroot when preseeding"`
 	ExtraAssertionFilenames   []string       `long:"assertion" description:"Include extra assertions. Each usage indicates the path to a file containing the assertions. The paths are passed through to \"snap-prepare-image\" that validates their contents." value-name:"ASSERTION-FILE"`
+	AllowSnapdKernelMismatch  bool           `long:"allow-snapd-kernel-mismatch" description:"Allow mismatch between snap-bootstrap in the kernel and the snapd snap"`
 }
 
 type SnapCommand struct {
