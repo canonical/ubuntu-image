@@ -444,6 +444,7 @@ func TestPopulateSnapRootfsContents(t *testing.T) {
 			stateMachine.Args.ModelAssertion = tc.modelAssertion
 			stateMachine.stateMachineFlags.WorkDir = workDir
 			stateMachine.stateMachineFlags.Thru = "populate_rootfs_contents"
+			stateMachine.Opts.AllowSnapdKernelMismatch = true
 
 			err = stateMachine.Setup()
 			asserter.AssertErrNil(err, true)
