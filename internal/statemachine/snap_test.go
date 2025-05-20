@@ -307,6 +307,7 @@ func TestSuccessfulSnapCore18(t *testing.T) {
 	stateMachine.commonFlags.Channel = "stable"
 	stateMachine.Opts.CloudInit = filepath.Join("testdata", "user-data")
 	stateMachine.Opts.Snaps = []string{"hello-world"}
+	stateMachine.Opts.AllowSnapdKernelMismatch = true
 	workDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
@@ -564,6 +565,7 @@ func TestFailedPopulateSnapRootfsContents(t *testing.T) {
 	stateMachine.parent = &stateMachine
 	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.Opts.AllowSnapdKernelMismatch = true
 
 	// need workdir and gadget.yaml set up for this
 	err = stateMachine.determineOutputDirectory()
@@ -666,6 +668,7 @@ func TestSnapFlagSyntax(t *testing.T) {
 			// use core18 because it builds the fastest
 			stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertion18")
 			stateMachine.Opts.Snaps = tc.snapArgs
+			stateMachine.Opts.AllowSnapdKernelMismatch = true
 			workDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() { os.RemoveAll(workDir) })
@@ -757,6 +760,7 @@ func TestSnapRevisions(t *testing.T) {
 		"hello": 38,
 		"core":  14784,
 	}
+	stateMachine.Opts.AllowSnapdKernelMismatch = true
 	workDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(workDir) })
