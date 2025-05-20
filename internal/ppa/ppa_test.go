@@ -19,7 +19,7 @@ import (
 var (
 	imageDefPPA1 = &imagedefinition.PPA{
 		Name:        "canonical-foundations/ubuntu-image",
-		Auth:        "sil2100:vVg74j6SM8WVltwpxDRJ",
+		Auth:        "upils:Z3jNRMLKnSvSbt3J1lk3",
 		Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
 		KeepEnabled: helper.BoolPtr(false),
 	}
@@ -31,13 +31,13 @@ var (
 
 	imageDefPPA3 = &imagedefinition.PPA{
 		Name:        "canonical-foundations/ubuntu-image-private-test",
-		Auth:        "sil2100:vVg74j6SM8WVltwpxDRJ",
+		Auth:        "upils:Z3jNRMLKnSvSbt3J1lk3",
 		Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
 		KeepEnabled: helper.BoolPtr(false),
 	}
 
 	deb822PPA1Content = `Types: deb
-URIS: https://sil2100:vVg74j6SM8WVltwpxDRJ@private-ppa.launchpadcontent.net/canonical-foundations/ubuntu-image/ubuntu
+URIS: https://upils:Z3jNRMLKnSvSbt3J1lk3@private-ppa.launchpadcontent.net/canonical-foundations/ubuntu-image/ubuntu
 Suites: jammy
 Components: main
 Signed-By:
@@ -56,7 +56,7 @@ Signed-By:
 `
 
 	deb822PPA3Content = `Types: deb
-URIS: https://sil2100:vVg74j6SM8WVltwpxDRJ@private-ppa.launchpadcontent.net/canonical-foundations/ubuntu-image-private-test/ubuntu
+URIS: https://upils:Z3jNRMLKnSvSbt3J1lk3@private-ppa.launchpadcontent.net/canonical-foundations/ubuntu-image-private-test/ubuntu
 Suites: jammy
 Components: main
 Signed-By:
@@ -412,7 +412,7 @@ func TestRemove_fail(t *testing.T) {
 			BasePPA{
 				PPA: &imagedefinition.PPA{
 					Name:        "canonical-foundations/ubuntu-image",
-					Auth:        "sil2100:vVg74j6SM8WVltwpxDRJ",
+					Auth:        "upils:Z3jNRMLKnSvSbt3J1lk3",
 					Fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139",
 					KeepEnabled: nil,
 				},
