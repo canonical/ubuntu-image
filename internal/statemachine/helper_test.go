@@ -248,11 +248,12 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	// separate out the volumeStructures to test different scenarios
 	var mbrStruct gadget.VolumeStructure
 	var rootfsStruct gadget.VolumeStructure
-	var volume *gadget.Volume = stateMachine.GadgetInfo.Volumes["pc"]
+	var volume = stateMachine.GadgetInfo.Volumes["pc"]
 	for _, structure := range volume.Structure {
-		if structure.Name == "mbr" {
+		switch structure.Name {
+		case "mbr":
 			mbrStruct = structure
-		} else if structure.Name == "EFI System" {
+		case "EFI System":
 			rootfsStruct = structure
 		}
 	}
@@ -297,25 +298,25 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	asserter.AssertErrContains(err, "Error listing contents of volume")
 	osReadDir = os.ReadDir
 
-	// Set invalid value in MKE2FS_CONFIG_ENV
-	OLD_MKE2FS_CONFIG_ENV := MKE2FS_CONFIG_ENV
-	MKE2FS_CONFIG_ENV = "test="
+	// Set invalid value in Mke2fsConfigEnv
+	OldMke2fsConfigEnv := Mke2fsConfigEnv
+	Mke2fsConfigEnv = "test="
 
 	err = os.Setenv("SNAP", "testdata/mkfs")
 	asserter.AssertErrNil(err, true)
 
-	OLD_MKE2FS_BASE_PATH := MKE2FS_BASE_PATH
-	MKE2FS_BASE_PATH = "base_path_test"
+	OldMke2fsBasepath := Mke2fsBasepath
+	Mke2fsBasepath = "base_path_test"
 
 	t.Cleanup(func() {
-		MKE2FS_BASE_PATH = OLD_MKE2FS_BASE_PATH
+		Mke2fsBasepath = OldMke2fsBasepath
 	})
 
 	err = stateMachine.copyStructureContent(&rootfsStruct, "",
 		filepath.Join(testhelper.DefaultTmpDir, uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error preparing env for mkfs")
-	MKE2FS_CONFIG_ENV = OLD_MKE2FS_CONFIG_ENV
-	MKE2FS_BASE_PATH = OLD_MKE2FS_BASE_PATH
+	Mke2fsConfigEnv = OldMke2fsConfigEnv
+	Mke2fsBasepath = OldMke2fsBasepath
 
 	// mock gadget.MkfsWithContent
 	mkfsMakeWithContent = mockMkfsWithContent
@@ -426,9 +427,9 @@ func TestStructureContentNonFSStructure(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// manually set the size of the rootfs structure to 0
-	var volume *gadget.Volume = stateMachine.GadgetInfo.Volumes["pc"]
+	var volume = stateMachine.GadgetInfo.Volumes["pc"]
 	var nonFSStructure gadget.VolumeStructure
-	var nonFSStructureNumber int = -1
+	var nonFSStructureNumber = -1
 	for structureNumber, structure := range volume.Structure {
 		if structure.Name == "placeholder" {
 			nonFSStructure = structure
@@ -1001,7 +1002,7 @@ func TestLP1981720(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	var bootStruct gadget.VolumeStructure
-	var volume *gadget.Volume = stateMachine.GadgetInfo.Volumes["pc"]
+	var volume = stateMachine.GadgetInfo.Volumes["pc"]
 	for _, structure := range volume.Structure {
 		if structure.Name == "system-boot" {
 			bootStruct = structure
@@ -1346,14 +1347,14 @@ func TestStateMachine_setMk2fsConf(t *testing.T) {
 
 			osGetenv = tt.envHolder.Getenv
 			osSetenv = tt.envHolder.Setenv
-			OLD_MKE2FS_BASE_PATH := MKE2FS_BASE_PATH
-			MKE2FS_BASE_PATH = tt.mkfsBasePath
+			OldMke2fsBasepath := Mke2fsBasepath
+			Mke2fsBasepath = tt.mkfsBasePath
 
 			t.Cleanup(func() {
 				osGetenv = os.Getenv
 				osSetenv = os.Setenv
-				MKE2FS_BASE_PATH = OLD_MKE2FS_BASE_PATH
-				os.Unsetenv(MKE2FS_CONFIG_ENV)
+				Mke2fsBasepath = OldMke2fsBasepath
+				os.Unsetenv(Mke2fsConfigEnv)
 			})
 
 			err := setMk2fsConf(tt.fields.series)
@@ -1361,9 +1362,9 @@ func TestStateMachine_setMk2fsConf(t *testing.T) {
 
 			var got string
 			if tt.envHolder.mockSetenv {
-				got = tt.envHolder.env[MKE2FS_CONFIG_ENV]
+				got = tt.envHolder.env[Mke2fsConfigEnv]
 			} else {
-				got = os.Getenv(MKE2FS_CONFIG_ENV)
+				got = os.Getenv(Mke2fsConfigEnv)
 			}
 			asserter.AssertEqual(tt.want, got)
 		})

@@ -317,10 +317,10 @@ func (i ImageDefinition) securityMirror() string {
 
 // List of valid pockets
 const (
-	RELEASE_POCKET  = "release"
-	SECURITY_POCKET = "security"
-	UPDATES_POCKET  = "updates"
-	PROPOSED_POCKET = "proposed"
+	ReleasePocket  = "release"
+	SecurityPocket = "security"
+	UpdatesPocket  = "updates"
+	ProposedPocket = "proposed"
 )
 
 // generateLegacySourcesList returns the content to write to the sources.list file
@@ -343,13 +343,13 @@ func generateLegacySourcesList(series string, components []string, mirror string
 	sourcesList := make([]string, 0)
 
 	switch pocket {
-	case RELEASE_POCKET:
+	case ReleasePocket:
 		sourcesList = append(sourcesList, releaseSource)
-	case SECURITY_POCKET:
+	case SecurityPocket:
 		sourcesList = append(sourcesList, releaseSource, securitySource)
-	case UPDATES_POCKET:
+	case UpdatesPocket:
 		sourcesList = append(sourcesList, releaseSource, securitySource, updatesSource)
-	case PROPOSED_POCKET:
+	case ProposedPocket:
 		sourcesList = append(sourcesList, releaseSource, securitySource, updatesSource, proposedSource)
 	}
 
@@ -399,15 +399,15 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 	suites := make([]string, 0)
 
 	switch pocket {
-	case SECURITY_POCKET:
+	case SecurityPocket:
 		suites = []string{series + "-security"}
-	case PROPOSED_POCKET:
+	case ProposedPocket:
 		suites = append([]string{series + "-proposed"}, suites...)
 		fallthrough
-	case UPDATES_POCKET:
+	case UpdatesPocket:
 		suites = append([]string{series + "-updates"}, suites...)
 		fallthrough
-	case RELEASE_POCKET:
+	case ReleasePocket:
 		suites = append([]string{series}, suites...)
 	}
 
@@ -491,7 +491,7 @@ func (i *ImageDefinition) deb822SourcesList(target bool) string {
 		i.securityMirror(),
 		i.Series,
 		i.Rootfs.Components,
-		SECURITY_POCKET,
+		SecurityPocket,
 	)
 
 	return ubuntuSources

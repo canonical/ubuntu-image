@@ -212,7 +212,7 @@ func (p *BasePPA) importKey(basePath string, ppaFileName string, ascii bool, deb
 // Fingerprint for private PPA cannot be fetched, so they have to be provided in
 // the configuration.
 func (p *BasePPA) ensureFingerprint(baseURL string) error {
-	if p.PPA.Fingerprint != "" {
+	if p.Fingerprint != "" {
 		return nil
 	}
 	// The YAML schema has already been validated that if no fingerprint is
@@ -316,7 +316,7 @@ func (p *LegacyPPA) FileContent() (string, error) {
 }
 
 func (p *LegacyPPA) ImportKey(basePath string, debug bool) error {
-	return p.BasePPA.importKey(basePath, p.FileName(), false, debug)
+	return p.importKey(basePath, p.FileName(), false, debug)
 }
 
 func (p *LegacyPPA) Remove(basePath string) error {
@@ -349,7 +349,7 @@ func (p *Deb822PPA) FileName() string {
 }
 
 func (p *Deb822PPA) FileContent() (string, error) {
-	key, err := p.formatKey(p.BasePPA.signingKey)
+	key, err := p.formatKey(p.signingKey)
 	if err != nil {
 		return "", err
 	}
@@ -360,7 +360,7 @@ func (p *Deb822PPA) FileContent() (string, error) {
 }
 
 func (p *Deb822PPA) ImportKey(basePath string, debug bool) error {
-	return p.BasePPA.importKey(basePath, p.FileName(), true, debug)
+	return p.importKey(basePath, p.FileName(), true, debug)
 }
 
 func (p *Deb822PPA) Remove(basePath string) error {

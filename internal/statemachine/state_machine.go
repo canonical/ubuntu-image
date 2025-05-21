@@ -263,10 +263,10 @@ func (stateMachine *StateMachine) saveVolumeOrder(gadgetYamlContents string) {
 // - Adds the rootfs to the partitions list if needed
 // - Adds missing content
 func (stateMachine *StateMachine) postProcessGadgetYaml() error {
-	var rootfsSeen bool = false
+	var rootfsSeen = false
 	var farthestOffset quantity.Offset
 	var lastOffset quantity.Offset
-	var farthestOffsetUnknown bool = false
+	var farthestOffsetUnknown = false
 	lastVolumeName := ""
 
 	for _, volumeName := range stateMachine.VolumeOrder {
@@ -498,29 +498,29 @@ func rebuildYamlIndex(info *gadget.Info) {
 }
 
 // displayStates print the calculated states
-func (s *StateMachine) displayStates() {
-	if !s.commonFlags.Debug && !s.commonFlags.DryRun {
+func (stateMachine *StateMachine) displayStates() {
+	if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.DryRun {
 		return
 	}
 
 	verb := "will"
-	if s.commonFlags.DryRun {
+	if stateMachine.commonFlags.DryRun {
 		verb = "would"
 	}
 	fmt.Printf("\nFollowing states %s be executed:\n", verb)
 
-	for i, state := range s.states {
-		if state.name == s.stateMachineFlags.Until {
+	for i, state := range stateMachine.states {
+		if state.name == stateMachine.stateMachineFlags.Until {
 			break
 		}
 		fmt.Printf("[%d] %s\n", i, state.name)
 
-		if state.name == s.stateMachineFlags.Thru {
+		if state.name == stateMachine.stateMachineFlags.Thru {
 			break
 		}
 	}
 
-	if s.commonFlags.DryRun {
+	if stateMachine.commonFlags.DryRun {
 		return
 	}
 	fmt.Println("\nContinuing")

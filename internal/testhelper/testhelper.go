@@ -32,7 +32,7 @@ type OSMockConf struct {
 	TruncateThreshold              uint
 	OpenFileThreshold              uint
 	MkdirAllThreshold              uint
-	HttpGetThreshold               uint
+	HTTPGetThreshold               uint
 	ReadAllThreshold               uint
 }
 
@@ -49,7 +49,7 @@ type osMock struct {
 	beforeTruncateFail              uint
 	beforeOpenFileFail              uint
 	beforeMkdirAllFail              uint
-	beforeHttpGetFail               uint
+	beforeHTTPGetFail               uint
 	beforeReadAllFail               uint
 }
 
@@ -122,12 +122,12 @@ func (o *osMock) MkdirAll(path string, perm os.FileMode) error {
 	return nil
 }
 
-// HttpGet mocks http.Get
-func (o *osMock) HttpGet(path string) (*http.Response, error) {
-	if o.beforeHttpGetFail >= o.conf.HttpGetThreshold {
+// HTTPGet mocks http.Get
+func (o *osMock) HTTPGet(path string) (*http.Response, error) {
+	if o.beforeHTTPGetFail >= o.conf.HTTPGetThreshold {
 		return nil, fmt.Errorf("HttpGet fail")
 	}
-	o.beforeHttpGetFail++
+	o.beforeHTTPGetFail++
 
 	return &http.Response{}, nil
 }
@@ -152,7 +152,7 @@ type SfdiskOutput struct {
 
 type PartitionTable struct {
 	Label      string
-	Id         string
+	ID         string
 	Device     string
 	Unit       string
 	FirstLBA   uint64
@@ -166,6 +166,6 @@ type SfDiskPartitions struct {
 	Start uint64
 	Size  uint64
 	Type  string
-	Uuid  string
+	UUID  string
 	Name  string
 }
