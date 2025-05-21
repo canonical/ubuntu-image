@@ -21,11 +21,11 @@ jobs:
         run: FMT=`go fmt ./...` && [ -z "$FMT" ]
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         id: lint
         with:
           version: latest
-          args: '-c .github/.golangci.yml --out-format=colored-line-number'
+          args: '--config=.github/.golangci.yml --out-format=colored-line-number'
           skip-cache: true
 
       - name: Print error message
@@ -33,6 +33,6 @@ jobs:
         run: |
           echo '
           Linting failed. On your local machine, please run
-              golangci-lint run -c .github/.golangci.yml --fix
+              golangci-lint run --config=.github/.golangci.yml --fix
           and check in the changes.'
           exit 1
