@@ -97,7 +97,7 @@ func unhidePackOpts(parser *flags.Parser) {
 }
 
 // parseFlags parses received flags and returns error code accordingly
-func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdout, stderr io.Reader, resume, version bool) (error, int) {
+func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdout, stderr io.Reader, resume, version bool) (int, error) {
 	if _, err := parser.Parse(); err != nil {
 		if e, ok := err.(*flags.Error); ok {
 			switch e.Type {
@@ -107,10 +107,10 @@ func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdou
 				readStdout, err := io.ReadAll(stdout)
 				if err != nil {
 					fmt.Printf("Error reading from stdout: %s\n", err.Error())
-					return err, 1
+					return 1, err
 				}
 				fmt.Println(string(readStdout))
-				return e, 0
+				return 0, e
 			case flags.ErrCommandRequired:
 				// if --resume was given, this is not an error
 				if !resume && !version {
@@ -119,20 +119,20 @@ func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdou
 					readStderr, err := io.ReadAll(stderr)
 					if err != nil {
 						fmt.Printf("Error reading from stderr: %s\n", err.Error())
-						return err, 1
+						return 1, err
 					}
 					fmt.Printf("Error: %s\n", string(readStderr))
-					return e, 1
+					return 1, e
 				}
 			default:
 				restoreStdout()
 				restoreStderr()
 				fmt.Printf("Error: %s\n", err.Error())
-				return e, 1
+				return 1, e
 			}
 		}
 	}
-	return nil, 0
+	return 0, nil
 }
 
 func main() { //nolint: gocyclo
@@ -176,7 +176,7 @@ func main() { //nolint: gocyclo
 	unhidePackOpts(parser)
 
 	// Parse the options provided and handle specific errors
-	err, code := parseFlags(parser, restoreStdout, restoreStderr, stdout, stderr, stateMachineOpts.Resume, commonOpts.Version)
+	code, err := parseFlags(parser, restoreStdout, restoreStderr, stdout, stderr, stateMachineOpts.Resume, commonOpts.Version)
 	if err != nil {
 		osExit(code)
 		return
@@ -198,8 +198,8 @@ func main() { //nolint: gocyclo
 	}
 
 	var imageType string
-	if parser.Command.Active != nil {
-		imageType = parser.Command.Active.Name
+	if parser.Active != nil {
+		imageType = parser.Active.Name
 	}
 
 	// init the state machine

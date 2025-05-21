@@ -323,13 +323,13 @@ func validateAbsolutePath(path string, errorKey string, result *gojsonschema.Res
 // that was loaded previously.
 // If a new possible state is added to the classic build state machine, it
 // should be added here (usually basing on contents of the image definition)
-func (s *StateMachine) calculateStates() error {
-	c := s.parent.(*ClassicStateMachine)
+func (stateMachine *StateMachine) calculateStates() error {
+	c := stateMachine.parent.(*ClassicStateMachine)
 
 	var rootfsCreationStates []stateFunc
 
 	if c.ImageDef.Gadget != nil {
-		s.addGadgetStates(&rootfsCreationStates)
+		stateMachine.addGadgetStates(&rootfsCreationStates)
 	}
 
 	if c.ImageDef.Artifacts != nil {
@@ -349,9 +349,9 @@ func (s *StateMachine) calculateStates() error {
 	// options are mutually exclusive and have been validated
 	// by the schema already
 	if c.ImageDef.Rootfs.Tarball != nil {
-		s.addRootfsFromTarballStates(&rootfsCreationStates)
+		stateMachine.addRootfsFromTarballStates(&rootfsCreationStates)
 	} else if c.ImageDef.Rootfs.Seed != nil {
-		s.addRootfsFromSeedStates(&rootfsCreationStates)
+		stateMachine.addRootfsFromSeedStates(&rootfsCreationStates)
 	} else {
 		rootfsCreationStates = append(rootfsCreationStates, buildRootfsFromTasksState)
 	}
@@ -363,7 +363,7 @@ func (s *StateMachine) calculateStates() error {
 	rootfsCreationStates = append(rootfsCreationStates, customizeSourcesListState)
 
 	if c.ImageDef.Customization != nil {
-		s.addCustomizationStates(&rootfsCreationStates)
+		stateMachine.addCustomizationStates(&rootfsCreationStates)
 	}
 
 	// Make sure that the rootfs has the correct locale set
@@ -372,20 +372,20 @@ func (s *StateMachine) calculateStates() error {
 	// The rootfs is laid out in a staging area, now populate it in the correct location
 	rootfsCreationStates = append(rootfsCreationStates, populateClassicRootfsContentsState)
 
-	if s.commonFlags.DiskInfo != "" {
+	if stateMachine.commonFlags.DiskInfo != "" {
 		rootfsCreationStates = append(rootfsCreationStates, generateDiskInfoState)
 	}
 
-	s.addArtifactsStates(c, &rootfsCreationStates)
+	stateMachine.addArtifactsStates(c, &rootfsCreationStates)
 
 	// Append the newly calculated states to the slice of funcs in the parent struct
-	s.states = append(s.states, rootfsCreationStates...)
+	stateMachine.states = append(stateMachine.states, rootfsCreationStates...)
 
 	return nil
 }
 
-func (s *StateMachine) addGadgetStates(states *[]stateFunc) {
-	c := s.parent.(*ClassicStateMachine)
+func (stateMachine *StateMachine) addGadgetStates(states *[]stateFunc) { //nolint:staticcheck,ST1016
+	c := stateMachine.parent.(*ClassicStateMachine)
 
 	// determine the states needed for preparing the gadget
 	switch c.ImageDef.Gadget.GadgetType {
@@ -400,8 +400,8 @@ func (s *StateMachine) addGadgetStates(states *[]stateFunc) {
 	*states = append(*states, loadGadgetYamlState)
 }
 
-func (s *StateMachine) addRootfsFromTarballStates(states *[]stateFunc) {
-	c := s.parent.(*ClassicStateMachine)
+func (stateMachine *StateMachine) addRootfsFromTarballStates(states *[]stateFunc) {
+	c := stateMachine.parent.(*ClassicStateMachine)
 
 	*states = append(*states, extractRootfsTarState)
 	if c.ImageDef.Customization == nil {
@@ -428,8 +428,8 @@ func (s *StateMachine) addRootfsFromTarballStates(states *[]stateFunc) {
 	}
 }
 
-func (s *StateMachine) addRootfsFromSeedStates(states *[]stateFunc) {
-	c := s.parent.(*ClassicStateMachine)
+func (stateMachine *StateMachine) addRootfsFromSeedStates(states *[]stateFunc) {
+	c := stateMachine.parent.(*ClassicStateMachine)
 
 	*states = append(*states, rootfsSeedStates...)
 
@@ -457,8 +457,8 @@ func (s *StateMachine) addRootfsFromSeedStates(states *[]stateFunc) {
 // addCustomizationStates determines any customization that needs to run before the image
 // is created
 // TODO: installer image customization... eventually.
-func (s *StateMachine) addCustomizationStates(states *[]stateFunc) {
-	c := s.parent.(*ClassicStateMachine)
+func (stateMachine *StateMachine) addCustomizationStates(states *[]stateFunc) {
+	c := stateMachine.parent.(*ClassicStateMachine)
 
 	if c.ImageDef.Customization.CloudInit != nil {
 		*states = append(*states, customizeCloudInitState)
@@ -472,16 +472,16 @@ func (s *StateMachine) addCustomizationStates(states *[]stateFunc) {
 }
 
 // addArtifactsStates adds the needed states to generates the artifacts
-func (s *StateMachine) addArtifactsStates(c *ClassicStateMachine, states *[]stateFunc) {
+func (stateMachine *StateMachine) addArtifactsStates(c *ClassicStateMachine, states *[]stateFunc) {
 	if c.ImageDef.Artifacts == nil {
 		return
 	}
 	if c.ImageDef.Gadget != nil {
-		s.addImgStates(states)
+		stateMachine.addImgStates(states)
 	}
 
 	if c.ImageDef.Artifacts.Qcow2 != nil {
-		s.addQcow2States(states)
+		stateMachine.addQcow2States(states)
 	}
 
 	if c.ImageDef.Artifacts.Manifest != nil {
@@ -497,8 +497,8 @@ func (s *StateMachine) addArtifactsStates(c *ClassicStateMachine, states *[]stat
 	}
 }
 
-func (s *StateMachine) addImgStates(states *[]stateFunc) {
-	c := s.parent.(*ClassicStateMachine)
+func (stateMachine *StateMachine) addImgStates(states *[]stateFunc) {
+	c := stateMachine.parent.(*ClassicStateMachine)
 	*states = append(*states, imageCreationStates...)
 
 	if c.ImageDef.Artifacts.Img == nil {
@@ -511,7 +511,7 @@ func (s *StateMachine) addImgStates(states *[]stateFunc) {
 	)
 }
 
-func (s *StateMachine) addQcow2States(states *[]stateFunc) {
+func (stateMachine *StateMachine) addQcow2States(states *[]stateFunc) {
 	// Only run make_disk once
 	found := false
 	for _, stateFunc := range *states {

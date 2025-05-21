@@ -29,9 +29,9 @@ var runCmd = helper.RunCmd
 var blockSize string = "1"
 
 var (
-	MKE2FS_CONFIG_ENV  = "MKE2FS_CONFIG"
-	MKE2FS_CONFIG_FILE = "mke2fs.conf"
-	MKE2FS_BASE_PATH   = "/etc/ubuntu-image/mkfs"
+	Mke2fsConfigEnv  = "MKE2FS_CONFIG"
+	Mke2fsConfigFile = "mke2fs.conf"
+	Mke2fsBasepath   = "/etc/ubuntu-image/mkfs"
 )
 
 // validateInput ensures that command line flags for the state machine are valid. These
@@ -79,7 +79,7 @@ func (stateMachine *StateMachine) setConfDefDir(confFileArg string) error {
 func (stateMachine *StateMachine) validateUntilThru() error {
 	// if --until or --thru was given, make sure the specified state exists
 	var searchState string
-	var stateFound bool = false
+	var stateFound = false
 	if stateMachine.stateMachineFlags.Until != "" {
 		searchState = stateMachine.stateMachineFlags.Until
 	}
@@ -294,7 +294,7 @@ func fixDiskIDOnMBR(imgName string) error {
 
 // The MKE2FS_BASE_PATH folder is setup to handle codename and release number as a series.
 func setMk2fsConf(series string) error {
-	mk2fsConfPath := strings.Join([]string{osGetenv("SNAP"), MKE2FS_BASE_PATH, series, MKE2FS_CONFIG_FILE}, "/")
+	mk2fsConfPath := strings.Join([]string{osGetenv("SNAP"), Mke2fsBasepath, series, Mke2fsConfigFile}, "/")
 
 	_, err := os.Stat(mk2fsConfPath)
 	if err != nil {
@@ -302,22 +302,24 @@ func setMk2fsConf(series string) error {
 		return nil
 	}
 
-	return osSetenv(MKE2FS_CONFIG_ENV, mk2fsConfPath)
+	return osSetenv(Mke2fsConfigEnv, mk2fsConfPath)
 }
 
 // handleSecureBoot handles a special case where files need to be moved from /boot/ to
 // /EFI/ubuntu/ so that SecureBoot can still be used
 func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, targetDir string) error {
 	var bootDir, ubuntuDir string
-	if volume.Bootloader == "u-boot" {
+
+	switch volume.Bootloader {
+	case "u-boot":
 		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "uboot")
 		ubuntuDir = targetDir
-	} else if volume.Bootloader == "piboot" {
+	case "piboot":
 		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "piboot")
 		ubuntuDir = targetDir
-	} else if volume.Bootloader == "grub" {
+	case "grub":
 		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
 			"image", "boot", "grub")
 		ubuntuDir = filepath.Join(targetDir, "EFI", "ubuntu")
