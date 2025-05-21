@@ -19,6 +19,10 @@ import (
 
 var setArtifactNamesState = stateFunc{"set_artifact_names", (*StateMachine).setArtifactNames}
 
+const (
+	schemaEMMC = "emmc"
+)
+
 // for snap/core image builds, the image name is always <volume-name>.img for
 // each volume in the gadget. This function stores that info in the struct
 func (stateMachine *StateMachine) setArtifactNames() error {
@@ -361,7 +365,7 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
 
 		// eMMC volumes do not have their own disk image
-		if volume.Schema == helper.SchemaEMMC {
+		if volume.Schema == schemaEMMC {
 			continue
 		}
 
@@ -426,7 +430,7 @@ func (stateMachine *StateMachine) makeDisk() error {
 		// as they consist only of fixed content images that needs to be written during
 		// runtime (i.e gadget install or gadget update). The contents of the image are
 		// part of the gadget snap
-		if volume.Schema == helper.SchemaEMMC {
+		if volume.Schema == schemaEMMC {
 			continue
 		}
 
