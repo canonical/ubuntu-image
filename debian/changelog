@@ -3,6 +3,7 @@ ubuntu-image (3.8.0) UNRELEASED; urgency=medium
   [ Philip Meulengracht ]
   * add new CLI option "--allow-snapd-kernel-mismatch" to allow building images that
     contain mismatched snapd versions between kernel and snapd snap
+  * do not generate volume image for eMMC schemas
 
   [ Paul Mars ]
   * add mkfs configuration for questing
