@@ -4,6 +4,9 @@ ubuntu-image (3.8.0) UNRELEASED; urgency=medium
   * add new CLI option "--allow-snapd-kernel-mismatch" to allow building images that
     contain mismatched snapd versions between kernel and snapd snap
 
+  [ Paul Mars ]
+  * add mkfs configuration for questing
+
  -- Philip Meulengracht <philip.meulengracht@canonical.com>  Mon, 19 May 2025 14:07:35 +0200
 
 ubuntu-image (3.7.0) UNRELEASED; urgency=medium
