@@ -25,7 +25,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.23'
 
       - name: build go binary
         run: go build ./...
@@ -78,44 +78,3 @@ jobs:
         id: check-mkfs
         shell: bash
         run: ./tools/check-mkfs-confs.sh
-    
-  # tics-report:
-  #   runs-on: ubuntu-latest
-  #   needs: test
-  #   if: ${{ github.event_name == 'push' || github.ref == 'refs/heads/main' }}
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 2
-
-  #     - uses: actions/setup-go@v5
-  #       with:
-  #         go-version: '1.21'
-
-  #     - name: Download coverage report artifact
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: ubuntu-image-coverage-long
-  #         path: .coverage
-
-  #     - name: Install tools
-  #       run: |
-  #         go install github.com/axw/gocov/gocov@latest
-  #         go install github.com/AlekSi/gocov-xml@latest
-  #         go install honnef.co/go/tools/cmd/staticcheck@latest
-
-  #     - name: Convert report to xml
-  #       run: |
-  #         cd .coverage && \
-  #         gocov convert coverage-long.out > coverage.json && \
-  #         gocov-xml < coverage.json > coverage-go.xml
-
-  #     - name: TICS analysis and report
-  #       run: |
-  #         export TICSAUTHTOKEN=${{ secrets.TICSAUTHTOKEN }}
-
-  #         set -x
-  #         # Install the TICS and staticcheck
-  #         curl --silent --show-error "https://canonical.tiobe.com/tiobeweb/TICS/api/public/v1/fapi/installtics/Script?cfg=default&platform=linux&url=https://canonical.tiobe.com/tiobeweb/TICS/" > install_tics.sh
-  #         . ./install_tics.sh
-  #         TICSQServer -project ubuntu-image -tmpdir /tmp/tics -branchdir .
