@@ -6,6 +6,8 @@ ubuntu-image (3.8.0) UNRELEASED; urgency=medium
 
   [ Paul Mars ]
   * add mkfs configuration for questing
+  * update go dependencies
+  * replace test credentials
 
  -- Philip Meulengracht <philip.meulengracht@canonical.com>  Mon, 19 May 2025 14:07:35 +0200
 
