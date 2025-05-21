@@ -738,7 +738,7 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 }
 
 // TestMakeDiskPartitionSchemes tests that makeDisk() can successfully parse
-// mbr, gpt, and hybrid schemes. It then runs "dumpe2fs" to ensure the
+// mbr, gpt, emmc, and hybrid schemes. It then runs "dumpe2fs" to ensure the
 // resulting disk has the correct type of partition table.
 // We also check various sector sizes while at it and rootfs placements
 func TestMakeDiskPartitionSchemes(t *testing.T) {
@@ -796,6 +796,14 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			rootfsVolName:     "pc",
 			rootfsContentPath: filepath.Join("testdata", "gadget_tree_piboot"), // bigger than what was calculated based on the rootfs declared in the gadget.yaml
 			rootfsPartNum:     1,
+		},
+		{
+			name:              "emmc",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree_emmc"),
+			rootfsPartNum:     3,
 		},
 	}
 	for _, tc := range testCases {
