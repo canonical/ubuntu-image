@@ -412,7 +412,7 @@ apt sources. For example, to produce an image for the 24.04 release, this
 should be "noble". Example values include:
 
 * noble
-* oracular
+* plucky
 * focal
 * jammy
 
