@@ -1,8 +1,8 @@
 module github.com/canonical/ubuntu-image
 
-go 1.24
+go 1.24.0
 
-toolchain go1.24.2
+toolchain go1.24.6
 
 require (
 	github.com/diskfs/go-diskfs v1.4.1-0.20240716094240-ec697b09567e
@@ -39,7 +39,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
-	github.com/ulikunitz/xz v0.5.12 // indirect
+	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.etcd.io/bbolt v1.3.9 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
