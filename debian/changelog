@@ -1,7 +1,12 @@
 ubuntu-image (3.9.0) UNRELEASED; urgency=medium
 
+  [ Alfonso Sanchez-Beato ]
   * Update to snapd packages to 2.72, which now inserts system-user
     assertions in the auto-import.assert file when --assertion is used.
+
+  [ Paul Mars ]
+  * remove mkfs configuration for oracular and update the questing one.
+  * update go dependencies
 
  -- Alfonso Sanchez-Beato <alfonso.sanchez-beato@canonical.com>  Mon, 22 Sep 2025 11:06:58 -0400
 
