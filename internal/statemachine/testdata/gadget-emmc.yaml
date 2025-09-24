@@ -35,6 +35,5 @@ volumes:
     schema: emmc
     structure:
       - name: boot0
-        size: 1M
         content:
         - image: pc-boot.img
