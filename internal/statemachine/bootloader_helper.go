@@ -120,7 +120,7 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 
 	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
 
-	loopUsed, losetupDetachCmd, err := stateMachine.associateLoopDevice(imgPath)
+	loopUsed, losetupDetachCmd, err := associateLoopDevice(imgPath, stateMachine.SectorSize)
 	if err != nil {
 		return err
 	}
