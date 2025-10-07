@@ -100,7 +100,7 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 		return fmt.Errorf("Error creating scratch/loopback/boot/efi directory: %s", err.Error())
 	}
 
-	target, grubPackages := grubTargetAndPkgsFromArch(architecture)
+	target := grubTargetFromArch(architecture)
 	if len(target) == 0 {
 		return fmt.Errorf("no valid efi target for the provided architecture")
 	}
@@ -189,11 +189,9 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 		execCommand("udevadm", "settle"),
 	}, teardownCmds...)
 
-	// udev needed to have grub-install properly work
-	grubPackages = append(grubPackages, "udev")
-
 	setupGrubCmds = append(setupGrubCmds,
-		aptInstallCmd(mountDir, grubPackages, false),
+		// udev needed to have grub-install properly work
+		aptInstallCmd(mountDir, []string{"udev"}, false),
 		execCommand("chroot",
 			mountDir,
 			"grub-install",
@@ -233,18 +231,17 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 	return helper.RunCmds(setupGrubCmds, stateMachine.commonFlags.Debug)
 }
 
-// grubTargetAndPkgsFromArch returns the proper grub-install target and packages to
-// install based on the given architecture.
-func grubTargetAndPkgsFromArch(architecture string) (string, []string) {
+// grubTargetFromArch returns the proper grub-install target given the architecture.
+func grubTargetFromArch(architecture string) string {
 	switch architecture {
 	case arch.AMD64:
-		return "x86_64-efi", []string{"grub-pc", "shim-signed"}
+		return "x86_64-efi"
 	case arch.ARM64:
-		return "arm64-efi", []string{"grub-efi-arm64", "grub-efi-arm64-bin"}
+		return "arm64-efi"
 	case arch.ARMHF:
-		return "arm-efi", []string{"grub-efi-arm", "grub-efi-arm-bin"}
+		return "arm-efi"
 	default:
-		return "", nil
+		return ""
 	}
 }
 

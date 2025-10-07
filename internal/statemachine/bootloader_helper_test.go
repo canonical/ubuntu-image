@@ -259,7 +259,7 @@ func TestStateMachine_setupGrub_checkcmds(t *testing.T) {
 		regexp.MustCompile("^mount -t proc proc-build .*/scratch/loopback/proc$"),
 		regexp.MustCompile("^mount -t sysfs sysfs-build .*/scratch/loopback/sys$"),
 		regexp.MustCompile("^mount --bind .*/run.*$"),
-		regexp.MustCompile("^chroot .*/scratch/loopback apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold --no-install-recommends grub-pc shim-signed"),
+		regexp.MustCompile("^chroot .*/scratch/loopback apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold --no-install-recommends udev"),
 		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --boot-directory=/boot --efi-directory=/boot/efi --target=x86_64-efi --uefi-secure-boot --no-nvram$"),
 		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --target=i386-pc$"),
 		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert"),
