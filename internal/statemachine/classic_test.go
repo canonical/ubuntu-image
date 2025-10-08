@@ -86,6 +86,8 @@ func TestYAMLSchemaParsing(t *testing.T) {
 		{"invalid_paths_in_manual_touch_file", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (../../malicious)"},
 		{"invalid_paths_in_manual_touch_file_bug", "test_invalid_paths_in_manual_touch_file.yaml", false, "needs to be an absolute path (/../../malicious)"},
 		{"img_specified_without_gadget", "test_image_without_gadget.yaml", false, "Key img cannot be used without key gadget:"},
+		{"manual_execute_path_and_cmd", "test_manual_execute_path_and_cmd.yaml", false, "Key customization:manual:execute:execute-path cannot be used with key customization:manual:execute:execute-command"},
+		{"manual_execute_no_cmd", "test_manual_execute_no_cmd.yaml", false, "No path or command where defined in the manual execute entry"},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -3105,6 +3107,9 @@ func TestSuccessfulClassicRun(t *testing.T) {
 
 	testHelperCheckMakeDirs(t, mountDir)
 	testHelperCheckAddUser(t, &asserter, mountDir)
+	testHelperCheckAddGroup(t, &asserter, mountDir)
+	testHelperCheckTouchFile(t, mountDir)
+	testHelperCheckExecute(t, &asserter, mountDir)
 	testHelperCheckGrubConfig(t, mountDir)
 	testHelperCheckCleanedFiles(t, mountDir)
 	testHelperCheckLocaleFile(t, &asserter, mountDir)
@@ -3222,6 +3227,60 @@ func testHelperCheckAddUser(t *testing.T, asserter *helper.Asserter, mountDir st
 
 	if expire != "0" {
 		t.Error("ubuntu2 user password should be expired")
+	}
+}
+
+func testHelperCheckAddGroup(t *testing.T, asserter *helper.Asserter, mountDir string) {
+	t.Helper()
+
+	groupFilePath := filepath.Join(mountDir, "etc", "group")
+	groupFile, err := os.Open(groupFilePath)
+	asserter.AssertErrNil(err, true)
+	defer groupFile.Close()
+	addGroupFeatureFound := false
+	addGroupLine := ""
+
+	scanner := bufio.NewScanner(groupFile)
+
+	for scanner.Scan() {
+		if strings.HasPrefix(scanner.Text(), "addgroupfeature") {
+			addGroupLine = scanner.Text()
+			addGroupFeatureFound = true
+			break
+		}
+	}
+
+	if !addGroupFeatureFound {
+		t.Error("addgroupfeature user not created")
+	}
+
+	gid := strings.Split(addGroupLine, ":")[2]
+
+	if gid != "4321" {
+		t.Errorf("addgroupfeature did not create the group with the right gid. Got gid %s", gid)
+	}
+}
+
+func testHelperCheckTouchFile(t *testing.T, mountDir string) {
+	t.Helper()
+
+	toucheFilePath := filepath.Join(mountDir, "etc", "touchfilefeature")
+	_, err := os.Stat(toucheFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("File \"%s\" should exist, but does not", toucheFilePath)
+		}
+	}
+}
+
+func testHelperCheckExecute(t *testing.T, asserter *helper.Asserter, mountDir string) {
+	t.Helper()
+
+	executeFilePath := filepath.Join(mountDir, "etc", "executefeature")
+	executeBytes, err := os.ReadFile(executeFilePath)
+	asserter.AssertErrNil(err, true)
+	if string(executeBytes) != "test" {
+		t.Errorf("Expected 'test' in %s, but got %s", executeFilePath, string(executeBytes))
 	}
 }
 
@@ -4256,7 +4315,7 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "sbin", "initctl"))
 	asserter.AssertErrNil(err, true)
 
-	mockCmder := NewMockExecCommand()
+	mockCmder := NewMockExecCommander()
 
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
@@ -4328,7 +4387,7 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-	mockCmder := NewMockExecCommand()
+	mockCmder := NewMockExecCommander()
 
 	execCommand = mockCmder.Command
 	t.Cleanup(func() { execCommand = exec.Command })
