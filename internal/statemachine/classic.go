@@ -414,6 +414,11 @@ func (stateMachine *StateMachine) addRootfsFromTarballStates(states *[]stateFunc
 	c := stateMachine.parent.(*ClassicStateMachine)
 
 	*states = append(*states, extractRootfsTarState)
+
+	if c.ImageDef.Rootfs.Pocket != "release" {
+		*states = append(*states, upgradePackagesState)
+	}
+
 	if c.ImageDef.Customization == nil {
 		return
 	}
@@ -442,6 +447,10 @@ func (stateMachine *StateMachine) addRootfsFromSeedStates(states *[]stateFunc) {
 	c := stateMachine.parent.(*ClassicStateMachine)
 
 	*states = append(*states, rootfsSeedStates...)
+
+	if c.ImageDef.Rootfs.Pocket != "release" {
+		*states = append(*states, upgradePackagesState)
+	}
 
 	if c.ImageDef.Customization == nil {
 		*states = append(*states, installPackagesState)

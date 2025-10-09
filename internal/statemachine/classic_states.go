@@ -239,18 +239,49 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 	return nil
 }
 
+var upgradePackagesState = stateFunc{"upgrade_packages", (*StateMachine).upgradePackages}
+
+// Upgrade packages in the chroot envrionment to align with configured pocket
+func (stateMachine *StateMachine) upgradePackages() error {
+	return stateMachine.runCmdsWithChrootSetup(
+		generateAptUpgradeCmds(stateMachine.tempDirs.chroot, true))
+}
+
 var installPackagesState = stateFunc{"install_packages", (*StateMachine).installPackages}
 
 // Install packages in the chroot environment
 func (stateMachine *StateMachine) installPackages() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
+	stateMachine.gatherPackages(&classicStateMachine.ImageDef)
+
+	return stateMachine.runCmdsWithChrootSetup(
+		generateAptInstallCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages, true))
+}
+
+func (stateMachine *StateMachine) gatherPackages(imageDef *imagedefinition.ImageDefinition) {
+	if imageDef.Customization != nil {
+		for _, packageInfo := range imageDef.Customization.ExtraPackages {
+			stateMachine.Packages = append(stateMachine.Packages,
+				packageInfo.PackageName)
+		}
+	}
+
+	// Make sure to install the extra kernel if it is specified
+	if imageDef.Kernel != "" {
+		stateMachine.Packages = append(stateMachine.Packages,
+			imageDef.Kernel)
+	}
+}
+
+// run given commands with the chroot setup (mountpoint, network access, ...)
+func (stateMachine *StateMachine) runCmdsWithChrootSetup(cmds []*exec.Cmd) error {
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
 	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
 	if err != nil {
 		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
 	}
-
-	stateMachine.gatherPackages(&classicStateMachine.ImageDef)
 
 	// setupCmds should be filled as a FIFO list
 	var setupCmds []*exec.Cmd
@@ -354,29 +385,12 @@ func (stateMachine *StateMachine) installPackages() error {
 		}()
 	}
 
-	installPackagesCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages, true)
-
-	err = helper.RunCmds(installPackagesCmds, classicStateMachine.commonFlags.Debug)
+	err = helper.RunCmds(cmds, classicStateMachine.commonFlags.Debug)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func (stateMachine *StateMachine) gatherPackages(imageDef *imagedefinition.ImageDefinition) {
-	if imageDef.Customization != nil {
-		for _, packageInfo := range imageDef.Customization.ExtraPackages {
-			stateMachine.Packages = append(stateMachine.Packages,
-				packageInfo.PackageName)
-		}
-	}
-
-	// Make sure to install the extra kernel if it is specified
-	if imageDef.Kernel != "" {
-		stateMachine.Packages = append(stateMachine.Packages,
-			imageDef.Kernel)
-	}
 }
 
 // generateMountPointCmds generate lists of mount/umount commands for a list of mountpoints

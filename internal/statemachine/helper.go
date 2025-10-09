@@ -529,18 +529,29 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 	return debootstrapCmd
 }
 
-// generateAptCmd generates the apt command used to create a chroot
-// environment that will eventually become the rootfs of the resulting image
-func generateAptCmds(targetDir string, packageList []string, installRecommends bool) []*exec.Cmd {
+// generateAptUpgradeCmds generates the apt commands used to upgrade packages
+func generateAptUpgradeCmds(targetDir string, installRecommends bool) []*exec.Cmd {
 	updateCmd := execCommand("chroot", targetDir, "apt", "update")
 
-	return []*exec.Cmd{updateCmd, aptInstallCmd(targetDir, packageList, installRecommends)}
+	upgradeCmd := generateAptPackageInstallingCmd(targetDir, []string{"upgrade"}, installRecommends)
+
+	return []*exec.Cmd{updateCmd, upgradeCmd}
 }
 
-// generateAptCmd generates the apt command used to create a chroot
+// generateAptInstallCmds generates the apt command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func aptInstallCmd(targetDir string, packageList []string, installRecommends bool) *exec.Cmd {
-	installCmd := execCommand("chroot", targetDir, "apt", "install",
+func generateAptInstallCmds(targetDir string, packageList []string, installRecommends bool) []*exec.Cmd {
+	updateCmd := execCommand("chroot", targetDir, "apt", "update")
+	installCmd := generateAptPackageInstallingCmd(targetDir, append([]string{"install"}, packageList...), installRecommends)
+
+	return []*exec.Cmd{updateCmd, installCmd}
+}
+
+// generateAptPackageInstallingCmd generates the apt command with correct
+// options and environment to correctly install packages in a chroot
+// environment
+func generateAptPackageInstallingCmd(targetDir string, argumentList []string, installRecommends bool) *exec.Cmd {
+	cmd := execCommand("chroot", targetDir, "apt",
 		"--assume-yes",
 		"--quiet",
 		"--option=Dpkg::options::=--force-unsafe-io",
@@ -548,19 +559,19 @@ func aptInstallCmd(targetDir string, packageList []string, installRecommends boo
 	)
 
 	if !installRecommends {
-		installCmd.Args = append(installCmd.Args, "--no-install-recommends")
+		cmd.Args = append(cmd.Args, "--no-install-recommends")
 	}
 
-	installCmd.Args = append(installCmd.Args, packageList...)
+	cmd.Args = append(cmd.Args, argumentList...)
 
 	// Env is sometimes used for mocking command calls in tests,
 	// so only overwrite env if it is nil
-	if installCmd.Env == nil {
-		installCmd.Env = os.Environ()
+	if cmd.Env == nil {
+		cmd.Env = os.Environ()
 	}
-	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+	cmd.Env = append(cmd.Env, "DEBIAN_FRONTEND=noninteractive")
 
-	return installCmd
+	return cmd
 }
 
 func setDenyingPolicyRcD(path string) (func(error) error, error) {
