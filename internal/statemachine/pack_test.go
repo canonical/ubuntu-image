@@ -347,9 +347,6 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 	}
 	asserter.AssertErrNil(err, true)
 
-	err = os.Mkdir(filepath.Join(stateMachine.Opts.RootfsDir, "boot", "grub"), 0755)
-	asserter.AssertErrNil(err, true)
-
 	err = stateMachine.Setup()
 	asserter.AssertErrNil(err, true)
 
