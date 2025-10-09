@@ -1,3 +1,10 @@
+ubuntu-image (3.10.0) UNRELEASED; urgency=medium
+
+  [ Paul Mars ]
+  * Properly install grub and update /boot/efi.
+
+ -- Paul Mars <paul.mars@canonical.com>  Thu, 09 Oct 2025 11:18:14 +0100
+
 ubuntu-image (3.9.0) UNRELEASED; urgency=medium
 
   [ Alfonso Sanchez-Beato ]
