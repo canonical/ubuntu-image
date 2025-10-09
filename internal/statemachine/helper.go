@@ -615,28 +615,45 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 	return debootstrapCmd
 }
 
-// generateAptCmd generates the apt command used to create a chroot
-// environment that will eventually become the rootfs of the resulting image
-func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
+// generateAptUpgradeCmds generates the apt commands used to upgrade packages
+func generateAptUpgradeCmds(targetDir string) []*exec.Cmd {
 	updateCmd := execCommand("chroot", targetDir, "apt", "update")
 
-	installCmd := execCommand("chroot", targetDir, "apt", "install",
+	upgradeCmd := generateAptPackageInstallingCmd(targetDir, []string{"upgrade"})
+
+	return []*exec.Cmd{updateCmd, upgradeCmd}
+}
+
+// generateAptInstallCmds generates the apt command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func generateAptInstallCmds(targetDir string, packageList []string) []*exec.Cmd {
+	updateCmd := execCommand("chroot", targetDir, "apt", "update")
+	installCmd := generateAptPackageInstallingCmd(targetDir, append([]string{"install"}, packageList...))
+
+	return []*exec.Cmd{updateCmd, installCmd}
+}
+
+// generateAptPackageInstallingCmd generates the apt command with correct
+// options and environment to correctly install packages in a chroot
+// environment
+func generateAptPackageInstallingCmd(targetDir string, argumentList []string) *exec.Cmd {
+	cmd := execCommand("chroot", targetDir, "apt",
 		"--assume-yes",
 		"--quiet",
 		"--option=Dpkg::options::=--force-unsafe-io",
 		"--option=Dpkg::Options::=--force-confold",
 	)
 
-	installCmd.Args = append(installCmd.Args, packageList...)
+	cmd.Args = append(cmd.Args, argumentList...)
 
 	// Env is sometimes used for mocking command calls in tests,
 	// so only overwrite env if it is nil
-	if installCmd.Env == nil {
-		installCmd.Env = os.Environ()
+	if cmd.Env == nil {
+		cmd.Env = os.Environ()
 	}
-	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+	cmd.Env = append(cmd.Env, "DEBIAN_FRONTEND=noninteractive")
 
-	return []*exec.Cmd{updateCmd, installCmd}
+	return cmd
 }
 
 func setDenyingPolicyRcD(path string) (func(error) error, error) {
