@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -714,8 +715,55 @@ func TestFailedManualAddUser(t *testing.T) {
 	asserter.AssertErrContains(err, "Error running command")
 }
 
-// TestGenerateAptCmd unit tests the generateAptCmd function
-func TestGenerateAptCmds(t *testing.T) {
+func TestGenerateAptPackageInstallingCmd(t *testing.T) {
+	t.Parallel()
+	expectedEnvValue := "DEBIAN_FRONTEND=noninteractive"
+	testCases := []struct {
+		name              string
+		targetDir         string
+		argumentList      []string
+		installRecommends bool
+		expected          string
+	}{
+		{
+			name:              "one_argument",
+			targetDir:         "chroot1",
+			argumentList:      []string{"upgrade"},
+			installRecommends: true,
+			expected:          "chroot chroot1 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold upgrade",
+		},
+		{
+			name:              "many_argument_no_recommends",
+			targetDir:         "chroot2",
+			argumentList:      []string{"install", "test1", "test2"},
+			installRecommends: false,
+			expected:          "chroot chroot2 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold --no-install-recommends install test1 test2",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_apt_package_install_cmd_"+tc.name, func(t *testing.T) {
+			aptCmd := generateAptPackageInstallingCmd(tc.targetDir, tc.argumentList, tc.installRecommends)
+			if !strings.Contains(aptCmd.String(), tc.expected) {
+				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmd.String())
+			}
+			if !slices.Contains(aptCmd.Env, expectedEnvValue) {
+				t.Errorf("apt command env do not contain exepcted \"%s\" value", expectedEnvValue)
+			}
+		})
+	}
+}
+
+// TestGenerateAptUpgradeCmds unit tests the generateAptUpgradeCmds function
+func TestGenerateAptUpgradeCmds(t *testing.T) {
+	expected := "chroot chroot2 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold upgrade"
+	aptCmds := generateAptUpgradeCmds("chroot2", true)
+	if !strings.Contains(aptCmds[1].String(), expected) {
+		t.Errorf("Expected apt command \"%s\" but got \"%s\"", expected, aptCmds[1].String())
+	}
+}
+
+// TestGenerateAptInstallCmds unit tests the generateAptInstallCmds function
+func TestGenerateAptInstallCmds(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name              string
@@ -729,19 +777,19 @@ func TestGenerateAptCmds(t *testing.T) {
 			targetDir:         "chroot1",
 			packageList:       []string{"test"},
 			installRecommends: true,
-			expected:          "chroot chroot1 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test",
+			expected:          "chroot chroot1 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold install test",
 		},
 		{
 			name:              "many_packages",
 			targetDir:         "chroot2",
 			packageList:       []string{"test1", "test2"},
 			installRecommends: false,
-			expected:          "chroot chroot2 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold --no-install-recommends test1 test2",
+			expected:          "chroot chroot2 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold --no-install-recommends install test1 test2",
 		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
-			aptCmds := generateAptCmds(tc.targetDir, tc.packageList, tc.installRecommends)
+		t.Run("test_generate_apt_install_cmd_"+tc.name, func(t *testing.T) {
+			aptCmds := generateAptInstallCmds(tc.targetDir, tc.packageList, tc.installRecommends)
 			if !strings.Contains(aptCmds[1].String(), tc.expected) {
 				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmds[1].String())
 			}

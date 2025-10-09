@@ -284,6 +284,38 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 			},
 		},
 		{
+			name:            "state_upgrade",
+			imageDefinition: "test_amd64_upgrade.yaml",
+			expectedStates: []string{
+				"build_gadget_tree",
+				"prepare_gadget_tree",
+				"load_gadget_yaml",
+				"verify_artifact_names",
+				"germinate",
+				"create_chroot",
+				"upgrade_packages",
+				"add_extra_ppas",
+				"install_packages",
+				"clean_extra_ppas",
+				"prepare_image",
+				"preseed_image",
+				"clean_rootfs",
+				"customize_sources_list",
+				"customize_cloud_init",
+				"perform_manual_customization",
+				"set_default_locale",
+				"populate_rootfs_contents",
+				"calculate_rootfs_size",
+				"populate_bootfs_contents",
+				"populate_prepare_partitions",
+				"make_disk",
+				"update_bootloader",
+				"make_qcow2_image",
+				"generate_package_manifest",
+				"generate_filelist",
+			},
+		},
+		{
 			name:            "extract_rootfs_tar",
 			imageDefinition: "test_extract_rootfs_tar.yaml",
 			expectedStates: []string{
@@ -550,22 +582,23 @@ func TestDisplayStates(t *testing.T) {
 [3] verify_artifact_names
 [4] germinate
 [5] create_chroot
-[6] install_packages
-[7] prepare_image
-[8] preseed_image
-[9] clean_rootfs
-[10] customize_sources_list
-[11] customize_fstab
-[12] perform_manual_customization
-[13] set_default_locale
-[14] populate_rootfs_contents
-[15] generate_disk_info
-[16] calculate_rootfs_size
-[17] populate_bootfs_contents
-[18] populate_prepare_partitions
-[19] make_disk
-[20] update_bootloader
-[21] generate_package_manifest
+[6] upgrade_packages
+[7] install_packages
+[8] prepare_image
+[9] preseed_image
+[10] clean_rootfs
+[11] customize_sources_list
+[12] customize_fstab
+[13] perform_manual_customization
+[14] set_default_locale
+[15] populate_rootfs_contents
+[16] generate_disk_info
+[17] calculate_rootfs_size
+[18] populate_bootfs_contents
+[19] populate_prepare_partitions
+[20] make_disk
+[21] update_bootloader
+[22] generate_package_manifest
 `
 	if !strings.Contains(string(readStdout), expectedStates) {
 		t.Errorf("Expected states to be printed in output:\n\"%s\"\n but got \n\"%s\"\n instead",
@@ -4286,7 +4319,7 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 		regexp.MustCompile("^mount --bind .*/scratch/run.* .*/chroot/run$"),
 		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert"),
 		regexp.MustCompile("^chroot /var/tmp.*/chroot apt update$"),
-		regexp.MustCompile("^chroot /var/tmp.*/chroot apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold$"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold install$"),
 		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --remove"),
 		regexp.MustCompile("^udevadm settle$"),
 		regexp.MustCompile("^mount --make-rprivate /var/tmp.*/chroot/run$"),
