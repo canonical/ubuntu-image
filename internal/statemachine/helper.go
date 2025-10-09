@@ -113,40 +113,6 @@ func (stateMachine *StateMachine) cleanup() error {
 	return nil
 }
 
-// handleLkBootloader handles the special "lk" bootloader case where some extra
-// files need to be added to the bootfs
-func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) error {
-	if volume.Bootloader != "lk" {
-		return nil
-	}
-	// For the LK bootloader we need to copy boot.img and snapbootsel.bin to
-	// the gadget folder so they can be used as partition content. The first
-	// one comes from the kernel snap, while the second one is modified by
-	// the prepare_image step to set the right core and kernel for the kernel
-	// command line.
-	bootDir := filepath.Join(stateMachine.tempDirs.unpack,
-		"image", "boot", "lk")
-	gadgetDir := filepath.Join(stateMachine.tempDirs.unpack, "gadget")
-	if _, err := os.Stat(bootDir); err != nil {
-		return fmt.Errorf("got lk bootloader but directory %s does not exist", bootDir)
-	}
-	err := osMkdir(gadgetDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("Failed to create gadget dir: %s", err.Error())
-	}
-	files, err := osReadDir(bootDir)
-	if err != nil {
-		return fmt.Errorf("Error reading lk bootloader dir: %s", err.Error())
-	}
-	for _, lkFile := range files {
-		srcFile := filepath.Join(bootDir, lkFile.Name())
-		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
-			return fmt.Errorf("Error copying lk bootloader dir: %s", err.Error())
-		}
-	}
-	return nil
-}
-
 // copyStructureContent handles copying raw blobs or creating formatted filesystems
 func (stateMachine *StateMachine) copyStructureContent(structure *gadget.VolumeStructure, contentRoot, partImg string) error {
 
@@ -305,51 +271,6 @@ func setMk2fsConf(series string) error {
 	return osSetenv(Mke2fsConfigEnv, mk2fsConfPath)
 }
 
-// handleSecureBoot handles a special case where files need to be moved from /boot/ to
-// /EFI/ubuntu/ so that SecureBoot can still be used
-func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, targetDir string) error {
-	var bootDir, ubuntuDir string
-
-	switch volume.Bootloader {
-	case "u-boot":
-		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
-			"image", "boot", "uboot")
-		ubuntuDir = targetDir
-	case "piboot":
-		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
-			"image", "boot", "piboot")
-		ubuntuDir = targetDir
-	case "grub":
-		bootDir = filepath.Join(stateMachine.tempDirs.unpack,
-			"image", "boot", "grub")
-		ubuntuDir = filepath.Join(targetDir, "EFI", "ubuntu")
-	}
-
-	if _, err := os.Stat(bootDir); err != nil {
-		// this won't always exist, and that's fine
-		return nil
-	}
-
-	// copy the files from bootDir to ubuntuDir
-	if err := osMkdirAll(ubuntuDir, 0755); err != nil {
-		return fmt.Errorf("Error creating ubuntu dir: %s", err.Error())
-	}
-
-	files, err := osReadDir(bootDir)
-	if err != nil {
-		return fmt.Errorf("Error reading boot dir: %s", err.Error())
-	}
-	for _, bootFile := range files {
-		srcFile := filepath.Join(bootDir, bootFile.Name())
-		dstFile := filepath.Join(ubuntuDir, bootFile.Name())
-		if err := osRename(srcFile, dstFile); err != nil {
-			return fmt.Errorf("Error copying boot dir: %s", err.Error())
-		}
-	}
-
-	return nil
-}
-
 // WriteSnapManifest generates a snap manifest based on the contents of the selected snapsDir
 func WriteSnapManifest(snapsDir string, outputPath string) error {
 	files, err := osReadDir(snapsDir)
@@ -372,13 +293,6 @@ func WriteSnapManifest(snapsDir string, outputPath string) error {
 		}
 	}
 	return nil
-}
-
-// getHostArch uses dpkg to return the host architecture of the current system
-func getHostArch() string {
-	cmd := exec.Command("dpkg", "--print-architecture")
-	outputBytes, _ := cmd.Output() // nolint: errcheck
-	return strings.TrimSpace(string(outputBytes))
 }
 
 // getHostSuite checks the release name of the host system to use as a default if --suite is not passed
@@ -617,15 +531,25 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 
 // generateAptCmd generates the apt command used to create a chroot
 // environment that will eventually become the rootfs of the resulting image
-func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
+func generateAptCmds(targetDir string, packageList []string, installRecommends bool) []*exec.Cmd {
 	updateCmd := execCommand("chroot", targetDir, "apt", "update")
 
+	return []*exec.Cmd{updateCmd, aptInstallCmd(targetDir, packageList, installRecommends)}
+}
+
+// generateAptCmd generates the apt command used to create a chroot
+// environment that will eventually become the rootfs of the resulting image
+func aptInstallCmd(targetDir string, packageList []string, installRecommends bool) *exec.Cmd {
 	installCmd := execCommand("chroot", targetDir, "apt", "install",
 		"--assume-yes",
 		"--quiet",
 		"--option=Dpkg::options::=--force-unsafe-io",
 		"--option=Dpkg::Options::=--force-confold",
 	)
+
+	if !installRecommends {
+		installCmd.Args = append(installCmd.Args, "--no-install-recommends")
+	}
 
 	installCmd.Args = append(installCmd.Args, packageList...)
 
@@ -636,7 +560,7 @@ func generateAptCmds(targetDir string, packageList []string) []*exec.Cmd {
 	}
 	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
 
-	return []*exec.Cmd{updateCmd, installCmd}
+	return installCmd
 }
 
 func setDenyingPolicyRcD(path string) (func(error) error, error) {
@@ -936,114 +860,4 @@ func associateLoopDevice(path string, sectorSize quantity.Size) (string, *exec.C
 // the build system
 func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
 	return dpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
-}
-
-// updateGrub mounts the resulting image and runs update-grub
-func (stateMachine *StateMachine) updateGrub(rootfsVolName string, rootfsPartNum int) (err error) {
-	// create a directory in which to mount the rootfs
-	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
-	err = osMkdir(mountDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
-	}
-
-	// Slice used to store all the commands that need to be run
-	// to properly update grub.cfg in the chroot
-	// updateGrubCmds should be filled as a FIFO list
-	var updateGrubCmds []*exec.Cmd
-	// Slice used to store all the commands that need to be run
-	// to properly cleanup everything after the update of grub.cfg
-	// updateGrubCmds should be filled as a LIFO list (so new entries should added at the start of the slice)
-	var teardownCmds []*exec.Cmd
-
-	defer func() {
-		err = execTeardownCmds(teardownCmds, stateMachine.commonFlags.Debug, err)
-	}()
-
-	imgPath := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[rootfsVolName])
-
-	loopUsed, losetupDetachCmd, err := associateLoopDevice(imgPath, stateMachine.SectorSize)
-	if err != nil {
-		return err
-	}
-
-	// detach the loopback device
-	teardownCmds = append(teardownCmds, losetupDetachCmd)
-
-	updateGrubCmds = append(updateGrubCmds,
-		// mount the rootfs partition in which to run update-grub
-		//nolint:gosec,G204
-		execCommand("mount",
-			fmt.Sprintf("%sp%d", loopUsed, rootfsPartNum),
-			mountDir,
-		),
-	)
-
-	teardownCmds = append([]*exec.Cmd{execCommand("umount", mountDir)}, teardownCmds...)
-
-	// set up the mountpoints
-	mountPoints := []mountPoint{
-		{
-			src:      "devtmpfs-build",
-			basePath: mountDir,
-			relpath:  "/dev",
-			typ:      "devtmpfs",
-		},
-		{
-			src:      "devpts-build",
-			basePath: mountDir,
-			relpath:  "/dev/pts",
-			typ:      "devpts",
-			opts:     []string{"nodev", "nosuid"},
-		},
-		{
-			src:      "proc-build",
-			basePath: mountDir,
-			relpath:  "/proc",
-			typ:      "proc",
-		},
-		{
-			src:      "sysfs-build",
-			basePath: mountDir,
-			relpath:  "/sys",
-			typ:      "sysfs",
-		},
-	}
-
-	for _, mp := range mountPoints {
-		mountCmds, umountCmds, err := mp.getMountCmd()
-		if err != nil {
-			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
-				mp.relpath,
-				err.Error(),
-			)
-		}
-		updateGrubCmds = append(updateGrubCmds, mountCmds...)
-		teardownCmds = append(umountCmds, teardownCmds...)
-	}
-
-	teardownCmds = append([]*exec.Cmd{
-		execCommand("udevadm", "settle"),
-	}, teardownCmds...)
-
-	divert, undivert := divertOSProber(mountDir)
-
-	updateGrubCmds = append(updateGrubCmds, divert)
-	teardownCmds = append([]*exec.Cmd{undivert}, teardownCmds...)
-
-	// actually run update-grub
-	updateGrubCmds = append(updateGrubCmds,
-		execCommand("chroot",
-			mountDir,
-			"update-grub",
-		),
-	)
-
-	// now run all the commands
-	err = helper.RunCmds(updateGrubCmds, stateMachine.commonFlags.Debug)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

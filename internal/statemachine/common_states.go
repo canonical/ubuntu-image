@@ -496,14 +496,15 @@ func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gad
 
 // partitionDisk generates a partition table and applies it to the disk
 func (stateMachine *StateMachine) partitionDisk(diskImg *diskutils.Disk, volume *gadget.Volume, volumeName string) error {
-	partitionTable, rootfsPartitionNumber, err := partition.GeneratePartitionTable(volume, uint64(stateMachine.SectorSize), uint64(diskImg.Size), stateMachine.IsSeeded)
+	partitionTable, rootfsPartitionNumber, bootPartitionNumber, err := partition.GeneratePartitionTable(volume, uint64(stateMachine.SectorSize), uint64(diskImg.Size), stateMachine.IsSeeded)
 	if err != nil {
 		return err
 	}
 
-	// Save the rootfs partition number, for later use
+	// Save the rootfs/boot partition numbers, for later use
 	// Store in any case, even if value is -1 to make it clear later it was not found
 	stateMachine.RootfsPartNum = rootfsPartitionNumber
+	stateMachine.BootPartNum = bootPartitionNumber
 	if rootfsPartitionNumber != -1 {
 		stateMachine.RootfsVolName = volumeName
 	}
