@@ -332,6 +332,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		"--arch", "amd64",
 		"--variant=minbase",
 		"--include=grub2-common",
+		"--include=shim-signed",
 		"jammy",
 		stateMachine.Opts.RootfsDir,
 		"http://archive.ubuntu.com/ubuntu/",
