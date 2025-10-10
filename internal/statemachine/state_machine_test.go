@@ -78,6 +78,9 @@ func mockBackupAndCopyResolvConfSuccess(string) error {
 func mockRestoreResolvConf(string) error {
 	return fmt.Errorf("Test Error")
 }
+func mockRestoreResolvConfSuccess(string) error {
+	return nil
+}
 func mockCopyBlobSuccess([]string) error {
 	return nil
 }

@@ -66,6 +66,8 @@ customization:
       auth: "upils:Z3jNRMLKnSvSbt3J1lk3"
       fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139"
   extra-packages:
+    - name: "grub-pc"
+    - name: "shim-signed"
     -
       name: "hello-ubuntu-image-public"
     -
