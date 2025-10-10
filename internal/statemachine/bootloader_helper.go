@@ -3,13 +3,10 @@ package statemachine
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/snapcore/snapd/gadget"
 
-	"github.com/canonical/ubuntu-image/internal/arch"
-	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
 // handleLkBootloader handles the special "lk" bootloader case where some extra
