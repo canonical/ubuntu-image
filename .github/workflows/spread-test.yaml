@@ -50,12 +50,12 @@ jobs:
       matrix:
         include:
           - group: ubuntu-devel
-            series: plucky
+            series: questing
             arch: amd64
             systems: 'ubuntu-24.04-64'
             tests: 'tests/commons/... tests/amd64/...'
           - group: ubuntu-devel-crossbuild
-            series: plucky
+            series: questing
             arch: amd64
             systems: 'ubuntu-24.04-64'
             tests: 'tests/amd64-crossbuild/...'
@@ -75,7 +75,7 @@ jobs:
             systems: 'ubuntu-20.04-64 ubuntu-22.04-64'
             tests: 'tests/commons/... tests/amd64/...'
           - group: ubuntu-arm-devel
-            series: plucky
+            series: questing
             arch: arm64
             systems: 'ubuntu-24.04-arm-64'
             tests: 'tests/commons/... tests/arm64/...'
