@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,6 +87,15 @@ func (classicStateMachine *ClassicStateMachine) Setup() error {
 func (classicStateMachine *ClassicStateMachine) SetSeries() error {
 	classicStateMachine.series = classicStateMachine.ImageDef.Series
 	return nil
+}
+
+func (classicStateMachine *ClassicStateMachine) Architecture() (string, error) {
+	arch := classicStateMachine.ImageDef.Architecture
+	if len(arch) == 0 {
+		return "", errors.New("unable to identify the arch")
+	}
+
+	return arch, nil
 }
 
 // parseImageDefinition parses the provided yaml file and ensures it is valid

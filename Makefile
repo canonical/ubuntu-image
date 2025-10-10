@@ -1,6 +1,6 @@
 .PHONY: snap
 snap:  ## Create a ubuntu-image snap
-	@snapcraft clean && snapcraft --use-lxd -v
+	@snapcraft clean && snapcraft pack --use-lxd -v
 
 .PHONY: collect-mkfs-confs
 collect-mkfs-confs:

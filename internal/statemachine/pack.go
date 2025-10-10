@@ -62,3 +62,7 @@ func (packStateMachine *PackStateMachine) Setup() error {
 func (packStateMachine *PackStateMachine) SetSeries() error {
 	return nil
 }
+
+func (packStateMachine *PackStateMachine) Architecture() (string, error) {
+	return packStateMachine.Opts.Architecture, nil
+}
