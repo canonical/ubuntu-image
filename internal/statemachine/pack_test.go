@@ -9,6 +9,7 @@ import (
 
 	"github.com/snapcore/snapd/osutil"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/testhelper"
@@ -307,8 +308,9 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 	stateMachine.commonFlags.OutputDir = outputDir
 
 	stateMachine.Opts = commands.PackOpts{
-		RootfsDir: rootfsDir,
-		GadgetDir: filepath.Join(gadgetDir, "gadget"),
+		RootfsDir:    rootfsDir,
+		GadgetDir:    filepath.Join(gadgetDir, "gadget"),
+		Architecture: arch.AMD64,
 	}
 
 	gadgetSource := filepath.Join("testdata", "gadget_tree")

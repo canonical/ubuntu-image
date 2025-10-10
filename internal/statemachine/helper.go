@@ -374,13 +374,6 @@ func WriteSnapManifest(snapsDir string, outputPath string) error {
 	return nil
 }
 
-// getHostArch uses dpkg to return the host architecture of the current system
-func getHostArch() string {
-	cmd := exec.Command("dpkg", "--print-architecture")
-	outputBytes, _ := cmd.Output() // nolint: errcheck
-	return strings.TrimSpace(string(outputBytes))
-}
-
 // getHostSuite checks the release name of the host system to use as a default if --suite is not passed
 func getHostSuite() string {
 	cmd := exec.Command("lsb_release", "-c", "-s")

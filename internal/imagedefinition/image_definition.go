@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/canonical/ubuntu-image/internal/arch"
 )
 
 // ImageDefinition is the parent struct for the data
@@ -309,7 +311,7 @@ type DependentKeyError struct {
 }
 
 func (i ImageDefinition) securityMirror() string {
-	if i.Architecture == "amd64" || i.Architecture == "i386" {
+	if i.Architecture == arch.AMD64 || i.Architecture == arch.I386 {
 		return "http://security.ubuntu.com/ubuntu/"
 	}
 	return i.Rootfs.Mirror
