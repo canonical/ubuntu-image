@@ -1,3 +1,10 @@
+ubuntu-image (3.10.0) UNRELEASED; urgency=medium
+
+  [ Alexis Cellier ]
+  * i/statemachine: add upgrade_packages state
+
+ -- Alexis Cellier <alexis.cellier@canonical.com>  Fri, 10 Oct 2025 22:31:37 +0000
+
 ubuntu-image (3.9.0) UNRELEASED; urgency=medium
 
   [ Alfonso Sanchez-Beato ]

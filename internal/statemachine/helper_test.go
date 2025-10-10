@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -931,8 +932,42 @@ func TestFailedManualAddUser(t *testing.T) {
 	asserter.AssertErrContains(err, "Error running command")
 }
 
-// TestGenerateAptCmd unit tests the generateAptCmd function
-func TestGenerateAptCmds(t *testing.T) {
+func TestGenerateAptPackageInstallingCmd(t *testing.T) {
+	t.Parallel()
+	expectedEnvValue := "DEBIAN_FRONTEND=noninteractive"
+	testCases := []struct {
+		name         string
+		targetDir    string
+		argumentList []string
+		expected     string
+	}{
+		{"one_argument", "chroot1", []string{"install", "test"}, "chroot chroot1 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold install test"},
+		{"many_arguments", "chroot2", []string{"install", "test1", "test2"}, "chroot chroot2 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold install test1 test2"},
+	}
+	for _, tc := range testCases {
+		t.Run("test_generate_apt_package_install_cmd_"+tc.name, func(t *testing.T) {
+			aptCmd := generateAptPackageInstallingCmd(tc.targetDir, tc.argumentList)
+			if !strings.Contains(aptCmd.String(), tc.expected) {
+				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmd.String())
+			}
+			if !slices.Contains(aptCmd.Env, expectedEnvValue) {
+				t.Errorf("apt command env do not contain exepcted \"%s\" value", expectedEnvValue)
+			}
+		})
+	}
+}
+
+// TestGenerateAptUpgradeCmds unit tests the generateAptUpgradeCmds function
+func TestGenerateAptUpgradeCmds(t *testing.T) {
+	expected := "chroot chroot2 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold upgrade"
+	aptCmds := generateAptUpgradeCmds("chroot2")
+	if !strings.Contains(aptCmds[1].String(), expected) {
+		t.Errorf("Expected apt command \"%s\" but got \"%s\"", expected, aptCmds[1].String())
+	}
+}
+
+// TestGenerateAptInstallCmds unit tests the generateAptInstallCmds function
+func TestGenerateAptInstallCmds(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name        string
@@ -940,12 +975,12 @@ func TestGenerateAptCmds(t *testing.T) {
 		packageList []string
 		expected    string
 	}{
-		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test"},
-		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test1 test2"},
+		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold install test"},
+		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold install test1 test2"},
 	}
 	for _, tc := range testCases {
-		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
-			aptCmds := generateAptCmds(tc.targetDir, tc.packageList)
+		t.Run("test_generate_apt_install_cmd_"+tc.name, func(t *testing.T) {
+			aptCmds := generateAptInstallCmds(tc.targetDir, tc.packageList)
 			if !strings.Contains(aptCmds[1].String(), tc.expected) {
 				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmds[1].String())
 			}
