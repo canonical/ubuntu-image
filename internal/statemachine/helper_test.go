@@ -907,17 +907,30 @@ func TestFailedManualAddUser(t *testing.T) {
 func TestGenerateAptCmds(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
-		name        string
-		targetDir   string
-		packageList []string
-		expected    string
+		name              string
+		targetDir         string
+		packageList       []string
+		installRecommends bool
+		expected          string
 	}{
-		{"one_package", "chroot1", []string{"test"}, "chroot chroot1 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test"},
-		{"many_packages", "chroot2", []string{"test1", "test2"}, "chroot chroot2 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test1 test2"},
+		{
+			name:              "one_package",
+			targetDir:         "chroot1",
+			packageList:       []string{"test"},
+			installRecommends: true,
+			expected:          "chroot chroot1 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold test",
+		},
+		{
+			name:              "many_packages",
+			targetDir:         "chroot2",
+			packageList:       []string{"test1", "test2"},
+			installRecommends: false,
+			expected:          "chroot chroot2 apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold --no-install-recommends test1 test2",
+		},
 	}
 	for _, tc := range testCases {
 		t.Run("test_generate_apt_cmd_"+tc.name, func(t *testing.T) {
-			aptCmds := generateAptCmds(tc.targetDir, tc.packageList)
+			aptCmds := generateAptCmds(tc.targetDir, tc.packageList, tc.installRecommends)
 			if !strings.Contains(aptCmds[1].String(), tc.expected) {
 				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmds[1].String())
 			}
