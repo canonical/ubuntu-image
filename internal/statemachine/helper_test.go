@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -936,107 +935,6 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 	err = os.Rename(filepath.Join(seedDir, "seed.yaml.bak"),
 		filepath.Join(seedDir, "seed.yaml"))
 	asserter.AssertErrNil(err, true)
-}
-
-// TestStateMachine_updateGrub_checkcmds checks commands to update grub order is ok
-func TestStateMachine_updateGrub_checkcmds(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
-	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-	stateMachine.commonFlags.Debug = true
-	stateMachine.commonFlags.OutputDir = testhelper.DefaultTmpDir
-
-	err := stateMachine.makeTemporaryDirectories()
-	asserter.AssertErrNil(err, true)
-
-	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
-
-	mockCmder := NewMockExecCommand()
-
-	execCommand = mockCmder.Command
-	t.Cleanup(func() { execCommand = exec.Command })
-
-	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
-	asserter.AssertErrNil(err, true)
-	t.Cleanup(func() { restoreStdout() })
-
-	err = stateMachine.updateGrub("", 2)
-	asserter.AssertErrNil(err, true)
-
-	restoreStdout()
-	readStdout, err := io.ReadAll(stdout)
-	asserter.AssertErrNil(err, true)
-
-	expectedCmds := []*regexp.Regexp{
-		regexp.MustCompile("^mount .*p2 .*/scratch/loopback$"),
-		regexp.MustCompile("^mount -t devtmpfs devtmpfs-build .*/scratch/loopback/dev$"),
-		regexp.MustCompile("^mount -t devpts devpts-build -o nodev,nosuid .*/scratch/loopback/dev/pts$"),
-		regexp.MustCompile("^mount -t proc proc-build .*/scratch/loopback/proc$"),
-		regexp.MustCompile("^mount -t sysfs sysfs-build .*/scratch/loopback/sys$"),
-		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert"),
-		regexp.MustCompile("^chroot .*/scratch/loopback update-grub$"),
-		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert --remove"),
-		regexp.MustCompile("^udevadm settle$"),
-		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/sys$"),
-		regexp.MustCompile("^umount --recursive .*scratch/loopback/sys$"),
-		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/proc$"),
-		regexp.MustCompile("^umount --recursive .*scratch/loopback/proc$"),
-		regexp.MustCompile("^mount --make-rprivate .*scratch/loopback/dev/pts$"),
-		regexp.MustCompile("^umount --recursive .*scratch/loopback/dev/pts$"),
-		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/dev$"),
-		regexp.MustCompile("^umount --recursive .*scratch/loopback/dev$"),
-		regexp.MustCompile("^umount .*scratch/loopback$"),
-		regexp.MustCompile("^losetup --detach .* /var/tmp$"),
-	}
-
-	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
-	if len(expectedCmds) != len(gotCmds) {
-		t.Fatalf("%v commands to be executed, expected %v commands. Got: %v", len(gotCmds), len(expectedCmds), gotCmds)
-	}
-
-	for i, gotCmd := range gotCmds {
-		expected := expectedCmds[i]
-
-		if !expected.Match([]byte(gotCmd)) {
-			t.Errorf("Cmd \"%v\" not matching. Expected %v\n", gotCmd, expected.String())
-		}
-	}
-}
-
-// TestFailedUpdateGrub tests failures in the updateGrub function
-func TestFailedUpdateGrub(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
-	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-	err := stateMachine.makeTemporaryDirectories()
-	asserter.AssertErrNil(err, true)
-
-	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
-
-	// mock os.Mkdir
-	osMkdir = mockMkdir
-	t.Cleanup(func() {
-		osMkdir = os.Mkdir
-	})
-	err = stateMachine.updateGrub("", 0)
-	asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
-	osMkdir = os.Mkdir
-
-	// Setup the exec.Command mock to mock losetup
-	testCaseName = "TestFailedUpdateGrubLosetup"
-	execCommand = fakeExecCommand
-	t.Cleanup(func() {
-		execCommand = exec.Command
-	})
-	err = stateMachine.updateGrub("", 0)
-	asserter.AssertErrContains(err, "Error running losetup command")
-
-	// now test a command failure that isn't losetup
-	testCaseName = "TestFailedUpdateGrubOther"
-	err = stateMachine.updateGrub("", 0)
-	asserter.AssertErrContains(err, "Error running command")
-	execCommand = exec.Command
 }
 
 func TestStateMachine_setConfDefDir(t *testing.T) {

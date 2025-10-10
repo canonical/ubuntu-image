@@ -1350,23 +1350,38 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 	return nil
 }
 
-var updateBootloaderState = stateFunc{"update_bootloader", (*StateMachine).updateBootloader}
+var setupBootloaderState = stateFunc{"setup_bootloader", (*StateMachine).setupBootloader}
 
-// updateBootloader determines the bootloader for each volume
-// and runs the correct helper function to update the bootloader
-func (stateMachine *StateMachine) updateBootloader() error {
-	if stateMachine.RootfsPartNum == -1 || stateMachine.RootfsVolName == "" {
-		return fmt.Errorf("Error: could not determine partition number of the root filesystem")
+// setupBootloader determines the bootloader for each volume
+// and runs the correct helper function to install/update the bootloader
+func (stateMachine *StateMachine) setupBootloader() error {
+	volume, found := stateMachine.GadgetInfo.Volumes[stateMachine.RootfsVolName]
+	if !found {
+		return fmt.Errorf("no volume to setup bootloader for")
 	}
-	volume := stateMachine.GadgetInfo.Volumes[stateMachine.RootfsVolName]
 	switch volume.Bootloader {
 	case "grub":
-		err := stateMachine.updateGrub(stateMachine.RootfsVolName, stateMachine.RootfsPartNum)
+		if stateMachine.RootfsPartNum == -1 {
+			return fmt.Errorf("could not determine partition number of the root filesystem")
+		}
+		if stateMachine.BootPartNum == -1 {
+			return fmt.Errorf("could not determine partition number of the boot filesystem")
+		}
+		arch, err := stateMachine.parent.Architecture()
+		if err != nil {
+			return err
+		}
+		err = stateMachine.setupGrub(
+			stateMachine.RootfsVolName,
+			stateMachine.RootfsPartNum,
+			stateMachine.BootPartNum,
+			arch,
+		)
 		if err != nil {
 			return err
 		}
 	default:
-		fmt.Printf("WARNING: updating bootloader %s not yet supported\n",
+		fmt.Printf("WARNING: setting up bootloader %s not yet supported\n",
 			volume.Bootloader,
 		)
 	}
