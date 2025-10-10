@@ -105,6 +105,7 @@ type StateMachine struct {
 	IsSeeded      bool          // core 20 images are seeded
 	RootfsVolName string        // volume on which the rootfs is located
 	RootfsPartNum int           // rootfs partition number
+	BootPartNum   int           // boot partition number
 	SectorSize    quantity.Size // parsed (converted) sector size
 	RootfsSize    quantity.Size
 	tempDirs      temporaryDirectories
@@ -455,6 +456,7 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.IsSeeded = partialStateMachine.IsSeeded
 	stateMachine.RootfsVolName = partialStateMachine.RootfsVolName
 	stateMachine.RootfsPartNum = partialStateMachine.RootfsPartNum
+	stateMachine.BootPartNum = partialStateMachine.BootPartNum
 
 	stateMachine.SectorSize = partialStateMachine.SectorSize
 	stateMachine.RootfsSize = partialStateMachine.RootfsSize
