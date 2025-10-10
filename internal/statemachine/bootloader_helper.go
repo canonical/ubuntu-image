@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/snapcore/snapd/gadget"
-
 )
 
 // handleLkBootloader handles the special "lk" bootloader case where some extra
