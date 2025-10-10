@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/xeipuuv/gojsonschema"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
@@ -307,7 +308,7 @@ func TestImageDefinition_securityMirror(t *testing.T) {
 		{
 			name: "amd64",
 			fields: fields{
-				Architecture: "amd64",
+				Architecture: arch.AMD64,
 				Rootfs: &Rootfs{
 					Mirror: "http://archive.ubuntu.com/ubuntu/",
 				},
