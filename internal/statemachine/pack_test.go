@@ -332,6 +332,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		"--arch", "amd64",
 		"--variant=minbase",
 		"--include=grub2-common",
+		"--include=shim-signed",
 		"jammy",
 		stateMachine.Opts.RootfsDir,
 		"http://archive.ubuntu.com/ubuntu/",
@@ -344,9 +345,6 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		t.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
 			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
 	}
-	asserter.AssertErrNil(err, true)
-
-	err = os.Mkdir(filepath.Join(stateMachine.Opts.RootfsDir, "boot", "grub"), 0755)
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.Setup()
@@ -367,6 +365,7 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 
 	// create a directory in which to mount the rootfs
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
+	bootUEFIDir := filepath.Join(mountDir, "boot", "efi")
 	var setupImageCmds []*exec.Cmd
 	var teardownImageCmds []*exec.Cmd
 
@@ -395,7 +394,37 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		exec.Command("mount", fmt.Sprintf("%sp3", loopUsed), mountDir), // with this example the rootfs is partition 3 mountDir
 	)
 
-	teardownImageCmds = append([]*exec.Cmd{exec.Command("umount", "--recursive", mountDir)}, teardownImageCmds...)
+	// unset the loopback
+	teardownImageCmds = append(teardownImageCmds,
+		//nolint:gosec,G204
+		exec.Command("losetup", "--detach", filepath.Join("/dev", "loop99")),
+	)
+
+	setupImageCmds = append(setupImageCmds,
+		//nolint:gosec,G204
+		exec.Command("kpartx", "-a", filepath.Join("/dev", "loop99")),
+	)
+
+	teardownImageCmds = append([]*exec.Cmd{
+		//nolint:gosec,G204
+		exec.Command("kpartx", "-d", filepath.Join("/dev", "loop99")),
+	}, teardownImageCmds...,
+	)
+
+	setupImageCmds = append(setupImageCmds,
+		//nolint:gosec,G204
+		exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3"), mountDir), // with this example the rootfs is partition 3
+		//nolint:gosec,G204
+		exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p2"), bootUEFIDir), // with this example the boot partition is partition 2
+	)
+
+	teardownImageCmds = append([]*exec.Cmd{
+		//nolint:gosec,G204
+		exec.Command("mount", "--make-rprivate", filepath.Join("/dev", "mapper", "loop99p3")),
+		//nolint:gosec,G204
+		exec.Command("umount", "--recursive", filepath.Join("/dev", "mapper", "loop99p3")),
+	}, teardownImageCmds...,
+	)
 
 	// set up the mountpoints
 	mountPoints := []mountPoint{
@@ -449,5 +478,6 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		}
 	}
 
+	testHelperCheckUEFIConfig(t, mountDir)
 	testHelperCheckGrubConfig(t, mountDir)
 }

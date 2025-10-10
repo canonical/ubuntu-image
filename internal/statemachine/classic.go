@@ -517,7 +517,7 @@ func (stateMachine *StateMachine) addImgStates(states *[]stateFunc) {
 
 	*states = append(*states,
 		makeDiskState,
-		updateBootloaderState,
+		setupBootloaderState,
 	)
 }
 
@@ -532,7 +532,7 @@ func (stateMachine *StateMachine) addQcow2States(states *[]stateFunc) {
 	if !found {
 		*states = append(*states,
 			makeDiskState,
-			updateBootloaderState,
+			setupBootloaderState,
 		)
 	}
 	*states = append(*states, makeQcow2ImgState)

@@ -1,14 +1,19 @@
 package statemachine
 
 import (
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/osutil"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
 // TestFailedHandleSecureBoot tests failures in the handleSecureBoot function by mocking functions
@@ -196,4 +201,157 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 	err = stateMachine.handleLkBootloader(volume)
 	asserter.AssertErrContains(err, "Error copying lk bootloader dir")
 	osutilCopySpecialFile = osutil.CopySpecialFile
+}
+
+// TestStateMachine_setupGrub_checkcmds checks commands to update grub order is ok
+func TestStateMachine_setupGrub_checkcmds(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.commonFlags.Debug = true
+	stateMachine.commonFlags.OutputDir = "/tmp"
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: "amd64",
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+	}
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	mockCmder := NewMockExecCommand()
+
+	execCommand = mockCmder.Command
+	t.Cleanup(func() { execCommand = exec.Command })
+
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { restoreStdout() })
+
+	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfSuccess
+	t.Cleanup(func() {
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+	})
+
+	helperRestoreResolvConf = mockRestoreResolvConfSuccess
+	t.Cleanup(func() {
+		helperRestoreResolvConf = helper.RestoreResolvConf
+	})
+
+	err = stateMachine.setupGrub("", 2, 1, stateMachine.ImageDef.Architecture)
+	asserter.AssertErrNil(err, true)
+
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
+
+	expectedCmds := []*regexp.Regexp{
+		regexp.MustCompile("^udevadm settle$"),
+		regexp.MustCompile("^mount .*p2 .*/scratch/loopback$"),
+		regexp.MustCompile("^mkdir -p .*/scratch/loopback/boot/efi$"),
+		regexp.MustCompile("^mount .*p1 .*/scratch/loopback/boot/efi$"),
+		regexp.MustCompile("^mount -t devtmpfs devtmpfs-build .*/scratch/loopback/dev$"),
+		regexp.MustCompile("^mount -t devpts devpts-build -o nodev,nosuid .*/scratch/loopback/dev/pts$"),
+		regexp.MustCompile("^mount -t proc proc-build .*/scratch/loopback/proc$"),
+		regexp.MustCompile("^mount -t sysfs sysfs-build .*/scratch/loopback/sys$"),
+		regexp.MustCompile("^mount --bind .*/run.*$"),
+		regexp.MustCompile("^chroot .*/scratch/loopback apt install --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold --no-install-recommends udev"),
+		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --boot-directory=/boot --efi-directory=/boot/efi --target=x86_64-efi --uefi-secure-boot --no-nvram$"),
+		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --target=i386-pc$"),
+		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert"),
+		regexp.MustCompile("^chroot .*/scratch/loopback update-grub$"),
+		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert --remove"),
+		regexp.MustCompile("^udevadm settle$"),
+		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/run$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/run$"),
+		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/sys$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/sys$"),
+		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/proc$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/proc$"),
+		regexp.MustCompile("^mount --make-rprivate .*scratch/loopback/dev/pts$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/dev/pts$"),
+		regexp.MustCompile("^mount --make-rprivate .*/scratch/loopback/dev$"),
+		regexp.MustCompile("^umount --recursive .*scratch/loopback/dev$"),
+		regexp.MustCompile("^umount .*scratch/loopback/boot/efi$"),
+		regexp.MustCompile("^umount .*scratch/loopback$"),
+		regexp.MustCompile("^losetup --detach .* /tmp$"),
+	}
+
+	gotCmds := strings.Split(strings.TrimSpace(string(readStdout)), "\n")
+	if len(expectedCmds) != len(gotCmds) {
+		t.Fatalf("%v commands to be executed, expected %v commands. Got: %v", len(gotCmds), len(expectedCmds), gotCmds)
+	}
+
+	for i, gotCmd := range gotCmds {
+		expected := expectedCmds[i]
+
+		if !expected.Match([]byte(gotCmd)) {
+			t.Errorf("Cmd \"%v\" not matching. Expected %v\n", gotCmd, expected.String())
+		}
+	}
+}
+
+// TestStateMachine_setupGrub_failed tests failures in the updateGrub function
+func TestStateMachine_setupGrub_failed(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: "amd64",
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+	}
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// mock os.Mkdir
+	osMkdir = mockMkdir
+	t.Cleanup(func() {
+		osMkdir = os.Mkdir
+	})
+	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	asserter.AssertErrContains(err, "Error creating scratch/loopback/boot/efi directory")
+	osMkdir = os.Mkdir
+
+	// Setup the exec.Command mock to mock losetup
+	testCaseName = "TestFailedUpdateGrubLosetup"
+	execCommand = fakeExecCommand
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	asserter.AssertErrContains(err, "Error running losetup command")
+
+	// now test a command failure that isn't losetup
+	testCaseName = "TestFailedUpdateGrubOther"
+	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	asserter.AssertErrContains(err, "Error running command")
+	execCommand = exec.Command
+
+	err = stateMachine.setupGrub("", 0, 0, "unknown")
+	asserter.AssertErrContains(err, "no valid efi target for the provided architecture")
+
+	// Test failing helperBackupAndCopyResolvConf
+	mockCmder := NewMockExecCommand()
+
+	execCommand = mockCmder.Command
+	t.Cleanup(func() { execCommand = exec.Command })
+	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfFail
+	t.Cleanup(func() {
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+	})
+	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
+	helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 }
