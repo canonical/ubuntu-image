@@ -241,7 +241,7 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 
 var upgradePackagesState = stateFunc{"upgrade_packages", (*StateMachine).upgradePackages}
 
-// Upgrade packages in the chroot envrionment to align with configured pocket
+// Upgrade packages in the chroot environment to align with configured pocket
 func (stateMachine *StateMachine) upgradePackages() error {
 	return stateMachine.runCmdsWithChrootSetup(
 		generateAptUpgradeCmds(stateMachine.tempDirs.chroot, true))

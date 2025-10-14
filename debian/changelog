@@ -1,7 +1,7 @@
 ubuntu-image (3.10.0) UNRELEASED; urgency=medium
 
   [ Alexis Cellier ]
-  * add upgrade_packages state which upgrades pacakges installed by
+  * add upgrade_packages state which upgrades packages installed by
     debootstrap according to the configured rootfs pocket.
 
  -- Alexis Cellier <alexis.cellier@canonical.com>  Mon, 13 Oct 2025 09:36:28 +0000
