@@ -747,7 +747,7 @@ func TestGenerateAptPackageInstallingCmd(t *testing.T) {
 				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmd.String())
 			}
 			if !slices.Contains(aptCmd.Env, expectedEnvValue) {
-				t.Errorf("apt command env do not contain exepcted \"%s\" value", expectedEnvValue)
+				t.Errorf("apt command env do not contain expected \"%s\" value", expectedEnvValue)
 			}
 		})
 	}

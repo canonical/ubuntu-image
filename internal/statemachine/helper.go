@@ -532,7 +532,6 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 // generateAptUpgradeCmds generates the apt commands used to upgrade packages
 func generateAptUpgradeCmds(targetDir string, installRecommends bool) []*exec.Cmd {
 	updateCmd := execCommand("chroot", targetDir, "apt", "update")
-
 	upgradeCmd := generateAptPackageInstallingCmd(targetDir, []string{"upgrade"}, installRecommends)
 
 	return []*exec.Cmd{updateCmd, upgradeCmd}
