@@ -1,6 +1,7 @@
-name: "TIOBE/TiCS"
+name: TIOBE Quality Checks
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 0 * * TUE'
 
@@ -14,7 +15,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: 'go.mod'
 
       - name: build go binary
         run: CGO_ENABLED=0 go build ./...
@@ -37,18 +38,19 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
   
-  tics-report:
-    runs-on: ubuntu-latest
+  TiCS:
+    runs-on: [self-hosted, reactive, amd64, tiobe, noble]
     needs: test
     if: ${{ github.repository == 'canonical/ubuntu-image' }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: 'go.mod'
 
       - name: Download coverage report artifact
         uses: actions/download-artifact@v4
@@ -56,24 +58,23 @@ jobs:
           name: ubuntu-image-coverage-long
           path: .coverage
 
-      - name: Install tools
+      - name: Install dependencies
         run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
           go install github.com/axw/gocov/gocov@latest
           go install github.com/AlekSi/gocov-xml@latest
-          go install honnef.co/go/tools/cmd/staticcheck@latest
 
       - name: Convert report to xml
         run: |
           cd .coverage && \
           gocov convert coverage-long.out > coverage.json && \
-          gocov-xml < coverage.json > coverage-go.xml
+          gocov-xml < coverage.json > coverage.xml
 
-      - name: TICS analysis and report
-        run: |
-          export TICSAUTHTOKEN=${{ secrets.TICSAUTHTOKEN }}
-
-          set -x
-          # Install the TICS and staticcheck
-          curl --silent --show-error "https://canonical.tiobe.com/tiobeweb/TICS/api/public/v1/fapi/installtics/Script?cfg=default&platform=linux&url=https://canonical.tiobe.com/tiobeweb/TICS/" > install_tics.sh
-          . ./install_tics.sh
-          TICSQServer -project ubuntu-image -tmpdir /tmp/tics -branchdir .
+      - name: TiCS GitHub Action
+        uses: tiobe/tics-github-action@b9861e16fd5d38624516fcd3e49e233c133ebaf3 # 3.5.0
+        with:
+          mode: qserver
+          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=GoProjects
+          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
+          project: ubuntu-image
+          installTics: true
