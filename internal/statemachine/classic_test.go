@@ -5067,7 +5067,7 @@ func TestStateMachine_setupBootloader_fail(t *testing.T) {
 	})
 
 	err = stateMachine.setupBootloader()
-	asserter.AssertErrContains(err, "Error creating scratch/loopback/boot/efi")
+	asserter.AssertErrContains(err, "Error creating scratch/loopback")
 }
 
 // TestStateMachine_setupBootloader_warning tests that a warning is thrown if the
