@@ -197,7 +197,6 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 
 	if needUdev {
 		setupGrubCmds = append(setupGrubCmds,
-			
 			aptInstallChrootCmd(mountDir, []string{"udev"}, false),
 		)
 	}
