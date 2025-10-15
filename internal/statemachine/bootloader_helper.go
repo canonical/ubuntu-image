@@ -189,9 +189,20 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 		execCommand("udevadm", "settle"),
 	}, teardownCmds...)
 
+	// udev is needed to have grub-install properly work on jammy and older
+	needUdev, err := isSeriesEqualOrOlder(stateMachine.series, "jammy")
+	if err != nil {
+		return err
+	}
+
+	if needUdev {
+		setupGrubCmds = append(setupGrubCmds,
+			
+			aptInstallChrootCmd(mountDir, []string{"udev"}, false),
+		)
+	}
+
 	setupGrubCmds = append(setupGrubCmds,
-		// udev needed to have grub-install properly work
-		aptInstallChrootCmd(mountDir, []string{"udev"}, false),
 		execCommand("chroot",
 			mountDir,
 			"grub-install",
