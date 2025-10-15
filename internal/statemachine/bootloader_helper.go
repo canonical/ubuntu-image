@@ -97,7 +97,7 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
 	err = osMkdir(mountDir, 0755)
 	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("Error creating scratch/loopback/boot/efi directory: %s", err.Error())
+		return fmt.Errorf("Error creating scratch/loopback directory: %s", err.Error())
 	}
 
 	target := grubTargetFromArch(architecture)
@@ -189,41 +189,12 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 		execCommand("udevadm", "settle"),
 	}, teardownCmds...)
 
-	// udev is needed to have grub-install properly work on jammy and older
-	needUdev, err := isSeriesEqualOrOlder(stateMachine.series, "jammy")
+	err = addUdevInstallCmds(&setupGrubCmds, stateMachine.series, mountDir)
 	if err != nil {
 		return err
 	}
 
-	if needUdev {
-		setupGrubCmds = append(setupGrubCmds,
-			aptInstallChrootCmd(mountDir, []string{"udev"}, false),
-		)
-	}
-
-	setupGrubCmds = append(setupGrubCmds,
-		execCommand("chroot",
-			mountDir,
-			"grub-install",
-			loopUsed,
-			"--boot-directory=/boot",
-			"--efi-directory=/boot/efi",
-			fmt.Sprintf("--target=%s", target),
-			"--uefi-secure-boot",
-			"--no-nvram",
-		),
-	)
-
-	if architecture == arch.AMD64 {
-		setupGrubCmds = append(setupGrubCmds,
-			execCommand("chroot",
-				mountDir,
-				"grub-install",
-				loopUsed,
-				"--target=i386-pc",
-			),
-		)
-	}
+	addGrubInstallCmds(&setupGrubCmds, mountDir, target, architecture, loopUsed)
 
 	divert, undivert := divertOSProber(mountDir)
 
@@ -239,6 +210,49 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 
 	// now run all the commands
 	return helper.RunCmds(setupGrubCmds, stateMachine.commonFlags.Debug)
+}
+
+// addGrubInstallCmds adds the grub-install related commands to the setup commands
+func addGrubInstallCmds(cmds *[]*exec.Cmd, mountDir string, target string, architecture string, loopUsed string) {
+	*cmds = append(*cmds,
+		execCommand("chroot",
+			mountDir,
+			"grub-install",
+			loopUsed,
+			"--boot-directory=/boot",
+			"--efi-directory=/boot/efi",
+			fmt.Sprintf("--target=%s", target),
+			"--uefi-secure-boot",
+			"--no-nvram",
+		),
+	)
+
+	if architecture == arch.AMD64 {
+		*cmds = append(*cmds,
+			execCommand("chroot",
+				mountDir,
+				"grub-install",
+				loopUsed,
+				"--target=i386-pc",
+			),
+		)
+	}
+}
+
+// addUdevInstallCmds adds commands to install udev in the image if the series is
+// jammy or older
+func addUdevInstallCmds(cmds *[]*exec.Cmd, series string, mountDir string) error {
+	needUdev, err := isSeriesEqualOrOlder(series, "jammy")
+	if err != nil {
+		return err
+	}
+
+	if needUdev {
+		*cmds = append(*cmds,
+			aptInstallChrootCmd(mountDir, []string{"udev"}, false),
+		)
+	}
+	return nil
 }
 
 // grubTargetFromArch returns the proper grub-install target given the architecture.
