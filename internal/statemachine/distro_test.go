@@ -86,10 +86,10 @@ func Test_isSeriesEqualOrOlder(t *testing.T) {
 			expected:  false,
 		},
 		{
-			name:      "Invalid codename",
-			aCodename: "foo",
-			bCodename: "jammy",
-			expected:  false,
+			name:        "Invalid codename",
+			aCodename:   "foo",
+			bCodename:   "jammy",
+			expected:    false,
 			expectedErr: "unable to get the release from the codename foo",
 		},
 	}
