@@ -309,7 +309,7 @@ func TestClassicStateMachine_calculateStates(t *testing.T) {
 				"populate_bootfs_contents",
 				"populate_prepare_partitions",
 				"make_disk",
-				"update_bootloader",
+				"setup_bootloader",
 				"make_qcow2_image",
 				"generate_package_manifest",
 				"generate_filelist",
