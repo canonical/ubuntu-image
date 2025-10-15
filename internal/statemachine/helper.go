@@ -529,21 +529,19 @@ func generateDebootstrapCmd(imageDefinition imagedefinition.ImageDefinition, tar
 	return debootstrapCmd
 }
 
-// generateAptUpgradeCmds generates the apt commands used to upgrade packages
-func generateAptUpgradeCmds(targetDir string, installRecommends bool) []*exec.Cmd {
-	updateCmd := execCommand("chroot", targetDir, "apt", "update")
-	upgradeCmd := generateAptPackageInstallingCmd(targetDir, []string{"upgrade"}, installRecommends)
-
-	return []*exec.Cmd{updateCmd, upgradeCmd}
+// aptUpdateChrootCmd returns the apt command to update the package list in the chroot
+func aptUpdateChrootCmd(targetDir string) *exec.Cmd {
+	return execCommand("chroot", targetDir, "apt", "update")
 }
 
-// generateAptInstallCmds generates the apt command used to create a chroot
-// environment that will eventually become the rootfs of the resulting image
-func generateAptInstallCmds(targetDir string, packageList []string, installRecommends bool) []*exec.Cmd {
-	updateCmd := execCommand("chroot", targetDir, "apt", "update")
-	installCmd := generateAptPackageInstallingCmd(targetDir, append([]string{"install"}, packageList...), installRecommends)
+// aptInstallChrootCmd returns the apt command to install the packages in the chroot
+func aptInstallChrootCmd(targetDir string, packageList []string, installRecommends bool) *exec.Cmd {
+	return generateAptPackageInstallingCmd(targetDir, append([]string{"install"}, packageList...), installRecommends)
+}
 
-	return []*exec.Cmd{updateCmd, installCmd}
+// aptUpgradeChrootCmd returns the apt command to upgrade packages in the chroot
+func aptUpgradeChrootCmd(targetDir string, installRecommends bool) *exec.Cmd {
+	return generateAptPackageInstallingCmd(targetDir, []string{"upgrade"}, installRecommends)
 }
 
 // generateAptPackageInstallingCmd generates the apt command with correct

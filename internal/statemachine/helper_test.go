@@ -752,17 +752,17 @@ func TestGenerateAptPackageInstallingCmd(t *testing.T) {
 	}
 }
 
-// TestGenerateAptUpgradeCmds unit tests the generateAptUpgradeCmds function
-func TestGenerateAptUpgradeCmds(t *testing.T) {
+// Test_aptUpgradeChrootCmd unit tests the aptUpgradeChrootCmd function
+func Test_aptUpgradeChrootCmd(t *testing.T) {
 	expected := "chroot chroot2 apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold upgrade"
-	aptCmds := generateAptUpgradeCmds("chroot2", true)
-	if !strings.Contains(aptCmds[1].String(), expected) {
-		t.Errorf("Expected apt command \"%s\" but got \"%s\"", expected, aptCmds[1].String())
+	aptCmd := aptUpgradeChrootCmd("chroot2", true)
+	if !strings.Contains(aptCmd.String(), expected) {
+		t.Errorf("Expected apt command \"%s\" but got \"%s\"", expected, aptCmd.String())
 	}
 }
 
-// TestGenerateAptInstallCmds unit tests the generateAptInstallCmds function
-func TestGenerateAptInstallCmds(t *testing.T) {
+// Test_aptInstallChrootCmd unit tests the aptInstallChrootCmd function
+func Test_aptInstallChrootCmd(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name              string
@@ -787,10 +787,10 @@ func TestGenerateAptInstallCmds(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_generate_apt_install_cmd_"+tc.name, func(t *testing.T) {
-			aptCmds := generateAptInstallCmds(tc.targetDir, tc.packageList, tc.installRecommends)
-			if !strings.Contains(aptCmds[1].String(), tc.expected) {
-				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmds[1].String())
+		t.Run("test_apt_install_chroot_cmd_"+tc.name, func(t *testing.T) {
+			aptCmd := aptInstallChrootCmd(tc.targetDir, tc.packageList, tc.installRecommends)
+			if !strings.Contains(aptCmd.String(), tc.expected) {
+				t.Errorf("Expected apt command \"%s\" but got \"%s\"", tc.expected, aptCmd.String())
 			}
 		})
 	}

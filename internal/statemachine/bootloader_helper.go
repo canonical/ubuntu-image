@@ -191,7 +191,7 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 
 	setupGrubCmds = append(setupGrubCmds,
 		// udev needed to have grub-install properly work
-		aptInstallCmd(mountDir, []string{"udev"}, false),
+		aptInstallChrootCmd(mountDir, []string{"udev"}, false),
 		execCommand("chroot",
 			mountDir,
 			"grub-install",

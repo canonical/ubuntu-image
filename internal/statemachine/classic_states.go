@@ -244,7 +244,11 @@ var upgradePackagesState = stateFunc{"upgrade_packages", (*StateMachine).upgrade
 // Upgrade packages in the chroot environment to align with configured pocket
 func (stateMachine *StateMachine) upgradePackages() error {
 	return stateMachine.runCmdsWithChrootSetup(
-		generateAptUpgradeCmds(stateMachine.tempDirs.chroot, true))
+		[]*exec.Cmd{
+			aptUpdateChrootCmd(stateMachine.tempDirs.chroot),
+			aptUpgradeChrootCmd(stateMachine.tempDirs.chroot, true),
+		},
+	)
 }
 
 var installPackagesState = stateFunc{"install_packages", (*StateMachine).installPackages}
@@ -256,7 +260,11 @@ func (stateMachine *StateMachine) installPackages() error {
 	stateMachine.gatherPackages(&classicStateMachine.ImageDef)
 
 	return stateMachine.runCmdsWithChrootSetup(
-		generateAptInstallCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages, true))
+		[]*exec.Cmd{
+			aptUpdateChrootCmd(stateMachine.tempDirs.chroot),
+			aptInstallChrootCmd(stateMachine.tempDirs.chroot, classicStateMachine.Packages, true),
+		},
+	)
 }
 
 func (stateMachine *StateMachine) gatherPackages(imageDef *imagedefinition.ImageDefinition) {
