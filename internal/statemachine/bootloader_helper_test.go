@@ -333,7 +333,7 @@ func TestStateMachine_setupGrub_failed(t *testing.T) {
 		osMkdir = os.Mkdir
 	})
 	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
-	asserter.AssertErrContains(err, "Error creating scratch/loopback/boot/efi directory")
+	asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
 	osMkdir = os.Mkdir
 
 	// Setup the exec.Command mock to mock losetup
