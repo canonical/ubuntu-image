@@ -3,44 +3,31 @@ package statemachine
 import (
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 )
-
-// releaseFromCodename returns the release version associated to a codename
-func releaseFromCodename(codename string) (string, error) {
-	cmd := exec.Command("ubuntu-distro-info", "-r", "--series", codename)
-	outputBytes, err := cmd.Output() // nolint: errcheck
-	if err != nil {
-		return "", fmt.Errorf("unable to get the release from the codename %s", codename)
-	}
-	// Remove the "LTS" suffix if needed
-	return strings.TrimSpace(strings.Split(string(outputBytes), " ")[0]), nil
-}
 
 // isSeriesEqualOrOlder returns true if a is equal to or older than b
 func isSeriesEqualOrOlder(a, b string) (bool, error) {
 	if a == b {
 		return true, nil
 	}
-	aRelease, err := releaseFromCodename(a)
+	// ubuntu-distro-info --all returns series sorted by release date
+	cmd := exec.Command("ubuntu-distro-info", "--all")
+	outputBytes, err := cmd.Output()
 	if err != nil {
-		return false, err
+		return true, fmt.Errorf("unable to get distro info: %w", err)
 	}
-	bRelease, err := releaseFromCodename(b)
-	if err != nil {
-		return false, err
-	}
-	cmd := exec.Command("dpkg", "--compare-versions", aRelease, "lt", bRelease)
-	err = cmd.Run()
-	if err != nil {
-		exitError, ok := err.(*exec.ExitError)
-		if !ok {
-			return false, err
+	seriesList := strings.Split(string(outputBytes), "\n")
+
+	aPosition := slices.Index(seriesList, a)
+	bPosition := slices.Index(seriesList, b)
+
+	for name, pos := range map[string]int{a: aPosition, b: bPosition} {
+		if pos == -1 {
+			return true, fmt.Errorf("unknown series: %s", name)
 		}
-		if exitError.ExitCode() == 1 && string(exitError.Stderr) == "" {
-			return false, nil
-		}
-		return false, err
 	}
-	return true, nil
+
+	return aPosition <= bPosition, nil
 }

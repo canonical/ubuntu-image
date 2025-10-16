@@ -6,57 +6,6 @@ import (
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
 
-// Test_releaseFromCodename unit tests the releaseFromCodename function
-func Test_releaseFromCodename(t *testing.T) {
-	t.Parallel()
-	testCases := []struct {
-		name        string
-		codename    string
-		expected    string
-		expectedErr string
-	}{
-		{
-			name:     "Noble LTS",
-			codename: "noble",
-			expected: "24.04",
-		},
-		{
-			name:     "Oracular (non-LTS)",
-			codename: "oracular",
-			expected: "24.10",
-		},
-		{
-			name:        "Unknown",
-			codename:    "unknown",
-			expected:    "",
-			expectedErr: "unable to get the release from the codename unknown",
-		},
-		{
-			name:     "Old release - gutsy",
-			codename: "gutsy",
-			expected: "7.10",
-		},
-		{
-			name:     "Old release - gutsy",
-			codename: "gutsy",
-			expected: "7.10",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run("test_releaseFromCodename", func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			gotRelease, err := releaseFromCodename(tc.codename)
-			if gotRelease != tc.expected {
-				t.Errorf("Wrong value of releaseFromCodename. Expected '%s', got '%s'", tc.expected, gotRelease)
-			}
-			if err != nil || len(tc.expectedErr) != 0 {
-				asserter.AssertErrContains(err, tc.expectedErr)
-			}
-		})
-	}
-}
-
 // Test_isSeriesEqualOrOlder unit tests the isSeriesEqualOrOlder function
 func Test_isSeriesEqualOrOlder(t *testing.T) {
 	t.Parallel()
@@ -86,11 +35,18 @@ func Test_isSeriesEqualOrOlder(t *testing.T) {
 			expected:  false,
 		},
 		{
-			name:        "Invalid codename",
+			name:        "First codename invalid",
 			aCodename:   "foo",
 			bCodename:   "jammy",
-			expected:    false,
-			expectedErr: "unable to get the release from the codename foo",
+			expected:    true,
+			expectedErr: "unknown series: foo",
+		},
+		{
+			name:        "Second codename invalid",
+			aCodename:   "jammy",
+			bCodename:   "foo",
+			expected:    true,
+			expectedErr: "unknown series: foo",
 		},
 	}
 
