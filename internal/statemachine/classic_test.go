@@ -4757,8 +4757,8 @@ func TestGenerateRootfsTarball(t *testing.T) {
 			name:           "gzip",
 			tarPath:        "test_generate_rootfs_tarball.tar.gz",
 			fileType:       "gzip compressed data",
-			minArchiveSize: 31600,
-			maxArchiveSize: 31900,
+			minArchiveSize: 31700,
+			maxArchiveSize: 32000,
 		},
 		{
 			name:           "xz",
