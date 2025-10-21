@@ -1,3 +1,11 @@
+ubuntu-image (3.10.1) UNRELEASED; urgency=medium
+
+  [ Alexis Cellier ]
+  * Fix gzip rootfs test by shifting a bit the size
+  * Display warnings about Deb822 format only when meaningful
+
+ -- Alexis Cellier <alexis.cellier@canonical.com>  Tue, 21 Oct 2025 10:45:06 +0000
+
 ubuntu-image (3.10.0) UNRELEASED; urgency=medium
 
   [ Alexis Cellier ]
