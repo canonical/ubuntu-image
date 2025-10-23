@@ -199,7 +199,6 @@ func TestImageDefinition_SetDefaults(t *testing.T) {
 				},
 				Artifacts: &Artifact{
 					Img:       &[]Img{{}},
-					Iso:       &[]Iso{{}},
 					Qcow2:     &[]Qcow2{{}},
 					Manifest:  &Manifest{},
 					Filelist:  &Filelist{},
@@ -247,7 +246,6 @@ func TestImageDefinition_SetDefaults(t *testing.T) {
 				},
 				Artifacts: &Artifact{
 					Img:       &[]Img{{}},
-					Iso:       &[]Iso{{}},
 					Qcow2:     &[]Qcow2{{}},
 					Manifest:  &Manifest{},
 					Filelist:  &Filelist{},
