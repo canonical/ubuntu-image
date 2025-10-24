@@ -163,6 +163,86 @@ func TestFailedParseImageDefinition(t *testing.T) {
 	helperCheckTags = helper.CheckTags
 }
 
+func TestPrintDeb822Warnings(t *testing.T) {
+	testCases := []struct {
+		name           string
+		series         string
+		deb822Format   *bool
+		expectedOutput []string
+	}{
+		{
+			name:           "unset_with_legacy_series",
+			series:         "jammy",
+			deb822Format:   nil,
+			expectedOutput: []string{"WARNING: rootfs.sources-list-deb822 was not set. Please explicitly set the format desired for sources list in your image definition.\n"},
+		},
+		{
+			name:           "unset",
+			series:         "questing",
+			deb822Format:   nil,
+			expectedOutput: []string{"WARNING: rootfs.sources-list-deb822 was not set. Please explicitly set the format desired for sources list in your image definition.\n", "WARNING: rootfs.sources-list-deb822 is set to false. The deprecated format will be used to manage sources list. Please if possible adopt the new format.\n"},
+		},
+		{
+			name:           "set_true_with_legacy_series",
+			series:         "jammy",
+			deb822Format:   helper.BoolPtr(true),
+			expectedOutput: []string{"WARNING: rootfs.sources-list-deb822 is set to true. The DEB822 format is not supported by series older than noble.\n"},
+		},
+		{
+			name:           "set_true",
+			series:         "noble",
+			deb822Format:   helper.BoolPtr(true),
+			expectedOutput: []string{},
+		},
+		{
+			name:           "set_false_with_legacy_series",
+			series:         "jammy",
+			deb822Format:   helper.BoolPtr(false),
+			expectedOutput: []string{},
+		},
+		{
+			name:           "set_false",
+			series:         "noble",
+			deb822Format:   helper.BoolPtr(false),
+			expectedOutput: []string{"WARNING: rootfs.sources-list-deb822 is set to false. The deprecated format will be used to manage sources list. Please if possible adopt the new format.\n"},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			imageDefinition, err := readImageDefinition(filepath.Join("testdata", "image_definitions", "test_deb822.yaml"))
+			asserter.AssertErrNil(err, true)
+			imageDefinition.Series = tc.series
+			imageDefinition.Rootfs.SourcesListDeb822 = nil
+			if tc.deb822Format != nil {
+				imageDefinition.Rootfs.SourcesListDeb822 = helper.BoolPtr(*tc.deb822Format)
+			}
+
+			// capture stdout, run copy structure content, and ensure the warning was thrown
+			stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+			defer restoreStdout()
+			asserter.AssertErrNil(err, true)
+
+			err = printDeb822Warnings(imageDefinition)
+			asserter.AssertErrNil(err, true)
+
+			// restore stdout and check that the warning was printed
+			restoreStdout()
+			readStdout, err := io.ReadAll(stdout)
+			asserter.AssertErrNil(err, true)
+
+			expectedStdout := strings.Join(tc.expectedOutput, "")
+			if string(readStdout) != expectedStdout {
+				t.Errorf("Warnings about DEB822 format are not correct.\n * Expected:\n%s * Got:\n%s", expectedStdout, string(readStdout))
+			}
+		})
+	}
+}
+
 // TestClassicStateMachine_calculateStates reads in a variety of yaml files and ensures
 // that the correct states are added to the state machine
 // TODO: manually assemble the image definitions instead of relying on the parseImageDefinition() function to make this more of a unit test
@@ -4757,8 +4837,8 @@ func TestGenerateRootfsTarball(t *testing.T) {
 			name:           "gzip",
 			tarPath:        "test_generate_rootfs_tarball.tar.gz",
 			fileType:       "gzip compressed data",
-			minArchiveSize: 31600,
-			maxArchiveSize: 31900,
+			minArchiveSize: 31700,
+			maxArchiveSize: 32000,
 		},
 		{
 			name:           "xz",

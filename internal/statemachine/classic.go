@@ -107,8 +107,9 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return err
 	}
 
-	if imageDefinition.Rootfs != nil && imageDefinition.Rootfs.SourcesListDeb822 == nil {
-		fmt.Print("WARNING: rootfs.sources-list-deb822 was not set. Please explicitly set the format desired for sources list in your image definition.\n")
+	// print warnings about deb822 sources list format misconfiguration
+	if err := printDeb822Warnings(imageDefinition); err != nil {
+		return err
 	}
 
 	// populate the default values for imageDefinition if they were not provided in
@@ -117,18 +118,44 @@ func (stateMachine *StateMachine) parseImageDefinition() error {
 		return err
 	}
 
-	if imageDefinition.Rootfs != nil && *imageDefinition.Rootfs.SourcesListDeb822 {
-		fmt.Print("WARNING: rootfs.sources-list-deb822 is set to true. The DEB822 format will be used to manage sources list. Please make sure you are not building an image older than noble.\n")
-	} else {
-		fmt.Print("WARNING: rootfs.sources-list-deb822 is set to false. The deprecated format will be used to manage sources list. Please if possible adopt the new format.\n")
-	}
-
 	err = validateImageDefinition(imageDefinition)
 	if err != nil {
 		return err
 	}
 
 	classicStateMachine.ImageDef = *imageDefinition
+
+	return nil
+}
+
+// printDeb822Warnings prints warnings on stdout about possible
+// misconfiguration about the DEB822 sources list format
+func printDeb822Warnings(imageDefinition *imagedefinition.ImageDefinition) error {
+	if imageDefinition.Rootfs == nil {
+		return nil
+	}
+
+	// not set
+	if imageDefinition.Rootfs.SourcesListDeb822 == nil {
+		fmt.Print("WARNING: rootfs.sources-list-deb822 was not set. Please explicitly set the format desired for sources list in your image definition.\n")
+	}
+
+	legacySupportOnly, err := isSeriesEqualOrOlder(imageDefinition.Series, "jammy")
+	if err != nil {
+		return err
+	}
+
+	// set to true with series older than noble
+	if legacySupportOnly && imageDefinition.Rootfs.SourcesListDeb822 != nil && *imageDefinition.Rootfs.SourcesListDeb822 {
+		fmt.Print("WARNING: rootfs.sources-list-deb822 is set to true. The DEB822 format is not supported by series older than noble.\n")
+		return nil
+	}
+
+	// set to false (or defaulted to false) with series newer than jammy
+	if !legacySupportOnly && (imageDefinition.Rootfs.SourcesListDeb822 == nil || !*imageDefinition.Rootfs.SourcesListDeb822) {
+		fmt.Print("WARNING: rootfs.sources-list-deb822 is set to false. The deprecated format will be used to manage sources list. Please if possible adopt the new format.\n")
+		return nil
+	}
 
 	return nil
 }
