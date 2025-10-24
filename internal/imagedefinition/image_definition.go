@@ -176,7 +176,6 @@ type AddUser struct {
 // during and as a result of the image build process
 type Artifact struct {
 	Img       *[]Img     `yaml:"img"            json:"Img,omitempty"       is_disk:"true"`
-	Iso       *[]Iso     `yaml:"iso"            json:"Iso,omitempty"       is_disk:"true"`
 	Qcow2     *[]Qcow2   `yaml:"qcow2"          json:"Qcow2,omitempty"     is_disk:"true"`
 	Manifest  *Manifest  `yaml:"manifest"       json:"Manifest,omitempty"  is_disk:"false"`
 	Filelist  *Filelist  `yaml:"filelist"       json:"Filelist,omitempty"  is_disk:"false"`
@@ -189,15 +188,6 @@ type Artifact struct {
 type Img struct {
 	ImgName   string `yaml:"name"   json:"ImgName"`
 	ImgVolume string `yaml:"volume" json:"ImgVolume"`
-}
-
-// Iso specifies the name of the resulting .iso file
-// and optionally the xorrisofs command used to create it.
-// If left emtpy no .iso file will be created
-type Iso struct {
-	IsoName   string `yaml:"name"            json:"IsoName"`
-	IsoVolume string `yaml:"volume"          json:"IsoVolume"`
-	Command   string `yaml:"xorriso-command" json:"Command,omitempty"`
 }
 
 // Qcow2 specifies the name of the resulting .qcow2 file
