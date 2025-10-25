@@ -328,9 +328,12 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 	)
 	asserter.AssertErrNil(err, true)
 
-	debootstrapCmd := execCommand("debootstrap",
+	mmdebstrapCmd := execCommand("mmdebstrap",
 		"--arch", "amd64",
 		"--variant=minbase",
+		"--mode=sudo",
+		"--include=apt",
+		"--format=dir",
 		"--include=grub2-common",
 		"--include=shim-signed",
 		"jammy",
@@ -338,12 +341,12 @@ func TestPackStateMachine_SuccessfulRun(t *testing.T) {
 		"http://archive.ubuntu.com/ubuntu/",
 	)
 
-	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, true)
+	mmdebstrapOutput := helper.SetCommandOutput(mmdebstrapCmd, true)
 
-	err = debootstrapCmd.Run()
+	err = mmdebstrapCmd.Run()
 	if err != nil {
-		t.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
-			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
+		t.Errorf("Error running mmdebstrap command \"%s\". Error is \"%s\". Output is: \n%s",
+			mmdebstrapCmd.String(), err.Error(), mmdebstrapOutput.String())
 	}
 	asserter.AssertErrNil(err, true)
 

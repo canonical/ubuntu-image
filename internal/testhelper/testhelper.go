@@ -83,6 +83,7 @@ func (o *osMock) Remove(name string) error {
 	return nil
 }
 
+// RemoveAll mocks os.RemoveAll
 func (o *osMock) RemoveAll(name string) error {
 	if o.beforeRemoveAllFail >= o.conf.RemoveAllThreshold {
 		return fmt.Errorf("RemoveAll fail")
