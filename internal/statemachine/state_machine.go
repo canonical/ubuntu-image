@@ -106,6 +106,7 @@ type StateMachine struct {
 	RootfsVolName string        // volume on which the rootfs is located
 	RootfsPartNum int           // rootfs partition number
 	BootPartNum   int           // boot partition number
+	EFIBIOSHybrid bool          // whether the image is holding partitions for BIOS and EFI boot
 	SectorSize    quantity.Size // parsed (converted) sector size
 	RootfsSize    quantity.Size
 	tempDirs      temporaryDirectories
@@ -457,6 +458,7 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.RootfsVolName = partialStateMachine.RootfsVolName
 	stateMachine.RootfsPartNum = partialStateMachine.RootfsPartNum
 	stateMachine.BootPartNum = partialStateMachine.BootPartNum
+	stateMachine.EFIBIOSHybrid = partialStateMachine.EFIBIOSHybrid
 
 	stateMachine.SectorSize = partialStateMachine.SectorSize
 	stateMachine.RootfsSize = partialStateMachine.RootfsSize

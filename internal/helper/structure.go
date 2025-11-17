@@ -1,6 +1,10 @@
 package helper
 
-import "github.com/snapcore/snapd/gadget"
+import (
+	"strings"
+
+	"github.com/snapcore/snapd/gadget"
+)
 
 // IsRootfsStructure determines if the given structure is the one associated
 // to the rootfs
@@ -36,6 +40,16 @@ func IsSystemSeedStructure(s *gadget.VolumeStructure) bool {
 	}
 
 	return s.Role == gadget.SystemSeed
+}
+
+// IsBIOSBootStructure determines if the given structure is likely a partition
+// for BIOS blobs. The heuristics relies on a naming convention and may not cover
+// all use cases.
+func IsBIOSBootStructure(s *gadget.VolumeStructure) bool {
+	if s == nil {
+		return false
+	}
+	return s.Role == gadget.SystemBoot && strings.HasPrefix(s.Name, "BIOS")
 }
 
 // ShouldSkipStructure returns whether a structure should be skipped during certain processing

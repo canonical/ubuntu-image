@@ -93,6 +93,7 @@ var gadgetMBR = &gadget.Volume{
 			MinSize:    1258291200,
 			Size:       1258291200,
 			Type:       "DA",
+			Role:       "system-boot",
 			Content: []gadget.VolumeContent{
 				{
 					Image: "pc-core.img",
@@ -169,6 +170,7 @@ func TestGeneratePartitionTable(t *testing.T) {
 		wantPartitionTable   partition.Table
 		wantRootfsPartNumber int
 		wantBootPartNumber   int
+		wantEFIBIOSHybrid    bool
 		expectedError        string
 	}{
 		{
@@ -277,30 +279,33 @@ func TestGeneratePartitionTable(t *testing.T) {
 				imgSize:    uint64(4 * quantity.SizeKiB),
 			},
 			wantRootfsPartNumber: -1,
-			wantBootPartNumber:   -1,
+			wantBootPartNumber:   1,
 			wantPartitionTable: &mbr.Table{
 				Partitions: []*mbr.Partition{
 					{
-						Type:  218,
-						Start: 2048,
-						Size:  2457600,
+						Bootable: true,
+						Type:     218,
+						Start:    2048,
+						Size:     2457600,
 					},
 				},
 				LogicalSectorSize:  512,
 				PhysicalSectorSize: 512,
 			},
+			wantEFIBIOSHybrid: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			asserter := &helper.Asserter{T: t}
-			gotPartitionTable, gotRootfsPartNumber, gotBootPartNumber, gotErr := GeneratePartitionTable(tt.args.volume, tt.args.sectorSize, tt.args.imgSize, tt.args.isSeeded)
+			gotPartitionTable, gotRootfsPartNumber, gotBootPartNumber, gotEFIBIOSHybrid, gotErr := GeneratePartitionTable(tt.args.volume, tt.args.sectorSize, tt.args.imgSize, tt.args.isSeeded)
 
 			if len(tt.expectedError) == 0 {
 				asserter.AssertErrNil(gotErr, true)
 				asserter.AssertEqual(tt.wantRootfsPartNumber, gotRootfsPartNumber)
 				asserter.AssertEqual(tt.wantBootPartNumber, gotBootPartNumber)
 				asserter.AssertEqual(tt.wantPartitionTable, gotPartitionTable)
+				asserter.AssertEqual(tt.wantEFIBIOSHybrid, gotEFIBIOSHybrid)
 			} else {
 				asserter.AssertErrContains(gotErr, tt.expectedError)
 			}
