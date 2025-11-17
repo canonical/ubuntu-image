@@ -62,7 +62,7 @@ func newPartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64)
 // returns it with useful partition numbers.
 func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize uint64, isSeeded bool) (partition.Table, int, int, bool, error) {
 	partitionNumber, rootfsPartitionNumber, bootPartitionNumber := 1, -1, -1
-	efiBIOSHybrid := false
+	hasBIOSPartition := false
 	partitionTable := newPartitionTable(volume, sectorSize, imgSize)
 	onDisk := gadget.OnDiskStructsFromGadget(volume)
 
@@ -80,7 +80,7 @@ func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize ui
 
 		// Record presence of a structure for BIOS
 		if helper.IsBIOSBootStructure(structure) {
-			efiBIOSHybrid = true
+			hasBIOSPartition = true
 		}
 
 		if helper.ShouldSkipStructure(structure, isSeeded) {
@@ -101,13 +101,13 @@ func GeneratePartitionTable(volume *gadget.Volume, sectorSize uint64, imgSize ui
 		structureType := getStructureType(structure, volume.Schema)
 		err := partitionTable.AddPartition(structurePair, structureType)
 		if err != nil {
-			return nil, rootfsPartitionNumber, bootPartitionNumber, efiBIOSHybrid, err
+			return nil, rootfsPartitionNumber, bootPartitionNumber, hasBIOSPartition, err
 		}
 
 		partitionNumber++
 	}
 
-	return partitionTable.GetConcreteTable(), rootfsPartitionNumber, bootPartitionNumber, efiBIOSHybrid, nil
+	return partitionTable.GetConcreteTable(), rootfsPartitionNumber, bootPartitionNumber, hasBIOSPartition, nil
 }
 
 // getStructureType extracts the structure type from the structure.Type considering

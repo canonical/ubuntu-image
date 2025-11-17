@@ -5205,7 +5205,7 @@ func TestStateMachine_setupBootloader_warning(t *testing.T) {
 			wantWarning:    "WARNING: Skipping GRUB installation because no data partition was found.",
 		},
 		{
-			name:           "no rootfs part num",
+			name:           "no bootfs part num",
 			rootfsPartNum:  3,
 			bootPartNum:    -1,
 			rootfsVolName:  "pc",

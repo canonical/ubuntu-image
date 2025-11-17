@@ -170,7 +170,7 @@ func TestGeneratePartitionTable(t *testing.T) {
 		wantPartitionTable   partition.Table
 		wantRootfsPartNumber int
 		wantBootPartNumber   int
-		wantEFIBIOSHybrid    bool
+		wantHasBIOSPartition bool
 		expectedError        string
 	}{
 		{
@@ -292,20 +292,20 @@ func TestGeneratePartitionTable(t *testing.T) {
 				LogicalSectorSize:  512,
 				PhysicalSectorSize: 512,
 			},
-			wantEFIBIOSHybrid: true,
+			wantHasBIOSPartition: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			asserter := &helper.Asserter{T: t}
-			gotPartitionTable, gotRootfsPartNumber, gotBootPartNumber, gotEFIBIOSHybrid, gotErr := GeneratePartitionTable(tt.args.volume, tt.args.sectorSize, tt.args.imgSize, tt.args.isSeeded)
+			gotPartitionTable, gotRootfsPartNumber, gotBootPartNumber, gotHasBIOSPartition, gotErr := GeneratePartitionTable(tt.args.volume, tt.args.sectorSize, tt.args.imgSize, tt.args.isSeeded)
 
 			if len(tt.expectedError) == 0 {
 				asserter.AssertErrNil(gotErr, true)
 				asserter.AssertEqual(tt.wantRootfsPartNumber, gotRootfsPartNumber)
 				asserter.AssertEqual(tt.wantBootPartNumber, gotBootPartNumber)
 				asserter.AssertEqual(tt.wantPartitionTable, gotPartitionTable)
-				asserter.AssertEqual(tt.wantEFIBIOSHybrid, gotEFIBIOSHybrid)
+				asserter.AssertEqual(tt.wantHasBIOSPartition, gotHasBIOSPartition)
 			} else {
 				asserter.AssertErrContains(gotErr, tt.expectedError)
 			}

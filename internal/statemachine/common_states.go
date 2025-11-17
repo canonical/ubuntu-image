@@ -496,7 +496,7 @@ func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gad
 
 // partitionDisk generates a partition table and applies it to the disk
 func (stateMachine *StateMachine) partitionDisk(diskImg *diskutils.Disk, volume *gadget.Volume, volumeName string) error {
-	partitionTable, rootfsPartitionNumber, bootPartitionNumber, efiBIOSHybrid, err := partition.GeneratePartitionTable(volume, uint64(stateMachine.SectorSize), uint64(diskImg.Size), stateMachine.IsSeeded)
+	partitionTable, rootfsPartitionNumber, bootPartitionNumber, hasBIOSPartition, err := partition.GeneratePartitionTable(volume, uint64(stateMachine.SectorSize), uint64(diskImg.Size), stateMachine.IsSeeded)
 	if err != nil {
 		return err
 	}
@@ -505,7 +505,7 @@ func (stateMachine *StateMachine) partitionDisk(diskImg *diskutils.Disk, volume 
 	// Store in any case, even if value is -1 to make it clear later it was not found
 	stateMachine.RootfsPartNum = rootfsPartitionNumber
 	stateMachine.BootPartNum = bootPartitionNumber
-	stateMachine.EFIBIOSHybrid = efiBIOSHybrid
+	stateMachine.HasBIOSPartition = hasBIOSPartition
 	if rootfsPartitionNumber != -1 {
 		stateMachine.RootfsVolName = volumeName
 	}

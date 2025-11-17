@@ -1385,7 +1385,7 @@ func (stateMachine *StateMachine) setupBootloader() error {
 			stateMachine.RootfsVolName,
 			stateMachine.RootfsPartNum,
 			stateMachine.BootPartNum,
-			stateMachine.EFIBIOSHybrid,
+			stateMachine.HasBIOSPartition,
 			arch,
 		)
 		if err != nil {

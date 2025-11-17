@@ -97,19 +97,19 @@ type temporaryDirectories struct {
 
 // StateMachine will hold the command line data, track the current state, and handle all function calls
 type StateMachine struct {
-	cleanWorkDir  bool          // whether or not to clean up the workDir
-	CurrentStep   string        // tracks the current progress of the state machine
-	StepsTaken    int           // counts the number of steps taken
-	ConfDefPath   string        // directory holding the model assertion / image definition file
-	YamlFilePath  string        // the location for the gadget yaml file
-	IsSeeded      bool          // core 20 images are seeded
-	RootfsVolName string        // volume on which the rootfs is located
-	RootfsPartNum int           // rootfs partition number
-	BootPartNum   int           // boot partition number
-	EFIBIOSHybrid bool          // whether the image is holding partitions for BIOS and EFI boot
-	SectorSize    quantity.Size // parsed (converted) sector size
-	RootfsSize    quantity.Size
-	tempDirs      temporaryDirectories
+	cleanWorkDir     bool          // whether or not to clean up the workDir
+	CurrentStep      string        // tracks the current progress of the state machine
+	StepsTaken       int           // counts the number of steps taken
+	ConfDefPath      string        // directory holding the model assertion / image definition file
+	YamlFilePath     string        // the location for the gadget yaml file
+	IsSeeded         bool          // core 20 images are seeded
+	RootfsVolName    string        // volume on which the rootfs is located
+	RootfsPartNum    int           // rootfs partition number
+	BootPartNum      int           // boot partition number
+	HasBIOSPartition bool          // whether the image is holding partitions for BIOS
+	SectorSize       quantity.Size // parsed (converted) sector size
+	RootfsSize       quantity.Size
+	tempDirs         temporaryDirectories
 
 	series string
 
@@ -458,7 +458,7 @@ func (stateMachine *StateMachine) loadState(partialStateMachine *StateMachine) e
 	stateMachine.RootfsVolName = partialStateMachine.RootfsVolName
 	stateMachine.RootfsPartNum = partialStateMachine.RootfsPartNum
 	stateMachine.BootPartNum = partialStateMachine.BootPartNum
-	stateMachine.EFIBIOSHybrid = partialStateMachine.EFIBIOSHybrid
+	stateMachine.HasBIOSPartition = partialStateMachine.HasBIOSPartition
 
 	stateMachine.SectorSize = partialStateMachine.SectorSize
 	stateMachine.RootfsSize = partialStateMachine.RootfsSize
