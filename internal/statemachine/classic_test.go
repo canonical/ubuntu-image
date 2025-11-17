@@ -5109,25 +5109,11 @@ func TestStateMachine_setupBootloader_fail(t *testing.T) {
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrNil(err, true)
 
-	// first, test that setupBootloader fails when the rootfs partition
-	// has not been found in earlier steps
+	// Test that setupBootloader fails when missing volume
 	stateMachine.RootfsPartNum = -1
 	stateMachine.RootfsVolName = ""
 	err = stateMachine.setupBootloader()
 	asserter.AssertErrContains(err, "no volume to setup bootloader for")
-
-	stateMachine.RootfsPartNum = -1
-	stateMachine.RootfsVolName = "pc"
-	err = stateMachine.setupBootloader()
-	asserter.AssertErrContains(err, "could not determine partition number of the root filesystem")
-
-	// Test that setupBootloader fails when the bootfs partition
-	// has not been found in earlier steps
-	stateMachine.BootPartNum = -1
-	stateMachine.RootfsPartNum = 3
-	stateMachine.RootfsVolName = "pc"
-	err = stateMachine.setupBootloader()
-	asserter.AssertErrContains(err, "could not determine partition number of the boot filesystem")
 
 	// prepare state in such a way that the rootfs/bootfs partition was found in
 	// earlier steps
@@ -5194,28 +5180,62 @@ func TestStateMachine_setupBootloader_warning(t *testing.T) {
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrNil(err, true)
 
-	// prepare state in such a way that the rootfs partition was found in
-	// earlier steps
-	stateMachine.RootfsPartNum = 3
-	stateMachine.RootfsVolName = "pc"
+	testCases := []struct {
+		name           string
+		rootfsPartNum  int
+		bootPartNum    int
+		rootfsVolName  string
+		bootloaderName string
+		wantWarning    string
+	}{
+		{
+			name:           "unknown bootloader",
+			rootfsPartNum:  3,
+			bootPartNum:    1,
+			rootfsVolName:  "pc",
+			bootloaderName: "test",
+			wantWarning:    "WARNING: setting up bootloader test not yet supported",
+		},
+		{
+			name:           "no rootfs part num",
+			rootfsPartNum:  -1,
+			bootPartNum:    1,
+			rootfsVolName:  "pc",
+			bootloaderName: "grub",
+			wantWarning:    "WARNING: Skipping GRUB installation because no data partition was found.",
+		},
+		{
+			name:           "no rootfs part num",
+			rootfsPartNum:  3,
+			bootPartNum:    -1,
+			rootfsVolName:  "pc",
+			bootloaderName: "grub",
+			wantWarning:    "WARNING: Skipping GRUB installation because no boot partition was found.",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stateMachine.RootfsPartNum = tc.rootfsPartNum
+			stateMachine.RootfsVolName = tc.rootfsVolName
+			stateMachine.BootPartNum = tc.bootPartNum
 
-	// set the bootloader for the volume to "test"
-	stateMachine.GadgetInfo.Volumes["pc"].Bootloader = "test"
+			// set the bootloader for the volume to "test"
+			stateMachine.GadgetInfo.Volumes["pc"].Bootloader = tc.bootloaderName
+			stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+			defer restoreStdout()
+			asserter.AssertErrNil(err, true)
 
-	// capture stdout, run updateBootloader and make sure the states were printed
-	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
-	defer restoreStdout()
-	asserter.AssertErrNil(err, true)
+			err = stateMachine.setupBootloader()
+			asserter.AssertErrNil(err, true)
 
-	err = stateMachine.setupBootloader()
-	asserter.AssertErrNil(err, true)
-
-	// restore stdout and examine what was printed
-	restoreStdout()
-	readStdout, err := io.ReadAll(stdout)
-	asserter.AssertErrNil(err, true)
-	if !strings.Contains(string(readStdout), "WARNING: setting up bootloader test not yet supported") {
-		t.Error("Warning for unsupported bootloader not printed")
+			// restore stdout and examine what was printed
+			restoreStdout()
+			readStdout, err := io.ReadAll(stdout)
+			asserter.AssertErrNil(err, true)
+			if !strings.Contains(string(readStdout), tc.wantWarning) {
+				t.Errorf("Warning: %s not printed", tc.wantWarning)
+			}
+		})
 	}
 }
 
