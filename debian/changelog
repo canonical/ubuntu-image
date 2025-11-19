@@ -12,11 +12,6 @@ ubuntu-image (3.10.1) UNRELEASED; urgency=medium
   [ Alexis Cellier ]
   * Fix gzip rootfs test by shifting a bit the size
   * Display warnings about Deb822 format only when meaningful
-  [ Paul Mars ]
-  * Only call grub-install with --target=i386-pc when a BIOS partition is
-    present.
-  * Do not fail but only warn (and return) when root filesystem or boot
-    filesystem partitions were not found when trying to install grub.
 
  -- Alexis Cellier <alexis.cellier@canonical.com>  Tue, 21 Oct 2025 10:45:06 +0000
 
