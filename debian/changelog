@@ -1,3 +1,12 @@
+ubuntu-image (3.10.2) UNRELEASED; urgency=medium
+
+  * Only call grub-install with --target=i386-pc when a BIOS partition is
+    present.
+  * Do not fail but only warn (and return) when root filesystem or boot
+    filesystem partitions were not found when trying to install grub.
+    
+ -- Paul Mars <paul.mars@canonical.com>  Wed, 10 Nov 2025 10:30:14 +0000
+    
 ubuntu-image (3.10.1) UNRELEASED; urgency=medium
 
   [ Alexis Cellier ]

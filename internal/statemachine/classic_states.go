@@ -1370,10 +1370,12 @@ func (stateMachine *StateMachine) setupBootloader() error {
 	switch volume.Bootloader {
 	case "grub":
 		if stateMachine.RootfsPartNum == -1 {
-			return fmt.Errorf("could not determine partition number of the root filesystem")
+			fmt.Printf("WARNING: Skipping GRUB installation because no data partition was found.")
+			return nil
 		}
 		if stateMachine.BootPartNum == -1 {
-			return fmt.Errorf("could not determine partition number of the boot filesystem")
+			fmt.Printf("WARNING: Skipping GRUB installation because no boot partition was found.")
+			return nil
 		}
 		arch, err := stateMachine.parent.Architecture()
 		if err != nil {
@@ -1383,6 +1385,7 @@ func (stateMachine *StateMachine) setupBootloader() error {
 			stateMachine.RootfsVolName,
 			stateMachine.RootfsPartNum,
 			stateMachine.BootPartNum,
+			stateMachine.HasBIOSPartition,
 			arch,
 		)
 		if err != nil {

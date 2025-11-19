@@ -92,7 +92,7 @@ func (stateMachine *StateMachine) handleSecureBoot(volume *gadget.Volume, target
 
 // setupGrub mounts the resulting image and runs update-grub
 // Works under the assumption rootfsPartNum and efiPartNum are valid.
-func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum int, efiPartNum int, architecture string) (err error) {
+func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum int, efiPartNum int, hasBIOSPartition bool, architecture string) (err error) {
 	// create directories in which to mount the rootfs and the boot partition
 	mountDir := filepath.Join(stateMachine.tempDirs.scratch, "loopback")
 	err = osMkdir(mountDir, 0755)
@@ -194,7 +194,7 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 		return err
 	}
 
-	addGrubInstallCmds(&setupGrubCmds, mountDir, target, architecture, loopUsed)
+	addGrubInstallCmds(&setupGrubCmds, mountDir, target, hasBIOSPartition, architecture, loopUsed)
 
 	divert, undivert := divertOSProber(mountDir)
 
@@ -213,7 +213,7 @@ func (stateMachine *StateMachine) setupGrub(rootfsVolName string, rootfsPartNum 
 }
 
 // addGrubInstallCmds adds the grub-install related commands to the setup commands
-func addGrubInstallCmds(cmds *[]*exec.Cmd, mountDir string, target string, architecture string, loopUsed string) {
+func addGrubInstallCmds(cmds *[]*exec.Cmd, mountDir string, target string, hasBIOSPartition bool, architecture string, loopUsed string) {
 	*cmds = append(*cmds,
 		execCommand("chroot",
 			mountDir,
@@ -227,7 +227,7 @@ func addGrubInstallCmds(cmds *[]*exec.Cmd, mountDir string, target string, archi
 		),
 	)
 
-	if architecture == arch.AMD64 {
+	if architecture == arch.AMD64 && hasBIOSPartition {
 		*cmds = append(*cmds,
 			execCommand("chroot",
 				mountDir,

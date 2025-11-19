@@ -246,7 +246,7 @@ func TestStateMachine_setupGrub_checkcmds(t *testing.T) {
 		helperRestoreResolvConf = helper.RestoreResolvConf
 	})
 
-	err = stateMachine.setupGrub("", 2, 1, stateMachine.ImageDef.Architecture)
+	err = stateMachine.setupGrub("", 2, 1, true, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrNil(err, true)
 
 	restoreStdout()
@@ -332,7 +332,7 @@ func TestStateMachine_setupGrub_failed(t *testing.T) {
 	t.Cleanup(func() {
 		osMkdir = os.Mkdir
 	})
-	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	err = stateMachine.setupGrub("", 0, 0, true, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrContains(err, "Error creating scratch/loopback directory")
 	osMkdir = os.Mkdir
 
@@ -342,16 +342,16 @@ func TestStateMachine_setupGrub_failed(t *testing.T) {
 	t.Cleanup(func() {
 		execCommand = exec.Command
 	})
-	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	err = stateMachine.setupGrub("", 0, 0, true, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrContains(err, "Error running losetup command")
 
 	// now test a command failure that isn't losetup
 	testCaseName = "TestFailedUpdateGrubOther"
-	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	err = stateMachine.setupGrub("", 0, 0, true, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrContains(err, "Error running command")
 	execCommand = exec.Command
 
-	err = stateMachine.setupGrub("", 0, 0, "unknown")
+	err = stateMachine.setupGrub("", 0, 0, true, "unknown")
 	asserter.AssertErrContains(err, "no valid efi target for the provided architecture")
 
 	// Test failing helperBackupAndCopyResolvConf
@@ -363,7 +363,7 @@ func TestStateMachine_setupGrub_failed(t *testing.T) {
 	t.Cleanup(func() {
 		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 	})
-	err = stateMachine.setupGrub("", 0, 0, stateMachine.ImageDef.Architecture)
+	err = stateMachine.setupGrub("", 0, 0, true, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
 	helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 }
