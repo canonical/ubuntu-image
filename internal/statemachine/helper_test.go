@@ -3,7 +3,6 @@ package statemachine
 import (
 	"bytes"
 	"crypto/rand"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -334,31 +333,6 @@ func TestGetHostSuite(t *testing.T) {
 	}
 }
 
-// TestGetQemuStaticForArch unit tests the getQemuStaticForArch function
-func TestGetQemuStaticForArch(t *testing.T) {
-	t.Parallel()
-	testCases := []struct {
-		arch     string
-		expected string
-	}{
-		{"amd64", ""},
-		{"armhf", "qemu-arm-static"},
-		{"arm64", "qemu-aarch64-static"},
-		{"ppc64el", "qemu-ppc64le-static"},
-		{"s390x", ""},
-		{"riscv64", ""},
-	}
-	for _, tc := range testCases {
-		t.Run("test_get_qemu_static_for_"+tc.arch, func(t *testing.T) {
-			qemuStatic := getQemuStaticForArch(tc.arch)
-			if qemuStatic != tc.expected {
-				t.Errorf("Expected qemu static \"%s\" for arch \"%s\", instead got \"%s\"",
-					tc.expected, tc.arch, qemuStatic)
-			}
-		})
-	}
-}
-
 // TestGenerateGerminateCmd unit tests the generateGerminateCmd function
 func TestGenerateGerminateCmd(t *testing.T) {
 	t.Parallel()
@@ -408,7 +382,6 @@ func TestGenerateGerminateCmd(t *testing.T) {
 				},
 			}
 			germinateCmd := generateGerminateCmd(imageDef)
-			fmt.Print(germinateCmd)
 
 			if !strings.Contains(germinateCmd.String(), tc.mirror) {
 				t.Errorf("germinate command \"%s\" has incorrect mirror. Expected \"%s\"",
@@ -1109,6 +1082,62 @@ func TestStateMachine_setMk2fsConf(t *testing.T) {
 				got = os.Getenv(Mke2fsConfigEnv)
 			}
 			asserter.AssertEqual(tt.want, got)
+		})
+	}
+}
+
+func Test_generateMmdebstrapCmd(t *testing.T) {
+	type args struct {
+		imageDefinition imagedefinition.ImageDefinition
+		targetDir       string
+		debug           bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "simple case",
+			args: args{
+				imageDefinition: imagedefinition.ImageDefinition{
+					Architecture: "amd64",
+					Series:       "jammy",
+					Rootfs: &imagedefinition.Rootfs{
+						Mirror: "http://archive.ubuntu.com/ubuntu/",
+					},
+				},
+			},
+			want: "/usr/bin/mmdebstrap --arch amd64 --variant=minbase --mode=sudo --include=apt --format=dir jammy  http://archive.ubuntu.com/ubuntu/",
+		},
+		{
+			name: "complex case",
+			args: args{
+				imageDefinition: imagedefinition.ImageDefinition{
+					Architecture: "amd64",
+					Series:       "jammy",
+					Rootfs: &imagedefinition.Rootfs{
+						Mirror:     "http://archive.ubuntu.com/ubuntu/",
+						Components: []string{"main,restricted"},
+					},
+					Customization: &imagedefinition.Customization{
+						ExtraPPAs: []*imagedefinition.PPA{
+							{
+								Name: "test",
+							},
+						},
+					},
+				},
+				debug: true,
+			},
+			want: "/usr/bin/mmdebstrap --arch amd64 --variant=minbase --mode=sudo --include=apt --format=dir --verbose --include=ca-certificates --components=main,restricted jammy  http://archive.ubuntu.com/ubuntu/",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			got := generateMmdebstrapCmd(tt.args.imageDefinition, tt.args.targetDir, tt.args.debug)
+			asserter.AssertEqual(tt.want, got.String())
 		})
 	}
 }

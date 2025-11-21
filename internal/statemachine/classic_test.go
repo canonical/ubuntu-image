@@ -4204,6 +4204,7 @@ func TestCreateChroot(t *testing.T) {
 		Rootfs: &imagedefinition.Rootfs{
 			Pocket:            "proposed",
 			SourcesListDeb822: helper.BoolPtr(true),
+			Mirror:            "http://archive.ubuntu.com/ubuntu/",
 		},
 	}
 
@@ -4317,6 +4318,7 @@ func TestFailedCreateChroot(t *testing.T) {
 		Series:       getHostSuite(),
 		Rootfs: &imagedefinition.Rootfs{
 			SourcesListDeb822: helper.BoolPtr(false),
+			Mirror:            "http://archive.ubuntu.com/ubuntu/",
 		},
 	}
 
@@ -4339,7 +4341,7 @@ func TestFailedCreateChroot(t *testing.T) {
 		execCommand = exec.Command
 	})
 	err = stateMachine.createChroot()
-	asserter.AssertErrContains(err, "Error running debootstrap command")
+	asserter.AssertErrContains(err, "Error running mmdebstrap command")
 	execCommand = exec.Command
 
 	// Check if failure of open hostname file is detected
@@ -4348,7 +4350,7 @@ func TestFailedCreateChroot(t *testing.T) {
 	err = stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
 
-	// Prepare a fallthrough debootstrap
+	// Prepare a fallthrough mmdebstrap
 	testCaseName = "TestFailedCreateChrootNoHostname"
 	execCommand = fakeExecCommand
 	t.Cleanup(func() {
@@ -4372,7 +4374,7 @@ func TestFailedCreateChroot(t *testing.T) {
 	err = stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
 
-	// Prepare a fallthrough debootstrap
+	// Prepare a fallthrough mmdebstrap
 	testCaseName = "TestFailedCreateChrootSkip"
 	osTruncate = mockTruncate
 	t.Cleanup(func() {
@@ -5509,7 +5511,7 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 	err = stateMachine.cleanRootfs()
 	asserter.AssertErrNil(err, true)
 
-	// Check cleaned files were removed
+	// Check cleaned files and dirs were removed
 	cleaned := []string{
 		filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_rsa_key"),
@@ -5528,7 +5530,7 @@ func TestClassicStateMachine_cleanRootfs_real_rootfs(t *testing.T) {
 	for _, file := range cleaned {
 		_, err := os.Stat(file)
 		if !os.IsNotExist(err) {
-			t.Errorf("File %s should not exist, but does", file)
+			t.Errorf("File/Directory %s should not exist, but does", file)
 		}
 	}
 
@@ -5572,6 +5574,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("dev", "stdout"),
 				filepath.Join("sys", "kernel", "security"),
 				filepath.Join("run", "mount", "utab.lock"),
+				filepath.Join("run", "lock", "test"),
+				filepath.Join("run", "mount", "test"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                    0,
@@ -5601,6 +5605,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("dev", "stdout"),
 				filepath.Join("sys", "kernel", "security"),
 				filepath.Join("run", "mount", "utab.lock"),
+				filepath.Join("run", "lock", "test"),
+				filepath.Join("run", "mount", "test"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                   sampleSize,
@@ -5613,6 +5619,35 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("dev", "stdout"):                                       sampleSize,
 				filepath.Join("sys", "kernel", "security"):                           sampleSize,
 				filepath.Join("run", "mount", "utab.lock"):                           sampleSize,
+				filepath.Join("run", "lock", "test"):                                 sampleSize,
+				filepath.Join("run", "mount", "test"):                                sampleSize,
+			},
+		},
+		{
+			name: "fail to delete dirs",
+			mockFuncs: func() func() {
+				mock := testhelper.NewOSMock(
+					&testhelper.OSMockConf{},
+				)
+
+				osRemoveAll = mock.RemoveAll
+				return func() { osRemoveAll = os.RemoveAll }
+			},
+			expectedErr: "Error removing",
+			initialRootfsContent: []string{
+				filepath.Join("etc", "machine-id"),
+				filepath.Join("var", "lib", "dbus", "machine-id"),
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
+				filepath.Join("var", "cache", "debconf", "test-old"),
+				filepath.Join("var", "lib", "dpkg", "testdpkg-old"),
+				filepath.Join("run", "lock", "test"),
+				filepath.Join("run", "mount", "test"),
+			},
+			wantRootfsContent: map[string]int64{
+				filepath.Join("etc", "machine-id"):                                   sampleSize,
+				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"): sampleSize,
+				filepath.Join("run", "lock", "test"):                                 sampleSize,
+				filepath.Join("run", "mount", "test"):                                sampleSize,
 			},
 		},
 		{
@@ -5630,6 +5665,8 @@ func TestClassicStateMachine_cleanRootfs(t *testing.T) {
 				filepath.Join("etc", "machine-id"),
 				filepath.Join("var", "lib", "dbus", "machine-id"),
 				filepath.Join("etc", "udev", "rules.d", "test-persistent-net.rules"),
+				filepath.Join("run", "lock", "test"),
+				filepath.Join("run", "mount", "test"),
 			},
 			wantRootfsContent: map[string]int64{
 				filepath.Join("etc", "machine-id"):                                   sampleSize,
