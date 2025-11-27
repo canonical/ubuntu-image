@@ -18,7 +18,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: build go binary
-        run: CGO_ENABLED=0 go build ./...
+        run: CGO_ENABLED=0 go build -tags snapdusergo ./...
 
       - name: apt-update
         run: sudo apt update

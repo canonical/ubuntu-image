@@ -3,7 +3,7 @@ summary: Create Ubuntu images
 description: |
   Official tool for building Ubuntu images, currently supporing Ubuntu Core
   snap-based images and preinstalled Ubuntu classic images.
-version: "3.10.2"
+version: "3.10.3"
 grade: stable
 confinement: classic
 base: core24
@@ -72,7 +72,9 @@ parts:
       # We need this as setting interpreter/rpath is known to cause
       # issues with go binaries (https://github.com/NixOS/patchelf/issues/146).
       # On compiling statically go, see https://mt165.co.uk/blog/static-link-go/
-      CGO_ENABLED=0 go build -o "$ins_bin" ./cmd/ubuntu-image/
+      # Enable snapdusergo to enable getent user lookup in snapd dependencies
+      # pulled in by ubuntu-image.
+      CGO_ENABLED=0 go build -o "$ins_bin" -tags snapdusergo ./cmd/ubuntu-image/
       # Create a symbolic link to /usr/lib/<arch> where libfakeroot will live
       cd $SNAPCRAFT_PART_INSTALL/usr/lib/
       ln -s ${CRAFT_ARCH_TRIPLET_BUILD_FOR} lib-arch
