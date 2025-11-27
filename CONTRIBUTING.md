@@ -29,7 +29,7 @@ cd ubuntu-image
 ```
 3. Run:
 ```
-CGO_ENABLED=0 go build -o . ./...
+CGO_ENABLED=0 go build -tags snapdusergo -o . ./...
 ```
 
 The newly compiled executable `ubuntu-image` will be created in the current directory. 
