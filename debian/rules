@@ -8,7 +8,7 @@ export DH_GOPKG := github.com/canonical/ubuntu-image
 export DPKG_GENSYMBOLS_CHECK_LEVEL=4
 
 PKGVERSION=$(shell dpkg-parsechangelog --show-field version)
-BUILDFLAGS+= -buildmode=pie -ldflags "-X main.Version=$(PKGVERSION)"
+BUILDFLAGS+= -tags snapdusergo -buildmode=pie -ldflags "-X main.Version=$(PKGVERSION)"
 builddir = $(CURDIR)/obj-$(DEB_HOST_GNU_TYPE)
 artifactsdir = $(builddir)/build
 
