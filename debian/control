@@ -19,7 +19,7 @@ Architecture: any
 Built-Using: ${misc:Built-Using},
 Depends: ${shlibs:Depends},
          ${misc:Depends},
-         debootstrap,
+         mmdebstrap,
          eatmydata,
          dosfstools,
          fdisk,
