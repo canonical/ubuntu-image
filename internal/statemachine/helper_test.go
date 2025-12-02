@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
 
@@ -1109,6 +1111,159 @@ func TestStateMachine_setMk2fsConf(t *testing.T) {
 				got = os.Getenv(Mke2fsConfigEnv)
 			}
 			asserter.AssertEqual(tt.want, got)
+		})
+	}
+}
+
+// Mocked dpkgDivert function that mv the file instead of using dpkg-divert of the chroot.
+func mockDpkgDivert(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+	return execCommand("mv", filepath.Join(targetDir, target), filepath.Join(targetDir, target+".dpkg-divert")),
+		execCommand("mv", filepath.Join(targetDir, target+".dpkg-divert"), filepath.Join(targetDir, target))
+}
+
+// TestDivertExecWithFake runs DivertExecWtihFake with fake dpkg-divert (only moving file) and ensure the behaviour is the correct one.
+func TestDivertExecWithFake(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	// Prepare temporary directory
+	workDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// Create test environment
+	err = os.MkdirAll(filepath.Join(workDir, "usr", "bin"), 0755)
+	asserter.AssertErrNil(err, true)
+	testFile := filepath.Join(workDir, "usr", "bin", "test")
+	err = os.WriteFile(filepath.Join(workDir, "usr", "bin", "test"), []byte("test"), 0600)
+	asserter.AssertErrNil(err, true)
+
+	// Mock the DpkgDivert (as we cannot execute dpkg-divert)
+	dpkgDivert = mockDpkgDivert
+	t.Cleanup(func() {
+		dpkgDivert = DpkgDivert
+	})
+	divertCmds, undivertCmds := DivertExecWithFake(workDir, filepath.Join("usr", "bin", "test"), "replaced")
+	err = helper.RunCmds(divertCmds, false)
+	asserter.AssertErrNil(err, true)
+	if !osutil.FileExists(testFile) {
+		t.Errorf("replacement test file \"%s\" does not exist", testFile)
+	}
+	content, err := os.ReadFile(testFile)
+	asserter.AssertErrNil(err, true)
+	if string(content) != "replaced" {
+		t.Errorf("replacement test file \"%s\" does not have correct content: \"%s\" != \"%s\"", testFile, string(content), "replaced")
+	}
+	if !osutil.FileExists(testFile + ".dpkg-divert") {
+		t.Errorf("diverted test file \"%s\" does not exist", testFile+".dpkg-divert")
+	}
+	content, err = os.ReadFile(testFile + ".dpkg-divert")
+	asserter.AssertErrNil(err, true)
+	if string(content) != "test" {
+		t.Errorf("diverted test file \"%s\" does not have correct content: \"%s\" != \"%s\"", testFile+".dpkg-divert", string(content), "test")
+	}
+	err = helper.RunCmds(undivertCmds, false)
+	asserter.AssertErrNil(err, true)
+	if osutil.FileExists(testFile + ".dpkg-divert") {
+		t.Errorf("diverted test file \"%s\" is still here", testFile+".dpkg-divert")
+	}
+	if !osutil.FileExists(testFile) {
+		t.Errorf("test file \"%s\" does not exist anymore", testFile)
+	}
+	content, err = os.ReadFile(testFile)
+	asserter.AssertErrNil(err, true)
+	if string(content) != "test" {
+		t.Errorf("diverted test file \"%s\" does not have correct content: \"%s\" != \"%s\"", testFile, string(content), "test")
+	}
+}
+
+// TestDivertExec tests DivertStartStopDaemon and DivertInitctl, with and without a usr-merged setup.
+func TestDivertExec(t *testing.T) {
+	type testCase struct {
+		name      string
+		usrMerged bool // true: symlink /sbin to /usr/sbin
+		cmd       func(string) ([]*exec.Cmd, []*exec.Cmd)
+		execPath  string
+	}
+
+	cases := []testCase{
+		{
+			name:      "StartStopDaemonWithUsrMerged",
+			usrMerged: true,
+			cmd:       DivertStartStopDaemon,
+			execPath:  "/usr/sbin/start-stop-daemon",
+		},
+		{
+			name:      "StartStopDaemonWithoutUsrMerged",
+			usrMerged: false,
+			cmd:       DivertStartStopDaemon,
+			execPath:  "/sbin/start-stop-daemon",
+		},
+		{
+			name:      "InitctlWithUsrMerged",
+			usrMerged: true,
+			cmd:       DivertInitctl,
+			execPath:  "/usr/sbin/initctl",
+		},
+		{
+			name:      "InitctlWithoutUsrMerged",
+			usrMerged: false,
+			cmd:       DivertInitctl,
+			execPath:  "/sbin/initctl",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			workDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
+			err := os.MkdirAll(workDir, 0755)
+			asserter.AssertErrNil(err, true)
+
+			// Create usr/sbin for both cases
+			err = os.MkdirAll(filepath.Join(workDir, "usr", "sbin"), 0755)
+			asserter.AssertErrNil(err, true)
+
+			// Setup /sbin as symlink or as a directory
+			sbinPath := filepath.Join(workDir, "sbin")
+			if tc.usrMerged {
+				// Symlink /sbin to /usr/sbin
+				err = os.Symlink(filepath.Join(workDir, "usr", "sbin"), sbinPath)
+				asserter.AssertErrNil(err, true)
+			} else {
+				// Real directory
+				err = os.MkdirAll(sbinPath, 0755)
+				asserter.AssertErrNil(err, true)
+			}
+
+			// Create the fake target
+			_, err = os.Create(filepath.Join(workDir, "sbin", filepath.Base(tc.execPath)))
+			asserter.AssertErrNil(err, true)
+
+			divertCmds, undivertCmds := tc.cmd(workDir)
+
+			// Diversion commands
+			expectedDivertCmds := []*regexp.Regexp{
+				regexp.MustCompile("^/usr/sbin/chroot " + workDir + " dpkg-divert --local .* " + tc.execPath + "$"),
+				regexp.MustCompile("(?s)^/usr/bin/sh -c printf .* " + filepath.Join(workDir, tc.execPath) + "$"),
+				regexp.MustCompile("^/usr/bin/chmod .* " + filepath.Join(workDir, tc.execPath) + "$"),
+			}
+			assertCommandMatches := func(cmds []*exec.Cmd, expected []*regexp.Regexp) {
+				if len(cmds) != len(expected) {
+					t.Fatalf("Expected %d commands, got %d", len(expected), len(cmds))
+				}
+				for i, cmd := range cmds {
+					if !expected[i].MatchString(cmd.String()) {
+						t.Errorf("Command \"%v\" does not match \"%v\"", cmd.String(), expected[i].String())
+					}
+				}
+			}
+			assertCommandMatches(divertCmds, expectedDivertCmds)
+
+			// Undivert commands
+			expectedUndivertCmds := []*regexp.Regexp{
+				regexp.MustCompile("^/usr/bin/rm " + filepath.Join(workDir+tc.execPath) + "$"),
+				regexp.MustCompile("^/usr/sbin/chroot " + workDir + " dpkg-divert --remove .* " + tc.execPath + "$"),
+			}
+			assertCommandMatches(undivertCmds, expectedUndivertCmds)
 		})
 	}
 }

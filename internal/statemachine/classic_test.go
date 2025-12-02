@@ -4423,10 +4423,20 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 		regexp.MustCompile("^mount -t proc proc-build /var/tmp.*/chroot/proc$"),
 		regexp.MustCompile("^mount -t sysfs sysfs-build /var/tmp.*/chroot/sys$"),
 		regexp.MustCompile("^mount --bind .*/scratch/run.* .*/chroot/run$"),
-		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --local .* /usr/sbin/policy-rc.d$"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --local .* /sbin/start-stop-daemon$"),
+		regexp.MustCompile("^sh -c printf .* > /var/tmp.*/chroot/sbin/start-stop-daemon$"),
+		regexp.MustCompile("^chmod .* /var/tmp.*/chroot/sbin/start-stop-daemon$"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --local .* /sbin/initctl$"),
+		regexp.MustCompile("^sh -c printf .* > /var/tmp.*/chroot/sbin/initctl$"),
+		regexp.MustCompile("^chmod .* /var/tmp.*/chroot/sbin/initctl$"),
 		regexp.MustCompile("^chroot /var/tmp.*/chroot apt update$"),
 		regexp.MustCompile("^chroot /var/tmp.*/chroot apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold install$"),
-		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --remove"),
+		regexp.MustCompile("^rm /var/tmp.*/chroot/sbin/initctl$"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --remove .* /sbin/initctl$"),
+		regexp.MustCompile("^rm /var/tmp.*/chroot/sbin/start-stop-daemon$"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --remove .* /sbin/start-stop-daemon$"),
+		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --remove .* /usr/sbin/policy-rc.d$"),
 		regexp.MustCompile("^udevadm settle$"),
 		regexp.MustCompile("^mount --make-rprivate /var/tmp.*/chroot/run$"),
 		regexp.MustCompile("^umount --recursive /var/tmp.*/chroot/run$"),
@@ -4587,15 +4597,6 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	err = stateMachine.installPackages()
 	asserter.AssertErrContains(err, "Error writing to policy-rc.d")
 	osWriteFile = os.WriteFile
-
-	osRename = mockRename
-	t.Cleanup(func() {
-		osRename = os.Rename
-	})
-	err = stateMachine.installPackages()
-	asserter.AssertErrContains(err, "Error moving file ")
-	osRename = os.Rename
-
 }
 
 // Test_generateMountPointCmds_fail tests when generateMountPointCmds fails

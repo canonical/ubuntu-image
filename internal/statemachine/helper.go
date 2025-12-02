@@ -18,6 +18,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
 
@@ -27,6 +28,7 @@ import (
 
 var runCmd = helper.RunCmd
 var blockSize string = "1"
+var dpkgDivert = DpkgDivert
 
 var (
 	Mke2fsConfigEnv  = "MKE2FS_CONFIG"
@@ -600,8 +602,9 @@ func divertPolicyRcD(targetDir string) (*exec.Cmd, *exec.Cmd) {
 	return dpkgDivert(targetDir, "/usr/sbin/policy-rc.d")
 }
 
-// dpkgDivert dpkg-diverts the given file in the given baseDir
-func dpkgDivert(baseDir string, target string) (*exec.Cmd, *exec.Cmd) {
+// DpkgDivert dpkg-diverts the given file in the given baseDir
+// Returns two commands: one for diverting the target file, and one for undiverting it.
+func DpkgDivert(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
 	dpkgDivert := "dpkg-divert"
 	targetDiverted := target + ".dpkg-divert"
 
@@ -613,35 +616,10 @@ func dpkgDivert(baseDir string, target string) (*exec.Cmd, *exec.Cmd) {
 		target,
 	}
 
-	divert := append([]string{baseDir, dpkgDivert}, commonArgs...)
-	undivert := append([]string{baseDir, dpkgDivert, "--remove"}, commonArgs...)
+	divert := append([]string{targetDir, dpkgDivert}, commonArgs...)
+	undivert := append([]string{targetDir, dpkgDivert, "--remove"}, commonArgs...)
 
 	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
-}
-
-// backupReplaceStartStopDaemon backup start-stop-daemon and replace it with a fake one
-// Returns a restore function to put the original one in place
-func backupReplaceStartStopDaemon(baseDir string) (func(error) error, error) {
-	const startStopDaemonContent = `#!/bin/sh
-echo
-echo "Warning: Fake start-stop-daemon called, doing nothing"
-`
-
-	startStopDaemon := filepath.Join(baseDir, "sbin", "start-stop-daemon")
-	return helper.BackupReplace(startStopDaemon, startStopDaemonContent)
-}
-
-// backupReplaceInitctl backup initctl and replace it with a fake one
-// Returns a restore function to put the original one in place
-func backupReplaceInitctl(baseDir string) (func(error) error, error) {
-	const initctlContent = `#!/bin/sh
-if [ "$1" = version ]; then exec /sbin/initctl.REAL "$@"; fi
-echo
-echo "Warning: Fake initctl called, doing nothing"
-`
-
-	initctl := filepath.Join(baseDir, "sbin", "initctl")
-	return helper.BackupReplace(initctl, initctlContent)
 }
 
 // execTeardownCmds executes given commands and collects error to join them with an existing error.
@@ -868,4 +846,51 @@ func associateLoopDevice(path string, sectorSize quantity.Size) (string, *exec.C
 // the build system
 func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
 	return dpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
+}
+
+// DivertExecWithFake replaces a target file in chroot with a provided fake content
+// using dpkg-divert, and returns two commands lists: one for diverting, one for undiverting.
+func DivertExecWithFake(targetDir string, file string, fakeContent string) ([]*exec.Cmd, []*exec.Cmd) {
+	divertCmd, undivertCmd := dpkgDivert(targetDir, file)
+
+	divertCmds := []*exec.Cmd{
+		divertCmd,
+		execCommand("sh", "-c", "printf '%s' '"+fakeContent+"' > "+filepath.Join(targetDir, file)),
+		execCommand("chmod", "+x", filepath.Join(targetDir, file)),
+	}
+	undivertCmds := []*exec.Cmd{
+		execCommand("rm", filepath.Join(targetDir, file)),
+		undivertCmd,
+	}
+
+	return divertCmds, undivertCmds
+}
+
+// DivertStartStopDaemon diverts [/usr]/sbin/start-stop-daemon with one doing nothing.
+func DivertStartStopDaemon(targetDir string) ([]*exec.Cmd, []*exec.Cmd) {
+	path := filepath.Join("/sbin", "start-stop-daemon")
+	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
+		// usr-merged enabled
+		path = filepath.Join("/usr", path)
+	}
+	fakeContent := `#!/bin/sh
+echo 'Warning: Fake start-stop-daemon called, doing nothing'
+`
+	return DivertExecWithFake(targetDir, path, fakeContent)
+}
+
+// DivertInitctl diverts [/usr]/sbin/initctl with one only performing version action.
+func DivertInitctl(targetDir string) ([]*exec.Cmd, []*exec.Cmd) {
+	path := filepath.Join("/sbin", "initctl")
+	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
+		// usr-merged enabled
+		path = filepath.Join("/usr", path)
+	}
+	fakeContent := fmt.Sprintf(`#!/bin/sh
+if [ "$1" = version ]; then exec %s.dpkg-divert "$@"; fi
+
+echo "Warning: Fake initctl called, doing nothing"
+`,
+		path)
+	return DivertExecWithFake(targetDir, path, fakeContent)
 }

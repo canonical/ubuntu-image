@@ -295,7 +295,7 @@ func TestStateMachine_setupGrub_checkcmds(t *testing.T) {
 	expectedCmds = append(expectedCmds, []*regexp.Regexp{
 		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --boot-directory=/boot --efi-directory=/boot/efi --target=x86_64-efi --uefi-secure-boot --no-nvram$"),
 		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --target=i386-pc$"),
-		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert"),
+		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert --local"),
 		regexp.MustCompile("^chroot .*/scratch/loopback update-grub$"),
 		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert --remove"),
 		regexp.MustCompile("^udevadm settle$"),
