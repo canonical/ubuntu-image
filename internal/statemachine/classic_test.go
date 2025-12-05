@@ -4546,6 +4546,12 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "etc", "resolv.conf"))
 	asserter.AssertErrNil(err, true)
 
+	// create files to be diverted in the chroot
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "usr", "sbin"), 0755)
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d"))
+	asserter.AssertErrNil(err, true)
+
 	osMkdirTemp = mockMkdirTemp
 	t.Cleanup(func() {
 		osMkdirTemp = os.MkdirTemp
@@ -4575,22 +4581,6 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	err = stateMachine.installPackages()
 	asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
 	helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
-
-	osMkdirAll = mockMkdirAll
-	t.Cleanup(func() {
-		osMkdirAll = os.MkdirAll
-	})
-	err = stateMachine.installPackages()
-	asserter.AssertErrContains(err, "Error creating policy-rc.d dir")
-	osMkdirAll = os.MkdirAll
-
-	osWriteFile = mockWriteFile
-	t.Cleanup(func() {
-		osWriteFile = os.WriteFile
-	})
-	err = stateMachine.installPackages()
-	asserter.AssertErrContains(err, "Error writing to policy-rc.d")
-	osWriteFile = os.WriteFile
 }
 
 // Test_generateMountPointCmds_fail tests when generateMountPointCmds fails

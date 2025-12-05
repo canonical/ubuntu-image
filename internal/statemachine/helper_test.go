@@ -1121,6 +1121,56 @@ func mockDpkgDivert(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
 		execCommand("mv", filepath.Join(targetDir, target+".dpkg-divert"), filepath.Join(targetDir, target))
 }
 
+func TestDivertExecWithFake_fail(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	// Prepare temporary directory
+	workDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// Create test environment
+	err = os.MkdirAll(filepath.Join(workDir, "usr", "bin"), 0755)
+	asserter.AssertErrNil(err, true)
+	testFile := filepath.Join(workDir, "usr", "bin", "test")
+	err = os.WriteFile(filepath.Join(workDir, "usr", "bin", "test"), []byte("test"), 0600)
+	asserter.AssertErrNil(err, true)
+
+	// Mock the DpkgDivert (as we cannot execute dpkg-divert)
+	dpkgDivert = func(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+		return execCommand("true"), execCommand("true")
+	}
+	t.Cleanup(func() {
+		dpkgDivert = DpkgDivert
+	})
+
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
+		osMkdirAll = os.MkdirAll
+	})
+	divert, _ := DivertExecWithFake(workDir, testFile, "replaced", true)
+	err = divert()
+	asserter.AssertErrContains(err, fmt.Sprintf("Error creating %s directory", testFile))
+	osMkdirAll = os.MkdirAll
+
+	osWriteFile = mockWriteFile
+	t.Cleanup(func() {
+		osWriteFile = os.WriteFile
+	})
+	divert, _ = DivertExecWithFake(workDir, testFile, "replaced", true)
+	err = divert()
+	asserter.AssertErrContains(err, fmt.Sprintf("Error writing to %s", testFile))
+	osWriteFile = os.WriteFile
+
+	osRemove = mockRemove
+	t.Cleanup(func() {
+		osRemove = os.Remove
+	})
+	_, undivert := DivertExecWithFake(workDir, testFile, "replaced", true)
+	err = undivert(nil)
+	asserter.AssertErrContains(err, fmt.Sprintf("Error removing %s", testFile))
+	osWriteFile = os.WriteFile
+}
+
 // TestDivertExecWithFake runs DivertExecWtihFake with fake dpkg-divert (only moving file) and ensure the behaviour is the correct one.
 func TestDivertExecWithFake(t *testing.T) {
 	asserter := helper.Asserter{T: t}

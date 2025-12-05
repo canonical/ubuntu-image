@@ -573,35 +573,6 @@ func generateAptPackageInstallingCmd(targetDir string, argumentList []string, in
 	return cmd
 }
 
-func setDenyingPolicyRcD(path string) (func(error) error, error) {
-	const policyRcDDisableAll = `#!/bin/sh
-echo "All runlevel operations denied by policy" >&2
-exit 101
-`
-	err := osMkdirAll(filepath.Dir(path), 0755)
-	if err != nil {
-		return nil, fmt.Errorf("Error creating policy-rc.d dir: %s", err.Error())
-	}
-
-	err = osWriteFile(path, []byte(policyRcDDisableAll), 0755)
-	if err != nil {
-		return nil, fmt.Errorf("Error writing to policy-rc.d: %s", err.Error())
-	}
-
-	return func(err error) error {
-		tmpErr := osRemove(path)
-		if tmpErr != nil {
-			err = fmt.Errorf("%s\n%s", err, tmpErr)
-		}
-		return err
-	}, nil
-}
-
-// divertPolicyRcD dpkg-diverts policy-rc.d to keep it if it already exists
-func divertPolicyRcD(targetDir string) (*exec.Cmd, *exec.Cmd) {
-	return dpkgDivert(targetDir, "/usr/sbin/policy-rc.d")
-}
-
 // DpkgDivert dpkg-diverts the given file in the given baseDir
 // Returns two commands: one for diverting the target file, and one for undiverting it.
 func DpkgDivert(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
@@ -858,11 +829,19 @@ func DivertExecWithFake(targetDir string, file string, fakeContent string, debug
 			if err != nil {
 				return err
 			}
-			return osWriteFile(filepath.Join(targetDir, file), []byte(fakeContent), 0755)
+			err = osMkdirAll(filepath.Dir(file), 0755)
+			if err != nil {
+				return fmt.Errorf("Error creating %s directory: %s", file, err.Error())
+			}
+			err = osWriteFile(filepath.Join(targetDir, file), []byte(fakeContent), 0755)
+			if err != nil {
+				return fmt.Errorf("Error writing to %s: %s", file, err.Error())
+			}
+			return nil
 		}, func(err error) error {
 			tmpErr := osRemove(filepath.Join(targetDir, file))
 			if tmpErr != nil {
-				return fmt.Errorf("%s\n%s", err, tmpErr)
+				return fmt.Errorf("%s\nError removing %s: %s", err, file, tmpErr)
 			}
 			tmpErr = runCmd(undivertCmd, debug)
 			if tmpErr != nil {
@@ -893,10 +872,19 @@ func DivertInitctl(targetDir string, debug bool) (func() error, func(error) erro
 		path = filepath.Join("/usr", path)
 	}
 	fakeContent := fmt.Sprintf(`#!/bin/sh
-if [ "$1" = version ]; then exec %s.dpkg-divert "$@"; fi
-
-echo "Warning: Fake initctl called, doing nothing"
+[ "$1" = version ] && exec %s.dpkg-divert "$@"
+echo 'Warning: Fake initctl called, doing nothing'
 `,
 		path)
+	return DivertExecWithFake(targetDir, path, fakeContent, debug)
+}
+
+// divertPolicyRcD diverts /usr/sbin/policy-rc.d with one that denies everything operation.
+func divertPolicyRcD(targetDir string, debug bool) (func() error, func(error) error) {
+	path := filepath.Join("/usr", "sbin", "policy-rc.d")
+	fakeContent := `#!/bin/sh
+echo "All runlevel operations denied by policy" >&2
+exit 101
+`
 	return DivertExecWithFake(targetDir, path, fakeContent, debug)
 }

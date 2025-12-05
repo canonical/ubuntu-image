@@ -129,6 +129,9 @@ func mockOpenFileAppend(name string, flag int, perm os.FileMode) (*os.File, erro
 func mockRemoveAll(string) error {
 	return fmt.Errorf("Test error")
 }
+func mockRemove(string) error {
+	return fmt.Errorf("Test error")
+}
 func mockRename(string, string) error {
 	return fmt.Errorf("Test error")
 }

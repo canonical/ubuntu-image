@@ -283,10 +283,10 @@ func (stateMachine *StateMachine) gatherPackages(imageDef *imagedefinition.Image
 }
 
 // run given commands with the chroot setup (mountpoint, network access, ...)
-func (stateMachine *StateMachine) runCmdsWithChrootSetup(cmds []*exec.Cmd) error {
+func (stateMachine *StateMachine) runCmdsWithChrootSetup(cmds []*exec.Cmd) (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
+	err = helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
 	if err != nil {
 		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
 	}
@@ -349,52 +349,42 @@ func (stateMachine *StateMachine) runCmdsWithChrootSetup(cmds []*exec.Cmd) error
 		execCommand("udevadm", "settle"),
 	}, teardownCmds...)
 
-	policyRcDPath := filepath.Join(classicStateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d")
-
-	if osutil.FileExists(policyRcDPath) {
-		divertCmd, undivertCmd := divertPolicyRcD(stateMachine.tempDirs.chroot)
-		setupCmds = append(setupCmds, divertCmd)
-		teardownCmds = append([]*exec.Cmd{undivertCmd}, teardownCmds...)
-	}
-
 	err = helper.RunCmds(setupCmds, classicStateMachine.commonFlags.Debug)
 	if err != nil {
 		return err
 	}
 
-	unsetDenyingPolicyRcD, err := setDenyingPolicyRcD(policyRcDPath)
-	if err != nil {
-		return err
+	type diversion struct {
+		path string
+		fn   func(string, bool) (func() error, func(error) error)
 	}
 
-	defer func() {
-		err = unsetDenyingPolicyRcD(err)
-	}()
-
-	startStopDaemonPath := filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "start-stop-daemon")
-
-	if osutil.FileExists(startStopDaemonPath) {
-		divert, undivert := DivertStartStopDaemon(stateMachine.tempDirs.chroot, classicStateMachine.commonFlags.Debug)
-		err = divert()
-		if err != nil {
-			return err
-		}
-		defer func() {
-			err = undivert(err)
-		}()
+	diversions := []diversion{
+		{
+			path: filepath.Join(classicStateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d"),
+			fn:   divertPolicyRcD,
+		},
+		{
+			path: filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "start-stop-daemon"),
+			fn:   DivertStartStopDaemon,
+		},
+		{
+			path: filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "initctl"),
+			fn:   DivertInitctl,
+		},
 	}
 
-	initctlPath := filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "initctl")
-
-	if osutil.FileExists(initctlPath) {
-		divert, undivert := DivertInitctl(stateMachine.tempDirs.chroot, classicStateMachine.commonFlags.Debug)
-		err = divert()
-		if err != nil {
-			return err
+	for _, diversion := range diversions {
+		if osutil.FileExists(diversion.path) {
+			divert, undivert := diversion.fn(stateMachine.tempDirs.chroot, classicStateMachine.commonFlags.Debug)
+			err = divert()
+			if err != nil {
+				return err
+			}
+			defer func() {
+				err = undivert(err)
+			}()
 		}
-		defer func() {
-			err = undivert(err)
-		}()
 	}
 
 	err = helper.RunCmds(cmds, classicStateMachine.commonFlags.Debug)
