@@ -1141,8 +1141,8 @@ func TestDivertExecWithFake(t *testing.T) {
 	t.Cleanup(func() {
 		dpkgDivert = DpkgDivert
 	})
-	divertCmds, undivertCmds := DivertExecWithFake(workDir, filepath.Join("usr", "bin", "test"), "replaced")
-	err = helper.RunCmds(divertCmds, false)
+	divert, undivert := DivertExecWithFake(workDir, filepath.Join("usr", "bin", "test"), "replaced", true)
+	err = divert()
 	asserter.AssertErrNil(err, true)
 	if !osutil.FileExists(testFile) {
 		t.Errorf("replacement test file \"%s\" does not exist", testFile)
@@ -1160,7 +1160,7 @@ func TestDivertExecWithFake(t *testing.T) {
 	if string(content) != "test" {
 		t.Errorf("diverted test file \"%s\" does not have correct content: \"%s\" != \"%s\"", testFile+".dpkg-divert", string(content), "test")
 	}
-	err = helper.RunCmds(undivertCmds, false)
+	err = undivert(nil)
 	asserter.AssertErrNil(err, true)
 	if osutil.FileExists(testFile + ".dpkg-divert") {
 		t.Errorf("diverted test file \"%s\" is still here", testFile+".dpkg-divert")
@@ -1175,12 +1175,28 @@ func TestDivertExecWithFake(t *testing.T) {
 	}
 }
 
+func runAndCheck(t *testing.T, fn func() error, expected *regexp.Regexp) {
+	asserter := helper.Asserter{T: t}
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { restoreStdout() })
+	err = fn()
+	asserter.AssertErrNil(err, true)
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
+	cmd := strings.TrimSpace(string(readStdout))
+	if !expected.MatchString(cmd) {
+		t.Errorf("Command \"%v\" does not match \"%v\"", cmd, expected.String())
+	}
+}
+
 // TestDivertExec tests DivertStartStopDaemon and DivertInitctl, with and without a usr-merged setup.
 func TestDivertExec(t *testing.T) {
 	type testCase struct {
 		name      string
 		usrMerged bool // true: symlink /sbin to /usr/sbin
-		cmd       func(string) ([]*exec.Cmd, []*exec.Cmd)
+		cmd       func(string, bool) (func() error, func(error) error)
 		execPath  string
 	}
 
@@ -1238,32 +1254,15 @@ func TestDivertExec(t *testing.T) {
 			_, err = os.Create(filepath.Join(workDir, "sbin", filepath.Base(tc.execPath)))
 			asserter.AssertErrNil(err, true)
 
-			divertCmds, undivertCmds := tc.cmd(workDir)
+			mockCmder := NewMockExecCommand()
 
-			// Diversion commands
-			expectedDivertCmds := []*regexp.Regexp{
-				regexp.MustCompile("^/usr/sbin/chroot " + workDir + " dpkg-divert --local .* " + tc.execPath + "$"),
-				regexp.MustCompile("(?s)^/usr/bin/sh -c printf .* " + filepath.Join(workDir, tc.execPath) + "$"),
-				regexp.MustCompile("^/usr/bin/chmod .* " + filepath.Join(workDir, tc.execPath) + "$"),
-			}
-			assertCommandMatches := func(cmds []*exec.Cmd, expected []*regexp.Regexp) {
-				if len(cmds) != len(expected) {
-					t.Fatalf("Expected %d commands, got %d", len(expected), len(cmds))
-				}
-				for i, cmd := range cmds {
-					if !expected[i].MatchString(cmd.String()) {
-						t.Errorf("Command \"%v\" does not match \"%v\"", cmd.String(), expected[i].String())
-					}
-				}
-			}
-			assertCommandMatches(divertCmds, expectedDivertCmds)
+			execCommand = mockCmder.Command
+			t.Cleanup(func() { execCommand = exec.Command })
 
-			// Undivert commands
-			expectedUndivertCmds := []*regexp.Regexp{
-				regexp.MustCompile("^/usr/bin/rm " + filepath.Join(workDir+tc.execPath) + "$"),
-				regexp.MustCompile("^/usr/sbin/chroot " + workDir + " dpkg-divert --remove .* " + tc.execPath + "$"),
-			}
-			assertCommandMatches(undivertCmds, expectedUndivertCmds)
+			divert, undivert := tc.cmd(workDir, true)
+
+			runAndCheck(t, divert, regexp.MustCompile("^chroot "+workDir+" dpkg-divert --local .* "+tc.execPath+"$"))
+			runAndCheck(t, func() error { return undivert(nil) }, regexp.MustCompile("^chroot "+workDir+" dpkg-divert --remove .* "+tc.execPath+"$"))
 		})
 	}
 }

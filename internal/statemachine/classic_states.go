@@ -357,22 +357,6 @@ func (stateMachine *StateMachine) runCmdsWithChrootSetup(cmds []*exec.Cmd) error
 		teardownCmds = append([]*exec.Cmd{undivertCmd}, teardownCmds...)
 	}
 
-	startStopDaemonPath := filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "start-stop-daemon")
-
-	if osutil.FileExists(startStopDaemonPath) {
-		divertCmds, undivertCmds := DivertStartStopDaemon(stateMachine.tempDirs.chroot)
-		setupCmds = append(setupCmds, divertCmds...)
-		teardownCmds = append(undivertCmds, teardownCmds...)
-	}
-
-	initctlPath := filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "initctl")
-
-	if osutil.FileExists(initctlPath) {
-		divertCmds, undivertCmds := DivertInitctl(stateMachine.tempDirs.chroot)
-		setupCmds = append(setupCmds, divertCmds...)
-		teardownCmds = append(undivertCmds, teardownCmds...)
-	}
-
 	err = helper.RunCmds(setupCmds, classicStateMachine.commonFlags.Debug)
 	if err != nil {
 		return err
@@ -386,6 +370,32 @@ func (stateMachine *StateMachine) runCmdsWithChrootSetup(cmds []*exec.Cmd) error
 	defer func() {
 		err = unsetDenyingPolicyRcD(err)
 	}()
+
+	startStopDaemonPath := filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "start-stop-daemon")
+
+	if osutil.FileExists(startStopDaemonPath) {
+		divert, undivert := DivertStartStopDaemon(stateMachine.tempDirs.chroot, classicStateMachine.commonFlags.Debug)
+		err = divert()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			err = undivert(err)
+		}()
+	}
+
+	initctlPath := filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "initctl")
+
+	if osutil.FileExists(initctlPath) {
+		divert, undivert := DivertInitctl(stateMachine.tempDirs.chroot, classicStateMachine.commonFlags.Debug)
+		err = divert()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			err = undivert(err)
+		}()
+	}
 
 	err = helper.RunCmds(cmds, classicStateMachine.commonFlags.Debug)
 	if err != nil {

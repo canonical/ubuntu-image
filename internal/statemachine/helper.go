@@ -849,25 +849,31 @@ func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
 }
 
 // DivertExecWithFake replaces a target file in chroot with a provided fake content
-// using dpkg-divert, and returns two commands lists: one for diverting, one for undiverting.
-func DivertExecWithFake(targetDir string, file string, fakeContent string) ([]*exec.Cmd, []*exec.Cmd) {
+// using dpkg-divert, and returns two functions: one for diverting, one for undiverting.
+func DivertExecWithFake(targetDir string, file string, fakeContent string, debug bool) (func() error, func(error) error) {
 	divertCmd, undivertCmd := dpkgDivert(targetDir, file)
 
-	divertCmds := []*exec.Cmd{
-		divertCmd,
-		execCommand("sh", "-c", "printf '%s' '"+fakeContent+"' > "+filepath.Join(targetDir, file)),
-		execCommand("chmod", "+x", filepath.Join(targetDir, file)),
-	}
-	undivertCmds := []*exec.Cmd{
-		execCommand("rm", filepath.Join(targetDir, file)),
-		undivertCmd,
-	}
-
-	return divertCmds, undivertCmds
+	return func() error {
+			err := runCmd(divertCmd, debug)
+			if err != nil {
+				return err
+			}
+			return osWriteFile(filepath.Join(targetDir, file), []byte(fakeContent), 0755)
+		}, func(err error) error {
+			tmpErr := osRemove(filepath.Join(targetDir, file))
+			if tmpErr != nil {
+				return fmt.Errorf("%s\n%s", err, tmpErr)
+			}
+			tmpErr = runCmd(undivertCmd, debug)
+			if tmpErr != nil {
+				return fmt.Errorf("%s\n%s", err, tmpErr)
+			}
+			return err
+		}
 }
 
 // DivertStartStopDaemon diverts [/usr]/sbin/start-stop-daemon with one doing nothing.
-func DivertStartStopDaemon(targetDir string) ([]*exec.Cmd, []*exec.Cmd) {
+func DivertStartStopDaemon(targetDir string, debug bool) (func() error, func(error) error) {
 	path := filepath.Join("/sbin", "start-stop-daemon")
 	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
 		// usr-merged enabled
@@ -876,11 +882,11 @@ func DivertStartStopDaemon(targetDir string) ([]*exec.Cmd, []*exec.Cmd) {
 	fakeContent := `#!/bin/sh
 echo 'Warning: Fake start-stop-daemon called, doing nothing'
 `
-	return DivertExecWithFake(targetDir, path, fakeContent)
+	return DivertExecWithFake(targetDir, path, fakeContent, debug)
 }
 
 // DivertInitctl diverts [/usr]/sbin/initctl with one only performing version action.
-func DivertInitctl(targetDir string) ([]*exec.Cmd, []*exec.Cmd) {
+func DivertInitctl(targetDir string, debug bool) (func() error, func(error) error) {
 	path := filepath.Join("/sbin", "initctl")
 	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
 		// usr-merged enabled
@@ -892,5 +898,5 @@ if [ "$1" = version ]; then exec %s.dpkg-divert "$@"; fi
 echo "Warning: Fake initctl called, doing nothing"
 `,
 		path)
-	return DivertExecWithFake(targetDir, path, fakeContent)
+	return DivertExecWithFake(targetDir, path, fakeContent, debug)
 }
