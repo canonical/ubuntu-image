@@ -819,10 +819,10 @@ func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
 	return dpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
 }
 
-// DivertExecWithFake replaces a target file in chroot with a provided fake content
+// divertExecWithFake replaces a target file in chroot with a provided fake content
 // using dpkg-divert, and returns two functions: one for diverting, one for undiverting.
-func DivertExecWithFake(targetDir string, file string, fakeContent string, debug bool) (func() error, func(error) error) {
-	divertCmd, undivertCmd := dpkgDivert(targetDir, file)
+func divertExecWithFake(targetDir string, file string, fakeContent string, debug bool) (func() error, func(error) error) {
+	divertCmd, undivertCmd := helperDpkgDivert(targetDir, file)
 
 	return func() error {
 			err := runCmd(divertCmd, debug)
@@ -851,8 +851,8 @@ func DivertExecWithFake(targetDir string, file string, fakeContent string, debug
 		}
 }
 
-// DivertStartStopDaemon diverts [/usr]/sbin/start-stop-daemon with one doing nothing.
-func DivertStartStopDaemon(targetDir string, debug bool) (func() error, func(error) error) {
+// divertStartStopDaemon diverts [/usr]/sbin/start-stop-daemon with one doing nothing.
+func divertStartStopDaemon(targetDir string, debug bool) (func() error, func(error) error) {
 	path := filepath.Join("/sbin", "start-stop-daemon")
 	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
 		// usr-merged enabled
@@ -861,11 +861,11 @@ func DivertStartStopDaemon(targetDir string, debug bool) (func() error, func(err
 	fakeContent := `#!/bin/sh
 echo 'Warning: Fake start-stop-daemon called, doing nothing'
 `
-	return DivertExecWithFake(targetDir, path, fakeContent, debug)
+	return divertExecWithFake(targetDir, path, fakeContent, debug)
 }
 
-// DivertInitctl diverts [/usr]/sbin/initctl with one only performing version action.
-func DivertInitctl(targetDir string, debug bool) (func() error, func(error) error) {
+// divertInitctl diverts [/usr]/sbin/initctl with one only performing version action.
+func divertInitctl(targetDir string, debug bool) (func() error, func(error) error) {
 	path := filepath.Join("/sbin", "initctl")
 	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
 		// usr-merged enabled
@@ -876,7 +876,7 @@ func DivertInitctl(targetDir string, debug bool) (func() error, func(error) erro
 echo 'Warning: Fake initctl called, doing nothing'
 `,
 		path)
-	return DivertExecWithFake(targetDir, path, fakeContent, debug)
+	return divertExecWithFake(targetDir, path, fakeContent, debug)
 }
 
 // divertPolicyRcD diverts /usr/sbin/policy-rc.d with one that denies everything operation.
@@ -886,5 +886,5 @@ func divertPolicyRcD(targetDir string, debug bool) (func() error, func(error) er
 echo "All runlevel operations denied by policy" >&2
 exit 101
 `
-	return DivertExecWithFake(targetDir, path, fakeContent, debug)
+	return divertExecWithFake(targetDir, path, fakeContent, debug)
 }

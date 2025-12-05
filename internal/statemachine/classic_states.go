@@ -366,11 +366,11 @@ func (stateMachine *StateMachine) runCmdsWithChrootSetup(cmds []*exec.Cmd) (err 
 		},
 		{
 			path: filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "start-stop-daemon"),
-			fn:   DivertStartStopDaemon,
+			fn:   divertStartStopDaemon,
 		},
 		{
 			path: filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "initctl"),
-			fn:   DivertInitctl,
+			fn:   divertInitctl,
 		},
 	}
 

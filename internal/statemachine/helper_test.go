@@ -1121,7 +1121,7 @@ func mockDpkgDivert(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
 		execCommand("mv", filepath.Join(targetDir, target+".dpkg-divert"), filepath.Join(targetDir, target))
 }
 
-func TestDivertExecWithFake_fail(t *testing.T) {
+func Test_divertExecWithFake_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	// Prepare temporary directory
 	workDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
@@ -1147,7 +1147,7 @@ func TestDivertExecWithFake_fail(t *testing.T) {
 	t.Cleanup(func() {
 		osMkdirAll = os.MkdirAll
 	})
-	divert, _ := DivertExecWithFake(workDir, testFile, "replaced", true)
+	divert, _ := divertExecWithFake(workDir, testFile, "replaced", true)
 	err = divert()
 	asserter.AssertErrContains(err, fmt.Sprintf("Error creating %s directory", testFile))
 	osMkdirAll = os.MkdirAll
@@ -1156,7 +1156,7 @@ func TestDivertExecWithFake_fail(t *testing.T) {
 	t.Cleanup(func() {
 		osWriteFile = os.WriteFile
 	})
-	divert, _ = DivertExecWithFake(workDir, testFile, "replaced", true)
+	divert, _ = divertExecWithFake(workDir, testFile, "replaced", true)
 	err = divert()
 	asserter.AssertErrContains(err, fmt.Sprintf("Error writing to %s", testFile))
 	osWriteFile = os.WriteFile
@@ -1165,14 +1165,14 @@ func TestDivertExecWithFake_fail(t *testing.T) {
 	t.Cleanup(func() {
 		osRemove = os.Remove
 	})
-	_, undivert := DivertExecWithFake(workDir, testFile, "replaced", true)
+	_, undivert := divertExecWithFake(workDir, testFile, "replaced", true)
 	err = undivert(nil)
 	asserter.AssertErrContains(err, fmt.Sprintf("Error removing %s", testFile))
 	osWriteFile = os.WriteFile
 }
 
-// TestDivertExecWithFake runs DivertExecWtihFake with fake dpkg-divert (only moving file) and ensure the behaviour is the correct one.
-func TestDivertExecWithFake(t *testing.T) {
+// Test_divertExecWithFake runs divertExecWtihFake with fake dpkg-divert (only moving file) and ensure the behaviour is the correct one.
+func Test_divertExecWithFake(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	// Prepare temporary directory
 	workDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
@@ -1191,7 +1191,7 @@ func TestDivertExecWithFake(t *testing.T) {
 	t.Cleanup(func() {
 		dpkgDivert = DpkgDivert
 	})
-	divert, undivert := DivertExecWithFake(workDir, filepath.Join("usr", "bin", "test"), "replaced", true)
+	divert, undivert := divertExecWithFake(workDir, filepath.Join("usr", "bin", "test"), "replaced", true)
 	err = divert()
 	asserter.AssertErrNil(err, true)
 	if !osutil.FileExists(testFile) {
@@ -1241,7 +1241,7 @@ func runAndCheck(t *testing.T, fn func() error, expected *regexp.Regexp) {
 	}
 }
 
-// TestDivertExec tests DivertStartStopDaemon and DivertInitctl, with and without a usr-merged setup.
+// TestDivertExec tests divertStartStopDaemon and divertInitctl, with and without a usr-merged setup.
 func TestDivertExec(t *testing.T) {
 	type testCase struct {
 		name      string
@@ -1254,25 +1254,25 @@ func TestDivertExec(t *testing.T) {
 		{
 			name:      "StartStopDaemonWithUsrMerged",
 			usrMerged: true,
-			cmd:       DivertStartStopDaemon,
+			cmd:       divertStartStopDaemon,
 			execPath:  "/usr/sbin/start-stop-daemon",
 		},
 		{
 			name:      "StartStopDaemonWithoutUsrMerged",
 			usrMerged: false,
-			cmd:       DivertStartStopDaemon,
+			cmd:       divertStartStopDaemon,
 			execPath:  "/sbin/start-stop-daemon",
 		},
 		{
 			name:      "InitctlWithUsrMerged",
 			usrMerged: true,
-			cmd:       DivertInitctl,
+			cmd:       divertInitctl,
 			execPath:  "/usr/sbin/initctl",
 		},
 		{
 			name:      "InitctlWithoutUsrMerged",
 			usrMerged: false,
-			cmd:       DivertInitctl,
+			cmd:       divertInitctl,
 			execPath:  "/sbin/initctl",
 		},
 	}
