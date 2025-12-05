@@ -547,3 +547,23 @@ func RestoreResolvConf(chroot string) error {
 	}
 	return nil
 }
+
+// DpkgDivert dpkg-diverts the given file in the given targetDir
+// Returns two commands: one for diverting the target file, and one for undiverting it.
+func DpkgDivert(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+	dpkgDivert := "dpkg-divert"
+	targetDiverted := target + ".dpkg-divert"
+
+	commonArgs := []string{
+		"--local",
+		"--divert",
+		targetDiverted,
+		"--rename",
+		target,
+	}
+
+	divert := append([]string{targetDir, dpkgDivert}, commonArgs...)
+	undivert := append([]string{targetDir, dpkgDivert, "--remove"}, commonArgs...)
+
+	return exec.Command("chroot", divert...), exec.Command("chroot", undivert...)
+}

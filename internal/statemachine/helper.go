@@ -28,7 +28,6 @@ import (
 
 var runCmd = helper.RunCmd
 var blockSize string = "1"
-var dpkgDivert = DpkgDivert
 
 var (
 	Mke2fsConfigEnv  = "MKE2FS_CONFIG"
@@ -573,26 +572,6 @@ func generateAptPackageInstallingCmd(targetDir string, argumentList []string, in
 	return cmd
 }
 
-// DpkgDivert dpkg-diverts the given file in the given baseDir
-// Returns two commands: one for diverting the target file, and one for undiverting it.
-func DpkgDivert(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
-	dpkgDivert := "dpkg-divert"
-	targetDiverted := target + ".dpkg-divert"
-
-	commonArgs := []string{
-		"--local",
-		"--divert",
-		targetDiverted,
-		"--rename",
-		target,
-	}
-
-	divert := append([]string{targetDir, dpkgDivert}, commonArgs...)
-	undivert := append([]string{targetDir, dpkgDivert, "--remove"}, commonArgs...)
-
-	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
-}
-
 // execTeardownCmds executes given commands and collects error to join them with an existing error.
 // Failure to execute one command will not stop from executing following ones.
 func execTeardownCmds(teardownCmds []*exec.Cmd, debug bool, prevErr error) (err error) {
@@ -816,7 +795,7 @@ func associateLoopDevice(path string, sectorSize quantity.Size) (string, *exec.C
 // divertOSProber divert GRUB's os-prober as we don't want to scan for other OSes on
 // the build system
 func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
-	return dpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
+	return helperDpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
 }
 
 // divertExecWithFake replaces a target file in chroot with a provided fake content

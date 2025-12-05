@@ -1136,11 +1136,11 @@ func Test_divertExecWithFake_fail(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// Mock the DpkgDivert (as we cannot execute dpkg-divert)
-	dpkgDivert = func(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+	helperDpkgDivert = func(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
 		return execCommand("true"), execCommand("true")
 	}
 	t.Cleanup(func() {
-		dpkgDivert = DpkgDivert
+		helperDpkgDivert = helper.DpkgDivert
 	})
 
 	osMkdirAll = mockMkdirAll
@@ -1187,9 +1187,9 @@ func Test_divertExecWithFake(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// Mock the DpkgDivert (as we cannot execute dpkg-divert)
-	dpkgDivert = mockDpkgDivert
+	helperDpkgDivert = mockDpkgDivert
 	t.Cleanup(func() {
-		dpkgDivert = DpkgDivert
+		helperDpkgDivert = helper.DpkgDivert
 	})
 	divert, undivert := divertExecWithFake(workDir, filepath.Join("usr", "bin", "test"), "replaced", true)
 	err = divert()
@@ -1308,6 +1308,15 @@ func TestDivertExec(t *testing.T) {
 
 			execCommand = mockCmder.Command
 			t.Cleanup(func() { execCommand = exec.Command })
+
+			// Mock the DpkgDivert (as we cannot execute dpkg-divert)
+			helperDpkgDivert = func(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+				divert, undivert := helper.DpkgDivert(targetDir, target)
+				return execCommand(filepath.Base(divert.Path), divert.Args[1:]...), execCommand(filepath.Base(undivert.Path), undivert.Args[1:]...)
+			}
+			t.Cleanup(func() {
+				helperDpkgDivert = helper.DpkgDivert
+			})
 
 			divert, undivert := tc.cmd(workDir, true)
 

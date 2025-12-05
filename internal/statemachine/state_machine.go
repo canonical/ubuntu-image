@@ -43,6 +43,7 @@ var helperCheckEmptyFields = helper.CheckEmptyFields
 var helperCheckTags = helper.CheckTags
 var helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 var helperRestoreResolvConf = helper.RestoreResolvConf
+var helperDpkgDivert = helper.DpkgDivert
 var osReadDir = os.ReadDir
 var osReadFile = os.ReadFile
 var osWriteFile = os.WriteFile

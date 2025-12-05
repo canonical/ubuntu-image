@@ -266,6 +266,15 @@ func TestStateMachine_setupGrub_checkcmds(t *testing.T) {
 		helperRestoreResolvConf = helper.RestoreResolvConf
 	})
 
+	// Mock helper.DpkgDivert (as we cannot execute dpkg-divert)
+	helperDpkgDivert = func(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+		divert, undivert := helper.DpkgDivert(targetDir, target)
+		return execCommand(filepath.Base(divert.Path), divert.Args[1:]...), execCommand(filepath.Base(undivert.Path), undivert.Args[1:]...)
+	}
+	t.Cleanup(func() {
+		helperDpkgDivert = helper.DpkgDivert
+	})
+
 	err = stateMachine.setupGrub("", 2, 1, true, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrNil(err, true)
 
