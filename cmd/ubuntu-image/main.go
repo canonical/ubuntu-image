@@ -76,7 +76,7 @@ func executeStateMachine(sm statemachine.SmInterface) error {
 }
 
 // parseFlags parses received flags and returns error code accordingly
-func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdout, stderr io.Reader, resume, version bool) (int, error) {
+func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdout, stderr io.Reader, stateMachineOpts *commands.StateMachineOpts, commonOpts *commands.CommonOpts) (int, error) {
 	if _, err := parser.Parse(); err != nil {
 		if e, ok := err.(*flags.Error); ok {
 			switch e.Type {
@@ -91,8 +91,8 @@ func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdou
 				fmt.Println(string(readStdout))
 				return 0, e
 			case flags.ErrCommandRequired:
-				// if --resume was given, this is not an error
-				if !resume && !version {
+				// if --resume or --version was given, this is not an error
+				if !stateMachineOpts.Resume && !commonOpts.Version {
 					restoreStdout()
 					restoreStderr()
 					readStderr, err := io.ReadAll(stderr)
@@ -153,7 +153,7 @@ func main() { //nolint: gocyclo
 	defer restoreStderr()
 
 	// Parse the options provided and handle specific errors
-	code, err := parseFlags(parser, restoreStdout, restoreStderr, stdout, stderr, stateMachineOpts.Resume, commonOpts.Version)
+	code, err := parseFlags(parser, restoreStdout, restoreStderr, stdout, stderr, stateMachineOpts, commonOpts)
 	if err != nil {
 		osExit(code)
 		return
