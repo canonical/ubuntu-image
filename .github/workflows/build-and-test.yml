@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, X64, noble, medium]
     strategy:
       matrix:
         test-scenario: [short, long]
