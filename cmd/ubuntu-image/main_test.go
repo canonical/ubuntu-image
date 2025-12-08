@@ -88,15 +88,6 @@ func TestValidCommands(t *testing.T) {
 			},
 			want: "image_defintion.yml",
 		},
-		{
-			name:    "valid_pack_command",
-			command: "pack",
-			flags:   []string{"--artifact-type", "raw", "--gadget-dir", "./test-gadget-dir", "--rootfs-dir", "./test"},
-			field: func(u *commands.UbuntuImageCommand) string {
-				return u.Pack.PackOptsPassed.GadgetDir
-			},
-			want: "./test-gadget-dir",
-		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -158,7 +149,6 @@ func TestInvalidCommands(t *testing.T) {
 			ubuntuImageCommand := &commands.UbuntuImageCommand{}
 			_, gotErr := flags.ParseArgs(ubuntuImageCommand, args)
 			asserter.AssertErrContains(gotErr, tc.expectedError)
-
 		})
 	}
 }
@@ -312,7 +302,6 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 			if got != 1 {
 				t.Errorf("Expected error code on exit, got: %d", got)
 			}
-
 		})
 	}
 }
@@ -417,42 +406,6 @@ func Test_initStateMachine(t *testing.T) {
 			},
 		},
 		{
-			name: "init a pack state machine, no arch",
-			args: args{
-				imageType:        "pack",
-				commonOpts:       &commands.CommonOpts{},
-				stateMachineOpts: &commands.StateMachineOpts{},
-				ubuntuImageCommand: &commands.UbuntuImageCommand{
-					Pack: commands.PackCommand{
-						PackOptsPassed: commands.PackOpts{},
-					},
-				},
-			},
-			want: &statemachine.PackStateMachine{
-				StateMachine: statemachine.StateMachine{},
-				Opts:         commands.PackOpts{Architecture: "amd64"},
-			},
-		},
-		{
-			name: "init a pack state machine, with arch",
-			args: args{
-				imageType:        "pack",
-				commonOpts:       &commands.CommonOpts{},
-				stateMachineOpts: &commands.StateMachineOpts{},
-				ubuntuImageCommand: &commands.UbuntuImageCommand{
-					Pack: commands.PackCommand{
-						PackOptsPassed: commands.PackOpts{
-							Architecture: "arm64",
-						},
-					},
-				},
-			},
-			want: &statemachine.PackStateMachine{
-				StateMachine: statemachine.StateMachine{},
-				Opts:         commands.PackOpts{Architecture: "arm64"},
-			},
-		},
-		{
 			name: "fail to init an unknown statemachine",
 			args: args{
 				imageType:          "unknown",
@@ -473,7 +426,6 @@ func Test_initStateMachine(t *testing.T) {
 			}
 
 			asserter.AssertEqual(tc.want, got, cmpOpts...)
-
 		})
 	}
 }
