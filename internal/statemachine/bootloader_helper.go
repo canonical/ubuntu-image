@@ -264,6 +264,8 @@ func grubTargetFromArch(architecture string) string {
 		return "arm64-efi"
 	case arch.ARMHF:
 		return "arm-efi"
+	case arch.RISCV64:
+		return "riscv64-efi"
 	default:
 		return ""
 	}
