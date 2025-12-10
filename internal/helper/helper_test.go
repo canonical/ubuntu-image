@@ -2,9 +2,13 @@ package helper
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -17,11 +21,17 @@ import (
 )
 
 // define some mocked versions of go package functions
+func mockMkdirAll(string, os.FileMode) error {
+	return fmt.Errorf("Test error")
+}
 func mockRemove(string) error {
 	return fmt.Errorf("Test Error")
 }
 func mockRename(string, string) error {
 	return fmt.Errorf("Test Error")
+}
+func mockWriteFile(name string, data []byte, perm os.FileMode) error {
+	return fmt.Errorf("WriteFile Error")
 }
 
 // TestRestoreResolvConf tests if resolv.conf is restored correctly
@@ -485,5 +495,238 @@ func TestPingXattrs(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 	if !reflect.DeepEqual(pingXattrs, []string{"security.capability"}) {
 		t.Error("ping has lost the security.capability xattr after tar extraction")
+	}
+}
+
+// Test_divertExecWithFake runs divertExecWtihFake with fake dpkg-divert (only moving file) and ensure the behaviour is the correct one.
+func Test_DivertExecWithFake(t *testing.T) {
+	asserter := Asserter{T: t}
+	// Prepare temporary directory
+	workDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// Create test environment
+	err = os.MkdirAll(filepath.Join(workDir, "usr", "bin"), 0755)
+	asserter.AssertErrNil(err, true)
+	testFile := filepath.Join(workDir, "usr", "bin", "test")
+	err = os.WriteFile(filepath.Join(workDir, "usr", "bin", "test"), []byte("test"), 0600)
+	asserter.AssertErrNil(err, true)
+
+	// Mock the DpkgDivert (as we cannot execute dpkg-divert)
+	dpkgDivert = func(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+		//nolint:gosec,G204
+		return exec.Command("mv", filepath.Join(targetDir, target), filepath.Join(targetDir, target+".dpkg-divert")),
+			exec.Command("mv", filepath.Join(targetDir, target+".dpkg-divert"), filepath.Join(targetDir, target))
+	}
+	t.Cleanup(func() {
+		dpkgDivert = DpkgDivert
+	})
+	divert, undivert := DivertExecWithFake(workDir, filepath.Join("usr", "bin", "test"), "replaced", true)
+	err = divert()
+	asserter.AssertErrNil(err, true)
+	if !osutil.FileExists(testFile) {
+		t.Errorf("replacement test file \"%s\" does not exist", testFile)
+	}
+	content, err := os.ReadFile(testFile)
+	asserter.AssertErrNil(err, true)
+	if string(content) != "replaced" {
+		t.Errorf("replacement test file \"%s\" does not have correct content: \"%s\" != \"%s\"", testFile, string(content), "replaced")
+	}
+	if !osutil.FileExists(testFile + ".dpkg-divert") {
+		t.Errorf("diverted test file \"%s\" does not exist", testFile+".dpkg-divert")
+	}
+	content, err = os.ReadFile(testFile + ".dpkg-divert")
+	asserter.AssertErrNil(err, true)
+	if string(content) != "test" {
+		t.Errorf("diverted test file \"%s\" does not have correct content: \"%s\" != \"%s\"", testFile+".dpkg-divert", string(content), "test")
+	}
+	err = undivert(nil)
+	asserter.AssertErrNil(err, true)
+	if osutil.FileExists(testFile + ".dpkg-divert") {
+		t.Errorf("diverted test file \"%s\" is still here", testFile+".dpkg-divert")
+	}
+	if !osutil.FileExists(testFile) {
+		t.Errorf("test file \"%s\" does not exist anymore", testFile)
+	}
+	content, err = os.ReadFile(testFile)
+	asserter.AssertErrNil(err, true)
+	if string(content) != "test" {
+		t.Errorf("diverted test file \"%s\" does not have correct content: \"%s\" != \"%s\"", testFile, string(content), "test")
+	}
+}
+
+func Test_DivertExecWithFake_fail(t *testing.T) {
+	asserter := Asserter{T: t}
+	// Prepare temporary directory
+	workDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// Create test environment
+	err = os.MkdirAll(filepath.Join(workDir, "usr", "bin"), 0755)
+	asserter.AssertErrNil(err, true)
+	testFile := filepath.Join("/usr", "bin", "test")
+	testFilePath := filepath.Join(workDir, testFile)
+	err = os.WriteFile(testFilePath, []byte("test"), 0600)
+	asserter.AssertErrNil(err, true)
+
+	runCmd = func(cmd *exec.Cmd, debug bool) error {
+		return fmt.Errorf("Fail to run command %s", cmd.String())
+	}
+	t.Cleanup(func() {
+		runCmd = RunCmd
+	})
+	divert, _ := DivertExecWithFake(workDir, testFile, "replaced", true)
+	err = divert()
+	asserter.AssertErrContains(err, fmt.Sprintf("Fail to run command /usr/sbin/chroot %s dpkg-divert --local", workDir))
+	runCmd = RunCmd
+
+	// Mock the DpkgDivert (as we cannot execute dpkg-divert)
+	dpkgDivert = func(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+		return execCommand("true"), execCommand("true")
+	}
+	t.Cleanup(func() {
+		dpkgDivert = DpkgDivert
+	})
+
+	osMkdirAll = mockMkdirAll
+	t.Cleanup(func() {
+		osMkdirAll = os.MkdirAll
+	})
+	divert, _ = DivertExecWithFake(workDir, testFile, "replaced", true)
+	err = divert()
+	asserter.AssertErrContains(err, fmt.Sprintf("Error creating %s directory", testFile))
+	osMkdirAll = os.MkdirAll
+
+	osWriteFile = mockWriteFile
+	t.Cleanup(func() {
+		osWriteFile = os.WriteFile
+	})
+	divert, _ = DivertExecWithFake(workDir, testFile, "replaced", true)
+	err = divert()
+	asserter.AssertErrContains(err, fmt.Sprintf("Error writing to %s", testFile))
+	osWriteFile = os.WriteFile
+	dpkgDivert = DpkgDivert
+
+	osRemove = mockRemove
+	t.Cleanup(func() {
+		osRemove = os.Remove
+	})
+	_, undivert := DivertExecWithFake(workDir, testFile, "replaced", true)
+	err = undivert(nil)
+	asserter.AssertErrContains(err, fmt.Sprintf("Error removing %s", testFile))
+	osRemove = os.Remove
+
+	runCmd = func(cmd *exec.Cmd, debug bool) error {
+		return fmt.Errorf("Fail to run command %s", cmd.String())
+	}
+	t.Cleanup(func() {
+		runCmd = RunCmd
+	})
+	_, undivert = DivertExecWithFake(workDir, testFile, "replaced", true)
+	err = undivert(nil)
+	asserter.AssertErrContains(err, fmt.Sprintf("Fail to run command /usr/sbin/chroot %s dpkg-divert --remove", workDir))
+	runCmd = RunCmd
+}
+
+func runAndCheck(t *testing.T, fn func() error, expected *regexp.Regexp) {
+	asserter := Asserter{T: t}
+	stdout, restoreStdout, err := CaptureStd(&os.Stdout)
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { restoreStdout() })
+	err = fn()
+	asserter.AssertErrNil(err, true)
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
+	cmd := strings.TrimSpace(string(readStdout))
+	if !expected.MatchString(cmd) {
+		t.Errorf("Command \"%v\" does not match \"%v\"", cmd, expected.String())
+	}
+}
+
+// Test_DivertExec tests divertStartStopDaemon and divertInitctl, with and without a usr-merged setup.
+func Test_DivertExec(t *testing.T) {
+	type testCase struct {
+		name      string
+		usrMerged bool // true: symlink /sbin to /usr/sbin
+		cmd       func(string, bool) (func() error, func(error) error)
+		execPath  string
+	}
+
+	cases := []testCase{
+		{
+			name:      "StartStopDaemon_withUsrMerged",
+			usrMerged: true,
+			cmd:       DivertStartStopDaemon,
+			execPath:  "/usr/sbin/start-stop-daemon",
+		},
+		{
+			name:      "StartStopDaemon_withoutUsrMerged",
+			usrMerged: false,
+			cmd:       DivertStartStopDaemon,
+			execPath:  "/sbin/start-stop-daemon",
+		},
+		{
+			name:      "Initctl_withUsrMerged",
+			usrMerged: true,
+			cmd:       DivertInitctl,
+			execPath:  "/usr/sbin/initctl",
+		},
+		{
+			name:      "Initctl_withoutUsrMerged",
+			usrMerged: false,
+			cmd:       DivertInitctl,
+			execPath:  "/sbin/initctl",
+		},
+		{
+			name:      "PolicyRcD",
+			usrMerged: true,
+			cmd:       DivertPolicyRcD,
+			execPath:  "/usr/sbin/policy-rc.d",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := Asserter{T: t}
+			workDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
+			err := os.MkdirAll(workDir, 0755)
+			asserter.AssertErrNil(err, true)
+
+			// Create usr/sbin for both cases
+			err = os.MkdirAll(filepath.Join(workDir, "usr", "sbin"), 0755)
+			asserter.AssertErrNil(err, true)
+
+			// Setup /sbin as symlink or as a directory
+			sbinPath := filepath.Join(workDir, "sbin")
+			if tc.usrMerged {
+				// Symlink /sbin to /usr/sbin
+				err = os.Symlink(filepath.Join(workDir, "usr", "sbin"), sbinPath)
+				asserter.AssertErrNil(err, true)
+			} else {
+				// Real directory
+				err = os.MkdirAll(sbinPath, 0755)
+				asserter.AssertErrNil(err, true)
+			}
+
+			// Create the fake target
+			_, err = os.Create(filepath.Join(workDir, "sbin", filepath.Base(tc.execPath)))
+			asserter.AssertErrNil(err, true)
+
+			execCommand = func(cmd string, args ...string) *exec.Cmd {
+				//nolint:gosec,G204
+				return exec.Command("echo", append([]string{cmd}, args...)...)
+			}
+			t.Cleanup(func() {
+				execCommand = exec.Command
+			})
+
+			divert, undivert := tc.cmd(workDir, true)
+
+			runAndCheck(t, divert, regexp.MustCompile("^chroot "+workDir+" dpkg-divert --local .* "+tc.execPath+"$"))
+			runAndCheck(t, func() error { return undivert(nil) }, regexp.MustCompile("^chroot "+workDir+" dpkg-divert --remove .* "+tc.execPath+"$"))
+		})
 	}
 }

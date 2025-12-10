@@ -18,7 +18,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
-	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
+var helperDpkgDivert = helper.DpkgDivert
 var runCmd = helper.RunCmd
 var blockSize string = "1"
 
@@ -796,74 +796,4 @@ func associateLoopDevice(path string, sectorSize quantity.Size) (string, *exec.C
 // the build system
 func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
 	return helperDpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
-}
-
-// divertExecWithFake replaces a target file in chroot with a provided fake content
-// using dpkg-divert, and returns two functions: one for diverting, one for undiverting.
-func divertExecWithFake(targetDir string, file string, fakeContent string, debug bool) (func() error, func(error) error) {
-	divertCmd, undivertCmd := helperDpkgDivert(targetDir, file)
-
-	return func() error {
-			err := runCmd(divertCmd, debug)
-			if err != nil {
-				return err
-			}
-			err = osMkdirAll(filepath.Dir(file), 0755)
-			if err != nil {
-				return fmt.Errorf("Error creating %s directory: %s", file, err.Error())
-			}
-			err = osWriteFile(filepath.Join(targetDir, file), []byte(fakeContent), 0755)
-			if err != nil {
-				return fmt.Errorf("Error writing to %s: %s", file, err.Error())
-			}
-			return nil
-		}, func(err error) error {
-			tmpErr := osRemove(filepath.Join(targetDir, file))
-			if tmpErr != nil {
-				return fmt.Errorf("%s\nError removing %s: %s", err, file, tmpErr)
-			}
-			tmpErr = runCmd(undivertCmd, debug)
-			if tmpErr != nil {
-				return fmt.Errorf("%s\n%s", err, tmpErr)
-			}
-			return err
-		}
-}
-
-// divertStartStopDaemon diverts [/usr]/sbin/start-stop-daemon with one doing nothing.
-func divertStartStopDaemon(targetDir string, debug bool) (func() error, func(error) error) {
-	path := filepath.Join("/sbin", "start-stop-daemon")
-	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
-		// usr-merged enabled
-		path = filepath.Join("/usr", path)
-	}
-	fakeContent := `#!/bin/sh
-echo 'Warning: Fake start-stop-daemon called, doing nothing'
-`
-	return divertExecWithFake(targetDir, path, fakeContent, debug)
-}
-
-// divertInitctl diverts [/usr]/sbin/initctl with one only performing version action.
-func divertInitctl(targetDir string, debug bool) (func() error, func(error) error) {
-	path := filepath.Join("/sbin", "initctl")
-	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
-		// usr-merged enabled
-		path = filepath.Join("/usr", path)
-	}
-	fakeContent := fmt.Sprintf(`#!/bin/sh
-[ "$1" = version ] && exec %s.dpkg-divert "$@"
-echo 'Warning: Fake initctl called, doing nothing'
-`,
-		path)
-	return divertExecWithFake(targetDir, path, fakeContent, debug)
-}
-
-// divertPolicyRcD diverts /usr/sbin/policy-rc.d with one that denies everything operation.
-func divertPolicyRcD(targetDir string, debug bool) (func() error, func(error) error) {
-	path := filepath.Join("/usr", "sbin", "policy-rc.d")
-	fakeContent := `#!/bin/sh
-echo "All runlevel operations denied by policy" >&2
-exit 101
-`
-	return divertExecWithFake(targetDir, path, fakeContent, debug)
 }

@@ -362,15 +362,15 @@ func (stateMachine *StateMachine) runCmdsWithChrootSetup(cmds []*exec.Cmd) (err 
 	diversions := []diversion{
 		{
 			path: filepath.Join(classicStateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d"),
-			fn:   divertPolicyRcD,
+			fn:   helperDivertPolicyRcD,
 		},
 		{
 			path: filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "start-stop-daemon"),
-			fn:   divertStartStopDaemon,
+			fn:   helperDivertStartStopDaemon,
 		},
 		{
 			path: filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "initctl"),
-			fn:   divertInitctl,
+			fn:   helperDivertInitctl,
 		},
 	}
 

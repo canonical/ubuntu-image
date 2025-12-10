@@ -4396,13 +4396,17 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "sbin", "initctl"))
 	asserter.AssertErrNil(err, true)
 
-	// Mock helper.DpkgDivert (as we cannot execute dpkg-divert)
-	helperDpkgDivert = func(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
-		divert, undivert := helper.DpkgDivert(targetDir, target)
-		return execCommand(filepath.Base(divert.Path), divert.Args[1:]...), execCommand(filepath.Base(undivert.Path), undivert.Args[1:]...)
+	// Mock helper.Divert* functions
+	mock := func(targetDir string, debug bool) (func() error, func(error) error) {
+		return func() error { return nil }, func(error) error { return nil }
 	}
+	helperDivertPolicyRcD = mock
+	helperDivertStartStopDaemon = mock
+	helperDivertInitctl = mock
 	t.Cleanup(func() {
-		helperDpkgDivert = helper.DpkgDivert
+		helperDivertPolicyRcD = helper.DivertPolicyRcD
+		helperDivertStartStopDaemon = helper.DivertStartStopDaemon
+		helperDivertInitctl = helper.DivertInitctl
 	})
 
 	mockCmder := NewMockExecCommand()
@@ -4432,14 +4436,8 @@ func TestStateMachine_installPackages_checkcmds(t *testing.T) {
 		regexp.MustCompile("^mount -t proc proc-build /var/tmp.*/chroot/proc$"),
 		regexp.MustCompile("^mount -t sysfs sysfs-build /var/tmp.*/chroot/sys$"),
 		regexp.MustCompile("^mount --bind .*/scratch/run.* .*/chroot/run$"),
-		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --local .* /usr/sbin/policy-rc.d$"),
-		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --local .* /sbin/start-stop-daemon$"),
-		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --local .* /sbin/initctl$"),
 		regexp.MustCompile("^chroot /var/tmp.*/chroot apt update$"),
 		regexp.MustCompile("^chroot /var/tmp.*/chroot apt --assume-yes --quiet --option=Dpkg::options::=--force-unsafe-io --option=Dpkg::Options::=--force-confold install$"),
-		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --remove .* /sbin/initctl$"),
-		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --remove .* /sbin/start-stop-daemon$"),
-		regexp.MustCompile("^chroot /var/tmp.*/chroot dpkg-divert --remove .* /usr/sbin/policy-rc.d$"),
 		regexp.MustCompile("^udevadm settle$"),
 		regexp.MustCompile("^mount --make-rprivate /var/tmp.*/chroot/run$"),
 		regexp.MustCompile("^umount --recursive /var/tmp.*/chroot/run$"),
@@ -4522,6 +4520,45 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 	}
 }
 
+func checkDivertErrors(t *testing.T, fn func() error, expectedErr string, divertPolicyRcD error, undivertPolicyRcD error, divertStartStopDaemon error, undivertStartStopDaemon error, divertInitctl error, undivertInitctl error) {
+	asserter := helper.Asserter{T: t}
+
+	helperDivertPolicyRcD = func(targetDir string, debug bool) (func() error, func(error) error) {
+		return func() error { return divertPolicyRcD }, func(err error) error {
+			if err != nil {
+				return err
+			}
+			return undivertPolicyRcD
+		}
+	}
+	helperDivertStartStopDaemon = func(targetDir string, debug bool) (func() error, func(error) error) {
+		return func() error { return divertStartStopDaemon }, func(err error) error {
+			if err != nil {
+				return err
+			}
+			return undivertStartStopDaemon
+		}
+	}
+	helperDivertInitctl = func(targetDir string, debug bool) (func() error, func(error) error) {
+		return func() error { return divertInitctl }, func(err error) error {
+			if err != nil {
+				return err
+			}
+			return undivertInitctl
+		}
+	}
+	t.Cleanup(func() {
+		helperDivertPolicyRcD = helper.DivertPolicyRcD
+		helperDivertStartStopDaemon = helper.DivertStartStopDaemon
+		helperDivertInitctl = helper.DivertInitctl
+	})
+	err := fn()
+	asserter.AssertErrContains(err, expectedErr)
+	helperDivertPolicyRcD = helper.DivertPolicyRcD
+	helperDivertStartStopDaemon = helper.DivertStartStopDaemon
+	helperDivertInitctl = helper.DivertInitctl
+}
+
 // TestStateMachine_installPackages_fail tests failure cases in installPackages
 func TestStateMachine_installPackages_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
@@ -4560,6 +4597,12 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d"))
 	asserter.AssertErrNil(err, true)
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.chroot, "sbin"), 0755)
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "sbin", "start-stop-daemon"))
+	asserter.AssertErrNil(err, true)
+	_, err = os.Create(filepath.Join(stateMachine.tempDirs.chroot, "sbin", "initctl"))
+	asserter.AssertErrNil(err, true)
 
 	osMkdirTemp = mockMkdirTemp
 	t.Cleanup(func() {
@@ -4590,6 +4633,21 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	err = stateMachine.installPackages()
 	asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
 	helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+
+	execCommand = func(name string, arg ...string) *exec.Cmd { return exec.Command("true") }
+	t.Cleanup(func() { execCommand = exec.Command })
+
+	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfSuccess
+	t.Cleanup(func() {
+		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
+	})
+
+	checkDivertErrors(t, stateMachine.installPackages, "divertPolicyRcD", fmt.Errorf("divertPolicyRcD"), nil, nil, nil, nil, nil)
+	checkDivertErrors(t, stateMachine.installPackages, "undivertPolicyRcD", nil, fmt.Errorf("undivertPolicyRcD"), nil, nil, nil, nil)
+	checkDivertErrors(t, stateMachine.installPackages, "divertStartStopDaemon", nil, nil, fmt.Errorf("divertStartStopDaemon"), nil, nil, nil)
+	checkDivertErrors(t, stateMachine.installPackages, "undivertStartStopDaemon", nil, nil, nil, fmt.Errorf("undivertStartStopDaemon"), nil, nil)
+	checkDivertErrors(t, stateMachine.installPackages, "divertInitctl", nil, nil, nil, nil, fmt.Errorf("divertInitctl"), nil)
+	checkDivertErrors(t, stateMachine.installPackages, "undivertInitctl", nil, nil, nil, nil, nil, fmt.Errorf("undivertInitctl"))
 }
 
 // Test_generateMountPointCmds_fail tests when generateMountPointCmds fails
