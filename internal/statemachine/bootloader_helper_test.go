@@ -12,6 +12,7 @@ import (
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/osutil"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
@@ -201,6 +202,25 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 	err = stateMachine.handleLkBootloader(volume)
 	asserter.AssertErrContains(err, "Error copying lk bootloader dir")
 	osutilCopySpecialFile = osutil.CopySpecialFile
+}
+
+// TestStateMachine_grubTargetFromArch checks architecture support
+func TestStateMachine_grubTargetFromArch(t *testing.T) {
+	cases := []string{
+		arch.AMD64,
+		arch.ARM64,
+		arch.ARMHF,
+		arch.RISCV64,
+	}
+
+	for _, c := range cases {
+		t.Run(c, func(t *testing.T) {
+			got := grubTargetFromArch(c)
+			if len(got) == 0 {
+				t.Fatalf("expected non-empty target for %s, got empty", c)
+			}
+		})
+	}
 }
 
 // TestStateMachine_setupGrub_checkcmds checks commands to update grub order is ok
