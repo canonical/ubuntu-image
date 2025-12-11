@@ -18,7 +18,6 @@ import (
 
 	"github.com/jessevdk/go-flags"
 
-	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/statemachine"
@@ -29,8 +28,10 @@ import (
 var Version string = ""
 
 // helper variables for unit testing
-var osExit = os.Exit
-var captureStd = helper.CaptureStd
+var (
+	osExit     = os.Exit
+	captureStd = helper.CaptureStd
+)
 
 var stateMachineLongDesc = `Options for controlling the internal state machine.
 Other than -w, these options are mutually exclusive. When -u or -t is given,
@@ -48,13 +49,6 @@ func initStateMachine(imageType string, commonOpts *commands.CommonOpts, stateMa
 	case "classic":
 		stateMachine = &statemachine.ClassicStateMachine{
 			Args: ubuntuImageCommand.Classic.ClassicArgsPassed,
-		}
-	case "pack":
-		if ubuntuImageCommand.Pack.PackOptsPassed.Architecture == "" {
-			ubuntuImageCommand.Pack.PackOptsPassed.Architecture = arch.GetHostArch()
-		}
-		stateMachine = &statemachine.PackStateMachine{
-			Opts: ubuntuImageCommand.Pack.PackOptsPassed,
 		}
 	default:
 		return nil, fmt.Errorf("unsupported command\n")
@@ -81,27 +75,8 @@ func executeStateMachine(sm statemachine.SmInterface) error {
 	return nil
 }
 
-// unhidePackOpts make pack options visible in help if the pack command is used
-// This should be removed when the pack command is made visible to everyone
-func unhidePackOpts(parser *flags.Parser) {
-	// Save given options before removing them temporarily
-	// otherwise the help will be displayed twice
-	opts := parser.Options
-	parser.Options = 0
-	defer func() { parser.Options = opts }()
-	// parse once to determine the active command
-	// we do not care about error here since we will reparse again
-	_, _ = parser.Parse() // nolint: errcheck
-
-	if parser.Active != nil {
-		if parser.Active.Name == "pack" {
-			parser.Active.Hidden = false
-		}
-	}
-}
-
 // parseFlags parses received flags and returns error code accordingly
-func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdout, stderr io.Reader, resume, version bool) (int, error) {
+func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdout, stderr io.Reader, stateMachineOpts *commands.StateMachineOpts, commonOpts *commands.CommonOpts) (int, error) {
 	if _, err := parser.Parse(); err != nil {
 		if e, ok := err.(*flags.Error); ok {
 			switch e.Type {
@@ -116,8 +91,8 @@ func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdou
 				fmt.Println(string(readStdout))
 				return 0, e
 			case flags.ErrCommandRequired:
-				// if --resume was given, this is not an error
-				if !resume && !version {
+				// if --resume or --version was given, this is not an error
+				if !stateMachineOpts.Resume && !commonOpts.Version {
 					restoreStdout()
 					restoreStderr()
 					readStderr, err := io.ReadAll(stderr)
@@ -177,10 +152,8 @@ func main() { //nolint: gocyclo
 	}
 	defer restoreStderr()
 
-	unhidePackOpts(parser)
-
 	// Parse the options provided and handle specific errors
-	code, err := parseFlags(parser, restoreStdout, restoreStderr, stdout, stderr, stateMachineOpts.Resume, commonOpts.Version)
+	code, err := parseFlags(parser, restoreStdout, restoreStderr, stdout, stderr, stateMachineOpts, commonOpts)
 	if err != nil {
 		osExit(code)
 		return

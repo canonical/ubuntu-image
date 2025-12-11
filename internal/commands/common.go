@@ -31,5 +31,4 @@ type StateMachineOpts struct {
 type UbuntuImageCommand struct {
 	Snap    SnapCommand    `command:"snap"`
 	Classic ClassicCommand `command:"classic"`
-	Pack    PackCommand    `command:"pack" hidden:"true"`
 }

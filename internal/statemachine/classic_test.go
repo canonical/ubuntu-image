@@ -3104,7 +3104,7 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.commonFlags.Debug = true
-	stateMachine.commonFlags.Size = "5G"
+	stateMachine.commonFlags.Size = "3G"
 	stateMachine.commonFlags.OutputDir = outputDir
 	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 		"test_amd64.yaml")
@@ -3517,7 +3517,7 @@ func TestSuccessfulClassicRunNoArtifact(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.commonFlags.Debug = true
-	stateMachine.commonFlags.Size = "5G"
+	stateMachine.commonFlags.Size = "3G"
 	stateMachine.commonFlags.OutputDir = outputDir
 	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 		"test_no_artifact.yaml")
@@ -3559,7 +3559,7 @@ func TestSuccessfulRootfsGeneration(t *testing.T) {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.commonFlags.Debug = true
-	stateMachine.commonFlags.Size = "5G"
+	stateMachine.commonFlags.Size = "3G"
 	stateMachine.commonFlags.OutputDir = outputDir
 	stateMachine.Args.ImageDefinition = filepath.Join("testdata", "image_definitions",
 		"test_rootfs_tarball.yaml")
