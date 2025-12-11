@@ -3,6 +3,7 @@ package helper
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -595,11 +596,12 @@ func DivertExecWithFake(targetDir string, file string, fakeContent string, debug
 		}, func(err error) error {
 			tmpErr := osRemove(filepath.Join(targetDir, file))
 			if tmpErr != nil {
-				return fmt.Errorf("%s\nError removing %s: %s", err, file, tmpErr.Error())
+				tmpErr = fmt.Errorf("Error removing %s: %s", file, tmpErr.Error())
+				return errors.Join(err, tmpErr)
 			}
 			tmpErr = runCmd(undivertCmd, debug)
 			if tmpErr != nil {
-				return fmt.Errorf("%s\n%s", err, tmpErr.Error())
+				return errors.Join(err, tmpErr)
 			}
 			return err
 		}
