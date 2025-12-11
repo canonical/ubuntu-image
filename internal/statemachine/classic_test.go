@@ -4520,43 +4520,25 @@ func TestStateMachine_installPackages_checkcmds_failing(t *testing.T) {
 	}
 }
 
-func checkDivertErrors(t *testing.T, fn func() error, expectedErr string, divertPolicyRcD error, undivertPolicyRcD error, divertStartStopDaemon error, undivertStartStopDaemon error, divertInitctl error, undivertInitctl error) {
+func checkDivert(t *testing.T, fn func() error, divert *func(string, bool) (func() error, func(error) error)) {
 	asserter := helper.Asserter{T: t}
 
-	helperDivertPolicyRcD = func(targetDir string, debug bool) (func() error, func(error) error) {
-		return func() error { return divertPolicyRcD }, func(err error) error {
-			if err != nil {
-				return err
-			}
-			return undivertPolicyRcD
-		}
+	divertSaved := *divert
+	defer func() {
+		*divert = divertSaved
+	}()
+
+	*divert = func(targetDir string, debug bool) (func() error, func(error) error) {
+		return func() error { return fmt.Errorf("divert") }, func(err error) error { return err }
 	}
-	helperDivertStartStopDaemon = func(targetDir string, debug bool) (func() error, func(error) error) {
-		return func() error { return divertStartStopDaemon }, func(err error) error {
-			if err != nil {
-				return err
-			}
-			return undivertStartStopDaemon
-		}
-	}
-	helperDivertInitctl = func(targetDir string, debug bool) (func() error, func(error) error) {
-		return func() error { return divertInitctl }, func(err error) error {
-			if err != nil {
-				return err
-			}
-			return undivertInitctl
-		}
-	}
-	t.Cleanup(func() {
-		helperDivertPolicyRcD = helper.DivertPolicyRcD
-		helperDivertStartStopDaemon = helper.DivertStartStopDaemon
-		helperDivertInitctl = helper.DivertInitctl
-	})
 	err := fn()
-	asserter.AssertErrContains(err, expectedErr)
-	helperDivertPolicyRcD = helper.DivertPolicyRcD
-	helperDivertStartStopDaemon = helper.DivertStartStopDaemon
-	helperDivertInitctl = helper.DivertInitctl
+	asserter.AssertErrContains(err, "divert")
+
+	*divert = func(targetDir string, debug bool) (func() error, func(error) error) {
+		return func() error { return nil }, func(err error) error { return errors.Join(err, fmt.Errorf("undivert")) }
+	}
+	err = fn()
+	asserter.AssertErrContains(err, "undivert")
 }
 
 // TestStateMachine_installPackages_fail tests failure cases in installPackages
@@ -4634,7 +4616,7 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 	asserter.AssertErrContains(err, "Error setting up /etc/resolv.conf")
 	helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 
-	execCommand = func(name string, arg ...string) *exec.Cmd { return exec.Command("true") }
+	execCommand = func(string, ...string) *exec.Cmd { return exec.Command("true") }
 	t.Cleanup(func() { execCommand = exec.Command })
 
 	helperBackupAndCopyResolvConf = mockBackupAndCopyResolvConfSuccess
@@ -4642,12 +4624,22 @@ func TestStateMachine_installPackages_fail(t *testing.T) {
 		helperBackupAndCopyResolvConf = helper.BackupAndCopyResolvConf
 	})
 
-	checkDivertErrors(t, stateMachine.installPackages, "divertPolicyRcD", fmt.Errorf("divertPolicyRcD"), nil, nil, nil, nil, nil)
-	checkDivertErrors(t, stateMachine.installPackages, "undivertPolicyRcD", nil, fmt.Errorf("undivertPolicyRcD"), nil, nil, nil, nil)
-	checkDivertErrors(t, stateMachine.installPackages, "divertStartStopDaemon", nil, nil, fmt.Errorf("divertStartStopDaemon"), nil, nil, nil)
-	checkDivertErrors(t, stateMachine.installPackages, "undivertStartStopDaemon", nil, nil, nil, fmt.Errorf("undivertStartStopDaemon"), nil, nil)
-	checkDivertErrors(t, stateMachine.installPackages, "divertInitctl", nil, nil, nil, nil, fmt.Errorf("divertInitctl"), nil)
-	checkDivertErrors(t, stateMachine.installPackages, "undivertInitctl", nil, nil, nil, nil, nil, fmt.Errorf("undivertInitctl"))
+	// Mock helper.Divert* functions
+	mock := func(string, bool) (func() error, func(error) error) {
+		return func() error { return nil }, func(err error) error { return err }
+	}
+	helperDivertPolicyRcD = mock
+	helperDivertStartStopDaemon = mock
+	helperDivertInitctl = mock
+	t.Cleanup(func() {
+		helperDivertPolicyRcD = helper.DivertPolicyRcD
+		helperDivertStartStopDaemon = helper.DivertStartStopDaemon
+		helperDivertInitctl = helper.DivertInitctl
+	})
+
+	checkDivert(t, stateMachine.installPackages, &helperDivertPolicyRcD)
+	checkDivert(t, stateMachine.installPackages, &helperDivertStartStopDaemon)
+	checkDivert(t, stateMachine.installPackages, &helperDivertInitctl)
 }
 
 // Test_generateMountPointCmds_fail tests when generateMountPointCmds fails
