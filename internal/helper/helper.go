@@ -528,7 +528,7 @@ func BackupAndCopyResolvConf(chroot string) error {
 // version that was backed up by BackupAndCopyResolvConf
 func RestoreResolvConf(chroot string) error {
 	if !osutil.FileExists(filepath.Join(chroot, "etc", "resolv.conf.tmp")) &&
-	   !osutil.IsSymlink(filepath.Join(chroot, "etc", "resolv.conf.tmp")) {
+		!osutil.IsSymlink(filepath.Join(chroot, "etc", "resolv.conf.tmp")) {
 		return nil
 	}
 	if osutil.IsSymlink(filepath.Join(chroot, "etc", "resolv.conf")) {
