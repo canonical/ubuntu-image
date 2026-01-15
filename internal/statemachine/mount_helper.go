@@ -91,24 +91,26 @@ func umountAddedMountPointsCmds(path string, mountPoints []*mountPoint) (umountC
 }
 
 // diffMountPoints compares 2 lists of mountpoint and returns the added ones
-func diffMountPoints(olds []*mountPoint, currents []*mountPoint) (added []*mountPoint) {
-	for _, m := range currents {
-		found := false
-		for _, o := range olds {
-			if equalMountPoints(*m, *o) {
-				found = true
+func diffMountPoints(olds []*mountPoint, currents []*mountPoint) []*mountPoint {
+	lefts := currents
+	for _, o := range olds {
+		for i, l := range lefts {
+			if equalMountPoints(*o, *l) {
+				lefts = append(lefts[:i], lefts[i+1:]...)
+				break
 			}
-		}
-		if !found {
-			added = append(added, m)
 		}
 	}
 
-	return added
+	if len(lefts) == 0 {
+		return nil
+	} else {
+		return lefts
+	}
 }
 
 // equalMountPoints compare 2 mountpoints. Since mountPoints go object can be either
-// created by hand or parsed from /proc/self/mount, we need to compare strictly on the fields
+// created by hand or parsed from /proc/self/mounts, we need to compare strictly on the fields
 // useful to identify a unique mountpoint from the point of view of the OS.
 func equalMountPoints(a, b mountPoint) bool {
 	if len(a.path) == 0 {
@@ -118,6 +120,12 @@ func equalMountPoints(a, b mountPoint) bool {
 		b.path = filepath.Join(b.basePath, b.relpath)
 	}
 
+	// If a mountpoint is a bind mount, the src and typ won't match the
+	// mountpoint declaration, but will be the src and typ behind the binded
+	// mountpoint, so we can only compare the path.
+	if a.bind || b.bind {
+		return a.path == b.path
+	}
 	return a.src == b.src && a.path == b.path && a.typ == b.typ
 }
 
