@@ -90,6 +90,7 @@ func TestRestoreResolvConf(t *testing.T) {
 	err = os.Remove(backupConfPath)
 	asserter.AssertErrNil(err, true)
 	err = os.Symlink("non-existent-file", backupConfPath)
+	asserter.AssertErrNil(err, true)
 
 	err = RestoreResolvConf(workDir)
 	asserter.AssertErrNil(err, true)
