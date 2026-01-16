@@ -1,3 +1,9 @@
+ubuntu-image (3.10.6) UNRELEASED; urgency=medium
+
+  * i/helper: fix RestoreResolvConf function (LP: #2138450)
+
+ -- Sebastian Weyer <sebastian.weyer@canonical.com>  Fri, 16 Jan 2026 09:14:32 +0100
+
 ubuntu-image (3.10.4) UNRELEASED; urgency=medium
 
   * i/statemachine: add riscv64-efi GRUB target (LP: #2134449)
