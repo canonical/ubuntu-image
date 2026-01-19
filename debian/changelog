@@ -10,7 +10,6 @@ ubuntu-image (3.10.6) UNRELEASED; urgency=medium
 
 ubuntu-image (3.10.4) UNRELEASED; urgency=medium
 
-  [ Heinrich Schuchardt ]
   * i/statemachine: add riscv64-efi GRUB target (LP: #2134449)
 
  -- Heinrich Schuchardt <heinrich.schuchardt@canonical.com>  Tue, 09 Dec 2025 19:45:26 +0100
