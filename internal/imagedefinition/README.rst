@@ -306,19 +306,6 @@ The following specification defines what is supported in the YAML:
           # Volume from the gadget from which to create the image
           volume: <string> (optional for single volume gadgets,
                             required for multi-volume gadgets)
-      # Used to specify that ubuntu-image should create a .iso file.
-      # Not yet supported.
-      iso: (optional)
-        -
-          # Name to output the .iso file.
-          name: <string>
-          # Volume from the gadget from which to create the image
-          volume: <string> (optional for single volume gadgets,
-                            required for multi-volume gadgets)
-          # Specify parameters to use when calling `xorriso`. When not
-          # provided, ubuntu-image will attempt to create it's own
-          # `xorriso` command.
-          xorriso-command: <string> (optional)
       # Used to specify that ubuntu-image should create a .qcow2 file.
       # If a .img file is specified for the corresponding volume, the
       # existing .img will be re-used and converted into a qcow2 image.
@@ -464,9 +451,9 @@ gadget
 This optional field specifies from where the gadget tree will be sourced.
 Support is included for prebuilt gadgets, building gadgets from a local
 directory, or building gadgets from a git repository. If gadget is not
-included in the image definition, but some disk output (img, qcow2, iso)
-is included, an error will occur. Gadget should only be excluded if the
-only artifact that you will be creating is a rootfs tarball.
+included in the image definition, but some disk output (img, qcow2) is
+included, an error will occur. Gadget should only be excluded if the only
+artifact that you will be creating is a rootfs tarball.
 
 Examples
 ========
