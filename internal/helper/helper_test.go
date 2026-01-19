@@ -82,6 +82,24 @@ func TestRestoreResolvConf(t *testing.T) {
 	if !osutil.IsSymlink(mainConfPath) {
 		t.Errorf("Main resolv.conf should have remained a symlink, but it is not")
 	}
+
+	// Check if it works when resolv.conf was backed up as a symlink
+	// to non-existent file like systemd runtime resolv-stub.conf
+	_, err = os.Create(mainConfPath)
+	asserter.AssertErrNil(err, true)
+	err = os.Remove(backupConfPath)
+	asserter.AssertErrNil(err, true)
+	err = os.Symlink("non-existent-file", backupConfPath)
+	asserter.AssertErrNil(err, true)
+
+	err = RestoreResolvConf(workDir)
+	asserter.AssertErrNil(err, true)
+	if osutil.FileExists(backupConfPath) {
+		t.Errorf("Backup resolv.conf.tmp has not been removed when pointing to non-existent file")
+	}
+	if !osutil.IsSymlink(mainConfPath) {
+		t.Errorf("Main resolv.conf should have remained a symlink, but it is not")
+	}
 }
 
 // TestFailedRestoreResolvConf tests all resolv.conf error cases
