@@ -202,6 +202,24 @@ var (
 		relpath:  "src4relpath",
 		typ:      "anotherType",
 	}
+	mp5 = mountPoint{
+		basePath: "src5basePath",
+		relpath:  "src5relpath",
+		bind:     true,
+	}
+	mp51 = mountPoint{
+		src:      "srcmp51",
+		path:     "src5basePath/src5relpath",
+		basePath: "src5basePath",
+		relpath:  "src5relpath",
+		typ:      "typ",
+	}
+	mp52 = mountPoint{
+		src:      "srcmp52",
+		basePath: "src5basePath",
+		relpath:  "src5relpath",
+		typ:      "typ",
+	}
 )
 
 func Test_diffMountPoints(t *testing.T) {
@@ -303,6 +321,21 @@ func Test_diffMountPoints(t *testing.T) {
 				&mp21,
 				&mp31,
 				&mp41,
+			},
+		},
+		{
+			name: "double bind mount on the same place",
+			args: args{
+				olds: []*mountPoint{
+					&mp5,
+				},
+				currents: []*mountPoint{
+					&mp51,
+					&mp52,
+				},
+			},
+			want: []*mountPoint{
+				&mp52,
 			},
 		},
 	}

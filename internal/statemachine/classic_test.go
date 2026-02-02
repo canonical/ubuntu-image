@@ -3162,37 +3162,15 @@ func TestSuccessfulClassicRun(t *testing.T) {
 	setupImageCmds = append(setupImageCmds,
 		//nolint:gosec,G204
 		exec.Command("mount", fmt.Sprintf("%sp3", loopUsed), mountDir), // with this example the rootfs is partition 3 mountDir
-	)
-
-	// unset the loopback
-	teardownImageCmds = append(teardownImageCmds,
 		//nolint:gosec,G204
-		exec.Command("losetup", "--detach", filepath.Join("/dev", "loop99")),
-	)
-
-	setupImageCmds = append(setupImageCmds,
-		//nolint:gosec,G204
-		exec.Command("kpartx", "-a", filepath.Join("/dev", "loop99")),
+		exec.Command("mount", fmt.Sprintf("%sp2", loopUsed), bootUEFIDir), // with this example the boot partition is partition 2
 	)
 
 	teardownImageCmds = append([]*exec.Cmd{
 		//nolint:gosec,G204
-		exec.Command("kpartx", "-d", filepath.Join("/dev", "loop99")),
-	}, teardownImageCmds...,
-	)
-
-	setupImageCmds = append(setupImageCmds,
+		exec.Command("mount", "--make-rprivate", mountDir),
 		//nolint:gosec,G204
-		exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p3"), mountDir), // with this example the rootfs is partition 3 mountDir
-		//nolint:gosec,G204
-		exec.Command("mount", filepath.Join("/dev", "mapper", "loop99p2"), bootUEFIDir), // with this example the boot partition is partition 2
-	)
-
-	teardownImageCmds = append([]*exec.Cmd{
-		//nolint:gosec,G204
-		exec.Command("mount", "--make-rprivate", filepath.Join("/dev", "mapper", "loop99p3")),
-		//nolint:gosec,G204
-		exec.Command("umount", "--recursive", filepath.Join("/dev", "mapper", "loop99p3")),
+		exec.Command("umount", "--recursive", mountDir),
 	}, teardownImageCmds...,
 	)
 
