@@ -3,6 +3,7 @@ package helper
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -21,10 +22,13 @@ import (
 
 // define some functions that can be mocked by test cases
 var (
-	osRename         = os.Rename
-	osRemove         = os.Remove
-	osWriteFile      = os.WriteFile
-	osutilFileExists = osutil.FileExists
+	dpkgDivert  = DpkgDivert
+	runCmd      = RunCmd
+	execCommand = exec.Command
+	osMkdirAll  = os.MkdirAll
+	osRename    = os.Rename
+	osRemove    = os.Remove
+	osWriteFile = os.WriteFile
 )
 
 func BoolPtr(b bool) *bool {
@@ -550,41 +554,93 @@ func RestoreResolvConf(chroot string) error {
 	return nil
 }
 
-const backupExt = ".REAL"
+// DpkgDivert dpkg-diverts the given file in the given targetDir
+// Returns two commands: one for diverting the target file, and one for undiverting it.
+func DpkgDivert(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+	dpkgDivert := "dpkg-divert"
+	targetDiverted := target + ".dpkg-divert"
 
-// BackupReplace backup the target file and replace it with the given content
-// Returns the restore function.
-func BackupReplace(target string, content string) (func(error) error, error) {
-	backup := target + backupExt
-	if osutilFileExists(backup) {
-		// already backed up so do nothing
-		return nil, nil
+	commonArgs := []string{
+		"--local",
+		"--divert",
+		targetDiverted,
+		"--rename",
+		target,
 	}
 
-	if err := osRename(target, backup); err != nil {
-		return nil, fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", target, backup, err.Error())
-	}
+	divert := append([]string{targetDir, dpkgDivert}, commonArgs...)
+	undivert := append([]string{targetDir, dpkgDivert, "--remove"}, commonArgs...)
 
-	if err := osWriteFile(target, []byte(content), 0755); err != nil {
-		return nil, fmt.Errorf("Error writing to %s : %s", target, err.Error())
-	}
-
-	return genRestoreFile(target), nil
+	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
 }
 
-// genRestoreFile returns the function to be called to restore the backuped file
-func genRestoreFile(target string) func(err error) error {
-	return func(err error) error {
-		src := target + backupExt
-		if !osutilFileExists(src) {
+// DivertExecWithFake replaces a target file in targetDir with a provided fake content
+// using dpkg-divert, and returns two functions: one for diverting, one for undiverting.
+func DivertExecWithFake(targetDir string, file string, fakeContent string, debug bool) (func() error, func(error) error) {
+	divertCmd, undivertCmd := dpkgDivert(targetDir, file)
+
+	return func() error {
+			err := runCmd(divertCmd, debug)
+			if err != nil {
+				return err
+			}
+			err = osMkdirAll(filepath.Join(targetDir, filepath.Dir(file)), 0755)
+			if err != nil {
+				return fmt.Errorf("Error creating %s directory: %s", file, err.Error())
+			}
+			err = osWriteFile(filepath.Join(targetDir, file), []byte(fakeContent), 0755)
+			if err != nil {
+				return fmt.Errorf("Error writing to %s: %s", file, err.Error())
+			}
+			return nil
+		}, func(err error) error {
+			tmpErr := osRemove(filepath.Join(targetDir, file))
+			if tmpErr != nil {
+				tmpErr = fmt.Errorf("Error removing %s: %s", file, tmpErr.Error())
+				return errors.Join(err, tmpErr)
+			}
+			tmpErr = runCmd(undivertCmd, debug)
+			if tmpErr != nil {
+				return errors.Join(err, tmpErr)
+			}
 			return err
 		}
+}
 
-		if tmpErr := osRename(src, target); tmpErr != nil {
-			tmpErr = fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, target, tmpErr.Error())
-			return fmt.Errorf("%s\n%s", err, tmpErr)
-		}
-
-		return err
+// DivertStartStopDaemon diverts [/usr]/sbin/start-stop-daemon with one doing nothing.
+func DivertStartStopDaemon(targetDir string, debug bool) (func() error, func(error) error) {
+	path := filepath.Join("/sbin", "start-stop-daemon")
+	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
+		// usr-merged enabled
+		path = filepath.Join("/usr", path)
 	}
+	fakeContent := `#!/bin/sh
+echo 'Warning: Fake start-stop-daemon called, doing nothing'
+`
+	return DivertExecWithFake(targetDir, path, fakeContent, debug)
+}
+
+// DivertInitctl diverts [/usr]/sbin/initctl with one only performing version action.
+func DivertInitctl(targetDir string, debug bool) (func() error, func(error) error) {
+	path := filepath.Join("/sbin", "initctl")
+	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
+		// usr-merged enabled
+		path = filepath.Join("/usr", path)
+	}
+	fakeContent := fmt.Sprintf(`#!/bin/sh
+[ "$1" = version ] && exec %s.dpkg-divert "$@"
+echo 'Warning: Fake initctl called, doing nothing'
+`,
+		path)
+	return DivertExecWithFake(targetDir, path, fakeContent, debug)
+}
+
+// DivertPolicyRcD diverts /usr/sbin/policy-rc.d with one that denies every operation.
+func DivertPolicyRcD(targetDir string, debug bool) (func() error, func(error) error) {
+	path := filepath.Join("/usr", "sbin", "policy-rc.d")
+	fakeContent := `#!/bin/sh
+echo "All runlevel operations denied by policy" >&2
+exit 101
+`
+	return DivertExecWithFake(targetDir, path, fakeContent, debug)
 }

@@ -266,6 +266,15 @@ func TestStateMachine_setupGrub_checkcmds(t *testing.T) {
 		helperRestoreResolvConf = helper.RestoreResolvConf
 	})
 
+	// Mock helper.DpkgDivert (as we cannot execute dpkg-divert)
+	helperDpkgDivert = func(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+		divert, undivert := helper.DpkgDivert(targetDir, target)
+		return execCommand(filepath.Base(divert.Path), divert.Args[1:]...), execCommand(filepath.Base(undivert.Path), undivert.Args[1:]...)
+	}
+	t.Cleanup(func() {
+		helperDpkgDivert = helper.DpkgDivert
+	})
+
 	err = stateMachine.setupGrub("", 2, 1, true, stateMachine.ImageDef.Architecture)
 	asserter.AssertErrNil(err, true)
 
@@ -295,7 +304,7 @@ func TestStateMachine_setupGrub_checkcmds(t *testing.T) {
 	expectedCmds = append(expectedCmds, []*regexp.Regexp{
 		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --boot-directory=/boot --efi-directory=/boot/efi --target=x86_64-efi --uefi-secure-boot --no-nvram$"),
 		regexp.MustCompile("^chroot .*/scratch/loopback grub-install .* --target=i386-pc$"),
-		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert"),
+		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert --local"),
 		regexp.MustCompile("^chroot .*/scratch/loopback update-grub$"),
 		regexp.MustCompile("^chroot .*/scratch/loopback dpkg-divert --remove"),
 		regexp.MustCompile("^udevadm settle$"),

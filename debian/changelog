@@ -1,3 +1,10 @@
+ubuntu-image (3.10.7) UNRELEASED; urgency=medium
+
+  * Use diversion instead of backup/restore to prepare chroot, avoiding
+    restoring old file version
+
+ -- Alexis Cellier <alexis.cellier@canonical.com>  Fri, 30 Jan 2026 12:01:20 +0100
+
 ubuntu-image (3.10.6) UNRELEASED; urgency=medium
 
   [ Sebastian Weyer ]

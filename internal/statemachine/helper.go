@@ -25,6 +25,7 @@ import (
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
 )
 
+var helperDpkgDivert = helper.DpkgDivert
 var runCmd = helper.RunCmd
 var blockSize string = "1"
 
@@ -571,79 +572,6 @@ func generateAptPackageInstallingCmd(targetDir string, argumentList []string, in
 	return cmd
 }
 
-func setDenyingPolicyRcD(path string) (func(error) error, error) {
-	const policyRcDDisableAll = `#!/bin/sh
-echo "All runlevel operations denied by policy" >&2
-exit 101
-`
-	err := osMkdirAll(filepath.Dir(path), 0755)
-	if err != nil {
-		return nil, fmt.Errorf("Error creating policy-rc.d dir: %s", err.Error())
-	}
-
-	err = osWriteFile(path, []byte(policyRcDDisableAll), 0755)
-	if err != nil {
-		return nil, fmt.Errorf("Error writing to policy-rc.d: %s", err.Error())
-	}
-
-	return func(err error) error {
-		tmpErr := osRemove(path)
-		if tmpErr != nil {
-			err = fmt.Errorf("%s\n%s", err, tmpErr)
-		}
-		return err
-	}, nil
-}
-
-// divertPolicyRcD dpkg-diverts policy-rc.d to keep it if it already exists
-func divertPolicyRcD(targetDir string) (*exec.Cmd, *exec.Cmd) {
-	return dpkgDivert(targetDir, "/usr/sbin/policy-rc.d")
-}
-
-// dpkgDivert dpkg-diverts the given file in the given baseDir
-func dpkgDivert(baseDir string, target string) (*exec.Cmd, *exec.Cmd) {
-	dpkgDivert := "dpkg-divert"
-	targetDiverted := target + ".dpkg-divert"
-
-	commonArgs := []string{
-		"--local",
-		"--divert",
-		targetDiverted,
-		"--rename",
-		target,
-	}
-
-	divert := append([]string{baseDir, dpkgDivert}, commonArgs...)
-	undivert := append([]string{baseDir, dpkgDivert, "--remove"}, commonArgs...)
-
-	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
-}
-
-// backupReplaceStartStopDaemon backup start-stop-daemon and replace it with a fake one
-// Returns a restore function to put the original one in place
-func backupReplaceStartStopDaemon(baseDir string) (func(error) error, error) {
-	const startStopDaemonContent = `#!/bin/sh
-echo
-echo "Warning: Fake start-stop-daemon called, doing nothing"
-`
-
-	startStopDaemon := filepath.Join(baseDir, "sbin", "start-stop-daemon")
-	return helper.BackupReplace(startStopDaemon, startStopDaemonContent)
-}
-
-// backupReplaceInitctl backup initctl and replace it with a fake one
-// Returns a restore function to put the original one in place
-func backupReplaceInitctl(baseDir string) (func(error) error, error) {
-	const initctlContent = `#!/bin/sh
-if [ "$1" = version ]; then exec /sbin/initctl.REAL "$@"; fi
-echo
-echo "Warning: Fake initctl called, doing nothing"
-`
-
-	initctl := filepath.Join(baseDir, "sbin", "initctl")
-	return helper.BackupReplace(initctl, initctlContent)
-}
-
 // execTeardownCmds executes given commands and collects error to join them with an existing error.
 // Failure to execute one command will not stop from executing following ones.
 func execTeardownCmds(teardownCmds []*exec.Cmd, debug bool, prevErr error) (err error) {
@@ -867,5 +795,5 @@ func associateLoopDevice(path string, sectorSize quantity.Size) (string, *exec.C
 // divertOSProber divert GRUB's os-prober as we don't want to scan for other OSes on
 // the build system
 func divertOSProber(mountDir string) (*exec.Cmd, *exec.Cmd) {
-	return dpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
+	return helperDpkgDivert(mountDir, "/etc/grub.d/30_os-prober")
 }
