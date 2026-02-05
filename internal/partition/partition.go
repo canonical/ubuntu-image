@@ -21,6 +21,8 @@ const (
 	// SchemaGPT identifies a GUID Partition Table partitioning schema
 	SchemaGPT = "gpt"
 
+	gptBootableAttribute uint64 = 4
+
 	sectorSize512 uint64 = 512
 	sectorSize4k  uint64 = 4096
 
@@ -183,12 +185,18 @@ func (t *GPTTable) AddPartition(structurePair *gadget.OnDiskAndGadgetStructurePa
 		partitionName = "writable"
 	}
 
-	t.concreteTable.Partitions = append(t.concreteTable.Partitions, &gpt.Partition{
+	p := &gpt.Partition{
 		Start: startSector,
 		Size:  size,
 		Type:  gpt.Type(structureType),
 		Name:  partitionName,
-	})
+	}
+
+	if helper.IsSystemBootStructure(structurePair.GadgetStructure) {
+		p.Attributes = gptBootableAttribute
+	}
+
+	t.concreteTable.Partitions = append(t.concreteTable.Partitions, p)
 
 	return nil
 }
