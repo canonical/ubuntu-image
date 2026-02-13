@@ -1256,26 +1256,7 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	// This is basically just a wrapper around dpkg-query
 	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
 		classicStateMachine.ImageDef.Artifacts.Manifest.ManifestName)
-	cmd := execCommand("chroot", stateMachine.tempDirs.rootfs, "dpkg-query", "-W", "--showformat=${Package} ${Version}\n")
-	cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Error generating package manifest with command \"%s\". "+
-			"Error is \"%s\". Full output below:\n%s",
-			cmd.String(), err.Error(), cmdOutput.String())
-	}
-
-	// write the output to a file on successful executions
-	manifest, err := osCreate(outputPath)
-	if err != nil {
-		return fmt.Errorf("Error creating manifest file: %s", err.Error())
-	}
-	defer manifest.Close()
-	_, err = manifest.Write(cmdOutput.Bytes())
-	if err != nil {
-		return fmt.Errorf("error writing the manifest file: %w", err)
-	}
-	return nil
+	return GenerateClassicManifest(stateMachine.tempDirs.rootfs, outputPath, classicStateMachine.commonFlags.Debug)
 }
 
 var generateFilelistState = stateFunc{"generate_filelist", (*StateMachine).generateFilelist}
