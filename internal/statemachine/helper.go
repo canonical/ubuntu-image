@@ -10,8 +10,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/go-git/go-git/v5"
@@ -293,6 +296,65 @@ func WriteSnapManifest(snapsDir string, outputPath string) error {
 			fmt.Fprintf(manifest, "%s %s\n", split[0], strings.TrimSuffix(split[1], ".snap"))
 		}
 	}
+	return nil
+}
+
+// GenerateClassicManifest generate the classic manifest file for the given rootfs
+func GenerateClassicManifest(rootfs string, outputPath string, debug bool) error {
+	// get package list
+	adminDir := filepath.Join(rootfs, "var", "lib", "dpkg")
+	cmd := exec.Command("dpkg-query", "--show", fmt.Sprintf("--admindir=%s", adminDir))
+	cmdOutput := helper.SetCommandOutput(cmd, debug)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Error generating package list with command \"%s\". "+
+			"Error is \"%s\". Full output below:\n%s",
+			cmd.String(), err.Error(), cmdOutput.String())
+	}
+
+	// write package list to the manifest file
+	manifest, err := osCreate(outputPath)
+	if err != nil {
+		return fmt.Errorf("Error creating manifest file: %w", err)
+	}
+	defer manifest.Close()
+	_, err = manifest.Write(cmdOutput.Bytes())
+	if err != nil {
+		return fmt.Errorf("Error writing to the manifest file: %w", err)
+	}
+
+	seedPath := filepath.Join(rootfs, "var", "lib", "snapd", "seed", "seed.yaml")
+	if _, err := os.Stat(seedPath); err != nil {
+		// no seed.yaml file
+		return nil
+	}
+	// read snap list from seed.yaml
+	data, err := os.ReadFile(seedPath)
+	if err != nil {
+		return fmt.Errorf("Error reading the snap seed file: %w", err)
+	}
+	var seed struct {
+		Snaps []struct {
+			File    string `yaml:"file"`
+			Name    string `yaml:"name"`
+			Channel string `yaml:"channel"`
+		} `'yaml:"snaps"`
+	}
+	if err := yaml.Unmarshal(data, &seed); err != nil {
+		return fmt.Errorf("Error parsing the snap seed file: %w", err)
+	}
+
+	// write snap list to the manifest
+	nonDigits := regexp.MustCompile(`[^0-9]`)
+	for _, snap := range seed.Snaps {
+		file := snap.File
+		revision := file[strings.LastIndex(file, "_")+1:]
+		revision = nonDigits.ReplaceAllString(revision, "")
+		// Write formatted line: "snap:<name>\t<channel>\t<revision>\n"
+		if _, err := fmt.Fprintf(manifest, "snap:%s\t%s\t%s\n", snap.Name, snap.Channel, revision); err != nil {
+			return fmt.Errorf("Error writing to the manifest file: %w", err)
+		}
+	}
+
 	return nil
 }
 
