@@ -377,6 +377,13 @@ func (stateMachine *StateMachine) populatePreparePartitions() error {
 			if helper.ShouldSkipStructure(structure, stateMachine.IsSeeded) {
 				continue
 			}
+			if structure.Role == gadget.SystemBootState {
+				if err := stateMachine.handleUbootPart(
+					structIndex, volume.Name); err != nil {
+					return err
+				}
+				continue
+			}
 
 			var contentRoot string
 			if helper.IsRootfsStructure(structure) || helper.IsSystemSeedStructure(structure) { //nolint:gosec,G301

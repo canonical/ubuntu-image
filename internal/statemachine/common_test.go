@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -1312,6 +1313,72 @@ func TestPopulateGadgetWithEMMC(t *testing.T) {
 			t.Errorf("File %s should not exist", e.Name())
 		}
 	}
+}
+
+func TestPopulatePreparePartitionsWithUbuntuBootStatePart(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	// Prepare working dirs
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// Load gadget yaml that contains a system-boot-state structure.
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-ubootpart.yaml")
+
+	// ensure unpack exists as loadGadgetYaml expects it in some cases
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+
+	// ensure volumes exists
+	err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// Identify where the system-boot-state structure lives so we can assert the right part*.img
+	var (
+		bootStateVolName string
+		bootStateIdx     = -1
+	)
+	for _, volName := range stateMachine.VolumeOrder {
+		vol := stateMachine.GadgetInfo.Volumes[volName]
+		for i := range vol.Structure {
+			if vol.Structure[i].Role == gadget.SystemBootState {
+				bootStateVolName = volName
+				bootStateIdx = i
+				break
+			}
+		}
+		if bootStateIdx != -1 {
+			break
+		}
+	}
+	asserter.AssertEqual(bootStateIdx != -1, true)
+
+	// Create the expected source file: unpack/ubuntu-boot-state.img
+	want := []byte("boot-state-test-bytes\n")
+	bootStateSrc := filepath.Join(stateMachine.tempDirs.unpack, "ubuntu-boot-state.img")
+	err = os.WriteFile(bootStateSrc, want, 0644)
+	asserter.AssertErrNil(err, true)
+
+	// Ensure destination directory exists
+	destDir := filepath.Join(stateMachine.tempDirs.volumes, bootStateVolName)
+	err = os.MkdirAll(destDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// Run the state under test
+	err = stateMachine.populatePreparePartitions()
+	asserter.AssertErrNil(err, true)
+
+	// Assert the dest now matches the source content exactly
+	destFile := filepath.Join(destDir, fmt.Sprintf("part%d.img", bootStateIdx))
+	got, err := os.ReadFile(destFile)
+	asserter.AssertErrNil(err, true)
+	asserter.AssertEqual(got, want)
 }
 
 var volume1 = &gadget.Volume{

@@ -204,6 +204,54 @@ func TestFailedHandleLkBootloader(t *testing.T) {
 	osutilCopySpecialFile = osutil.CopySpecialFile
 }
 
+// TestHandleUBootPart checks that uboot with config in a raw partition is handled properly.
+func TestHandleUBootPart(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-ubootpart.yaml")
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	// create config file
+	unpackDir := stateMachine.tempDirs.unpack
+	err = os.MkdirAll(unpackDir, 0755)
+	asserter.AssertErrNil(err, true)
+	content := []byte("ubootpart")
+	err = os.WriteFile(filepath.Join(unpackDir, "ubuntu-boot-state.img"), content, 0644)
+	asserter.AssertErrNil(err, true)
+
+	// Volume directory is expected to exist
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.volumes, "emmc"), 0755)
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.handleUbootPart(0, "emmc")
+	asserter.AssertErrNil(err, true)
+
+	// ensure the file was copied
+	copiedFile := filepath.Join(stateMachine.tempDirs.volumes, "emmc", "part0.img")
+	readBytes, err := os.ReadFile(copiedFile)
+	asserter.AssertErrNil(err, true)
+	asserter.AssertEqual(content, readBytes)
+}
+
+// TestFailedHandleUBootPart tests failures of handleUbootPart
+func TestFailedHandleUBootPart(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-ubootpart.yaml")
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+
+	// No config file
+	err = stateMachine.handleUbootPart(0, "emmc")
+	asserter.AssertErrContains(err, "while preparing boot state partition: unable to open")
+	asserter.AssertErrContains(err, "ubuntu-boot-state.img: no such file or directory")
+}
+
 // TestStateMachine_grubTargetFromArch checks architecture support
 func TestStateMachine_grubTargetFromArch(t *testing.T) {
 	cases := []string{
