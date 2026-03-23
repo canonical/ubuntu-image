@@ -1,12 +1,12 @@
 module github.com/canonical/ubuntu-image
 
-go 1.24.0
+go 1.25
 
-toolchain go1.24.6
+toolchain go1.25.8
 
 require (
 	github.com/diskfs/go-diskfs v1.4.1-0.20240716094240-ec697b09567e
-	github.com/go-git/go-git/v5 v5.16.2
+	github.com/go-git/go-git/v5 v5.16.5
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/invopop/jsonschema v0.12.0
@@ -24,7 +24,7 @@ require (
 	github.com/canonical/go-kbkdf v0.0.0-20250104172618-3b1308f9acf9 // indirect
 	github.com/canonical/go-password-validator v0.0.0-20250617132709-1b205303ca54 // indirect
 	github.com/chai2010/gettext-go v1.0.3 // indirect
-	github.com/cloudflare/circl v1.6.1 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/djherbis/times v1.6.0 // indirect
 	github.com/elliotwutingfeng/asciiset v0.0.0-20240214025120-24af97c84155 // indirect
@@ -51,10 +51,10 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	golang.org/x/crypto v0.38.0 // indirect
-	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/term v0.32.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	gopkg.in/retry.v1 v1.0.3 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
