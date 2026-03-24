@@ -10,13 +10,15 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
 
     - name: Build ubuntu-image snap
-      uses: snapcore/action-build@v1
+      uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1.3.0
 
     - name: Uploading ubuntu-image snap artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: snap-amd64
         path: "*.snap"
@@ -29,18 +31,20 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
 
     - name: Build ubuntu-image snap
-      uses: snapcore/action-build@v1
+      uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1.3.0
 
     - name: Uploading ubuntu-image snap artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: snap-arm64
         path: "*.snap"
         if-no-files-found: error
-        
+
   spread:
     name: Build a ${{ matrix.series }} image on ${{ matrix.group }} (${{ matrix.systems }})
     runs-on: [self-hosted, ubuntu-image]
@@ -97,9 +101,10 @@ jobs:
             rm -rf "${{ github.workspace }}"
             mkdir "${{ github.workspace }}"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Get previous attempt
         id: get-previous-attempt
@@ -108,14 +113,14 @@ jobs:
         shell: bash
 
       - name: Get previous cache
-        uses: actions/cache@v4
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: "${{ github.workspace }}/.test-results"
           key: "${{ github.job }}-results-${{ github.run_id }}-${{ matrix.group }}-${{ steps.get-previous-attempt.outputs.previous_attempt }}"
 
-      # Needed for some older series we are unable to build the snap on anymore 
+      # Needed for some older series we are unable to build the snap on anymore
       - name: Download previously built artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           pattern: snap-${{ matrix.arch }}
           merge-multiple: true
@@ -126,14 +131,14 @@ jobs:
             # Create test results directories and save vars
             TEST_RESULTS_DIR="${{ github.workspace }}/.test-results"
             echo "TEST_RESULTS_DIR=$TEST_RESULTS_DIR" >> $GITHUB_ENV
-  
+
             # Save the var with the failed tests file
             echo "FAILED_TESTS_FILE=$TEST_RESULTS_DIR/failed-tests" >> $GITHUB_ENV
-  
+
             # Make sure the test results dirs are created
             # This step has to be after the cache is restored
-            mkdir -p "$TEST_RESULTS_DIR"        
-  
+            mkdir -p "$TEST_RESULTS_DIR"
+
       - name: Check failed tests to run
         if: "!contains(github.event.pull_request.labels.*.name, 'Run all')"
         run: |
@@ -153,7 +158,7 @@ jobs:
         run: |
             # Register a problem matcher to highlight spread failures
             echo "::add-matcher::.github/spread-problem-matcher.json"
-  
+
             BACKEND=google
             SERIES=${{ matrix.series }}
 
@@ -162,7 +167,7 @@ jobs:
             elif [[ "${{ matrix.group }}" =~ -crossbuild ]]; then
               BACKEND=google-crossbuild
             fi
-            
+
             RUN_TESTS=""
             # Save previous failed test results in FAILED_TESTS env var
             if [ -n "$FAILED_TESTS" ]; then
@@ -200,7 +205,7 @@ jobs:
                 if [[ "${{ matrix.systems }}" =~ -arm- ]]; then
                   BACKEND=google-arm
                 fi
-            
+
                 echo "Determining which tests were executed"
                 RUN_TESTS=""
                 for SYSTEM in ${{ matrix.systems }}; do
@@ -222,8 +227,7 @@ jobs:
 
       - name: Save spread test results to cache
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: "${{ github.workspace }}/.test-results"
           key: "${{ github.job }}-results-${{ github.run_id }}-${{ matrix.group }}-${{ github.run_attempt }}"
-
