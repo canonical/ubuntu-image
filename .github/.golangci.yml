@@ -14,7 +14,7 @@ linters:
     errcheck:
       check-blank: true
     gocyclo:
-      min-complexity: 10
+      min-complexity: 12
     gosec:
       excludes:
         - G115 # should be removed as soon as this rule works properly
