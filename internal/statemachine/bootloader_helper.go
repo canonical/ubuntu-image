@@ -6,7 +6,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/snapcore/snapd/bootloader"
 	"github.com/snapcore/snapd/gadget"
+	"github.com/snapcore/snapd/osutil"
 
 	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -42,6 +44,18 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 		if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
 			return fmt.Errorf("Error copying lk bootloader dir: %s", err.Error())
 		}
+	}
+	return nil
+}
+
+func (stateMachine *StateMachine) handleUbootPart(partIdx int, volumeName string) error {
+	partName := fmt.Sprintf("part%d", partIdx)
+	// This file has the content of the boot state partition
+	partFile := filepath.Join(stateMachine.tempDirs.unpack, bootloader.UbuntuBootStatePrepareTimeFile)
+	destFile := filepath.Join(stateMachine.tempDirs.volumes,
+		volumeName, partName+".img")
+	if err := osutil.CopyFile(partFile, destFile, osutil.CopyFlagDefault); err != nil {
+		return fmt.Errorf("while preparing boot state partition: %w", err)
 	}
 	return nil
 }

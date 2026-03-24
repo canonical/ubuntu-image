@@ -1,0 +1,35 @@
+volumes:
+  pc:
+    schema: gpt
+    bootloader: u-boot
+    structure:
+      - name: ubuntu-boot-state
+        offset: 10485760 # 0xA00000 bytes (20480)
+        role: system-boot-state
+        type: 3DE21764-95BD-54BD-A5C3-4ABE786F38A8
+        size: 1M
+      - name: ubuntu-seed
+        offset: 74448896 # 0x1500000 + tee-storage(0x3200000) = 0x4700000
+        role: system-seed
+        filesystem: ext4
+        type: 0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        size: 800M
+      - name: ubuntu-boot
+        offset: 913309696 # 0x4700000 + ubuntu-seed(0x32000000) = 0x36700000
+        role: system-boot
+        filesystem: ext4
+        type: 0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        # type: C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        size: 300M
+      - name: ubuntu-save
+        offset: 1227882496 # 0x36700000 + ubuntu-boot(0x12C00000) = 0x49300000
+        role: system-save
+        filesystem: ext4
+        type: 0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        size: 16M
+      - name: ubuntu-data
+        offset: 1244659712 # 0x49300000 + ubuntu-save(0x1000000) = 0x4A300000
+        role: system-data
+        filesystem: ext4
+        type: 0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        size: 1G

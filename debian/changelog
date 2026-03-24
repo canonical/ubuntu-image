@@ -1,3 +1,9 @@
+ubuntu-image (3.10.8) UNRELEASED; urgency=medium
+
+  * Add support for gadgets defining a system-boot-state partition
+
+ -- Alfonso Sanchez-Beato <alfonso.sanchez-beato@canonical.com>  Thu, 19 Mar 2026 08:31:36 -0400
+
 ubuntu-image (3.10.7) UNRELEASED; urgency=medium
 
   * Use diversion instead of backup/restore to prepare chroot, avoiding
