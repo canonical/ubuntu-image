@@ -4,10 +4,10 @@ on: [pull_request]
 
 # on:
 #   push:
-#     branches: 
+#     branches:
 #       - main
 #   pull_request:
-    
+
 concurrency:
   group: ${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
@@ -19,13 +19,14 @@ jobs:
       matrix:
         test-scenario: [short, long]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
+          persist-credentials: false
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: build go binary
         run: go build -tags snapdusergo ./...
@@ -40,14 +41,14 @@ jobs:
 
       - name: short tests
         if: ${{ matrix.test-scenario == 'short' }}
-        run: sudo go test -timeout 0 -v -test.short -coverprofile=.coverage/coverage-short.out -coverpkg $(go list ./... 2> /dev/null | tr '\n' ",") -covermode=atomic ./...
+        run: sudo go test -timeout 0 -v -test.short -coverprofile=.coverage/coverage-short.out -coverpkg $(go list ./... 2> /dev/null | paste -sd,) -covermode=atomic ./...
 
       - name: long tests
         if: ${{ matrix.test-scenario == 'long' }}
-        run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -coverpkg $(go list ./... 2> /dev/null | tr '\n' ",") -covermode=atomic ./...
+        run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -coverpkg $(go list ./... 2> /dev/null | paste -sd,) -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5.5.3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
@@ -56,7 +57,7 @@ jobs:
           verbose: true
 
       - name: Upload coverage report to artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ubuntu-image-coverage-${{ matrix.test-scenario }}
           path: .coverage/coverage-*.out
@@ -67,9 +68,10 @@ jobs:
   mkfs-conf:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
+          persist-credentials: false
       - name: apt-update
         run: sudo apt update
 

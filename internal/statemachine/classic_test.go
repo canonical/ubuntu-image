@@ -1745,7 +1745,7 @@ chpasswd:
 				if strings.Contains(name, file) {
 					return nil, errors.New("test error: failed to create file")
 				}
-				return os.Create(name)
+				return os.Create(name) //nolint:gosec
 			}
 
 			err := stateMachine.customizeCloudInit()
@@ -1766,12 +1766,12 @@ chpasswd:
 
 			osCreate = func(name string) (*os.File, error) {
 				if strings.Contains(name, file) {
-					fileReadWrite, err := os.Create(name)
+					fileReadWrite, err := os.Create(name) //nolint:gosec
 					asserter.AssertErrNil(err, true)
-					fileReadWrite.Close()
-					return os.Open(name)
+					fileReadWrite.Close() //nolint:gosec
+					return os.Open(name)  //nolint:gosec
 				}
-				return os.Create(name)
+				return os.Create(name) //nolint:gosec
 			}
 
 			err := stateMachine.customizeCloudInit()
@@ -2758,7 +2758,6 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 			asserter.AssertErrNil(err, true)
 
 			asserter.AssertEqual(tc.expectedDeb822SourcesList, string(deb822SourcesListBytes))
-
 		})
 	}
 }
@@ -4275,7 +4274,6 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 `
 	asserter.AssertEqual(wantAptDeb822SourcesList, string(aptDeb822SourcesListBytes))
-
 }
 
 // TestFailedCreateChroot tests failure cases in createChroot
@@ -4674,7 +4672,6 @@ func Test_generateMountPointCmds_fail(t *testing.T) {
 	asserter.AssertErrContains(err, "Error preparing mountpoint")
 	asserter.AssertEqual(nil, gotAllMountCmds)
 	asserter.AssertEqual(nil, gotAllUmountCmds)
-
 }
 
 // TestCustomizeFstab tests functionality of the customizeFstab function
@@ -5746,7 +5743,6 @@ func Test_addUniqueSnaps(t *testing.T) {
 				},
 			},
 			want: []string{
-
 				"c",
 				"d",
 			},

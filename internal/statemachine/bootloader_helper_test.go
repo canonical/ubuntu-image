@@ -219,7 +219,7 @@ func TestHandleUBootPart(t *testing.T) {
 	err = os.MkdirAll(unpackDir, 0755)
 	asserter.AssertErrNil(err, true)
 	content := []byte("ubootpart")
-	err = os.WriteFile(filepath.Join(unpackDir, "ubuntu-boot-state.img"), content, 0644)
+	err = os.WriteFile(filepath.Join(unpackDir, "ubuntu-boot-state.img"), content, 0644) //nolint:gosec
 	asserter.AssertErrNil(err, true)
 
 	// Volume directory is expected to exist

@@ -36,6 +36,7 @@ var (
 		KeepEnabled: helper.BoolPtr(false),
 	}
 
+	//nolint:gosec
 	deb822PPA1Content = `Types: deb
 URIS: https://upils:Z3jNRMLKnSvSbt3J1lk3@private-ppa.launchpadcontent.net/canonical-foundations/ubuntu-image/ubuntu
 Suites: jammy
@@ -55,6 +56,7 @@ Signed-By:
  -----END PGP PUBLIC KEY BLOCK-----
 `
 
+	//nolint:gosec
 	deb822PPA3Content = `Types: deb
 URIS: https://upils:Z3jNRMLKnSvSbt3J1lk3@private-ppa.launchpadcontent.net/canonical-foundations/ubuntu-image-private-test/ubuntu
 Suites: jammy
@@ -398,7 +400,6 @@ func TestAdd_fail(t *testing.T) {
 	err = p.Add(tmpDirPath, true)
 	asserter.AssertErrContains(err, "Error removing temporary gpg directory")
 	osRemoveAll = os.RemoveAll
-
 }
 
 func TestRemove_fail(t *testing.T) {

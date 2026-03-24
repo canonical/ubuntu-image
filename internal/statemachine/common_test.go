@@ -1362,7 +1362,7 @@ func TestPopulatePreparePartitionsWithUbuntuBootStatePart(t *testing.T) {
 	// Create the expected source file: unpack/ubuntu-boot-state.img
 	want := []byte("boot-state-test-bytes\n")
 	bootStateSrc := filepath.Join(stateMachine.tempDirs.unpack, "ubuntu-boot-state.img")
-	err = os.WriteFile(bootStateSrc, want, 0644)
+	err = os.WriteFile(bootStateSrc, want, 0644) //nolint:gosec
 	asserter.AssertErrNil(err, true)
 
 	// Ensure destination directory exists
