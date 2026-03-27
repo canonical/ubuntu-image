@@ -2909,7 +2909,7 @@ func TestGeneratePackageManifest(t *testing.T) {
 	manifestBytes, err := os.ReadFile(manifestPath)
 	asserter.AssertErrNil(err, true)
 	// The order of packages shouldn't matter
-	examplePackages := []string{"foo 1.2", "bar 1.4-1ubuntu4.1", "libbaz 0.1.3ubuntu2"}
+	examplePackages := []string{"foo\t1.2", "bar\t1.4-1ubuntu4.1", "libbaz\t0.1.3ubuntu2"}
 	for _, pkg := range examplePackages {
 		if !strings.Contains(string(manifestBytes), pkg) {
 			t.Errorf("filesystem.manifest does not contain expected package: %s", pkg)
@@ -2967,7 +2967,7 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 		execCommand = exec.Command
 	})
 	err = stateMachine.generatePackageManifest()
-	asserter.AssertErrContains(err, "Error generating package manifest with command")
+	asserter.AssertErrContains(err, "Error generating package list with command")
 }
 
 // TestGenerateFilelist tests if classic image filelist generation works

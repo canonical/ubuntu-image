@@ -216,7 +216,7 @@ func TestExecHelperProcess(t *testing.T) {
 	// instead on the actual arguments. And this makes sense to me
 	switch os.Getenv("TEST_CASE") {
 	case "TestGeneratePackageManifest":
-		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
+		fmt.Fprint(os.Stdout, "foo\t1.2\nbar\t1.4-1ubuntu4.1\nlibbaz\t0.1.3ubuntu2\n")
 	case "TestGenerateFilelist":
 		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
 	case "TestFailedPreseedClassicImage",
