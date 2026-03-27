@@ -178,8 +178,9 @@ func (stateMachine *StateMachine) createChroot() error {
 	debootstrapOutput := helper.SetCommandOutput(debootstrapCmd, classicStateMachine.commonFlags.Debug)
 
 	if err := debootstrapCmd.Run(); err != nil {
+		debootstrapLog, _ := os.ReadFile(filepath.Join(stateMachine.tempDirs.chroot, "debootstrap/debootstrap.log"))
 		return fmt.Errorf("Error running debootstrap command \"%s\". Error is \"%s\". Output is: \n%s",
-			debootstrapCmd.String(), err.Error(), debootstrapOutput.String())
+			debootstrapCmd.String(), err.Error(), debootstrapOutput.String() + "\ndebootstrap.log:\n" + string(debootstrapLog))
 	}
 
 	err := stateMachine.fixHostname()
