@@ -364,13 +364,15 @@ func (i *ImageDefinition) LegacyTargetSourcesList() string {
 // legacy format (not deb822).
 func (i *ImageDefinition) legacySourcesList(target bool) string {
 	pocket := i.Rootfs.Pocket
+	components := i.Rootfs.Components
 	if target {
 		pocket = i.Customization.Pocket
+		components = i.Customization.Components
 	}
 
 	return generateLegacySourcesList(
 		i.Series,
-		i.Customization.Components,
+		components,
 		i.Rootfs.Mirror,
 		i.securityMirror(),
 		strings.ToLower(pocket))
