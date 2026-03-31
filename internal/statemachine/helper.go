@@ -615,7 +615,10 @@ func manualMakeDirs(customizations []*imagedefinition.MakeDirs, targetDir string
 // manualCopyFile copies a file into the chroot
 func manualCopyFile(customizations []*imagedefinition.CopyFile, confDefPath string, targetDir string, debug bool) error {
 	for _, c := range customizations {
-		source := filepath.Join(confDefPath, c.Source)
+		source := c.Source
+		if !filepath.IsAbs(source) {
+			source = filepath.Join(confDefPath, source)
+		}
 		dest := filepath.Join(targetDir, c.Dest)
 		if debug {
 			fmt.Printf("Copying file \"%s\" to \"%s\"\n", source, dest)
