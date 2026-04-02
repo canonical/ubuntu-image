@@ -3,11 +3,9 @@ package statemachine
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -15,6 +13,7 @@ import (
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
 	"github.com/invopop/jsonschema"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
@@ -25,6 +24,7 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 const (
@@ -40,20 +40,16 @@ var testStates = []stateFunc{
 
 // for tests where we want to run all the states
 var allTestStates = []stateFunc{
-	{"make_temporary_directories", (*StateMachine).makeTemporaryDirectories},
-	{"prepare_gadget_tree", func(statemachine *StateMachine) error { return nil }},
-	{"prepare_image", func(statemachine *StateMachine) error { return nil }},
-	{"load_gadget_yaml", func(statemachine *StateMachine) error { return nil }},
-	{"populate_rootfs_contents", func(statemachine *StateMachine) error { return nil }},
-	{"populate_rootfs_contents_hooks", func(statemachine *StateMachine) error { return nil }},
-	{"generate_disk_info", func(statemachine *StateMachine) error { return nil }},
-	{"calculate_rootfs_size", func(statemachine *StateMachine) error { return nil }},
-	{"prepopulate_bootfs_contents", func(statemachine *StateMachine) error { return nil }},
-	{"populate_bootfs_contents", func(statemachine *StateMachine) error { return nil }},
-	{"populate_prepare_partitions", func(statemachine *StateMachine) error { return nil }},
-	{"make_disk", func(statemachine *StateMachine) error { return nil }},
-	{"generate_manifest", func(statemachine *StateMachine) error { return nil }},
-	{"finish", (*StateMachine).finish},
+	{prepareGadgetTreeState.name, func(statemachine *StateMachine) error { return nil }},
+	{prepareClassicImageState.name, func(statemachine *StateMachine) error { return nil }},
+	{loadGadgetYamlState.name, func(statemachine *StateMachine) error { return nil }},
+	{populateClassicRootfsContentsState.name, func(statemachine *StateMachine) error { return nil }},
+	{generateDiskInfoState.name, func(statemachine *StateMachine) error { return nil }},
+	{calculateRootfsSizeState.name, func(statemachine *StateMachine) error { return nil }},
+	{populateBootfsContentsState.name, func(statemachine *StateMachine) error { return nil }},
+	{populatePreparePartitionsState.name, func(statemachine *StateMachine) error { return nil }},
+	{makeDiskState.name, func(statemachine *StateMachine) error { return nil }},
+	{generatePackageManifestState.name, func(statemachine *StateMachine) error { return nil }},
 }
 
 func ptrToOffset(offset quantity.Offset) *quantity.Offset {
@@ -82,6 +78,9 @@ func mockBackupAndCopyResolvConfSuccess(string) error {
 func mockRestoreResolvConf(string) error {
 	return fmt.Errorf("Test Error")
 }
+func mockRestoreResolvConfSuccess(string) error {
+	return nil
+}
 func mockCopyBlobSuccess([]string) error {
 	return nil
 }
@@ -90,7 +89,7 @@ func mockLayoutVolume(*gadget.Volume,
 	*gadget.LayoutOptions) (*gadget.LaidOutVolume, error) {
 	return nil, fmt.Errorf("Test Error")
 }
-func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure,
+func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure, *gadget.LaidOutStructure,
 	gadget.ContentObserver) (*gadget.MountedFilesystemWriter, error) {
 	return nil, fmt.Errorf("Test Error")
 }
@@ -99,9 +98,6 @@ func mockMkfsWithContent(typ, img, label, contentRootDir string, deviceSize, sec
 }
 func mockMkfs(typ, img, label string, deviceSize, sectorSize quantity.Size) error {
 	return fmt.Errorf("Test Error")
-}
-func mockReadAll(io.Reader) ([]byte, error) {
-	return []byte{}, fmt.Errorf("Test Error")
 }
 func mockReadDir(string) ([]os.DirEntry, error) {
 	return []os.DirEntry{}, fmt.Errorf("Test Error")
@@ -160,12 +156,6 @@ func mockSeedOpen(seedDir, label string) (seed.Seed, error) {
 func mockImagePrepare(*image.Options) error {
 	return fmt.Errorf("Test Error")
 }
-func mockGet(string) (*http.Response, error) {
-	return nil, fmt.Errorf("Test Error")
-}
-func mockUnmarshal([]byte, any) error {
-	return fmt.Errorf("Test Error")
-}
 func mockMarshal(interface{}) ([]byte, error) {
 	return []byte{}, fmt.Errorf("Test Error")
 }
@@ -198,6 +188,11 @@ func fakeExecCommand(command string, args ...string) *exec.Cmd {
 	return cmd
 }
 
+// helper function to define *quantity.Offsets inline
+func createOffsetPointer(x quantity.Offset) *quantity.Offset {
+	return &x
+}
+
 // This is a helper that mocks out any exec calls performed in this package
 func TestExecHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
@@ -224,38 +219,26 @@ func TestExecHelperProcess(t *testing.T) {
 		fmt.Fprint(os.Stdout, "foo 1.2\nbar 1.4-1ubuntu4.1\nlibbaz 0.1.3ubuntu2\n")
 	case "TestGenerateFilelist":
 		fmt.Fprint(os.Stdout, "/root\n/home\n/var")
-	case "TestFailedPreseedClassicImage":
-		fallthrough
-	case "TestFailedUpdateGrubLosetup":
-		fallthrough
-	case "TestFailedMakeQcow2Image":
-		fallthrough
-	case "TestFailedGeneratePackageManifest":
-		fallthrough
-	case "TestFailedGenerateFilelist":
-		fallthrough
-	case "TestFailedGerminate":
-		fallthrough
-	case "TestFailedSetupLiveBuildCommands":
-		fallthrough
-	case "TestFailedCreateChroot":
-		fallthrough
-	case "TestStateMachine_installPackages_fail":
-		fallthrough
-	case "TestFailedPrepareClassicImage":
-		fallthrough
-	case "TestFailedBuildGadgetTree":
+	case "TestFailedPreseedClassicImage",
+		"TestFailedUpdateGrubLosetup",
+		"TestFailedMakeQcow2Image",
+		"TestFailedGeneratePackageManifest",
+		"TestFailedGenerateFilelist",
+		"TestFailedGerminate",
+		"TestFailedSetupLiveBuildCommands",
+		"TestFailedCreateChroot",
+		"TestStateMachine_installPackages_fail",
+		"TestFailedPrepareClassicImage",
+		"TestFailedBuildGadgetTree":
 		// throwing an error here simulates the "command" having an error
 		os.Exit(1)
 	case "TestFailedUpdateGrubOther": // this passes the initial losetup command and fails a later command
 		if args[0] != "losetup" {
 			os.Exit(1)
 		}
-	case "TestFailedCreateChrootNoHostname":
-		fallthrough
-	case "TestFailedCreateChrootSkip":
-		fallthrough
-	case "TestFailedRunLiveBuild":
+	case "TestFailedCreateChrootNoHostname",
+		"TestFailedCreateChrootSkip",
+		"TestFailedRunLiveBuild":
 		// Do nothing so we don't have to wait for actual lb commands
 		break
 	}
@@ -299,7 +282,7 @@ func TestUntilThru(t *testing.T) {
 				// run a partial state machine
 				var partialStateMachine testStateMachine
 				partialStateMachine.commonFlags, partialStateMachine.stateMachineFlags = helper.InitCommonOpts()
-				tempDir := filepath.Join("/tmp", "ubuntu-image-"+tc.name)
+				tempDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+tc.name)
 				if err := os.Mkdir(tempDir, 0755); err != nil {
 					t.Errorf("Could not create workdir: %s\n", err.Error())
 				}
@@ -346,9 +329,11 @@ func TestUntilThru(t *testing.T) {
 func TestDebug(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	workDir := "ubuntu-image-test-debug"
-	if err := os.Mkdir("ubuntu-image-test-debug", 0755); err != nil {
+	if err := os.Mkdir(workDir, 0755); err != nil {
 		t.Errorf("Failed to create temporary directory %s\n", workDir)
 	}
+
+	t.Cleanup(func() { os.RemoveAll(workDir) })
 
 	var stateMachine testStateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -374,8 +359,41 @@ func TestDebug(t *testing.T) {
 	if !strings.Contains(string(readStdout), stateMachine.states[0].name) {
 		t.Errorf("Expected state name \"%s\" to appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
 	}
-	// clean up
-	os.RemoveAll(workDir)
+}
+
+// TestDryRun ensures that the name of the states is not printed when the --dry-run flag is used
+// because nothing should be executed
+func TestDryRun(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	workDir := "ubuntu-image-test-debug"
+	err := os.Mkdir(workDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+
+	var stateMachine testStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.commonFlags.DryRun = true
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	// just use the one state
+	stateMachine.states = testStates
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
+
+	if strings.Contains(string(readStdout), stateMachine.states[0].name) {
+		t.Errorf("Expected state name \"%s\" to not appear in output \"%s\"\n", stateMachine.states[0].name, string(readStdout))
+	}
 }
 
 // TestFunction replaces some of the stateFuncs to test various error scenarios
@@ -386,7 +404,7 @@ func TestFunctionErrors(t *testing.T) {
 		newStateFunc  stateFunc
 	}{
 		{"error_state_func", 0, stateFunc{"test_error_state_func", func(stateMachine *StateMachine) error { return fmt.Errorf("Test Error") }}},
-		{"error_write_metadata", 13, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
+		{"error_write_metadata", 8, stateFunc{"test_error_write_metadata", func(stateMachine *StateMachine) error {
 			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
 			return nil
 		}}},
@@ -394,9 +412,11 @@ func TestFunctionErrors(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("test "+tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			workDir := filepath.Join("/tmp", "ubuntu-image-"+tc.name)
+			workDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+tc.name)
 			err := os.Mkdir(workDir, 0755)
 			asserter.AssertErrNil(err, true)
+
+			t.Cleanup(func() { os.RemoveAll(workDir) })
 
 			var stateMachine testStateMachine
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -415,25 +435,85 @@ func TestFunctionErrors(t *testing.T) {
 					t.Errorf("Expected an error but there was none")
 				}
 			}
-
-			// clean up the workdir
-			os.RemoveAll(workDir)
 		})
 	}
 }
 
 // TestSetCommonOpts ensures that the function actually sets the correct values in the struct
 func TestSetCommonOpts(t *testing.T) {
-	commonOpts := new(commands.CommonOpts)
-	stateMachineOpts := new(commands.StateMachineOpts)
-	commonOpts.Debug = true
-	stateMachineOpts.WorkDir = testDir
+	asserter := helper.Asserter{T: t}
+	type args struct {
+		stateMachine     SmInterface
+		commonOpts       *commands.CommonOpts
+		stateMachineOpts *commands.StateMachineOpts
+	}
 
-	var stateMachine testStateMachine
-	stateMachine.SetCommonOpts(commonOpts, stateMachineOpts)
+	cmpOpts := []cmp.Option{
+		cmp.AllowUnexported(
+			StateMachine{},
+			temporaryDirectories{},
+		),
+		cmpopts.IgnoreUnexported(
+			gadget.Info{},
+		),
+	}
 
-	if !stateMachine.commonFlags.Debug || stateMachine.stateMachineFlags.WorkDir != testDir {
-		t.Error("SetCommonOpts failed to set the correct options")
+	tests := []struct {
+		name        string
+		args        args
+		want        SmInterface
+		expectedErr string
+	}{
+		{
+			name: "set options on a snap state machine",
+			args: args{
+				stateMachine: &SnapStateMachine{},
+				commonOpts: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineOpts: &commands.StateMachineOpts{
+					WorkDir: "workdir",
+				},
+			},
+			want: &SnapStateMachine{
+				StateMachine: StateMachine{
+					commonFlags: &commands.CommonOpts{
+						Debug: true,
+					},
+					stateMachineFlags: &commands.StateMachineOpts{
+						WorkDir: "workdir",
+					},
+				},
+			},
+		},
+		{
+			name: "set options on a classic state machine",
+			args: args{
+				stateMachine: &ClassicStateMachine{},
+				commonOpts: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineOpts: &commands.StateMachineOpts{
+					WorkDir: "workdir",
+				},
+			},
+			want: &ClassicStateMachine{
+				StateMachine: StateMachine{
+					commonFlags: &commands.CommonOpts{
+						Debug: true,
+					},
+					stateMachineFlags: &commands.StateMachineOpts{
+						WorkDir: "workdir",
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.args.stateMachine.SetCommonOpts(tc.args.commonOpts, tc.args.stateMachineOpts)
+			asserter.AssertEqual(tc.want, tc.args.stateMachine, cmpOpts...)
+		})
 	}
 }
 
@@ -530,22 +610,35 @@ func TestFailedParseImageSizes(t *testing.T) {
 	}
 }
 
-// TestHandleContentSizes ensures that using --image-size with a few different values
+// TestGrowImageSize ensures that using --image-size with a few different values
 // results in the correct sizes in stateMachine.ImageSizes
-func TestHandleContentSizes(t *testing.T) {
+func TestGrowImageSize(t *testing.T) {
 	testCases := []struct {
 		name   string
 		size   string
 		result map[string]quantity.Size
 	}{
-		{"size_not_specified", "", map[string]quantity.Size{"pc": 17825792}},
-		{"size_smaller_than_content", "pc:123", map[string]quantity.Size{"pc": 17825792}},
-		{"size_bigger_than_content", "pc:4G", map[string]quantity.Size{"pc": 4 * quantity.SizeGiB}},
+		{
+			name:   "size_not_specified",
+			size:   "",
+			result: map[string]quantity.Size{"pc": 54525952},
+		},
+		{
+			name:   "size_smaller_than_content",
+			size:   "pc:123",
+			result: map[string]quantity.Size{"pc": 54525952},
+		},
+		{
+			name:   "size_bigger_than_content",
+			size:   "pc:4G",
+			result: map[string]quantity.Size{"pc": 4 * quantity.SizeGiB},
+		},
 	}
 	for _, tc := range testCases {
-		t.Run("test_handle_content_sizes_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
 			var stateMachine StateMachine
+			volumeName := "pc"
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 			stateMachine.commonFlags.Size = tc.size
 			stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_tree",
@@ -558,7 +651,12 @@ func TestHandleContentSizes(t *testing.T) {
 			err = stateMachine.loadGadgetYaml()
 			asserter.AssertErrNil(err, false)
 
-			stateMachine.handleContentSizes(0, "pc")
+			v, found := stateMachine.GadgetInfo.Volumes[volumeName]
+			if !found {
+				t.Fatalf("no volume names pc in the gadget")
+			}
+
+			stateMachine.growImageSize(v.MinSize(), volumeName)
 			// ensure the correct size was set
 			for volumeName := range stateMachine.GadgetInfo.Volumes {
 				setSize := stateMachine.ImageSizes[volumeName]
@@ -571,181 +669,419 @@ func TestHandleContentSizes(t *testing.T) {
 	}
 }
 
-// TestPostProcessGadgetYaml runs through a variety of gadget.yaml files
-// and ensures the volume/structures are as expected
-func TestPostProcessGadgetYaml(t *testing.T) {
-	// helper function to define *quantity.Offsets inline
-	createOffsetPointer := func(x quantity.Offset) *quantity.Offset {
-		return &x
+// TestStateMachine_postProcessGadgetYaml tests postProcessGadgetYaml
+func TestStateMachine_postProcessGadgetYaml(t *testing.T) {
+	cmpOpts := []cmp.Option{
+		cmpopts.IgnoreUnexported(
+			gadget.Volume{},
+		),
+		cmpopts.IgnoreFields(gadget.VolumeStructure{}, "EnclosingVolume"),
 	}
-	testCases := []struct {
-		name           string
-		gadgetYaml     string
-		expectedResult gadget.Volume
+	tests := []struct {
+		name         string
+		gadgetYaml   []byte
+		volumeOrder  []string
+		wantVolumes  map[string]*gadget.Volume
+		wantIsSeeded bool
+		expectedErr  string
 	}{
 		{
-			"rootfs_gadget_source",
-			filepath.Join("testdata", "gadget_rootfs_source.yaml"),
-			gadget.Volume{
-				Schema:     "mbr",
-				Bootloader: "u-boot",
-				Name:       "pc",
-				Structure: []gadget.VolumeStructure{
-					{
-						VolumeName: "pc",
-						Type:       "0C",
-						Offset:     createOffsetPointer(1048576),
-						MinSize:    536870912,
-						Size:       536870912,
-						Label:      "system-boot",
-						Filesystem: "vfat",
-						Content: []gadget.VolumeContent{
-							{
-								UnresolvedSource: "install/boot-assets/",
-								Target:           "/",
+			name: "simple full test",
+			gadgetYaml: []byte(`volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        update:
+          edition: 1
+        content:
+          - image: pc-boot.img
+      - name: BIOS Boot
+        type: DA,21686148-6449-6E6F-744E-656564454649
+        size: 1M
+        offset: 1M
+        offset-write: mbr+92
+        update:
+          edition: 2
+        content:
+          - image: pc-core.img
+      - name: ubuntu-seed
+        role: system-seed
+        filesystem: vfat
+        # UEFI will boot the ESP partition by default first
+        type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        size: 1200M
+        update:
+          edition: 2
+        content:
+          - source: grubx64.efi
+            target: EFI/boot/grubx64.efi
+          - source: shim.efi.signed
+            target: EFI/boot/bootx64.efi
+      - name: ubuntu-boot
+        filesystem-label: system-boot
+        filesystem: ext4
+        type: 83,0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        # whats the appropriate size?
+        size: 750M
+        update:
+          edition: 1
+        content:
+          - source: grubx64.efi
+            target: EFI/boot/grubx64.efi
+          - source: shim.efi.signed
+            target: EFI/boot/bootx64.efi
+      - name: ubuntu-save
+        role: system-save
+        filesystem: ext4
+        type: 83,0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        size: 16M
+      - name: ubuntu-data
+        role: system-data
+        filesystem: ext4
+        type: 83,0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        size: 1G
+`),
+			volumeOrder:  []string{"pc"},
+			wantIsSeeded: true,
+			wantVolumes: map[string]*gadget.Volume{
+				"pc": {
+					Schema:     "gpt",
+					Bootloader: "grub",
+					Structure: []gadget.VolumeStructure{
+						{
+							VolumeName: "pc",
+							Name:       "mbr",
+							Offset:     createOffsetPointer(0),
+							MinSize:    440,
+							Size:       440,
+							Type:       "mbr",
+							Role:       "mbr",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-boot.img",
+								},
 							},
-							{
-								UnresolvedSource: "../../root/boot/vmlinuz",
-								Target:           "/",
+							Update: gadget.VolumeUpdate{Edition: 1},
+						},
+						{
+							VolumeName: "pc",
+							Name:       "BIOS Boot",
+							Offset:     createOffsetPointer(1048576),
+							OffsetWrite: &gadget.RelativeOffset{
+								RelativeTo: "mbr",
+								Offset:     quantity.Offset(92),
 							},
-							{
-								UnresolvedSource: "../../root/boot/initrd.img",
-								Target:           "/",
+							MinSize: 1048576,
+							Size:    1048576,
+							Type:    "DA,21686148-6449-6E6F-744E-656564454649",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-core.img",
+								},
 							},
+							Update:    gadget.VolumeUpdate{Edition: 2},
+							YamlIndex: 1,
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-seed",
+							Label:      "ubuntu-seed",
+							Offset:     createOffsetPointer(2097152),
+							MinSize:    1258291200,
+							Size:       1258291200,
+							Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+							Role:       "system-seed",
+							Filesystem: "vfat",
+							Content: []gadget.VolumeContent{
+								{
+									UnresolvedSource: "grubx64.efi",
+									Target:           "EFI/boot/grubx64.efi",
+								},
+								{
+									UnresolvedSource: "shim.efi.signed",
+									Target:           "EFI/boot/bootx64.efi",
+								},
+							},
+							Update:    gadget.VolumeUpdate{Edition: 2},
+							YamlIndex: 2,
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-boot",
+							Offset:     createOffsetPointer(1260388352),
+							MinSize:    786432000,
+							Size:       786432000,
+							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+							Label:      "system-boot",
+							Filesystem: "ext4",
+							Content: []gadget.VolumeContent{
+								{
+									UnresolvedSource: "grubx64.efi",
+									Target:           "EFI/boot/grubx64.efi",
+								},
+								{
+									UnresolvedSource: "shim.efi.signed",
+									Target:           "EFI/boot/bootx64.efi",
+								},
+							},
+							Update:    gadget.VolumeUpdate{Edition: 1},
+							YamlIndex: 3,
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-save",
+							Offset:     createOffsetPointer(2046820352),
+							MinSize:    16777216,
+							Size:       16777216,
+							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+							Role:       "system-save",
+							Filesystem: "ext4",
+							YamlIndex:  4,
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-data",
+							Offset:     createOffsetPointer(2063597568),
+							MinSize:    1073741824,
+							Size:       1073741824,
+							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+							Role:       "system-data",
+							Filesystem: "ext4",
+							Content:    []gadget.VolumeContent{},
+							YamlIndex:  5,
 						},
 					},
-					{
-						Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
-						Role:       "system-data",
-						Filesystem: "ext4",
-						Label:      "writable",
-						Offset:     createOffsetPointer(537919488),
-						Content:    []gadget.VolumeContent{},
-						YamlIndex:  1,
-					},
+					Name: "pc",
 				},
 			},
 		},
 		{
-			"rootfs_unspecified",
-			filepath.Join("testdata", "gadget_no_rootfs.yaml"),
-			gadget.Volume{
-				Schema:     "gpt",
-				Bootloader: "grub",
-				Name:       "pc",
-				Structure: []gadget.VolumeStructure{
-					{
-						VolumeName: "pc",
-						Name:       "mbr",
-						Type:       "mbr",
-						Offset:     createOffsetPointer(0),
-						Role:       "mbr",
-						MinSize:    440,
-						Size:       440,
-						Content: []gadget.VolumeContent{
-							{
-								Image:  "pc-boot.img",
-								Offset: createOffsetPointer(0),
+			name: "minimal configuration, adding a system-data structure and missing content on system-seed",
+			gadgetYaml: []byte(`volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        update:
+          edition: 1
+        content:
+          - image: pc-boot.img
+      - name: ubuntu-seed
+        role: system-seed
+        filesystem: vfat
+        # UEFI will boot the ESP partition by default first
+        type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        size: 1200M
+        update:
+          edition: 2
+`),
+			volumeOrder:  []string{"pc"},
+			wantIsSeeded: true,
+			wantVolumes: map[string]*gadget.Volume{
+				"pc": {
+					Schema:     "gpt",
+					Bootloader: "grub",
+					Structure: []gadget.VolumeStructure{
+						{
+							VolumeName: "pc",
+							Name:       "mbr",
+							Offset:     createOffsetPointer(0),
+							MinSize:    440,
+							Size:       440,
+							Type:       "mbr",
+							Role:       "mbr",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-boot.img",
+								},
 							},
+							Update: gadget.VolumeUpdate{Edition: 1},
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-seed",
+							Label:      "ubuntu-seed",
+							Offset:     createOffsetPointer(1048576),
+							MinSize:    1258291200,
+							Size:       1258291200,
+							Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+							Role:       "system-seed",
+							Filesystem: "vfat",
+							Content:    []gadget.VolumeContent{},
+							Update:     gadget.VolumeUpdate{Edition: 2},
+							YamlIndex:  1,
+						},
+						{
+							VolumeName: "",
+							Name:       "",
+							Label:      "writable",
+							Offset:     createOffsetPointer(1259339776),
+							MinSize:    0,
+							Size:       0,
+							Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+							Role:       "system-data",
+							Filesystem: "ext4",
+							Content:    []gadget.VolumeContent{},
+							YamlIndex:  2,
 						},
 					},
-					{
-						VolumeName: "pc",
-						Name:       "BIOS Boot",
-						Type:       "DA,21686148-6449-6E6F-744E-656564454649",
-						MinSize:    1048576,
-						Size:       1048576,
-						OffsetWrite: &gadget.RelativeOffset{
-							RelativeTo: "mbr",
-							Offset:     quantity.Offset(92),
-						},
-						Offset: createOffsetPointer(1048576),
-						Content: []gadget.VolumeContent{
-							{
-								Image: "pc-core.img",
-							},
-						},
-						YamlIndex: 1,
-					},
-					{
-						VolumeName: "pc",
-						Name:       "EFI System",
-						Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
-						MinSize:    52428800,
-						Size:       52428800,
-						Filesystem: "vfat",
-						Offset:     createOffsetPointer(2097152),
-						Label:      "system-boot",
-						Content: []gadget.VolumeContent{
-							{
-								UnresolvedSource: "grubx64.efi",
-								Target:           "EFI/boot/grubx64.efi",
-							},
-							{
-								UnresolvedSource: "shim.efi.signed",
-								Target:           "EFI/boot/bootx64.efi",
-							},
-							{
-								UnresolvedSource: "grub-cpc.cfg",
-								Target:           "EFI/ubuntu/grub.cfg",
-							},
-						},
-						YamlIndex: 2,
-					},
-					{
-						Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
-						Role:       "system-data",
-						Filesystem: "ext4",
-						Label:      "writable",
-						Offset:     createOffsetPointer(54525952),
-						Content:    []gadget.VolumeContent{},
-						YamlIndex:  3,
-					},
+					Name: "pc",
 				},
 			},
 		},
+		{
+			name: "do not add a system-data structure if there is not exactly one",
+			gadgetYaml: []byte(`volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        update:
+          edition: 1
+        content:
+          - image: pc-boot.img
+      - name: ubuntu-seed
+        role: system-seed
+        filesystem: vfat
+        # UEFI will boot the ESP partition by default first
+        type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        size: 1200M
+        update:
+          edition: 2
+  pc2:
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        update:
+          edition: 1
+        content:
+          - image: pc-boot.img
+`),
+			volumeOrder:  []string{"pc", "pc2"},
+			wantIsSeeded: true,
+			wantVolumes: map[string]*gadget.Volume{
+				"pc": {
+					Schema:     "gpt",
+					Bootloader: "grub",
+					Structure: []gadget.VolumeStructure{
+						{
+							VolumeName: "pc",
+							Name:       "mbr",
+							Offset:     createOffsetPointer(0),
+							MinSize:    440,
+							Size:       440,
+							Type:       "mbr",
+							Role:       "mbr",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-boot.img",
+								},
+							},
+							Update: gadget.VolumeUpdate{Edition: 1},
+						},
+						{
+							VolumeName: "pc",
+							Name:       "ubuntu-seed",
+							Label:      "ubuntu-seed",
+							Offset:     createOffsetPointer(1048576),
+							MinSize:    1258291200,
+							Size:       1258291200,
+							Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+							Role:       "system-seed",
+							Filesystem: "vfat",
+							Content:    []gadget.VolumeContent{},
+							Update:     gadget.VolumeUpdate{Edition: 2},
+							YamlIndex:  1,
+						},
+					},
+					Name: "pc",
+				},
+				"pc2": {
+					Schema:     "gpt",
+					Bootloader: "",
+					Structure: []gadget.VolumeStructure{
+						{
+							VolumeName: "pc2",
+							Name:       "mbr",
+							Offset:     createOffsetPointer(0),
+							MinSize:    440,
+							Size:       440,
+							Type:       "mbr",
+							Role:       "mbr",
+							Content: []gadget.VolumeContent{
+								{
+									Image: "pc-boot.img",
+								},
+							},
+							Update: gadget.VolumeUpdate{Edition: 1},
+						},
+					},
+					Name: "pc2",
+				},
+			},
+		},
+		{
+			name: "error with invalid source path",
+			gadgetYaml: []byte(`volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: ubuntu-seed
+        role: system-seed
+        filesystem: vfat
+        # UEFI will boot the ESP partition by default first
+        type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        size: 1200M
+        update:
+          edition: 2
+        content:
+          - source: ../grubx64.efi
+            target: EFI/boot/grubx64.efi
+`),
+			volumeOrder:  []string{"pc"},
+			wantIsSeeded: true,
+			expectedErr:  "filesystem content source \"../grubx64.efi\" contains \"../\". This is disallowed for security purposes",
+		},
 	}
-	for _, tc := range testCases {
-		t.Run("test_post_process_gadget_yaml_"+tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
+			stateMachine := &StateMachine{
+				VolumeOrder: tt.volumeOrder,
+			}
 			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
-			// need workdir and loaded gadget.yaml set up for this
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, false)
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-			// load in the gadget.yaml file
-			stateMachine.YamlFilePath = tc.gadgetYaml
-
-			// ensure unpack exists and load gadget.yaml
-			err = os.MkdirAll(stateMachine.tempDirs.unpack, 0755)
-			asserter.AssertErrNil(err, true)
-			err = stateMachine.loadGadgetYaml()
+			stateMachine.GadgetInfo, err = gadget.InfoFromGadgetYaml(tt.gadgetYaml, nil)
 			asserter.AssertErrNil(err, false)
 
-			// we now need to also ensure the expectedResult to have properly set volume pointers
-			for i := range tc.expectedResult.Structure {
-				if tc.expectedResult.Structure[i].VolumeName != "" {
-					tc.expectedResult.Structure[i].EnclosingVolume = stateMachine.GadgetInfo.Volumes[tc.expectedResult.Structure[i].VolumeName]
-				}
-			}
+			err = stateMachine.postProcessGadgetYaml()
 
-			if !reflect.DeepEqual(*stateMachine.GadgetInfo.Volumes["pc"], tc.expectedResult) {
-				t.Errorf("GadgetInfo after postProcessGadgetYaml:\n%+v "+
-					"does not match expected result:\n%+v",
-					*stateMachine.GadgetInfo.Volumes["pc"],
-					tc.expectedResult,
-				)
+			if len(tt.expectedErr) == 0 {
+				asserter.AssertErrNil(err, true)
+				asserter.AssertEqual(tt.wantIsSeeded, stateMachine.IsSeeded)
+				asserter.AssertEqual(tt.wantVolumes, stateMachine.GadgetInfo.Volumes, cmpOpts...)
+			} else {
+				asserter.AssertErrContains(err, tt.expectedErr)
 			}
 		})
 	}
 }
 
-// TestFailedPostProcessGadgetYaml tests failues in the post processing of
-// the gadget.yaml file after loading it in. This is accomplished by mocking
-// os.MkdirAll
-func TestFailedPostProcessGadgetYaml(t *testing.T) {
+// TestStateMachine_postProcessGadgetYaml_fail tests failues in the post processing of
+// the gadget.yaml file after loading it in.
+func TestStateMachine_postProcessGadgetYaml_fail(t *testing.T) {
 	asserter := helper.Asserter{T: t}
 	var stateMachine StateMachine
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
@@ -849,6 +1185,20 @@ func TestStateMachine_readMetadata(t *testing.T) {
 									Update: gadget.VolumeUpdate{
 										Edition: 1,
 									},
+									YamlIndex: 0,
+								},
+								{
+									Name:    "BIOS Boot",
+									Offset:  ptrToOffset(quantity.Offset(quantity.Size(1048576))),
+									MinSize: quantity.Size(1048576),
+									Size:    quantity.Size(1048576),
+									Role:    "",
+									Type:    "21686148-6449-6E6F-744E-656564454649",
+									Content: nil,
+									Update: gadget.VolumeUpdate{
+										Edition: 2,
+									},
+									YamlIndex: 1,
 								},
 							},
 						},
@@ -929,6 +1279,7 @@ func TestStateMachine_readMetadata(t *testing.T) {
 
 			err := gotStateMachine.readMetadata(tc.args.metadataFile)
 			if tc.shouldPass {
+				asserter.AssertErrNil(err, true)
 				asserter.AssertEqual(tc.wantStateMachine, gotStateMachine, cmpOpts...)
 			} else {
 				asserter.AssertErrContains(err, tc.expectedError)
@@ -979,6 +1330,7 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 									Update: gadget.VolumeUpdate{
 										Edition: 1,
 									},
+									YamlIndex: 0,
 								},
 							},
 						},
@@ -1015,7 +1367,7 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 				},
 				CurrentStep:  "",
 				StepsTaken:   2,
-				YamlFilePath: "/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
+				YamlFilePath: "/var/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
 			},
 			shouldPass:    false,
 			expectedError: "failed to JSON encode metadata",
@@ -1029,7 +1381,7 @@ func TestStateMachine_writeMetadata(t *testing.T) {
 				},
 				CurrentStep:  "",
 				StepsTaken:   2,
-				YamlFilePath: "/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
+				YamlFilePath: "/var/tmp/ubuntu-image-2329554237/unpack/gadget/meta/gadget.yaml",
 			},
 			shouldPass:    false,
 			expectedError: "error opening JSON metadata file for writing",
@@ -1073,4 +1425,318 @@ func TestMinSize(t *testing.T) {
 	asserter.AssertErrNil(err, false)
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrNil(err, false)
+}
+
+func TestStateMachine_displayStates(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	type fields struct {
+		commonFlags       *commands.CommonOpts
+		stateMachineFlags *commands.StateMachineOpts
+		states            []stateFunc
+	}
+	tests := []struct {
+		name       string
+		fields     fields
+		wantOutput string
+	}{
+		{
+			name: "simple case with 2 states",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+				},
+			},
+			wantOutput: `
+Following states will be executed:
+[0] stateFunc1
+[1] stateFunc2
+
+Continuing
+`,
+		},
+		{
+			name: "simple case with 2 states in dry-run mode",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug:  false,
+					DryRun: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+				},
+			},
+			wantOutput: `
+Following states would be executed:
+[0] stateFunc1
+[1] stateFunc2
+`,
+		},
+		{
+			name: "simple case with 2 states in dry-run mode and debug",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug:  true,
+					DryRun: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+				},
+			},
+			wantOutput: `
+Following states would be executed:
+[0] stateFunc1
+[1] stateFunc2
+`,
+		},
+		{
+			name: "3 states with until",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{
+					Until: "stateFunc3",
+				},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+					{
+						name: "stateFunc3",
+					},
+				},
+			},
+			wantOutput: `
+Following states will be executed:
+[0] stateFunc1
+[1] stateFunc2
+
+Continuing
+`,
+		},
+		{
+			name: "3 states with thru",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug: true,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{
+					Thru: "stateFunc2",
+				},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+					{
+						name: "stateFunc3",
+					},
+				},
+			},
+			wantOutput: `
+Following states will be executed:
+[0] stateFunc1
+[1] stateFunc2
+
+Continuing
+`,
+		},
+		{
+			name: "3 states without debug",
+			fields: fields{
+				commonFlags: &commands.CommonOpts{
+					Debug: false,
+				},
+				stateMachineFlags: &commands.StateMachineOpts{
+					Thru: "stateFunc2",
+				},
+				states: []stateFunc{
+					{
+						name: "stateFunc1",
+					},
+					{
+						name: "stateFunc2",
+					},
+					{
+						name: "stateFunc3",
+					},
+				},
+			},
+			wantOutput: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// capture stdout, calculate the states, and ensure they were printed
+			stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+			defer restoreStdout()
+			asserter.AssertErrNil(err, true)
+
+			s := &StateMachine{
+				commonFlags:       tt.fields.commonFlags,
+				stateMachineFlags: tt.fields.stateMachineFlags,
+				states:            tt.fields.states,
+			}
+			s.displayStates()
+
+			restoreStdout()
+			readStdout, err := io.ReadAll(stdout)
+			asserter.AssertErrNil(err, true)
+
+			asserter.AssertEqual(tt.wantOutput, string(readStdout))
+		})
+	}
+}
+
+// TestMakeTemporaryDirectories tests a successful execution of the
+// make_temporary_directories state with and without --workdir
+func TestMakeTemporaryDirectories(t *testing.T) {
+	testCases := []struct {
+		name    string
+		workdir string
+	}{
+		{"with_workdir", "/var/tmp/make_temporary_directories-" + uuid.NewString()},
+		{"without_workdir", ""},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.WorkDir = tc.workdir
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			// make sure workdir was successfully created
+			if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err != nil {
+				t.Errorf("Failed to create workdir %s",
+					stateMachine.stateMachineFlags.WorkDir)
+			}
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+		})
+	}
+}
+
+// TestFailedMakeTemporaryDirectories tests some failed executions of the make_temporary_directories state
+func TestFailedMakeTemporaryDirectories(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	// mock os.Mkdir and test with and without a WorkDir
+	osMkdir = mockMkdir
+	defer func() {
+		osMkdir = os.Mkdir
+	}()
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrContains(err, "Failed to create temporary directory")
+
+	stateMachine.stateMachineFlags.WorkDir = testDir
+	err = stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrContains(err, "Error creating temporary directory")
+
+	// mock os.MkdirAll and only test with a WorkDir
+	osMkdirAll = mockMkdirAll
+	defer func() {
+		osMkdirAll = os.MkdirAll
+	}()
+	err = stateMachine.makeTemporaryDirectories()
+	if err == nil {
+		// try adding a workdir to see if that triggers the failure
+		stateMachine.stateMachineFlags.WorkDir = testDir
+		err = stateMachine.makeTemporaryDirectories()
+		asserter.AssertErrContains(err, "Error creating temporary directory")
+	}
+	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+}
+
+// TestDetermineOutputDirectory unit tests the determineOutputDirectory function
+func TestDetermineOutputDirectory(t *testing.T) {
+	testDir1 := filepath.Join(testhelper.DefaultTmpDir, "determine_output_dir-"+uuid.NewString())
+	testDir2 := filepath.Join(testhelper.DefaultTmpDir, "determine_output_dir-"+uuid.NewString())
+	cwd, _ := os.Getwd() // nolint: errcheck
+	testCases := []struct {
+		name              string
+		workDir           string
+		outputDir         string
+		expectedOutputDir string
+		cleanUp           bool
+	}{
+		{"no_workdir_no_outputdir", "", "", cwd, false},
+		{"yes_workdir_no_outputdir", testDir1, "", testDir1, true},
+		{"no_workdir_yes_outputdir", "", testDir1, testDir1, true},
+		{"different_workdir_and_outputdir", testDir1, testDir2, testDir2, true},
+		{"same_workdir_and_outputdir", testDir1, testDir1, testDir1, true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.stateMachineFlags.WorkDir = tc.workDir
+			stateMachine.commonFlags.OutputDir = tc.outputDir
+
+			err := stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+
+			err = stateMachine.determineOutputDirectory()
+			asserter.AssertErrNil(err, true)
+			if tc.cleanUp {
+				t.Cleanup(func() { os.RemoveAll(stateMachine.commonFlags.OutputDir) })
+			}
+
+			// ensure the correct output dir was set and that it exists
+			if stateMachine.commonFlags.OutputDir != tc.expectedOutputDir {
+				t.Errorf("OutputDir set in in struct \"%s\" does not match expected value \"%s\"",
+					stateMachine.commonFlags.OutputDir, tc.expectedOutputDir)
+			}
+			if _, err := os.Stat(stateMachine.commonFlags.OutputDir); err != nil {
+				t.Errorf("Failed to create output directory %s",
+					stateMachine.stateMachineFlags.WorkDir)
+			}
+		})
+	}
+}
+
+// TestDetermineOutputDirectory_fail tests failures in the determineOutputDirectory function
+func TestDetermineOutputDirectory_fail(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.commonFlags.OutputDir = "testdir"
+
+	// mock os.MkdirAll
+	osMkdirAll = mockMkdirAll
+	defer func() {
+		osMkdirAll = os.MkdirAll
+	}()
+	err := stateMachine.determineOutputDirectory()
+	asserter.AssertErrContains(err, "Error creating OutputDir")
+	osMkdirAll = os.MkdirAll
 }

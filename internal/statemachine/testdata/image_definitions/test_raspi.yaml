@@ -11,6 +11,7 @@ gadget:
   type: "git"
 model-assertion: file://pi-generic.model
 rootfs:
+  sources-list-deb822: true
   archive: ubuntu
   components:
     - main

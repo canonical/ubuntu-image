@@ -1,0 +1,5 @@
+summary: Run ubuntu-image smoke test and check snap content
+execute: |
+    ubuntu-image --help | MATCH '^Usage:'
+    # Check mkfs configuration is in the expected place
+    ls /snap/ubuntu-image/current/etc/ubuntu-image/mkfs/

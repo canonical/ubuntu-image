@@ -10,6 +10,7 @@ gadget:
   branch: classic
   type: "git"
 rootfs:
+  sources-list-deb822: true
   seed:
     urls:
       - "https://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"

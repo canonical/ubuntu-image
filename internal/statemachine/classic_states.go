@@ -23,12 +23,15 @@ import (
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/ppa"
 )
 
 var (
 	seedVersionRegex   = regexp.MustCompile(`^[a-z0-9].*`)
 	localePresentRegex = regexp.MustCompile(`(?m)^LANG=|LC_[A-Z_]+=`)
 )
+
+var buildGadgetTreeState = stateFunc{"build_gadget_tree", (*StateMachine).buildGadgetTree}
 
 // Build the gadget tree
 func (stateMachine *StateMachine) buildGadgetTree() error {
@@ -37,37 +40,11 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	// make the gadget directory under scratch
 	gadgetDir := filepath.Join(stateMachine.tempDirs.scratch, "gadget")
 
-	err := osMkdir(gadgetDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("Error creating scratch/gadget directory: %s", err.Error())
+	err := classicStateMachine.prepareGadgetDir(gadgetDir)
+	if err != nil {
+		return err
 	}
 
-	switch classicStateMachine.ImageDef.Gadget.GadgetType {
-	case "git":
-		err := cloneGitRepo(classicStateMachine.ImageDef, gadgetDir)
-		if err != nil {
-			return fmt.Errorf("Error cloning gadget repository: \"%s\"", err.Error())
-		}
-	case "directory":
-		gadgetTreePath := strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
-		if !filepath.IsAbs(gadgetTreePath) {
-			gadgetTreePath = filepath.Join(stateMachine.ConfDefPath, gadgetTreePath)
-		}
-
-		// copy the source tree to the workdir
-		files, err := osReadDir(gadgetTreePath)
-		if err != nil {
-			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
-		}
-		for _, gadgetFile := range files {
-			srcFile := filepath.Join(gadgetTreePath, gadgetFile.Name())
-			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
-				return fmt.Errorf("Error copying gadget source: %s", err.Error())
-			}
-		}
-	}
-
-	// now run "make" to build the gadget tree
 	makeCmd := execCommand("make")
 
 	// if a make target was specified then add it to the command
@@ -95,6 +72,42 @@ func (stateMachine *StateMachine) buildGadgetTree() error {
 	return nil
 }
 
+// prepareGadgetDir prepares the gadget directory prior to running the make command
+func (classicStateMachine *ClassicStateMachine) prepareGadgetDir(gadgetDir string) error {
+	err := osMkdir(gadgetDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating scratch/gadget directory: %s", err.Error())
+	}
+
+	switch classicStateMachine.ImageDef.Gadget.GadgetType {
+	case "git":
+		err := cloneGitRepo(classicStateMachine.ImageDef, gadgetDir)
+		if err != nil {
+			return fmt.Errorf("Error cloning gadget repository: \"%s\"", err.Error())
+		}
+	case "directory":
+		gadgetTreePath := strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
+		if !filepath.IsAbs(gadgetTreePath) {
+			gadgetTreePath = filepath.Join(classicStateMachine.ConfDefPath, gadgetTreePath)
+		}
+
+		// copy the source tree to the workdir
+		files, err := osReadDir(gadgetTreePath)
+		if err != nil {
+			return fmt.Errorf("Error reading gadget tree: %s", err.Error())
+		}
+		for _, gadgetFile := range files {
+			srcFile := filepath.Join(gadgetTreePath, gadgetFile.Name())
+			if err := osutilCopySpecialFile(srcFile, gadgetDir); err != nil {
+				return fmt.Errorf("Error copying gadget source: %s", err.Error())
+			}
+		}
+	}
+	return nil
+}
+
+var prepareGadgetTreeState = stateFunc{"prepare_gadget_tree", (*StateMachine).prepareGadgetTree}
+
 // Prepare the gadget tree
 func (stateMachine *StateMachine) prepareGadgetTree() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -108,7 +121,10 @@ func (stateMachine *StateMachine) prepareGadgetTree() error {
 	if classicStateMachine.ImageDef.Gadget.GadgetType == "prebuilt" {
 		gadgetTree = strings.TrimPrefix(classicStateMachine.ImageDef.Gadget.GadgetURL, "file://")
 		if !filepath.IsAbs(gadgetTree) {
-			gadgetTree, _ = filepath.Abs(gadgetTree)
+			gadgetTree, err = filepath.Abs(gadgetTree)
+			if err != nil {
+				return fmt.Errorf("Error finding the absolute path of the gadget tree: %s", err.Error())
+			}
 		}
 	} else {
 		gadgetTree = filepath.Join(classicStateMachine.tempDirs.scratch, "gadget", "install")
@@ -144,6 +160,8 @@ func (stateMachine *StateMachine) fixHostname() error {
 	return nil
 }
 
+var createChrootState = stateFunc{"create_chroot", (*StateMachine).createChroot}
+
 // Bootstrap a chroot environment to install packages in. It will eventually
 // become the rootfs of the image
 func (stateMachine *StateMachine) createChroot() error {
@@ -176,112 +194,44 @@ func (stateMachine *StateMachine) createChroot() error {
 		return fmt.Errorf("Error truncating resolv.conf: %s", err.Error())
 	}
 
-	// add any extra apt sources to /etc/apt/sources.list
-	return stateMachine.overwriteSourcesList(classicStateMachine.ImageDef.BuildPocketList())
+	if *classicStateMachine.ImageDef.Rootfs.SourcesListDeb822 {
+		err := stateMachine.setDeb822SourcesList(classicStateMachine.ImageDef.Deb822BuildSourcesList())
+		if err != nil {
+			return err
+		}
+		return stateMachine.setLegacySourcesList(imagedefinition.LegacySourcesListComment)
+	}
+
+	return stateMachine.setLegacySourcesList(classicStateMachine.ImageDef.LegacyBuildSourcesList())
 }
 
-// add PPAs to the apt sources list
+var addExtraPPAsState = stateFunc{"add_extra_ppas", (*StateMachine).addExtraPPAs}
+
+// addExtraPPAs adds PPAs to the /etc/apt/sources.list.d directory
 func (stateMachine *StateMachine) addExtraPPAs() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// create /etc/apt/sources.list.d in the chroot if it doesn't already exist
-	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
-	err = osMkdir(sourcesListD, 0755)
-	if err != nil && !os.IsExist(err) {
-		err = fmt.Errorf("Failed to create apt sources.list.d: %s", err.Error())
-		return err
-	}
-
-	// now create the ppa sources.list files
-	tmpGPGDir, err := osMkdirTemp("/tmp", "ubuntu-image-gpg")
-	if err != nil {
-		err = fmt.Errorf("Error creating temp dir for gpg imports: %s", err.Error())
-		return err
-	}
-	defer func() {
-		tmpErr := osRemoveAll(tmpGPGDir)
-		if tmpErr != nil {
-			if err != nil {
-				err = fmt.Errorf("%s after previous error: %w", tmpErr.Error(), err)
-			} else {
-				err = tmpErr
-			}
-		}
-	}()
-
-	trustedGPGD := filepath.Join(classicStateMachine.tempDirs.chroot, "etc", "apt", "trusted.gpg.d")
-
-	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
-		ppaFileName, ppaFileContents := createPPAInfo(ppa,
-			classicStateMachine.ImageDef.Series)
-
-		var ppaIO *os.File
-		ppaFile := filepath.Join(sourcesListD, ppaFileName)
-		ppaIO, err = osOpenFile(ppaFile, os.O_CREATE|os.O_WRONLY, 0644)
+	for _, extraPPA := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		p := ppa.New(extraPPA, *classicStateMachine.ImageDef.Rootfs.SourcesListDeb822, classicStateMachine.ImageDef.Series)
+		err := p.Add(classicStateMachine.tempDirs.chroot, classicStateMachine.commonFlags.Debug)
 		if err != nil {
-			err = fmt.Errorf("Error creating %s: %s", ppaFile, err.Error())
 			return err
 		}
-		defer ppaIO.Close()
-		_, err = ppaIO.Write([]byte(ppaFileContents))
-		if err != nil {
-			err = fmt.Errorf("unable to write ppa file %s: %w", ppaFile, err)
-			return err
-		}
-
-		// Import keys either from the specified fingerprint or via the Launchpad API
-		/* TODO: this is the logic for deb822 sources. When other projects
-		(software-properties, ubuntu-release-upgrader) are ready, update
-		to this logic instead.
-		keyFileName := strings.Replace(ppaFileName, ".sources", ".gpg", 1)
-		*/
-		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
-		keyFilePath := filepath.Join(trustedGPGD, keyFileName)
-		err = importPPAKeys(ppa, tmpGPGDir, keyFilePath, stateMachine.commonFlags.Debug)
-		if err != nil {
-			err = fmt.Errorf("Error retrieving signing key for ppa \"%s\": %s",
-				ppa.PPAName, err.Error())
-			return err
-		}
-	}
-	if err = osRemoveAll(tmpGPGDir); err != nil {
-		err = fmt.Errorf("Error removing temporary gpg directory \"%s\": %s", tmpGPGDir, err.Error())
-		return err
 	}
 
 	return nil
 }
+
+var cleanExtraPPAsState = stateFunc{"clean_extra_ppas", (*StateMachine).cleanExtraPPAs}
 
 // cleanExtraPPAs cleans previously added PPA to the source list
 func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	sourcesListD := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
-
-	for _, ppa := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
-		if ppa.KeepEnabled == nil {
-			return imagedefinition.ErrKeepEnabledNil
-		}
-
-		if *ppa.KeepEnabled {
-			continue
-		}
-
-		ppaFileName, _ := createPPAInfo(ppa, classicStateMachine.ImageDef.Series)
-
-		ppaFile := filepath.Join(sourcesListD, ppaFileName)
-		err = osRemove(ppaFile)
+	for _, extraPPA := range classicStateMachine.ImageDef.Customization.ExtraPPAs {
+		p := ppa.New(extraPPA, *classicStateMachine.ImageDef.Rootfs.SourcesListDeb822, classicStateMachine.ImageDef.Series)
+		err := p.Remove(stateMachine.tempDirs.chroot)
 		if err != nil {
-			err = fmt.Errorf("Error removing %s: %s", ppaFile, err.Error())
-			return err
-		}
-
-		keyFileName := strings.Replace(ppaFileName, ".list", ".gpg", 1)
-		keyFilePath := filepath.Join(classicStateMachine.tempDirs.chroot,
-			"etc", "apt", "trusted.gpg.d", keyFileName)
-		err = osRemove(keyFilePath)
-		if err != nil {
-			err = fmt.Errorf("Error removing %s: %s", keyFilePath, err.Error())
 			return err
 		}
 	}
@@ -289,212 +239,323 @@ func (stateMachine *StateMachine) cleanExtraPPAs() (err error) {
 	return nil
 }
 
-// Install packages in the chroot environment. This is accomplished by
-// running commands to do the following:
-// 1. Mount /proc /sys /dev and /run in the chroot
-// 2. Run `apt update` in the chroot
-// 3. Run `apt install <package list>` in the chroot
-// 4. Unmount /proc /sys /dev and /run
+var upgradePackagesState = stateFunc{"upgrade_packages", (*StateMachine).upgradePackages}
+
+// Upgrade packages in the chroot environment to align with configured pocket
+func (stateMachine *StateMachine) upgradePackages() error {
+	return stateMachine.runCmdsWithChrootSetup(
+		[]*exec.Cmd{
+			aptUpdateChrootCmd(stateMachine.tempDirs.chroot),
+			aptUpgradeChrootCmd(stateMachine.tempDirs.chroot, true),
+		},
+	)
+}
+
+var installPackagesState = stateFunc{"install_packages", (*StateMachine).installPackages}
+
+// Install packages in the chroot environment
 func (stateMachine *StateMachine) installPackages() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	err := helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
-	if err != nil {
-		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
-	}
+	stateMachine.gatherPackages(&classicStateMachine.ImageDef)
 
-	// if any extra packages are specified, install them alongside the seeded packages
-	if classicStateMachine.ImageDef.Customization != nil {
-		for _, packageInfo := range classicStateMachine.ImageDef.Customization.ExtraPackages {
-			classicStateMachine.Packages = append(classicStateMachine.Packages,
+	return stateMachine.runCmdsWithChrootSetup(
+		[]*exec.Cmd{
+			aptUpdateChrootCmd(stateMachine.tempDirs.chroot),
+			aptInstallChrootCmd(stateMachine.tempDirs.chroot, classicStateMachine.Packages, true),
+		},
+	)
+}
+
+func (stateMachine *StateMachine) gatherPackages(imageDef *imagedefinition.ImageDefinition) {
+	if imageDef.Customization != nil {
+		for _, packageInfo := range imageDef.Customization.ExtraPackages {
+			stateMachine.Packages = append(stateMachine.Packages,
 				packageInfo.PackageName)
 		}
 	}
 
 	// Make sure to install the extra kernel if it is specified
-	if classicStateMachine.ImageDef.Kernel != "" {
-		classicStateMachine.Packages = append(classicStateMachine.Packages,
-			classicStateMachine.ImageDef.Kernel)
+	if imageDef.Kernel != "" {
+		stateMachine.Packages = append(stateMachine.Packages,
+			imageDef.Kernel)
+	}
+}
+
+// run given commands with the chroot setup (mountpoint, network access, ...)
+func (stateMachine *StateMachine) runCmdsWithChrootSetup(cmds []*exec.Cmd) (err error) {
+	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
+
+	err = helperBackupAndCopyResolvConf(classicStateMachine.tempDirs.chroot)
+	if err != nil {
+		return fmt.Errorf("Error setting up /etc/resolv.conf in the chroot: \"%s\"", err.Error())
 	}
 
-	// installPackagesCmds should be filled as a FIFO list
-	var installPackagesCmds []*exec.Cmd
+	// setupCmds should be filled as a FIFO list
+	var setupCmds []*exec.Cmd
 
 	// teardownCmds should be filled as a LIFO list
 	var teardownCmds []*exec.Cmd
 
+	mountPoints := []*mountPoint{}
+
 	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
-		err = execTeardown(teardownCmds, stateMachine.commonFlags.Debug, err)
+		err = teardownMount(stateMachine.tempDirs.chroot, mountPoints, teardownCmds, err, stateMachine.commonFlags.Debug)
 	}()
 
 	// mount some necessary partitions in the chroot
-	mountPoints := []mountPoint{
+	mountPoints = append(mountPoints,
+		&mountPoint{
+			src:      "devtmpfs-build",
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/dev",
+			typ:      "devtmpfs",
+		},
+		&mountPoint{
+			src:      "devpts-build",
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/dev/pts",
+			typ:      "devpts",
+			opts:     []string{"nodev", "nosuid"},
+		},
+		&mountPoint{
+			src:      "proc-build",
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/proc",
+			typ:      "proc",
+		},
+		&mountPoint{
+			src:      "sysfs-build",
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/sys",
+			typ:      "sysfs",
+		},
+		&mountPoint{
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/run",
+			bind:     true,
+		},
+	)
+
+	mountCmds, umountCmds, err := generateMountPointCmds(mountPoints, stateMachine.tempDirs.scratch)
+	if err != nil {
+		return err
+	}
+	setupCmds = append(setupCmds, mountCmds...)
+	teardownCmds = append(umountCmds, teardownCmds...)
+
+	teardownCmds = append([]*exec.Cmd{
+		execCommand("udevadm", "settle"),
+	}, teardownCmds...)
+
+	err = helper.RunCmds(setupCmds, classicStateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
+	}
+
+	type diversion struct {
+		path string
+		fn   func(string, bool) (func() error, func(error) error)
+	}
+
+	diversions := []diversion{
 		{
-			relpath: "/dev",
-			typ:     "devtmpfs",
-			src:     "devtmpfs-build",
+			path: filepath.Join(classicStateMachine.tempDirs.chroot, "usr", "sbin", "policy-rc.d"),
+			fn:   helperDivertPolicyRcD,
 		},
 		{
-			relpath: "/dev/pts",
-			typ:     "devpts",
-			src:     "devpts-build",
-			options: []string{"nodev", "nosuid"},
+			path: filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "start-stop-daemon"),
+			fn:   helperDivertStartStopDaemon,
 		},
 		{
-			relpath: "/proc",
-			typ:     "proc",
-			src:     "proc-build",
-		},
-		{
-			relpath: "/sys",
-			typ:     "sysfs",
-			src:     "sysfs-build",
-		},
-		{
-			relpath: "/run",
-			bind:    true,
+			path: filepath.Join(classicStateMachine.tempDirs.chroot, "sbin", "initctl"),
+			fn:   helperDivertInitctl,
 		},
 	}
 
+	for _, diversion := range diversions {
+		if osutil.FileExists(diversion.path) {
+			divert, undivert := diversion.fn(stateMachine.tempDirs.chroot, classicStateMachine.commonFlags.Debug)
+			err = divert()
+			if err != nil {
+				return err
+			}
+			defer func() {
+				err = undivert(err)
+			}()
+		}
+	}
+
+	err = helper.RunCmds(cmds, classicStateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// generateMountPointCmds generate lists of mount/umount commands for a list of mountpoints
+func generateMountPointCmds(mountPoints []*mountPoint, scratchDir string) (allMountCmds []*exec.Cmd, allUmountCmds []*exec.Cmd, err error) {
 	for _, mp := range mountPoints {
 		var mountCmds, umountCmds []*exec.Cmd
 		var err error
 		if mp.bind {
-			mp.src, err = osMkdirTemp(stateMachine.tempDirs.scratch, strings.Trim(mp.relpath, "/"))
+			mp.src, err = osMkdirTemp(scratchDir, strings.Trim(mp.relpath, "/"))
 			if err != nil {
-				return fmt.Errorf("Error mounting temporary directory for mountpoint \"%s\": \"%s\"",
+				return nil, nil, fmt.Errorf("Error making temporary directory for mountpoint \"%s\": \"%s\"",
 					mp.relpath,
 					err.Error(),
 				)
 			}
 		}
 
-		mountCmds, umountCmds, err = getMountCmd(mp.typ, mp.src, stateMachine.tempDirs.chroot, mp.relpath, mp.bind, mp.options...)
+		mountCmds, umountCmds, err = mp.getMountCmd()
 		if err != nil {
-			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
+			return nil, nil, fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
 				mp.relpath,
 				err.Error(),
 			)
 		}
 
-		installPackagesCmds = append(installPackagesCmds, mountCmds...)
-		teardownCmds = append(umountCmds, teardownCmds...)
+		allMountCmds = append(allMountCmds, mountCmds...)
+		allUmountCmds = append(umountCmds, allUmountCmds...)
 	}
-	teardownCmds = append([]*exec.Cmd{
-		execCommand("udevadm", "settle"),
-	}, teardownCmds...)
-
-	aptCmds := generateAptCmds(stateMachine.tempDirs.chroot, classicStateMachine.Packages)
-	installPackagesCmds = append(installPackagesCmds, aptCmds...)
-
-	for _, cmd := range installPackagesCmds {
-		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
-		err := cmd.Run()
-		if err != nil {
-			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-				cmd.String(), err.Error(), cmdOutput.String())
-		}
-	}
-
-	return nil
+	return allMountCmds, allUmountCmds, err
 }
+
+var verifyArtifactNamesState = stateFunc{"verify_artifact_names", (*StateMachine).verifyArtifactNames}
 
 // Verify artifact names have volumes listed for multi-volume gadgets and set
 // the volume names in the struct
 func (stateMachine *StateMachine) verifyArtifactNames() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
+	if classicStateMachine.ImageDef.Artifacts == nil {
+		return nil
+	}
+
 	stateMachine.VolumeNames = make(map[string]string)
 
 	if len(stateMachine.GadgetInfo.Volumes) > 1 {
-		// first handle .img files if they are specified
-		if classicStateMachine.ImageDef.Artifacts.Img != nil {
-			for _, img := range *classicStateMachine.ImageDef.Artifacts.Img {
-				if img.ImgVolume == "" {
-					return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
-				}
-				stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
-			}
+		err := stateMachine.prepareImgArtifactsMultipleVolumes(classicStateMachine.ImageDef.Artifacts)
+		if err != nil {
+			return err
 		}
-		// qcow2 img logic is more complicated. If .img artifacts are already specified
-		// in the image definition for corresponding volumes, we will re-use those and
-		// convert them to a qcow2 image. Otherwise, we will create a raw .img file to
-		// use as an input file for the conversion.
-		// The names of these images are placed in the VolumeNames map, which is used
-		// as an input file for an eventual `qemu-convert` operation.
-		if classicStateMachine.ImageDef.Artifacts.Qcow2 != nil {
-			for _, qcow2 := range *classicStateMachine.ImageDef.Artifacts.Qcow2 {
-				if qcow2.Qcow2Volume == "" {
-					return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
-				}
-				// We can save a whole lot of disk I/O here if the volume is
-				// already specified as a .img file
-				if classicStateMachine.ImageDef.Artifacts.Img != nil {
-					found := false
-					for _, img := range *classicStateMachine.ImageDef.Artifacts.Img {
-						if img.ImgVolume == qcow2.Qcow2Volume {
-							found = true
-						}
-					}
-					if !found {
-						// if a .img artifact for this volume isn't explicitly stated in
-						// the image definition, then create one
-						stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
-					}
-				} else {
-					// no .img artifacts exist in the image definition,
-					// but we still need to create one to convert to qcow2
-					stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
-				}
-			}
+		err = stateMachine.prepareQcow2ArtifactsMultipleVolumes(classicStateMachine.ImageDef.Artifacts)
+		if err != nil {
+			return err
 		}
 	} else {
-		if classicStateMachine.ImageDef.Artifacts.Img != nil {
-			img := (*classicStateMachine.ImageDef.Artifacts.Img)[0]
-			if img.ImgVolume == "" {
-				// there is only one volume, so get it from the map
-				volName := reflect.ValueOf(stateMachine.GadgetInfo.Volumes).MapKeys()[0].String()
-				stateMachine.VolumeNames[volName] = img.ImgName
-			} else {
-				stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
-			}
+		stateMachine.prepareImgArtifactOneVolume(classicStateMachine.ImageDef.Artifacts)
+		stateMachine.prepareQcow2ArtifactOneVolume(classicStateMachine.ImageDef.Artifacts)
+	}
+	return nil
+}
+
+func (stateMachine *StateMachine) prepareImgArtifactsMultipleVolumes(artifacts *imagedefinition.Artifact) error {
+	if artifacts.Img == nil {
+		return nil
+	}
+	for _, img := range *artifacts.Img {
+		if img.ImgVolume == "" {
+			return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
 		}
-		// qcow2 img logic is more complicated. If .img artifacts are already specified
-		// in the image definition for corresponding volumes, we will re-use those and
-		// convert them to a qcow2 image. Otherwise, we will create a raw .img file to
-		// use as an input file for the conversion.
-		// The names of these images are placed in the VolumeNames map, which is used
-		// as an input file for an eventual `qemu-convert` operation.
-		if classicStateMachine.ImageDef.Artifacts.Qcow2 != nil {
-			qcow2 := (*classicStateMachine.ImageDef.Artifacts.Qcow2)[0]
-			if qcow2.Qcow2Volume == "" {
-				volName := reflect.ValueOf(stateMachine.GadgetInfo.Volumes).MapKeys()[0].String()
-				if classicStateMachine.ImageDef.Artifacts.Img != nil {
-					qcow2.Qcow2Volume = volName
-					(*classicStateMachine.ImageDef.Artifacts.Qcow2)[0] = qcow2
-					return nil // We will re-use the .img file in this case
+		stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
+	}
+	return nil
+}
+
+// qcow2 img logic is complicated. If .img artifacts are already specified
+// in the image definition for corresponding volumes, we will re-use those and
+// convert them to a qcow2 image. Otherwise, we will create a raw .img file to
+// use as an input file for the conversion.
+// The names of these images are placed in the VolumeNames map, which is used
+// as an input file for an eventual `qemu-convert` operation.
+func (stateMachine *StateMachine) prepareQcow2ArtifactsMultipleVolumes(artifacts *imagedefinition.Artifact) error {
+	if artifacts.Qcow2 == nil {
+		return nil
+	}
+	for _, qcow2 := range *artifacts.Qcow2 {
+		if qcow2.Qcow2Volume == "" {
+			return fmt.Errorf("Volume names must be specified for each image when using a gadget with more than one volume")
+		}
+		// We can save a whole lot of disk I/O here if the volume is
+		// already specified as a .img file
+		if artifacts.Img != nil {
+			found := false
+			for _, img := range *artifacts.Img {
+				if img.ImgVolume == qcow2.Qcow2Volume {
+					found = true
 				}
-				// there is only one volume, so get it from the map
-				stateMachine.VolumeNames[volName] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
-				qcow2.Qcow2Volume = volName
-				(*classicStateMachine.ImageDef.Artifacts.Qcow2)[0] = qcow2
-			} else {
-				if classicStateMachine.ImageDef.Artifacts.Img != nil {
-					return nil // We will re-use the .img file in this case
-				}
+			}
+			if !found {
+				// if a .img artifact for this volume isn't explicitly stated in
+				// the image definition, then create one
 				stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
 			}
+		} else {
+			// no .img artifacts exist in the image definition,
+			// but we still need to create one to convert to qcow2
+			stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
 		}
 	}
 	return nil
 }
+
+func (stateMachine *StateMachine) prepareImgArtifactOneVolume(artifacts *imagedefinition.Artifact) {
+	if artifacts.Img == nil {
+		return
+	}
+	img := (*artifacts.Img)[0]
+	if img.ImgVolume == "" {
+		// there is only one volume, so get it from the map
+		volName := reflect.ValueOf(stateMachine.GadgetInfo.Volumes).MapKeys()[0].String()
+		stateMachine.VolumeNames[volName] = img.ImgName
+	} else {
+		stateMachine.VolumeNames[img.ImgVolume] = img.ImgName
+	}
+}
+
+// qcow2 img logic is complicated. If .img artifacts are already specified
+// in the image definition for corresponding volumes, we will re-use those and
+// convert them to a qcow2 image. Otherwise, we will create a raw .img file to
+// use as an input file for the conversion.
+// The names of these images are placed in the VolumeNames map, which is used
+// as an input file for an eventual `qemu-convert` operation.
+func (stateMachine *StateMachine) prepareQcow2ArtifactOneVolume(artifacts *imagedefinition.Artifact) {
+	if artifacts.Qcow2 == nil {
+		return
+	}
+	qcow2 := (*artifacts.Qcow2)[0]
+	if qcow2.Qcow2Volume == "" {
+		volName := reflect.ValueOf(stateMachine.GadgetInfo.Volumes).MapKeys()[0].String()
+		if artifacts.Img != nil {
+			qcow2.Qcow2Volume = volName
+			(*artifacts.Qcow2)[0] = qcow2
+			return // We will re-use the .img file in this case
+		}
+		// there is only one volume, so get it from the map
+		stateMachine.VolumeNames[volName] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
+		qcow2.Qcow2Volume = volName
+		(*artifacts.Qcow2)[0] = qcow2
+	} else {
+		if artifacts.Img != nil {
+			return // We will re-use the .img file in this case
+		}
+		stateMachine.VolumeNames[qcow2.Qcow2Volume] = fmt.Sprintf("%s.img", qcow2.Qcow2Name)
+	}
+}
+
+var buildRootfsFromTasksState = stateFunc{"build_rootfs_from_tasks", (*StateMachine).buildRootfsFromTasks}
 
 // Build a rootfs from a list of archive tasks
 func (stateMachine *StateMachine) buildRootfsFromTasks() error {
 	// currently a no-op pending implementation of the classic image redesign
 	return nil
 }
+
+var extractRootfsTarState = stateFunc{"extract_rootfs_tar", (*StateMachine).extractRootfsTar}
 
 // Extract the rootfs from a tar archive
 func (stateMachine *StateMachine) extractRootfsTar() error {
@@ -527,9 +588,10 @@ func (stateMachine *StateMachine) extractRootfsTar() error {
 	}
 
 	// now extract the archive
-	return helper.ExtractTarArchive(tarPath, stateMachine.tempDirs.chroot,
-		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
+	return helper.ExtractTarArchive(tarPath, stateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug)
 }
+
+var germinateState = stateFunc{"germinate", (*StateMachine).germinate}
 
 // germinate runs the germinate binary and parses the output to create
 // a list of packages from the seed section of the image definition
@@ -553,30 +615,59 @@ func (stateMachine *StateMachine) germinate() error {
 			germinateCmd.String(), err.Error(), germinateOutput.String())
 	}
 
-	packageMap := make(map[string]*[]string)
-	packageMap[".seed"] = &classicStateMachine.Packages
-	packageMap[".snaps"] = &classicStateMachine.Snaps
-	for fileExtension, packageList := range packageMap {
-		for _, fileName := range classicStateMachine.ImageDef.Rootfs.Seed.Names {
-			seedFilePath := filepath.Join(germinateDir, fileName+fileExtension)
-			seedFile, err := osOpen(seedFilePath)
-			if err != nil {
-				return fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
-			}
-			defer seedFile.Close()
+	pkgsFromSeed, err := packagesFromSeed(".seed", classicStateMachine.ImageDef.Rootfs.Seed.Names, germinateDir)
+	if err != nil {
+		return err
+	}
+	classicStateMachine.Packages = append(classicStateMachine.Packages, pkgsFromSeed...)
 
-			seedScanner := bufio.NewScanner(seedFile)
-			for seedScanner.Scan() {
-				seedLine := seedScanner.Bytes()
-				if seedVersionRegex.Match(seedLine) {
-					packageName := strings.Split(string(seedLine), " ")[0]
-					*packageList = append(*packageList, packageName)
-				}
+	snapsFromSeed, err := packagesFromSeed(".snaps", classicStateMachine.ImageDef.Rootfs.Seed.Names, germinateDir)
+	if err != nil {
+		return err
+	}
+
+	classicStateMachine.Snaps = addUniqueSnaps(classicStateMachine.Snaps, snapsFromSeed)
+
+	return nil
+}
+
+// packagesFromSeed returns a list of packages/snaps from a germinated seed
+func packagesFromSeed(ext string, seedNames []string, germinateDir string) ([]string, error) {
+	var pkgs []string
+	for _, fileName := range seedNames {
+		seedFilePath := filepath.Join(germinateDir, fileName+ext)
+		seedFile, err := osOpen(seedFilePath)
+		if err != nil {
+			return pkgs, fmt.Errorf("Error opening seed file %s: \"%s\"", seedFilePath, err.Error())
+		}
+		defer seedFile.Close()
+
+		seedScanner := bufio.NewScanner(seedFile)
+		for seedScanner.Scan() {
+			seedLine := seedScanner.Bytes()
+			if seedVersionRegex.Match(seedLine) {
+				packageName := strings.Split(string(seedLine), " ")[0]
+				pkgs = append(pkgs, packageName)
 			}
 		}
 	}
+	return pkgs, nil
+}
 
-	return nil
+// addUniqueSnaps returns a list of unique snaps
+func addUniqueSnaps(currentSnaps []string, newSnaps []string) []string {
+	m := make(map[string]bool)
+	snaps := []string{}
+	toDuplicate := append(currentSnaps, newSnaps...)
+
+	for _, s := range toDuplicate {
+		if m[s] {
+			continue
+		}
+		m[s] = true
+		snaps = append(snaps, s)
+	}
+	return snaps
 }
 
 // customizeCloudInitFile customizes a cloud-init data file with the given content
@@ -601,6 +692,8 @@ func customizeCloudInitFile(customData string, seedPath string, fileName string,
 
 	return nil
 }
+
+var customizeCloudInitState = stateFunc{"customize_cloud_init", (*StateMachine).customizeCloudInit}
 
 // Customize Cloud init with the values in the image definition YAML
 func (stateMachine *StateMachine) customizeCloudInit() error {
@@ -643,6 +736,8 @@ func (stateMachine *StateMachine) customizeCloudInit() error {
 	return err
 }
 
+var customizeFstabState = stateFunc{"customize_fstab", (*StateMachine).customizeFstab}
+
 // Customize /etc/fstab based on values in the image definition
 func (stateMachine *StateMachine) customizeFstab() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -678,6 +773,8 @@ func (stateMachine *StateMachine) customizeFstab() error {
 
 	return err
 }
+
+var manualCustomizationState = stateFunc{"perform_manual_customization", (*StateMachine).manualCustomization}
 
 // Handle any manual customizations specified in the image definition
 func (stateMachine *StateMachine) manualCustomization() error {
@@ -722,13 +819,14 @@ func (stateMachine *StateMachine) manualCustomization() error {
 	return nil
 }
 
+var prepareClassicImageState = stateFunc{"prepare_image", (*StateMachine).prepareClassicImage}
+
 // prepareClassicImage calls image.Prepare to stage snaps in classic images
 func (stateMachine *StateMachine) prepareClassicImage() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
-
-	var imageOpts image.Options
-
+	imageOpts := &image.Options{}
 	var err error
+
 	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(classicStateMachine.Snaps)
 	if err != nil {
 		return err
@@ -740,95 +838,22 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 	// plug/slot sanitization needed by provider handling
 	snap.SanitizePlugsSlots = builtin.SanitizePlugsSlots
 
-	// check if the rootfs is already preseeded. This can happen when building from a
-	// rootfs tarball
-	if osutil.FileExists(filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "snapd", "state.json")) {
-		// first get a list of all preseeded snaps
-		// seededSnaps maps the snap name and channel that was seeded
-		preseededSnaps, err := getPreseededSnaps(classicStateMachine.tempDirs.chroot)
-		if err != nil {
-			return fmt.Errorf("Error getting list of preseeded snaps from existing rootfs: %s",
-				err.Error())
-		}
-		for snap, channel := range preseededSnaps {
-			// if a channel is specified on the command line for a snap that was already
-			// preseeded, use the channel from the command line instead of the channel
-			// that was originally used for the preseeding
-			if !helper.SliceHasElement(imageOpts.Snaps, snap) {
-				imageOpts.Snaps = append(imageOpts.Snaps, snap)
-				imageOpts.SnapChannels[snap] = channel
-			}
-		}
-		// preseed.ClassicReset automatically has some output that we only want for
-		// verbose or greater logging
-		if !stateMachine.commonFlags.Debug && !stateMachine.commonFlags.Verbose {
-			oldPreseedStdout := preseed.Stdout
-			preseed.Stdout = io.Discard
-			defer func() {
-				preseed.Stdout = oldPreseedStdout
-			}()
-		}
-		// We need to use the snap-preseed binary for the reset as well, as using
-		// preseed.ClassicReset() might leave us in a chroot jail
-		cmd := execCommand("/usr/lib/snapd/snap-preseed", "--reset", stateMachine.tempDirs.chroot)
-		err = cmd.Run()
-		if err != nil {
-			return fmt.Errorf("Error resetting preseeding in the chroot. Error is \"%s\"", err.Error())
-		}
+	err = resetPreseeding(imageOpts, classicStateMachine.tempDirs.chroot, stateMachine.commonFlags.Debug, stateMachine.commonFlags.Verbose)
+	if err != nil {
+		return err
 	}
 
-	// iterate through the list of snaps and ensure that all of their bases
-	// are also set to be installed. Note we only do this for snaps that are
-	// seeded. Users are expected to specify all base and content provider
-	// snaps in the image definition.
-	snapStore := store.New(nil, nil)
-	snapContext := context.Background()
-	for _, seededSnap := range imageOpts.Snaps {
-		snapSpec := store.SnapSpec{Name: seededSnap}
-		snapInfo, err := snapStore.SnapInfo(snapContext, snapSpec, nil)
-		if err != nil {
-			return fmt.Errorf("Error getting info for snap %s: \"%s\"",
-				seededSnap, err.Error())
-		}
-		if snapInfo.Base != "" && !helper.SliceHasElement(imageOpts.Snaps, snapInfo.Base) {
-			imageOpts.Snaps = append(imageOpts.Snaps, snapInfo.Base)
-		}
+	err = ensureSnapBasesInstalled(imageOpts)
+	if err != nil {
+		return err
 	}
 
-	// add any extra snaps from the image definition to the list
-	// this is done last to ensure the correct channels are being used
-	if classicStateMachine.ImageDef.Customization != nil && len(classicStateMachine.ImageDef.Customization.ExtraSnaps) > 0 {
-		imageOpts.SeedManifest = seedwriter.NewManifest()
-		for _, extraSnap := range classicStateMachine.ImageDef.Customization.ExtraSnaps {
-			if !helper.SliceHasElement(imageOpts.Snaps, extraSnap.SnapName) {
-				imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
-			}
-			if extraSnap.Channel != "" {
-				imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
-			}
-			if extraSnap.SnapRevision != 0 {
-				fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n",
-					extraSnap.SnapRevision,
-					extraSnap.SnapName,
-				)
-				err = imageOpts.SeedManifest.SetAllowedSnapRevision(extraSnap.SnapName, snap.R(extraSnap.SnapRevision))
-				if err != nil {
-					return fmt.Errorf("error dealing with the extra snap %s: %w", extraSnap.SnapName, err)
-				}
-			}
-		}
+	err = addExtraSnaps(imageOpts, &classicStateMachine.ImageDef)
+	if err != nil {
+		return err
 	}
 
-	modelAssertionPath := strings.TrimPrefix(classicStateMachine.ImageDef.ModelAssertion, "file://")
-	// if no explicit model assertion was given, keep empty ModelFile to let snapd fallback to default
-	// model assertion
-	if len(modelAssertionPath) != 0 {
-		if !filepath.IsAbs(modelAssertionPath) {
-			imageOpts.ModelFile = filepath.Join(stateMachine.ConfDefPath, modelAssertionPath)
-		} else {
-			imageOpts.ModelFile = modelAssertionPath
-		}
-	}
+	setModelFile(imageOpts, classicStateMachine.ImageDef.ModelAssertion, stateMachine.ConfDefPath)
 
 	imageOpts.Classic = true
 	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
@@ -846,12 +871,121 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 		}()
 	}
 
-	if err := imagePrepare(&imageOpts); err != nil {
+	if err := imagePrepare(imageOpts); err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
 
 	return nil
 }
+
+// resetPreseeding checks if the rootfs is already preseeded and reset if necessary.
+// This can happen when building from a rootfs tarball
+func resetPreseeding(imageOpts *image.Options, chroot string, debug, verbose bool) error {
+	if !osutil.FileExists(filepath.Join(chroot, "var", "lib", "snapd", "state.json")) {
+		return nil
+	}
+	// first get a list of all preseeded snaps
+	// seededSnaps maps the snap name and channel that was seeded
+	preseededSnaps, err := getPreseededSnaps(chroot)
+	if err != nil {
+		return fmt.Errorf("Error getting list of preseeded snaps from existing rootfs: %s",
+			err.Error())
+	}
+	for snap, channel := range preseededSnaps {
+		// if a channel is specified on the command line for a snap that was already
+		// preseeded, use the channel from the command line instead of the channel
+		// that was originally used for the preseeding
+		if !helper.SliceHasElement(imageOpts.Snaps, snap) {
+			imageOpts.Snaps = append(imageOpts.Snaps, snap)
+			imageOpts.SnapChannels[snap] = channel
+		}
+	}
+	// preseed.ClassicReset automatically has some output that we only want for
+	// verbose or greater logging
+	if !debug && !verbose {
+		oldPreseedStdout := preseed.Stdout
+		preseed.Stdout = io.Discard
+		defer func() {
+			preseed.Stdout = oldPreseedStdout
+		}()
+	}
+	// We need to use the snap-preseed binary for the reset as well, as using
+	// preseed.ClassicReset() might leave us in a chroot jail
+	cmd := execCommand("/usr/lib/snapd/snap-preseed", "--reset", chroot)
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("Error resetting preseeding in the chroot. Error is \"%s\"", err.Error())
+	}
+
+	return nil
+}
+
+// ensureSnapBasesInstalled iterates through the list of snaps and ensure that all
+// of their bases are also set to be installed. Note we only do this for snaps that
+// are seeded. Users are expected to specify all base and content provider snaps
+// in the image definition.
+func ensureSnapBasesInstalled(imageOpts *image.Options) error {
+	snapStore := store.New(nil, nil)
+	snapContext := context.Background()
+	for _, seededSnap := range imageOpts.Snaps {
+		snapSpec := store.SnapSpec{Name: seededSnap}
+		snapInfo, err := snapStore.SnapInfo(snapContext, snapSpec, nil)
+		if err != nil {
+			return fmt.Errorf("Error getting info for snap %s: \"%s\"",
+				seededSnap, err.Error())
+		}
+		if snapInfo.Base != "" && !helper.SliceHasElement(imageOpts.Snaps, snapInfo.Base) {
+			imageOpts.Snaps = append(imageOpts.Snaps, snapInfo.Base)
+		}
+	}
+	return nil
+}
+
+// addExtraSnaps adds any extra snaps from the image definition to the list
+// This should be done last to ensure the correct channels are being used
+func addExtraSnaps(imageOpts *image.Options, imageDefinition *imagedefinition.ImageDefinition) error {
+	if imageDefinition.Customization == nil || len(imageDefinition.Customization.ExtraSnaps) == 0 {
+		return nil
+	}
+
+	imageOpts.SeedManifest = seedwriter.NewManifest()
+	for _, extraSnap := range imageDefinition.Customization.ExtraSnaps {
+		if !helper.SliceHasElement(imageOpts.Snaps, extraSnap.SnapName) {
+			imageOpts.Snaps = append(imageOpts.Snaps, extraSnap.SnapName)
+		}
+		if extraSnap.Channel != "" {
+			imageOpts.SnapChannels[extraSnap.SnapName] = extraSnap.Channel
+		}
+		if extraSnap.SnapRevision != 0 {
+			fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n",
+				extraSnap.SnapRevision,
+				extraSnap.SnapName,
+			)
+			err := imageOpts.SeedManifest.SetAllowedSnapRevision(extraSnap.SnapName, snap.R(extraSnap.SnapRevision))
+			if err != nil {
+				return fmt.Errorf("error dealing with the extra snap %s: %w", extraSnap.SnapName, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// setModelFile sets the ModelFile based on the given ModelAssertion
+func setModelFile(imageOpts *image.Options, modelAssertion string, confDefPath string) {
+	modelAssertionPath := strings.TrimPrefix(modelAssertion, "file://")
+	// if no explicit model assertion was given, keep empty ModelFile to let snapd fallback to default
+	// model assertion
+	if len(modelAssertionPath) != 0 {
+		if !filepath.IsAbs(modelAssertionPath) {
+			imageOpts.ModelFile = filepath.Join(confDefPath, modelAssertionPath)
+		} else {
+			imageOpts.ModelFile = modelAssertionPath
+		}
+	}
+}
+
+var preseedClassicImageState = stateFunc{"preseed_image", (*StateMachine).preseedClassicImage}
 
 // preseedClassicImage preseeds the snaps that have already been staged in the chroot
 func (stateMachine *StateMachine) preseedClassicImage() (err error) {
@@ -863,45 +997,50 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 	var teardownCmds []*exec.Cmd
 
 	// set up the mount commands
-	mountPoints := []mountPoint{
+	mountPoints := []*mountPoint{
 		{
-			relpath: "/dev",
-			typ:     "devtmpfs",
-			src:     "devtmpfs-build",
+			src:      "devtmpfs-build",
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/dev",
+			typ:      "devtmpfs",
 		},
 		{
-			relpath: "/dev/pts",
-			typ:     "devpts",
-			src:     "devpts-build",
-			options: []string{"nodev", "nosuid"},
+			src:      "devpts-build",
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/dev/pts",
+			typ:      "devpts",
+			opts:     []string{"nodev", "nosuid"},
 		},
 		{
-			relpath: "/proc",
-			typ:     "proc",
-			src:     "proc-build",
+			src:      "proc-build",
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/proc",
+			typ:      "proc",
 		},
 		{
-			relpath: "/sys/kernel/security",
-			typ:     "securityfs",
-			src:     "none",
+			src:      "none",
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/sys/kernel/security",
+			typ:      "securityfs",
 		},
 		{
-			relpath: "/sys/fs/cgroup",
-			typ:     "cgroup2",
-			src:     "none",
+			src:      "none",
+			basePath: stateMachine.tempDirs.chroot,
+			relpath:  "/sys/fs/cgroup",
+			typ:      "cgroup2",
 		},
 	}
 
 	// Make sure we left the system as clean as possible if something has gone wrong
 	defer func() {
-		err = execTeardown(teardownCmds, stateMachine.commonFlags.Debug, err)
+		err = teardownMount(stateMachine.tempDirs.chroot, mountPoints, teardownCmds, err, stateMachine.commonFlags.Debug)
 	}()
 
-	for _, mountPoint := range mountPoints {
-		mountCmds, umountCmds, err := getMountCmd(mountPoint.typ, mountPoint.src, stateMachine.tempDirs.chroot, mountPoint.relpath, mountPoint.bind, mountPoint.options...)
+	for _, mp := range mountPoints {
+		mountCmds, umountCmds, err := mp.getMountCmd()
 		if err != nil {
 			return fmt.Errorf("Error preparing mountpoint \"%s\": \"%s\"",
-				mountPoint.relpath,
+				mp.relpath,
 				err.Error(),
 			)
 		}
@@ -909,20 +1048,24 @@ func (stateMachine *StateMachine) preseedClassicImage() (err error) {
 		teardownCmds = append(umountCmds, teardownCmds...)
 	}
 
+	teardownCmds = append([]*exec.Cmd{
+		execCommand("udevadm", "settle"),
+	}, teardownCmds...)
+
 	preseedCmds = append(preseedCmds,
 		//nolint:gosec,G204
 		exec.Command("/usr/lib/snapd/snap-preseed", stateMachine.tempDirs.chroot),
 	)
-	for _, cmd := range preseedCmds {
-		cmdOutput := helper.SetCommandOutput(cmd, classicStateMachine.commonFlags.Debug)
-		err := cmd.Run()
-		if err != nil {
-			return fmt.Errorf("Error running command \"%s\". Error is \"%s\". Output is: \n%s",
-				cmd.String(), err.Error(), cmdOutput.String())
-		}
+
+	err = helper.RunCmds(preseedCmds, classicStateMachine.commonFlags.Debug)
+	if err != nil {
+		return err
 	}
+
 	return nil
 }
+
+var populateClassicRootfsContentsState = stateFunc{"populate_rootfs_contents", (*StateMachine).populateClassicRootfsContents}
 
 // populateClassicRootfsContents copies over the staged rootfs
 // to rootfs. It also changes fstab and handles the --cloud-init flag
@@ -937,7 +1080,7 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 
 	files, err := osReadDir(stateMachine.tempDirs.chroot)
 	if err != nil {
-		return fmt.Errorf("Error reading unpack/chroot dir: %s", err.Error())
+		return fmt.Errorf("Error reading chroot dir: %s", err.Error())
 	}
 
 	for _, srcFile := range files {
@@ -954,29 +1097,62 @@ func (stateMachine *StateMachine) populateClassicRootfsContents() error {
 	return classicStateMachine.fixFstab()
 }
 
+var customizeSourcesListState = stateFunc{"customize_sources_list", (*StateMachine).customizeSourcesList}
+
 // customizeSourcesList customize the /etc/apt/sources.list file for the
 // resulting image. This state must be executed once packages installation
 // is done, and before other manual customization to let users modify it.
 func (stateMachine *StateMachine) customizeSourcesList() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
-	return stateMachine.overwriteSourcesList(classicStateMachine.ImageDef.TargetPocketList())
+
+	if *classicStateMachine.ImageDef.Rootfs.SourcesListDeb822 {
+		err := stateMachine.setDeb822SourcesList(classicStateMachine.ImageDef.Deb822TargetSourcesList())
+		if err != nil {
+			return err
+		}
+		return stateMachine.setLegacySourcesList(imagedefinition.LegacySourcesListComment)
+	}
+
+	return stateMachine.setLegacySourcesList(classicStateMachine.ImageDef.LegacyTargetSourcesList())
 }
 
-// overwriteSourcesList replaces /etc/apt/sources.list with the given list of entries
+// setLegacySourcesList replaces /etc/apt/sources.list with the given list of entries
 // This function will truncate the existing file.
-func (stateMachine *StateMachine) overwriteSourcesList(aptSources []string) error {
+func (stateMachine *StateMachine) setLegacySourcesList(aptSources string) error {
 	sourcesList := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list")
 	sourcesListFile, err := osOpenFile(sourcesList, os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("unable to open sources.list file: %w", err)
 	}
 	defer sourcesListFile.Close()
-	for _, aptSource := range aptSources {
-		_, err = sourcesListFile.WriteString(aptSource)
-		if err != nil {
-			return fmt.Errorf("unable to write apt sources: %w", err)
-		}
+	_, err = sourcesListFile.WriteString(aptSources)
+	if err != nil {
+		return fmt.Errorf("unable to write apt sources: %w", err)
 	}
+	return nil
+}
+
+// setDeb822SourcesList replaces /etc/apt/sources.list.d/ubuntu.sources with the given content
+// This function will truncate the existing file if any
+func (stateMachine *StateMachine) setDeb822SourcesList(sourcesListContent string) error {
+	sourcesListDir := filepath.Join(stateMachine.tempDirs.chroot, "etc", "apt", "sources.list.d")
+	err := osMkdirAll(sourcesListDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error /etc/apt/sources.list.d directory: %s", err.Error())
+	}
+
+	sourcesList := filepath.Join(sourcesListDir, "ubuntu.sources")
+	f, err := osOpenFile(sourcesList, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open ubuntu.sources file: %w", err)
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(sourcesListContent)
+	if err != nil {
+		return fmt.Errorf("unable to write apt sources: %w", err)
+	}
+
 	return nil
 }
 
@@ -994,13 +1170,24 @@ func (stateMachine *StateMachine) fixFstab() error {
 		return fmt.Errorf("Error reading fstab: %s", err.Error())
 	}
 
+	lines := strings.Split(string(fstabBytes), "\n")
+	newLines := generateFstabLines(lines)
+
+	err = osWriteFile(fstabPath, []byte(strings.Join(newLines, "\n")+"\n"), 0644)
+	if err != nil {
+		return fmt.Errorf("Error writing to fstab: %s", err.Error())
+	}
+	return nil
+}
+
+// generateFstabLines generates new fstab lines from current ones
+func generateFstabLines(lines []string) []string {
 	rootMountFound := false
 	newLines := make([]string, 0)
 	rootFSLabel := "writable"
 	rootFSOptions := "discard,errors=remount-ro"
 	fsckOrder := "1"
 
-	lines := strings.Split(string(fstabBytes), "\n")
 	for _, l := range lines {
 		if l == "# UNCONFIGURED FSTAB" {
 			// omit this line if still present
@@ -1032,12 +1219,10 @@ func (stateMachine *StateMachine) fixFstab() error {
 		newLines = append(newLines, fmt.Sprintf("LABEL=%s	/	ext4	%s	0	%s", rootFSLabel, rootFSOptions, fsckOrder))
 	}
 
-	err = osWriteFile(fstabPath, []byte(strings.Join(newLines, "\n")+"\n"), 0644)
-	if err != nil {
-		return fmt.Errorf("Error writing to fstab: %s", err.Error())
-	}
-	return nil
+	return newLines
 }
+
+var setDefaultLocaleState = stateFunc{"set_default_locale", (*StateMachine).setDefaultLocale}
 
 // Set a default locale if one is not configured beforehand by other customizations
 func (stateMachine *StateMachine) setDefaultLocale() error {
@@ -1061,6 +1246,8 @@ func (stateMachine *StateMachine) setDefaultLocale() error {
 	}
 	return nil
 }
+
+var generatePackageManifestState = stateFunc{"generate_package_manifest", (*StateMachine).generatePackageManifest}
 
 // Generate the manifest
 func (stateMachine *StateMachine) generatePackageManifest() error {
@@ -1091,6 +1278,8 @@ func (stateMachine *StateMachine) generatePackageManifest() error {
 	return nil
 }
 
+var generateFilelistState = stateFunc{"generate_filelist", (*StateMachine).generateFilelist}
+
 // Generate the manifest
 func (stateMachine *StateMachine) generateFilelist() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
@@ -1120,18 +1309,25 @@ func (stateMachine *StateMachine) generateFilelist() error {
 	return nil
 }
 
+var generateRootfsTarballState = stateFunc{"generate_rootfs_tarball", (*StateMachine).generateRootfsTarball}
+
 // Generate the rootfs tarball
 func (stateMachine *StateMachine) generateRootfsTarball() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	// first create a vanilla uncompressed tar archive
-	rootfsSrc := filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
-	rootfsDst := filepath.Join(stateMachine.commonFlags.OutputDir,
-		classicStateMachine.ImageDef.Artifacts.RootfsTar.RootfsTarName)
-	return helper.CreateTarArchive(rootfsSrc, rootfsDst,
+	tarDst := filepath.Join(
+		stateMachine.commonFlags.OutputDir,
+		classicStateMachine.ImageDef.Artifacts.RootfsTar.RootfsTarName,
+	)
+	return helper.CreateTarArchive(
+		stateMachine.tempDirs.rootfs,
+		tarDst,
 		classicStateMachine.ImageDef.Artifacts.RootfsTar.Compression,
-		stateMachine.commonFlags.Verbose, stateMachine.commonFlags.Debug)
+		stateMachine.commonFlags.Debug,
+	)
 }
+
+var makeQcow2ImgState = stateFunc{"make_qcow2_image", (*StateMachine).makeQcow2Img}
 
 // makeQcow2Img converts raw .img artifacts into qcow2 artifacts
 func (stateMachine *StateMachine) makeQcow2Img() error {
@@ -1145,46 +1341,64 @@ func (stateMachine *StateMachine) makeQcow2Img() error {
 			"-c",
 			"-O",
 			"qcow2",
-			"-o",
-			"compat=0.10",
 			backingFile,
 			resultingFile,
 		)
-		qemuOutput := helper.SetCommandOutput(qemuImgCommand, classicStateMachine.commonFlags.Debug)
-		if err := qemuImgCommand.Run(); err != nil {
-			return fmt.Errorf("Error creating qcow2 artifact with command \"%s\". "+
-				"Error is \"%s\". Full output below:\n%s",
-				qemuImgCommand.String(), err.Error(), qemuOutput.String())
+		err := helper.RunCmd(qemuImgCommand, classicStateMachine.commonFlags.Debug)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-// updateBootloader determines the bootloader for each volume
-// and runs the correct helper function to update the bootloader
-func (stateMachine *StateMachine) updateBootloader() error {
-	if stateMachine.rootfsPartNum == -1 || stateMachine.rootfsVolName == "" {
-		return fmt.Errorf("Error: could not determine partition number of the root filesystem")
+var setupBootloaderState = stateFunc{"setup_bootloader", (*StateMachine).setupBootloader}
+
+// setupBootloader determines the bootloader for each volume
+// and runs the correct helper function to install/update the bootloader
+func (stateMachine *StateMachine) setupBootloader() error {
+	volume, found := stateMachine.GadgetInfo.Volumes[stateMachine.RootfsVolName]
+	if !found {
+		return fmt.Errorf("no volume to setup bootloader for")
 	}
-	volume := stateMachine.GadgetInfo.Volumes[stateMachine.rootfsVolName]
 	switch volume.Bootloader {
 	case "grub":
-		err := stateMachine.updateGrub(stateMachine.rootfsVolName, stateMachine.rootfsPartNum)
+		if stateMachine.RootfsPartNum == -1 {
+			fmt.Printf("WARNING: Skipping GRUB installation because no data partition was found.")
+			return nil
+		}
+		if stateMachine.BootPartNum == -1 {
+			fmt.Printf("WARNING: Skipping GRUB installation because no boot partition was found.")
+			return nil
+		}
+		arch, err := stateMachine.parent.Architecture()
+		if err != nil {
+			return err
+		}
+		err = stateMachine.setupGrub(
+			stateMachine.RootfsVolName,
+			stateMachine.RootfsPartNum,
+			stateMachine.BootPartNum,
+			stateMachine.HasBIOSPartition,
+			arch,
+		)
 		if err != nil {
 			return err
 		}
 	default:
-		fmt.Printf("WARNING: updating bootloader %s not yet supported\n",
+		fmt.Printf("WARNING: setting up bootloader %s not yet supported\n",
 			volume.Bootloader,
 		)
 	}
 	return nil
 }
 
+var cleanRootfsState = stateFunc{"clean_rootfs", (*StateMachine).cleanRootfs}
+
 // cleanRootfs cleans the created chroot from secrets/values generated
 // during the various preceding install steps
 func (stateMachine *StateMachine) cleanRootfs() error {
-	toClean := []string{
+	toDelete := []string{
 		filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dbus", "machine-id"),
 	}
 
@@ -1192,56 +1406,72 @@ func (stateMachine *StateMachine) cleanRootfs() error {
 		filepath.Join(stateMachine.tempDirs.chroot, "etc", "machine-id"),
 	}
 
-	// openssh default keys
-	sshPubKeys, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_*_key.pub"))
+	toCleanFromPattern, err := listWithPatterns(stateMachine.tempDirs.chroot,
+		[]string{
+			filepath.Join("etc", "ssh", "ssh_host_*_key.pub"),
+			filepath.Join("etc", "ssh", "ssh_host_*_key"),
+			filepath.Join("var", "cache", "debconf", "*-old"),
+			filepath.Join("var", "lib", "dpkg", "*-old"),
+			filepath.Join("dev", "*"),
+			filepath.Join("sys", "*"),
+			filepath.Join("run", "*"),
+		})
 	if err != nil {
-		return fmt.Errorf("unable to list ssh pub keys: %s", err.Error())
+		return err
 	}
 
-	toClean = append(toClean, sshPubKeys...)
+	toDelete = append(toDelete, toCleanFromPattern...)
 
-	sshPrivKeys, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "etc", "ssh", "ssh_host_*_key"))
+	err = doDeleteFiles(toDelete)
 	if err != nil {
-		return fmt.Errorf("unable to list ssh pub keys: %s", err.Error())
+		return err
 	}
 
-	toClean = append(toClean, sshPrivKeys...)
-
-	oldDebconf, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "var", "cache", "debconf", "*-old"))
+	toTruncateFromPattern, err := listWithPatterns(stateMachine.tempDirs.chroot,
+		[]string{
+			// udev persistent rules
+			filepath.Join("etc", "udev", "rules.d", "*persistent-net.rules"),
+		})
 	if err != nil {
-		return fmt.Errorf("unable to list old debconf conf: %s", err.Error())
+		return err
 	}
 
-	toClean = append(toClean, oldDebconf...)
+	toTruncate = append(toTruncate, toTruncateFromPattern...)
 
-	oldDpkg, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "var", "lib", "dpkg", "*-old"))
-	if err != nil {
-		return fmt.Errorf("unable to list old dpkg conf: %s", err.Error())
+	return doTruncateFiles(toTruncate)
+}
+
+func listWithPatterns(chroot string, patterns []string) ([]string, error) {
+	files := make([]string, 0)
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(filepath.Join(chroot, pattern))
+		if err != nil {
+			return nil, fmt.Errorf("unable to list files for pattern %s: %s", pattern, err.Error())
+		}
+
+		files = append(files, matches...)
 	}
+	return files, nil
+}
 
-	toClean = append(toClean, oldDpkg...)
-
-	for _, f := range toClean {
-		err = osRemove(f)
+// doDeleteFiles deletes the given list of files
+func doDeleteFiles(toDelete []string) error {
+	for _, f := range toDelete {
+		err := osRemoveAll(f)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error removing %s: %s", f, err.Error())
 		}
 	}
+	return nil
+}
 
-	// udev persistent rules
-	udevRules, err := filepath.Glob(filepath.Join(stateMachine.tempDirs.chroot, "etc", "udev", "rules.d", "*persistent-net.rules"))
-	if err != nil {
-		return fmt.Errorf("unable to list udev persistent rules: %s", err.Error())
-	}
-
-	toTruncate = append(toTruncate, udevRules...)
-
+// doTruncateFiles truncates content in the given list of files
+func doTruncateFiles(toTruncate []string) error {
 	for _, f := range toTruncate {
-		err = osTruncate(f, 0)
+		err := osTruncate(f, 0)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("Error truncating %s: %s", f, err.Error())
 		}
 	}
-
 	return nil
 }

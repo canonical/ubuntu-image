@@ -1,0 +1,9 @@
+device-tree-origin: kernel
+defaults:
+  # system default settings
+  system:
+    refresh:
+      retain: 2
+    watchdog:
+      runtime-timeout: 5s
+      shutdown-timeout: 8s

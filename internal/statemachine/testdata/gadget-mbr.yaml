@@ -18,7 +18,7 @@ volumes:
       - name: EFI System
         type: EF
         filesystem: vfat
-        filesystem-label: system-boot
+        role: system-boot
         size: 50M
         content:
           - source: grubx64.efi

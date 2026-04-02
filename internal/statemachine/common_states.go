@@ -6,67 +6,22 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	diskfs "github.com/diskfs/go-diskfs"
-	"github.com/google/uuid"
+	diskutils "github.com/diskfs/go-diskfs/disk"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/partition"
 )
 
-// generate work directory file structure
-func (stateMachine *StateMachine) makeTemporaryDirectories() error {
-	// if no workdir was specified, open a /tmp dir
-	if stateMachine.stateMachineFlags.WorkDir == "" {
-		stateMachine.stateMachineFlags.WorkDir = filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
-		if err := osMkdir(stateMachine.stateMachineFlags.WorkDir, 0755); err != nil {
-			return fmt.Errorf("Failed to create temporary directory: %s", err.Error())
-		}
-		stateMachine.cleanWorkDir = true
-	} else {
-		err := osMkdirAll(stateMachine.stateMachineFlags.WorkDir, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating work directory: %s", err.Error())
-		}
-	}
+var setArtifactNamesState = stateFunc{"set_artifact_names", (*StateMachine).setArtifactNames}
 
-	stateMachine.tempDirs.rootfs = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "root")
-	stateMachine.tempDirs.unpack = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "unpack")
-	stateMachine.tempDirs.volumes = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "volumes")
-	stateMachine.tempDirs.chroot = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "chroot")
-	stateMachine.tempDirs.scratch = filepath.Join(stateMachine.stateMachineFlags.WorkDir, "scratch")
-
-	tempDirs := []string{stateMachine.tempDirs.scratch, stateMachine.tempDirs.rootfs, stateMachine.tempDirs.unpack}
-	for _, tempDir := range tempDirs {
-		err := osMkdir(tempDir, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating temporary directory \"%s\": \"%s\"", tempDir, err.Error())
-		}
-	}
-
-	return nil
-}
-
-// determineOutputDirectory sets the directory in which to place artifacts
-// and creates it if it doesn't already exist
-func (stateMachine *StateMachine) determineOutputDirectory() error {
-	if stateMachine.commonFlags.OutputDir == "" {
-		if stateMachine.cleanWorkDir { // no workdir specified, so create the image in the pwd
-			stateMachine.commonFlags.OutputDir, _ = os.Getwd()
-		} else {
-			stateMachine.commonFlags.OutputDir = stateMachine.stateMachineFlags.WorkDir
-		}
-	} else {
-		err := osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating OutputDir: %s", err.Error())
-		}
-	}
-	return nil
-}
+const (
+	schemaEMMC = "emmc"
+)
 
 // for snap/core image builds, the image name is always <volume-name>.img for
 // each volume in the gadget. This function stores that info in the struct
@@ -77,6 +32,8 @@ func (stateMachine *StateMachine) setArtifactNames() error {
 	}
 	return nil
 }
+
+var loadGadgetYamlState = stateFunc{"load_gadget_yaml", (*StateMachine).loadGadgetYaml}
 
 // Load gadget.yaml, do some validation, and store the relevant info in the StateMachine struct
 func (stateMachine *StateMachine) loadGadgetYaml() error {
@@ -99,22 +56,26 @@ The gadget.yaml file is expected to be located in a "meta" subdirectory of the p
 		return fmt.Errorf("Error running InfoFromGadgetYaml: %s", err.Error())
 	}
 
+	err = gadget.Validate(stateMachine.GadgetInfo, nil, nil)
+	if err != nil {
+		return fmt.Errorf("invalid gadget: %s", err.Error())
+	}
+
 	// check if the unpack dir should be preserved
-	envar := os.Getenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
-	if envar != "" {
-		err := osMkdirAll(envar, 0755)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("Error creating preserve_unpack directory: %s", err.Error())
-		}
-		if err := osutilCopySpecialFile(stateMachine.tempDirs.unpack, envar); err != nil {
-			return fmt.Errorf("Error preserving unpack dir: %s", err.Error())
-		}
+	err = preserveUnpack(stateMachine.tempDirs.unpack)
+	if err != nil {
+		return err
+	}
+
+	err = stateMachine.validateVolumes()
+	if err != nil {
+		return err
 	}
 
 	// for the --image-size argument, the order of the volumes specified in gadget.yaml
 	// must be preserved. However, since gadget.Info stores the volumes as a map, the
 	// order is not preserved. We use the already read-in gadget.yaml file to store the
-	// order of the volumes as an array in the StateMachine struct
+	// order of the volumes in a slice in the StateMachine struct
 	stateMachine.saveVolumeOrder(string(gadgetYamlBytes))
 
 	if err := stateMachine.postProcessGadgetYaml(); err != nil {
@@ -127,10 +88,39 @@ The gadget.yaml file is expected to be located in a "meta" subdirectory of the p
 
 	// pre-parse the sector size argument here as it's a string and we will be using it
 	// in various places
-	stateMachine.SectorSize, _ = quantity.ParseSize(stateMachine.commonFlags.SectorSize)
+	stateMachine.SectorSize, err = quantity.ParseSize(stateMachine.commonFlags.SectorSize)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
+
+// preserveUnpack checks if and does preserve the gadget unpack directory
+func preserveUnpack(unpackDir string) error {
+	preserveUnpackDir := os.Getenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
+	if len(preserveUnpackDir) == 0 {
+		return nil
+	}
+	err := osMkdirAll(preserveUnpackDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("Error creating preserve unpack directory: %s", err.Error())
+	}
+	if err := osutilCopySpecialFile(unpackDir, preserveUnpackDir); err != nil {
+		return fmt.Errorf("Error preserving unpack dir: %s", err.Error())
+	}
+	return nil
+}
+
+// validateVolumes checks there is at least one volume in the gadget
+func (stateMachine *StateMachine) validateVolumes() error {
+	if len(stateMachine.GadgetInfo.Volumes) < 1 {
+		return fmt.Errorf("no volume in the gadget.yaml. Specify at least one volume.")
+	}
+	return nil
+}
+
+var generateDiskInfoState = stateFunc{"generate_disk_info", (*StateMachine).generateDiskInfo}
 
 // If --disk-info was used, copy the provided file to the correct location
 func (stateMachine *StateMachine) generateDiskInfo() error {
@@ -148,91 +138,140 @@ func (stateMachine *StateMachine) generateDiskInfo() error {
 	return nil
 }
 
-// Calculate the size of the root filesystem
-// on a 100MiB filesystem, ext4 takes a little over 7MiB for the
-// metadata. Use 8MB as a minimum padding here
+// Semi-arbitrary value, probably larger than needed but big enough to not have issues
+// and low enough to stay in the same magnitude
+const ext4FudgeFactor = 1.5
+
+// On a 100MiB filesystem, ext4 takes a little over 7MiB for the
+// metadata, so use 8MB as a minimum padding
+const ext4Padding = 8 * quantity.SizeMiB
+
+var calculateRootfsSizeState = stateFunc{"calculate_rootfs_size", (*StateMachine).calculateRootfsSize}
+
+// calculateRootfsSize calculates the size needed by the root filesystem.
+// If an image size was specified, make sure it is big enough to contain the
+// rootfs and try to allocate it to the rootfs
 func (stateMachine *StateMachine) calculateRootfsSize() error {
-	// use `du` to calculate the size of the rootfs
-	rootfsSize, err := helper.Du(stateMachine.tempDirs.rootfs)
+	rootfsMinSize, err := stateMachine.getRootfsMinSize()
 	if err != nil {
-		return fmt.Errorf("Error getting rootfs size: %s", err.Error())
+		return err
 	}
-	var rootfsQuantity quantity.Size = rootfsSize
 
-	// fudge factor for incidentals
-	rootfsPadding := 8 * quantity.SizeMiB
-	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity) * 1.5))
-	rootfsQuantity += rootfsPadding
+	stateMachine.RootfsSize = rootfsMinSize
 
-	// align the size of the rootfs to sector size
-	rootfsQuantity = quantity.Size(math.Ceil(float64(rootfsQuantity)/float64(stateMachine.SectorSize))) *
-		quantity.Size(stateMachine.SectorSize)
+	rootfsVolume, rootfsStructure := stateMachine.findRootfsVolumeStructure()
 
-	stateMachine.RootfsSize = rootfsQuantity
+	gadgetRootfsMinSize := stateMachine.getGadgetRootfsMinSize(rootfsStructure)
+	if gadgetRootfsMinSize > stateMachine.RootfsSize {
+		stateMachine.RootfsSize = gadgetRootfsMinSize
+	}
 
-	if stateMachine.commonFlags.Size != "" {
-		var parsedSize quantity.Size
+	desiredSize, foundDesiredSize := stateMachine.getRootfsDesiredSize(rootfsVolume)
 
-		// identify which structure has the rootfs
-		var rootfsVolume *gadget.Volume
-		var rootfsVolumeName string
-		for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
-			for _, structure := range volume.Structure {
-				if structure.Size == 0 {
-					rootfsVolume = volume
-					rootfsVolumeName = volumeName
-					break
-				}
-			}
-		}
-
-		if !strings.Contains(stateMachine.commonFlags.Size, ":") {
-			// this scenario has just one size for each volume
-			// no need to check error as it has already been done by
-			// the parseImageSizes function
-			parsedSize, _ = quantity.ParseSize(stateMachine.commonFlags.Size)
+	if foundDesiredSize {
+		if stateMachine.RootfsSize > desiredSize {
+			fmt.Printf("WARNING: rootfs content %d is bigger "+
+				"than requested image size (%d). Try using a larger value of "+
+				"--image-size",
+				stateMachine.RootfsSize, desiredSize,
+			)
 		} else {
-			parsedSize = stateMachine.ImageSizes[rootfsVolumeName]
-		}
-
-		// subtract the size and offsets of the existing volumes
-		if rootfsVolume != nil {
-			for _, structure := range rootfsVolume.Structure {
-				parsedSize = helper.SafeQuantitySubtraction(parsedSize, structure.Size)
-				if structure.Offset != nil {
-					parsedSize = helper.SafeQuantitySubtraction(parsedSize,
-						quantity.Size(*structure.Offset))
-				}
-			}
-
-			// align the size of the rootfs to sector size
-			parsedSize = quantity.Size(math.Ceil(float64(parsedSize)/float64(stateMachine.SectorSize))) *
-				quantity.Size(stateMachine.SectorSize)
-
-			if parsedSize < stateMachine.RootfsSize {
-				return fmt.Errorf("Error: calculated rootfs partition size %d is smaller "+
-					"than actual rootfs contents (%d). Try using a larger value of "+
-					"--image-size",
-					parsedSize, stateMachine.RootfsSize,
-				)
-			}
-
-			stateMachine.RootfsSize = parsedSize
+			stateMachine.RootfsSize = desiredSize
 		}
 	}
 
-	// we have already saved the rootfs size in the state machine struct, but we
-	// should also set it in the gadget.Structure that represents the rootfs
-	for _, volume := range stateMachine.GadgetInfo.Volumes {
-		for structureNumber, structure := range volume.Structure {
-			if structure.Size == 0 {
-				structure.Size = stateMachine.RootfsSize
-			}
-			volume.Structure[structureNumber] = structure
-		}
+	if rootfsStructure != nil {
+		raiseStructureSizes(rootfsStructure, stateMachine.RootfsSize)
 	}
+
 	return nil
 }
+
+// getRootfsMinSize gets the minimum size needed to hold the built rootfs directory
+func (stateMachine *StateMachine) getRootfsMinSize() (quantity.Size, error) {
+	rootfsMinSize, err := helper.Du(stateMachine.tempDirs.rootfs)
+	if err != nil {
+		return quantity.Size(0), fmt.Errorf("Error getting rootfs size: %s", err.Error())
+	}
+
+	// Take into account ext4 filesystems metadata size
+	rootfsPadding := ext4Padding
+	rootfsMinSize = quantity.Size(math.Ceil(float64(rootfsMinSize) * ext4FudgeFactor))
+	rootfsMinSize += rootfsPadding
+
+	return stateMachine.alignToSectorSize(rootfsMinSize), nil
+}
+
+// getGadgetRootfsMinSize gets the minimum size of the rootfs requested in the
+// gadget YAML
+func (stateMachine *StateMachine) getGadgetRootfsMinSize(rootfsStructure *gadget.VolumeStructure) quantity.Size {
+	if rootfsStructure == nil {
+		return quantity.Size(0)
+	}
+
+	return stateMachine.alignToSectorSize(rootfsStructure.MinSize)
+}
+
+// getRootfsDesiredSize subtracts the size and offsets of the existing structures
+// from the requested image size to determine the maximum possible size of the rootfs
+func (stateMachine *StateMachine) getRootfsDesiredSize(rootfsVolume *gadget.Volume) (quantity.Size, bool) {
+	if rootfsVolume == nil {
+		return quantity.Size(0), false
+	}
+
+	desiredSize, found := stateMachine.ImageSizes[rootfsVolume.Name]
+	if !found {
+		// So far we do not know of a desired size for the rootfs
+		return quantity.Size(0), false
+	}
+
+	reservedSize := calculateNoRootfsSize(rootfsVolume)
+	partitionSize := partition.PartitionTableSizeFromVolume(rootfsVolume, uint64(stateMachine.SectorSize), 0)
+	reservedSize += quantity.Size(partitionSize)
+
+	desiredSize = helper.SafeQuantitySubtraction(desiredSize, reservedSize)
+	desiredSize = stateMachine.alignToSectorSize(desiredSize)
+
+	return desiredSize, found
+}
+
+// calculateNoRootfsSize determines the needed space for existing structures
+// except for the rootfs
+func calculateNoRootfsSize(v *gadget.Volume) quantity.Size {
+	var size quantity.Size
+	for _, s := range v.Structure {
+		if helper.IsRootfsStructure(&s) { //nolint:gosec,G301
+			continue
+		}
+		if s.Offset != nil && quantity.Size(*s.Offset) > size {
+			size = quantity.Size(*s.Offset)
+		}
+		size += s.MinSize
+	}
+
+	return size
+}
+
+// findRootfsVolumeStructure finds the volume and the structure associated to the rootfs
+func (stateMachine *StateMachine) findRootfsVolumeStructure() (*gadget.Volume, *gadget.VolumeStructure) {
+	for _, volume := range stateMachine.GadgetInfo.Volumes {
+		for i := range volume.Structure {
+			s := &volume.Structure[i]
+			if helper.IsRootfsStructure(s) { //nolint:gosec,G301
+				return volume, s
+			}
+		}
+	}
+	return nil, nil
+}
+
+// alignToSectorSize align the given size to the SectorSize of the stateMachine
+func (stateMachine *StateMachine) alignToSectorSize(size quantity.Size) quantity.Size {
+	return quantity.Size(math.Ceil(float64(size)/float64(stateMachine.SectorSize))) *
+		quantity.Size(stateMachine.SectorSize)
+}
+
+var populateBootfsContentsState = stateFunc{"populate_bootfs_contents", (*StateMachine).populateBootfsContents}
 
 // Populate the Bootfs Contents by using snapd's MountedFilesystemWriter
 func (stateMachine *StateMachine) populateBootfsContents() error {
@@ -245,163 +284,180 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 			preserve = append(preserve, "config.txt")
 		}
 
-		// now call LayoutVolume to get a LaidOutVolume we can use
-		// with a mountedFilesystemWriter
-		layoutOptions := &gadget.LayoutOptions{
-			SkipResolveContent: false,
-			IgnoreContent:      false,
-			GadgetRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
-			KernelRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
-		}
-		laidOutVolume, err := gadgetLayoutVolume(volume,
-			gadget.OnDiskStructsFromGadget(volume), layoutOptions)
+		// Get a LaidOutVolume we can use with a mountedFilesystemWriter
+		laidOutVolume, err := stateMachine.layoutVolume(volume)
 		if err != nil {
-			return fmt.Errorf("Error laying out bootfs contents: %s", err.Error())
+			return err
 		}
 
-		for ii, laidOutStructure := range laidOutVolume.LaidOutStructure {
-			var targetDir string
-			if laidOutStructure.Role() == gadget.SystemSeed {
-				targetDir = stateMachine.tempDirs.rootfs
-			} else {
-				targetDir = filepath.Join(stateMachine.tempDirs.volumes,
-					volumeName,
-					"part"+strconv.Itoa(ii))
-			}
-			// Bad special-casing.  snapd's image.Prepare currently
-			// installs to /boot/grub, but we need to map this to
-			// /EFI/ubuntu.  This is because we are using a SecureBoot
-			// signed bootloader image which has this path embedded, so
-			// we need to install our files to there.
-			if !stateMachine.IsSeeded &&
-				(laidOutStructure.Role() == gadget.SystemBoot ||
-					laidOutStructure.Label() == gadget.SystemBoot) {
-				if err := stateMachine.handleSecureBoot(volume, targetDir); err != nil {
-					return err
-				}
-			}
-			if laidOutStructure.HasFilesystem() {
-				mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(&laidOutVolume.LaidOutStructure[ii], nil)
-				if err != nil {
-					return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
-				}
-
-				err = mountedFilesystemWriter.Write(targetDir, preserve)
-				if err != nil {
-					return fmt.Errorf("Error in mountedFilesystem.Write(): %s", err.Error())
-				}
+		for i, laidOutStructure := range laidOutVolume.LaidOutStructure {
+			err = stateMachine.populateBootfsLayoutStructure(laidOutStructure, laidOutVolume, i, volume, volumeName, preserve)
+			if err != nil {
+				return err
 			}
 		}
 	}
 	return nil
 }
 
-// Populate and prepare the partitions. For partitions without filesystem: specified in
-// gadget.yaml, this involves using dd to copy the content blobs into a .img file. For
-// partitions that do have filesystem: specified, we use the Mkfs functions from snapd.
+// layoutVolume generates a LaidOutVolume to be used with a gadget.NewMountedFilesystemWriter
+func (stateMachine *StateMachine) layoutVolume(volume *gadget.Volume) (*gadget.LaidOutVolume, error) {
+	layoutOptions := &gadget.LayoutOptions{
+		SkipResolveContent: false,
+		IgnoreContent:      false,
+		GadgetRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "gadget"),
+		KernelRootDir:      filepath.Join(stateMachine.tempDirs.unpack, "kernel"),
+	}
+	laidOutVolume, err := gadgetLayoutVolume(volume,
+		gadget.OnDiskStructsFromGadget(volume), layoutOptions)
+	if err != nil {
+		return nil, fmt.Errorf("Error laying out bootfs contents: %s", err.Error())
+	}
+
+	return laidOutVolume, nil
+}
+
+// populateBootfsLayoutStructure write a laidOutStructure to the associated target directory
+func (stateMachine *StateMachine) populateBootfsLayoutStructure(laidOutStructure gadget.LaidOutStructure, laidOutVolume *gadget.LaidOutVolume, index int, volume *gadget.Volume, volumeName string, preserve []string) error {
+	var targetDir string
+	if laidOutStructure.Role() == gadget.SystemSeed {
+		targetDir = stateMachine.tempDirs.rootfs
+	} else {
+		targetDir = filepath.Join(stateMachine.tempDirs.volumes,
+			volumeName,
+			"part"+strconv.Itoa(index))
+	}
+	// Bad special-casing.  snapd's image.Prepare currently
+	// installs to /boot/grub, but we need to map this to
+	// /EFI/ubuntu.  This is because we are using a SecureBoot
+	// signed bootloader image which has this path embedded, so
+	// we need to install our files to there.
+	if !stateMachine.IsSeeded &&
+		(laidOutStructure.Role() == gadget.SystemBoot ||
+			laidOutStructure.Label() == gadget.SystemBoot) {
+		if err := stateMachine.handleSecureBoot(volume, targetDir); err != nil {
+			return err
+		}
+	}
+	if laidOutStructure.HasFilesystem() {
+		mountedFilesystemWriter, err := gadgetNewMountedFilesystemWriter(nil, &laidOutVolume.LaidOutStructure[index], nil)
+		if err != nil {
+			return fmt.Errorf("Error creating NewMountedFilesystemWriter: %s", err.Error())
+		}
+
+		err = mountedFilesystemWriter.Write(targetDir, preserve)
+		if err != nil {
+			return fmt.Errorf("Error in mountedFilesystem.Write(): %s", err.Error())
+		}
+	}
+	return nil
+}
+
+var populatePreparePartitionsState = stateFunc{"populate_prepare_partitions", (*StateMachine).populatePreparePartitions}
+
+// populatePreparePartitions populates and prepares the partitions. For partitions without
+// "filesystem:" specified in gadget.yaml, this involves using dd to copy the content blobs
+// into a .img file. For partitions that do have "filesystem:" specified, we use the Mkfs
+// functions from snapd.
 // Throughout this process, the offset is tracked to ensure partitions are not overlapping.
 func (stateMachine *StateMachine) populatePreparePartitions() error {
-	// iterate through all the volumes
 	for _, volumeName := range stateMachine.VolumeOrder {
 		volume := stateMachine.GadgetInfo.Volumes[volumeName]
+
+		// eMMC volumes do not have their own disk image
+		if volume.Schema == schemaEMMC {
+			continue
+		}
+
 		if err := stateMachine.handleLkBootloader(volume); err != nil {
 			return err
 		}
-		for structureNumber, structure := range volume.Structure {
+		for structIndex := range volume.Structure {
+			structure := &volume.Structure[structIndex]
+			if helper.ShouldSkipStructure(structure, stateMachine.IsSeeded) {
+				continue
+			}
+			if structure.Role == gadget.SystemBootState {
+				if err := stateMachine.handleUbootPart(
+					structIndex, volume.Name); err != nil {
+					return err
+				}
+				continue
+			}
+
 			var contentRoot string
-			if structure.Role == gadget.SystemData || structure.Role == gadget.SystemSeed {
+			if helper.IsRootfsStructure(structure) || helper.IsSystemSeedStructure(structure) { //nolint:gosec,G301
 				contentRoot = stateMachine.tempDirs.rootfs
 			} else {
 				contentRoot = filepath.Join(stateMachine.tempDirs.volumes, volumeName,
-					"part"+strconv.Itoa(structureNumber))
-			}
-			if shouldSkipStructure(structure, stateMachine.IsSeeded) {
-				continue
+					"part"+strconv.Itoa(structIndex))
 			}
 
 			// copy the data
 			partImg := filepath.Join(stateMachine.tempDirs.volumes, volumeName,
-				"part"+strconv.Itoa(structureNumber)+".img")
-			if err := stateMachine.copyStructureContent(volume, structure,
-				structureNumber, contentRoot, partImg); err != nil {
+				"part"+strconv.Itoa(structIndex)+".img")
+			if err := stateMachine.copyStructureContent(structure,
+				contentRoot, partImg); err != nil {
 				return err
 			}
 		}
-		// Set the image size values to be used by make_disk, by using
-		// the minimum size that would be valid according to gadget.yaml.
-		stateMachine.handleContentSizes(quantity.Offset(volume.MinSize()), volumeName)
+		// Make sure the register image size grows with the content
+		stateMachine.growImageSize(volume.MinSize(), volumeName)
 	}
 	return nil
 }
 
-// Make the disk
+// growImageSize checks if the current size still fits in the requested
+// image size and grows it if necessary
+func (stateMachine *StateMachine) growImageSize(currentSize quantity.Size, volumeName string) {
+	desiredMinSize, found := stateMachine.ImageSizes[volumeName]
+	if !found {
+		stateMachine.ImageSizes[volumeName] = currentSize
+	} else {
+		if desiredMinSize < currentSize {
+			fmt.Printf("WARNING: ignoring image size smaller than "+
+				"minimum required size: vol:%s %d < %d\n",
+				volumeName, uint64(desiredMinSize), uint64(currentSize))
+			stateMachine.ImageSizes[volumeName] = currentSize
+		}
+	}
+}
+
+var makeDiskState = stateFunc{"make_disk", (*StateMachine).makeDisk}
+
+// makeDisk makes the disk image
 func (stateMachine *StateMachine) makeDisk() error {
-	// TODO: this is only temporarily needed until go-diskfs is fixed - see below
-	var existingDiskIds [][]byte
 	for volumeName, volume := range stateMachine.GadgetInfo.Volumes {
 		_, found := stateMachine.VolumeNames[volumeName]
 		if !found {
 			continue
 		}
+
+		// eMMC volumes should not have its own disk image, these are treated specially
+		// as they consist only of fixed content images that needs to be written during
+		// runtime (i.e gadget install or gadget update). The contents of the image are
+		// part of the gadget snap
+		if volume.Schema == schemaEMMC {
+			continue
+		}
+
 		imgName := filepath.Join(stateMachine.commonFlags.OutputDir, stateMachine.VolumeNames[volumeName])
-
-		// Create the disk image
-		imgSize, found := stateMachine.ImageSizes[volumeName]
-		if !found {
-			// Calculate the minimum size that would be
-			// valid according to gadget.yaml.
-			imgSize = volume.MinSize()
-		}
-
-		if err := osRemoveAll(imgName); err != nil {
-			return fmt.Errorf("Error removing old disk image: %s", err.Error())
-		}
-		sectorSizeFlag := diskfs.SectorSize(int(stateMachine.SectorSize))
-		diskImg, err := diskfsCreate(imgName, int64(imgSize), diskfs.Raw, sectorSizeFlag)
+		diskImg, err := stateMachine.createDiskImage(volumeName, volume, imgName)
 		if err != nil {
-			return fmt.Errorf("Error creating disk image: %s", err.Error())
+			return err
 		}
 
-		// make sure the disk image size is a multiple of its block/sector size
-		imgSize = quantity.Size(math.Ceil(float64(imgSize)/float64(stateMachine.SectorSize))) *
-			stateMachine.SectorSize
-		if err := osTruncate(diskImg.File.Name(), int64(imgSize)); err != nil {
-			return fmt.Errorf("Error resizing disk image to a multiple of its block size: %s",
-				err.Error())
-		}
-
-		// set up the partitions on the device
-		partitionTable, rootfsPartitionNumber := createPartitionTable(volumeName, volume, uint64(stateMachine.SectorSize), stateMachine.IsSeeded)
-
-		// Save the rootfs partition number, if found, for later use
-		if rootfsPartitionNumber != -1 {
-			stateMachine.rootfsVolName = volumeName
-			stateMachine.rootfsPartNum = rootfsPartitionNumber
-		}
-
-		// Write the partition table to disk
-		if err := diskImg.Partition(*partitionTable); err != nil {
-			return fmt.Errorf("Error partitioning image file: %s", err.Error())
+		if err := stateMachine.partitionDisk(diskImg, volume, volumeName); err != nil {
+			return err
 		}
 
 		// TODO: go-diskfs doesn't set the disk ID when using an MBR partition table.
 		// this function is a temporary workaround, but we should change upstream go-diskfs
-		if volume.Schema == "mbr" {
-			randomBytes, err := generateUniqueDiskID(&existingDiskIds)
+		if volume.Schema == partition.SchemaMBR {
+			err = fixDiskIDOnMBR(imgName)
 			if err != nil {
-				return fmt.Errorf("Error generating disk ID: %s", err.Error())
+				return err
 			}
-			diskFile, err := osOpenFile(imgName, os.O_RDWR, 0755)
-			if err != nil {
-				return fmt.Errorf("Error opening disk to write MBR disk identifier: %s",
-					err.Error())
-			}
-			defer diskFile.Close()
-			_, err = diskFile.WriteAt(randomBytes, 440)
-			if err != nil {
-				return fmt.Errorf("Error writing MBR disk identifier: %s", err.Error())
-			}
-			diskFile.Close()
 		}
 
 		// After the partitions have been created, copy the data into the correct locations
@@ -410,14 +466,59 @@ func (stateMachine *StateMachine) makeDisk() error {
 		}
 
 		// Open the file and write any OffsetWrite values
-		if err := writeOffsetValues(volume, imgName, uint64(stateMachine.SectorSize), uint64(imgSize)); err != nil {
+		if err := writeOffsetValues(volume, imgName, uint64(stateMachine.SectorSize), uint64(diskImg.Size)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Finish step to show that the build was successful
-func (stateMachine *StateMachine) finish() error {
+// createDiskImage creates a disk image and makes sure the size respects the configuration and
+// the SectorSize
+func (stateMachine *StateMachine) createDiskImage(volumeName string, volume *gadget.Volume, imgName string) (*diskutils.Disk, error) {
+	// Calculate the minimum size that would be needed according to gadget.yaml.
+	imgSize := volume.Size()
+
+	desiredImgSize, found := stateMachine.ImageSizes[volumeName]
+	if found && desiredImgSize > imgSize {
+		imgSize = desiredImgSize
+	}
+	if err := osRemoveAll(imgName); err != nil {
+		return nil, fmt.Errorf("Error removing old disk image: %s", err.Error())
+	}
+
+	sectorSizeDiskfs := diskfs.SectorSize(int(stateMachine.SectorSize))
+	imgSize = stateMachine.alignToSectorSize(imgSize)
+
+	partitionSize := partition.PartitionTableSizeFromVolume(volume, uint64(stateMachine.SectorSize), 0)
+	totalImgSize := int64(imgSize) + int64(partitionSize)
+
+	diskImg, err := diskfsCreate(imgName, totalImgSize, diskfs.Raw, sectorSizeDiskfs)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating disk image: %s", err.Error())
+	}
+
+	return diskImg, nil
+}
+
+// partitionDisk generates a partition table and applies it to the disk
+func (stateMachine *StateMachine) partitionDisk(diskImg *diskutils.Disk, volume *gadget.Volume, volumeName string) error {
+	partitionTable, rootfsPartitionNumber, bootPartitionNumber, hasBIOSPartition, err := partition.GeneratePartitionTable(volume, uint64(stateMachine.SectorSize), uint64(diskImg.Size), stateMachine.IsSeeded)
+	if err != nil {
+		return err
+	}
+
+	// Save the rootfs/boot partition numbers, for later use
+	// Store in any case, even if value is -1 to make it clear later it was not found
+	stateMachine.RootfsPartNum = rootfsPartitionNumber
+	stateMachine.BootPartNum = bootPartitionNumber
+	stateMachine.HasBIOSPartition = hasBIOSPartition
+	if rootfsPartitionNumber != -1 {
+		stateMachine.RootfsVolName = volumeName
+	}
+
+	if err := diskImg.Partition(partitionTable); err != nil {
+		return fmt.Errorf("Error partitioning image file: %s", err.Error())
+	}
 	return nil
 }

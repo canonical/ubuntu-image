@@ -1,0 +1,49 @@
+summary: Build classic Ubuntu server image
+
+kill-timeout: 3h
+
+execute: |
+    mkdir -p /tmp/${IMG}/{workdir,mount}
+    IMG_DEF_PATH=/home/ubuntu-image/ubuntu-images/${IMG}.yaml
+    ubuntu-image classic --debug --workdir /tmp/${IMG}/workdir $IMG_DEF_PATH
+
+    IMG_NAME=$(cat $IMG_DEF_PATH | yq '.artifacts.img.[0].name')
+    losetup --find --show --partscan /tmp/${IMG}/workdir/$IMG_NAME
+    losetup -a | grep $IMG_NAME |cut -f1 -d: >> loop.txt
+    LOOP="$(cat loop.txt)"
+
+    for l in `ls -d "$LOOP"p*`
+    do 
+        p=${l#"$LOOP"}
+        mkdir /tmp/${IMG}/mount/$p
+        mount $l /tmp/${IMG}/mount/$p || true
+        ls /tmp/${IMG}/mount/$p/ || true
+    done
+
+restore: |
+    if [ -f loop.txt ]; then
+        LOOP="$(cat loop.txt)"
+
+        for l in `ls -d "$LOOP"p*`
+        do 
+            p=${l#"$LOOP"}
+            mount --make-rprivate /tmp/${IMG}/mount/$p || true
+            umount --recursive /tmp/${IMG}/mount/$p || true
+        done
+
+        losetup -d "$LOOP"
+        sync
+        losetup -l | NOMATCH "$LOOP"
+        rm loop.txt
+    fi
+
+    rm -rf /tmp/${IMG}/
+
+debug: |
+    df -h
+    du -h -d 1 /tmp/
+    mount  -l
+    if [ -f loop.txt ]; then
+        cat loop.txt
+    fi
+    losetup -l

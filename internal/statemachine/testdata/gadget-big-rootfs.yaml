@@ -1,0 +1,34 @@
+volumes:
+  pc:
+    bootloader: grub
+    structure:
+      - name: mbr
+        type: mbr
+        size: 440
+        content:
+          - image: pc-boot.img
+            offset: 0
+      - name: BIOS Boot
+        type: DA,21686148-6449-6E6F-744E-656564454649
+        size: 1M
+        offset-write: mbr+92
+        content:
+          - image: pc-core.img
+      - name: EFI System
+        type: EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+        filesystem: vfat
+        role: system-boot
+        size: 50M
+        content:
+          - source: grubx64.efi
+            target: EFI/boot/grubx64.efi
+          - source: shim.efi.signed
+            target: EFI/boot/bootx64.efi
+          - source: grub-cpc.cfg
+            target: EFI/ubuntu/grub.cfg
+      - name: rootfs
+        label: writable
+        type: 83,0FC63DAF-8483-4772-8E79-3D69D8477DE4
+        filesystem: ext4
+        role: system-data
+        size: 1G

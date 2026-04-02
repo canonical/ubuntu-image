@@ -1,8 +1,6 @@
 package statemachine
 
 import (
-	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,15 +9,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/osutil"
 
+	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 var basicImageDef = imagedefinition.ImageDefinition{
-	Architecture: getHostArch(),
+	Architecture: arch.GetHostArch(),
 	Series:       getHostSuite(),
 	Rootfs: &imagedefinition.Rootfs{
-		Archive: "ubuntu",
+		Archive:           "ubuntu",
+		SourcesListDeb822: helper.BoolPtr(false),
 	},
 	Customization: &imagedefinition.Customization{},
 }
@@ -63,7 +64,7 @@ func (b *basicChrooter) init() error {
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 	stateMachine.parent = &stateMachine
 	stateMachine.ImageDef = basicImageDef
-	path := filepath.Join("/tmp", "ubuntu-image-chroot-"+uuid.NewString())
+	path := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-chroot-"+uuid.NewString())
 	stateMachine.tempDirs.chroot = path
 
 	err := helper.SetDefaults(&stateMachine.ImageDef)
@@ -109,74 +110,17 @@ func provideChroot(s StateMachine) error {
 	return osutil.CopySpecialFile(basicChroot.path, s.tempDirs.chroot)
 }
 
-type osMockConf struct {
-	osutilCopySpecialFileThreshold uint
-	ReadDirThreshold               uint
-	RemoveThreshold                uint
-	TruncateThreshold              uint
-	OpenFileThreshold              uint
+type mockRunCmd struct {
+	cmds []*exec.Cmd
 }
 
-// osMock holds methods to easily mock functions from os and snapd/osutil packages
-// Each method can be configured to fail after a given number of calls
-// This could be improved by letting the mock functions calls the real
-// functions before failing.
-type osMock struct {
-	conf                            *osMockConf
-	beforeOsutilCopySpecialFileFail uint
-	beforeReadDirFail               uint
-	beforeRemoveFail                uint
-	beforeTruncateFail              uint
-	beforeOpenFileFail              uint
+func NewMockRunCommand() *mockRunCmd {
+	return &mockRunCmd{}
 }
 
-func (o *osMock) CopySpecialFile(path, dest string) error {
-	if o.beforeOsutilCopySpecialFileFail >= o.conf.osutilCopySpecialFileThreshold {
-		return fmt.Errorf("CopySpecialFile fail")
-	}
-	o.beforeOsutilCopySpecialFileFail++
-
+func (m *mockRunCmd) runCmd(cmd *exec.Cmd, debug bool) error {
+	m.cmds = append(m.cmds, cmd)
 	return nil
-}
-
-func (o *osMock) ReadDir(name string) ([]fs.DirEntry, error) {
-	if o.beforeReadDirFail >= o.conf.ReadDirThreshold {
-		return nil, fmt.Errorf("ReadDir fail")
-	}
-	o.beforeReadDirFail++
-
-	return []fs.DirEntry{}, nil
-}
-
-func (o *osMock) Remove(name string) error {
-	if o.beforeRemoveFail >= o.conf.RemoveThreshold {
-		return fmt.Errorf("Remove fail")
-	}
-	o.beforeRemoveFail++
-
-	return nil
-}
-
-func (o *osMock) Truncate(name string, size int64) error {
-	if o.beforeTruncateFail >= o.conf.TruncateThreshold {
-		return fmt.Errorf("Truncate fail")
-	}
-	o.beforeTruncateFail++
-
-	return nil
-}
-
-func (o *osMock) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	if o.beforeOpenFileFail >= o.conf.OpenFileThreshold {
-		return nil, fmt.Errorf("OpenFile fail")
-	}
-	o.beforeOpenFileFail++
-
-	return &os.File{}, nil
-}
-
-func NewOSMock(conf *osMockConf) *osMock {
-	return &osMock{conf: conf}
 }
 
 type mockExecCmd struct{}

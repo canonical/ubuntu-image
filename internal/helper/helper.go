@@ -3,6 +3,7 @@ package helper
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -20,8 +21,15 @@ import (
 )
 
 // define some functions that can be mocked by test cases
-var osRename = os.Rename
-var osRemove = os.Remove
+var (
+	dpkgDivert  = DpkgDivert
+	runCmd      = RunCmd
+	execCommand = exec.Command
+	osMkdirAll  = os.MkdirAll
+	osRename    = os.Rename
+	osRemove    = os.Remove
+	osWriteFile = os.WriteFile
+)
 
 func BoolPtr(b bool) *bool {
 	return &b
@@ -70,14 +78,6 @@ func RunScript(hookScript string) error {
 	return nil
 }
 
-// SaveCWD gets the current working directory and returns a function to go back to it
-func SaveCWD() func() {
-	wd, _ := os.Getwd()
-	return func() {
-		_ = os.Chdir(wd)
-	}
-}
-
 // Du recurses through a directory similar to du and adds all the sizes of files together
 func Du(path string) (quantity.Size, error) {
 	duCommand := *exec.Command("du", "-s", "-B1")
@@ -117,64 +117,94 @@ func SetDefaults(needsDefaults interface{}) error {
 		field := elem.Field(i)
 		// if we're dealing with a slice of pointers to structs,
 		// iterate through it and set the defaults for each struct pointer
-		if field.Type().Kind() == reflect.Slice &&
-			field.Cap() > 0 &&
-			field.Index(0).Kind() == reflect.Pointer {
-			for i := 0; i < field.Cap(); i++ {
-				err := SetDefaults(field.Index(i).Interface())
-				if err != nil {
-					return err
-				}
+		if isSliceOfPtrToStructs(field) {
+			err := setDefaultsToSlice(field)
+			if err != nil {
+				return err
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
-			// if it's a pointer to a struct, look for default types
-			if field.Elem().Kind() == reflect.Struct {
-				err := SetDefaults(field.Interface())
-				if err != nil {
-					return err
-				}
-				// special case for pointer to bools
-			} else if field.Type().Elem() == reflect.TypeOf(true) {
-				// if a value is set, do nothing
-				if !field.IsNil() {
-					continue
-				}
-				tags := elem.Type().Field(i).Tag
-				defaultValue, hasDefault := tags.Lookup("default")
-				if !hasDefault {
-					// If no default and no value is set, make sure we have a valid
-					// value consistent with the "zero" value for a bool (false)
-					field.Set(reflect.ValueOf(BoolPtr(false)))
-					continue
-				}
-				if defaultValue == "true" {
-					field.Set(reflect.ValueOf(BoolPtr(true)))
-				} else {
-					field.Set(reflect.ValueOf(BoolPtr(false)))
-				}
+			err := setDefaultToPtr(field, elem, i)
+			if err != nil {
+				return err
 			}
 		} else {
-			tags := elem.Type().Field(i).Tag
-			defaultValue, hasDefault := tags.Lookup("default")
-			if !hasDefault {
-				continue
+			err := setDefaultToBasicType(field, elem, i)
+			if err != nil {
+				return err
 			}
-			indirectedField := reflect.Indirect(field)
-			if indirectedField.CanSet() && field.IsZero() {
-				varType := field.Type().Kind()
-				switch varType {
-				case reflect.String:
-					field.SetString(defaultValue)
-				case reflect.Slice:
-					defaultValues := strings.Split(defaultValue, ",")
-					field.Set(reflect.ValueOf(defaultValues))
-				case reflect.Bool:
-					return fmt.Errorf("Setting default value of a boolean not supported. Use a pointer to boolean instead.")
-				default:
-					return fmt.Errorf("Setting default value of type %s not supported",
-						varType)
-				}
-			}
+		}
+	}
+	return nil
+}
+
+// setDefaultsToSlice sets default values to elements of a slice.
+// It assumes it was already checked field is a non empty slice. Otherwise this
+// function will probably panic.
+func setDefaultsToSlice(field reflect.Value) error {
+	for i := 0; i < field.Cap(); i++ {
+		err := SetDefaults(field.Index(i).Interface())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// setDefaultToPtr sets a default value to a field being a pointer.
+// It assumes it was already checked that field is a ptr. Otherwise this
+// function will probably panic.
+func setDefaultToPtr(field reflect.Value, elem reflect.Value, fieldIndex int) error {
+	// if it's a pointer to a struct, look for default types
+	if field.Elem().Kind() == reflect.Struct {
+		err := SetDefaults(field.Interface())
+		if err != nil {
+			return err
+		}
+		// special case for pointer to bools
+	} else if field.Type().Elem() == reflect.TypeOf(true) {
+		// if a value is set, do nothing
+		if !field.IsNil() {
+			return nil
+		}
+		tags := elem.Type().Field(fieldIndex).Tag
+		defaultValue, hasDefault := tags.Lookup("default")
+		if !hasDefault {
+			// If no default and no value is set, make sure we have a valid
+			// value consistent with the "zero" value for a bool (false)
+			field.Set(reflect.ValueOf(BoolPtr(false)))
+			return nil
+		}
+		if defaultValue == "true" {
+			field.Set(reflect.ValueOf(BoolPtr(true)))
+		} else {
+			field.Set(reflect.ValueOf(BoolPtr(false)))
+		}
+	}
+	return nil
+}
+
+// setDefaultToBasicType sets the default value to a basic type (and slice) based on the
+// "default" tag.
+func setDefaultToBasicType(field reflect.Value, elem reflect.Value, fieldIndex int) error {
+	tags := elem.Type().Field(fieldIndex).Tag
+	defaultValue, hasDefault := tags.Lookup("default")
+	if !hasDefault {
+		return nil
+	}
+	indirectedField := reflect.Indirect(field)
+	if indirectedField.CanSet() && field.IsZero() {
+		varType := field.Type().Kind()
+		switch varType {
+		case reflect.String:
+			field.SetString(defaultValue)
+		case reflect.Slice:
+			defaultValues := strings.Split(defaultValue, ",")
+			field.Set(reflect.ValueOf(defaultValues))
+		case reflect.Bool:
+			return fmt.Errorf("Setting default value of a boolean not supported. Use a pointer to boolean instead.")
+		default:
+			return fmt.Errorf("Setting default value of type %s not supported",
+				varType)
 		}
 	}
 	return nil
@@ -197,62 +227,86 @@ func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema
 		// it and search for missing required fields in each
 		// element of the slice
 		if field.Type().Kind() == reflect.Slice {
-			for i := 0; i < field.Cap(); i++ {
-				sliceElem := field.Index(i)
-				if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
-					err := CheckEmptyFields(sliceElem.Interface(), result, schema)
-					if err != nil {
-						return err
-					}
-				}
+			err := checkEmptyFieldsInSlice(field, result, schema)
+			if err != nil {
+				return err
 			}
 		} else if field.Type().Kind() == reflect.Ptr {
 			// otherwise if it's just a pointer to a nested struct
 			// search it for empty required fields
-			if field.Elem().Kind() == reflect.Struct {
-				err := CheckEmptyFields(field.Interface(), result, schema)
-				if err != nil {
-					return err
-				}
+			err := checkEmptyFieldsInPtr(field, result, schema)
+			if err != nil {
+				return err
 			}
 		} else {
-
-			// check if the field is required and if it is present in the YAML file
-			required := false
 			tags := elem.Type().Field(i).Tag
-			jsonTag, hasJSON := tags.Lookup("json")
-			if hasJSON {
-				if !strings.Contains(jsonTag, "omitempty") {
-					required = true
-				}
+			if !isRequiredFromTags(tags) && !isRequiredFromSchema(elem, i, schema) {
+				continue
 			}
-			// also check for required values in the jsonschema
-			for _, requiredField := range schema.Required {
-				if elem.Type().Field(i).Name == requiredField {
-					required = true
-				}
+			// this is a required field, check for zero values
+			if !reflect.Indirect(field).IsZero() {
+				continue
 			}
-			if required {
-				// this is a required field, check for zero values
-				if reflect.Indirect(field).IsZero() {
-					jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
-					errDetail := gojsonschema.ErrorDetails{
-						"property": tags.Get("yaml"),
-						"parent":   elem.Type().Name(),
-					}
-					result.AddError(
-						newMissingFieldError(
-							gojsonschema.NewJsonContext("missing_field", jsonContext),
-							52,
-							errDetail,
-						),
-						errDetail,
-					)
-				}
+			jsonContext := gojsonschema.NewJsonContext("image_definition", nil)
+			errDetail := gojsonschema.ErrorDetails{
+				"property": tags.Get("yaml"),
+				"parent":   elem.Type().Name(),
+			}
+			result.AddError(
+				newMissingFieldError(
+					gojsonschema.NewJsonContext("missing_field", jsonContext),
+					52,
+					errDetail,
+				),
+				errDetail,
+			)
+		}
+	}
+	return nil
+}
+
+func checkEmptyFieldsInSlice(field reflect.Value, result *gojsonschema.Result, schema *jsonschema.Schema) error {
+	for i := 0; i < field.Cap(); i++ {
+		sliceElem := field.Index(i)
+		if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
+			err := CheckEmptyFields(sliceElem.Interface(), result, schema)
+			if err != nil {
+				return err
 			}
 		}
 	}
 	return nil
+}
+
+func checkEmptyFieldsInPtr(field reflect.Value, result *gojsonschema.Result, schema *jsonschema.Schema) error {
+	if field.Elem().Kind() == reflect.Struct {
+		err := CheckEmptyFields(field.Interface(), result, schema)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isRequiredFromTags checks if the field is required from the JSON tags
+func isRequiredFromTags(tags reflect.StructTag) bool {
+	jsonTag, hasJSON := tags.Lookup("json")
+	if hasJSON {
+		if !strings.Contains(jsonTag, "omitempty") {
+			return true
+		}
+	}
+	return false
+}
+
+// isRequiredFromSchema checks if the field is required from the schema
+func isRequiredFromSchema(elem reflect.Value, i int, schema *jsonschema.Schema) bool {
+	for _, requiredField := range schema.Required {
+		if elem.Type().Field(i).Name == requiredField {
+			return true
+		}
+	}
+	return false
 }
 
 func newMissingFieldError(context *gojsonschema.JsonContext, value interface{}, details gojsonschema.ErrorDetails) *MissingFieldError {
@@ -298,6 +352,29 @@ func SetCommandOutput(cmd *exec.Cmd, liveOutput bool) (cmdOutput *bytes.Buffer) 
 	return cmdOutput
 }
 
+func RunCmd(cmd *exec.Cmd, debug bool) error {
+	output := SetCommandOutput(cmd, debug)
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("Error running command \"%s\". Error: %s. Output:\n%s",
+			cmd.String(), err.Error(), output.String())
+	}
+	return nil
+}
+
+// RunCmds runs a list of commands and returns the error
+// It stops at the first error
+func RunCmds(cmds []*exec.Cmd, debug bool) error {
+	for _, cmd := range cmds {
+		err := RunCmd(cmd, debug)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // SafeQuantitySubtraction subtracts quantities while checking for integer underflow
 func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 	if subtract > orig {
@@ -308,14 +385,15 @@ func SafeQuantitySubtraction(orig, subtract quantity.Size) quantity.Size {
 
 // CreateTarArchive places all of the files from a source directory into a tar.
 // Currently supported are uncompressed tar archives and the following
-// compression types: zip, gzip, xz bzip2, zstd
-func CreateTarArchive(src, dest, compression string, verbose, debug bool) error {
-	tarCommand := *exec.Command(
+// compression types: gzip, xz bzip2, zstd
+func CreateTarArchive(src, dest, compression string, debug bool) error {
+	tarCommand := exec.Command(
 		"tar",
 		"--directory",
 		src,
 		"--xattrs",
 		"--xattrs-include=*",
+		"--sparse",
 		"--create",
 		"--file",
 		dest,
@@ -339,21 +417,14 @@ func CreateTarArchive(src, dest, compression string, verbose, debug bool) error 
 	default:
 		return fmt.Errorf("Unknown compression type: \"%s\"", compression)
 	}
-
-	tarOutput := SetCommandOutput(&tarCommand, debug)
-	if err := tarCommand.Run(); err != nil {
-		return fmt.Errorf("Error running \"tar\" command \"%s\". "+
-			"Error is \"%s\". Full output below:\n%s",
-			tarCommand.String(), err.Error(), tarOutput.String())
-	}
-	return nil
+	return RunCmd(tarCommand, debug)
 }
 
 // ExtractTarArchive extracts all the files from a tar. Currently supported are
 // uncompressed tar archives and the following compression types: zip, gzip, xz
 // bzip2, zstd
-func ExtractTarArchive(src, dest string, verbose, debug bool) error {
-	tarCommand := *exec.Command(
+func ExtractTarArchive(src, dest string, debug bool) error {
+	tarCommand := exec.Command(
 		"tar",
 		"--xattrs",
 		"--xattrs-include=*",
@@ -366,13 +437,7 @@ func ExtractTarArchive(src, dest string, verbose, debug bool) error {
 	if debug {
 		tarCommand.Args = append(tarCommand.Args, "--verbose")
 	}
-	tarOutput := SetCommandOutput(&tarCommand, debug)
-	if err := tarCommand.Run(); err != nil {
-		return fmt.Errorf("Error running \"tar\" command \"%s\". "+
-			"Error is \"%s\". Full output below:\n%s",
-			tarCommand.String(), err.Error(), tarOutput.String())
-	}
-	return nil
+	return RunCmd(tarCommand, debug)
 }
 
 // CalculateSHA256 calculates the SHA256 sum of the file provided as an argument
@@ -402,13 +467,22 @@ func CheckTags(searchStruct interface{}, tag string) (string, error) {
 		return "", fmt.Errorf("The argument to CheckTags must be a pointer")
 	}
 	elem := value.Elem()
+
+	return checkTagsOnField(elem, tag)
+}
+
+func isSliceOfPtrToStructs(field reflect.Value) bool {
+	return field.Type().Kind() == reflect.Slice &&
+		field.Cap() > 0 &&
+		field.Index(0).Kind() == reflect.Pointer
+}
+
+func checkTagsOnField(elem reflect.Value, tag string) (string, error) {
 	for i := 0; i < elem.NumField(); i++ {
 		field := elem.Field(i)
 		// if we're dealing with a slice of pointers to structs,
 		// iterate through it and check the tags for each struct pointer
-		if field.Type().Kind() == reflect.Slice &&
-			field.Cap() > 0 &&
-			field.Index(0).Kind() == reflect.Pointer {
+		if isSliceOfPtrToStructs(field) {
 			for i := 0; i < field.Cap(); i++ {
 				tagUsed, err := CheckTags(field.Index(i).Interface(), tag)
 				if err != nil {
@@ -457,23 +531,116 @@ func BackupAndCopyResolvConf(chroot string) error {
 // RestoreResolvConf restores the resolv.conf in the chroot from the
 // version that was backed up by BackupAndCopyResolvConf
 func RestoreResolvConf(chroot string) error {
-	if osutil.FileExists(filepath.Join(chroot, "etc", "resolv.conf.tmp")) {
-		if osutil.IsSymlink(filepath.Join(chroot, "etc", "resolv.conf")) {
-			// As per what live-build does, handle the case where some package
-			// in the install_packages phase converts resolv.conf into a
-			// symlink. In such case we don't restore our backup but instead
-			// remove it, leaving the symlink around.
-			backup := filepath.Join(chroot, "etc", "resolv.conf.tmp")
-			if err := osRemove(backup); err != nil {
-				return fmt.Errorf("Error removing file \"%s\": %s", backup, err.Error())
-			}
-		} else {
-			src := filepath.Join(chroot, "etc", "resolv.conf.tmp")
-			dest := filepath.Join(chroot, "etc", "resolv.conf")
-			if err := osRename(src, dest); err != nil {
-				return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
-			}
+	if !osutil.FileExists(filepath.Join(chroot, "etc", "resolv.conf.tmp")) &&
+		!osutil.IsSymlink(filepath.Join(chroot, "etc", "resolv.conf.tmp")) {
+		return nil
+	}
+	if osutil.IsSymlink(filepath.Join(chroot, "etc", "resolv.conf")) {
+		// As per what live-build does, handle the case where some package
+		// in the install_packages phase converts resolv.conf into a
+		// symlink. In such case we don't restore our backup but instead
+		// remove it, leaving the symlink around.
+		backup := filepath.Join(chroot, "etc", "resolv.conf.tmp")
+		if err := osRemove(backup); err != nil {
+			return fmt.Errorf("Error removing file \"%s\": %s", backup, err.Error())
+		}
+	} else {
+		src := filepath.Join(chroot, "etc", "resolv.conf.tmp")
+		dest := filepath.Join(chroot, "etc", "resolv.conf")
+		if err := osRename(src, dest); err != nil {
+			return fmt.Errorf("Error moving file \"%s\" to \"%s\": %s", src, dest, err.Error())
 		}
 	}
 	return nil
+}
+
+// DpkgDivert dpkg-diverts the given file in the given targetDir
+// Returns two commands: one for diverting the target file, and one for undiverting it.
+func DpkgDivert(targetDir string, target string) (*exec.Cmd, *exec.Cmd) {
+	dpkgDivert := "dpkg-divert"
+	targetDiverted := target + ".dpkg-divert"
+
+	commonArgs := []string{
+		"--local",
+		"--divert",
+		targetDiverted,
+		"--rename",
+		target,
+	}
+
+	divert := append([]string{targetDir, dpkgDivert}, commonArgs...)
+	undivert := append([]string{targetDir, dpkgDivert, "--remove"}, commonArgs...)
+
+	return execCommand("chroot", divert...), execCommand("chroot", undivert...)
+}
+
+// DivertExecWithFake replaces a target file in targetDir with a provided fake content
+// using dpkg-divert, and returns two functions: one for diverting, one for undiverting.
+func DivertExecWithFake(targetDir string, file string, fakeContent string, debug bool) (func() error, func(error) error) {
+	divertCmd, undivertCmd := dpkgDivert(targetDir, file)
+
+	return func() error {
+			err := runCmd(divertCmd, debug)
+			if err != nil {
+				return err
+			}
+			err = osMkdirAll(filepath.Join(targetDir, filepath.Dir(file)), 0755)
+			if err != nil {
+				return fmt.Errorf("Error creating %s directory: %s", file, err.Error())
+			}
+			err = osWriteFile(filepath.Join(targetDir, file), []byte(fakeContent), 0755)
+			if err != nil {
+				return fmt.Errorf("Error writing to %s: %s", file, err.Error())
+			}
+			return nil
+		}, func(err error) error {
+			tmpErr := osRemove(filepath.Join(targetDir, file))
+			if tmpErr != nil {
+				tmpErr = fmt.Errorf("Error removing %s: %s", file, tmpErr.Error())
+				return errors.Join(err, tmpErr)
+			}
+			tmpErr = runCmd(undivertCmd, debug)
+			if tmpErr != nil {
+				return errors.Join(err, tmpErr)
+			}
+			return err
+		}
+}
+
+// DivertStartStopDaemon diverts [/usr]/sbin/start-stop-daemon with one doing nothing.
+func DivertStartStopDaemon(targetDir string, debug bool) (func() error, func(error) error) {
+	path := filepath.Join("/sbin", "start-stop-daemon")
+	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
+		// usr-merged enabled
+		path = filepath.Join("/usr", path)
+	}
+	fakeContent := `#!/bin/sh
+echo 'Warning: Fake start-stop-daemon called, doing nothing'
+`
+	return DivertExecWithFake(targetDir, path, fakeContent, debug)
+}
+
+// DivertInitctl diverts [/usr]/sbin/initctl with one only performing version action.
+func DivertInitctl(targetDir string, debug bool) (func() error, func(error) error) {
+	path := filepath.Join("/sbin", "initctl")
+	if osutil.IsSymlink(filepath.Join(targetDir, "sbin")) {
+		// usr-merged enabled
+		path = filepath.Join("/usr", path)
+	}
+	fakeContent := fmt.Sprintf(`#!/bin/sh
+[ "$1" = version ] && exec %s.dpkg-divert "$@"
+echo 'Warning: Fake initctl called, doing nothing'
+`,
+		path)
+	return DivertExecWithFake(targetDir, path, fakeContent, debug)
+}
+
+// DivertPolicyRcD diverts /usr/sbin/policy-rc.d with one that denies every operation.
+func DivertPolicyRcD(targetDir string, debug bool) (func() error, func(error) error) {
+	path := filepath.Join("/usr", "sbin", "policy-rc.d")
+	fakeContent := `#!/bin/sh
+echo "All runlevel operations denied by policy" >&2
+exit 101
+`
+	return DivertExecWithFake(targetDir, path, fakeContent, debug)
 }

@@ -10,6 +10,7 @@ gadget:
   branch: classic
   type: "git"
 rootfs:
+  sources-list-deb822: true
   components:
     - main
     - universe
@@ -44,7 +45,7 @@ customization:
       fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139"
     -
       name: "canonical-foundations/ubuntu-image-private-test"
-      auth: "sil2100:vVg74j6SM8WVltwpxDRJ"
+      auth: "upils:Z3jNRMLKnSvSbt3J1lk3"
       fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139"
   extra-packages:
     -

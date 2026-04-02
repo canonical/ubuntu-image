@@ -1,10 +1,12 @@
 name: Build and Tests
 
-on:
-  push:
-    branches: 
-      - main
-  pull_request:
+on: [pull_request]
+
+# on:
+#   push:
+#     branches:
+#       - main
+#   pull_request:
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}
@@ -12,39 +14,71 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         test-scenario: [short, long]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
-      - name: install-go
-        run: sudo snap install go --classic
+          persist-credentials: false
 
-      - name: build
-        run: go build ./...
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version: '1.25'
+
+      - name: build go binary
+        run: go build -tags snapdusergo ./...
 
       - name: apt-update
         run: sudo apt update
 
       - name: install-test-dependencies
-        run: sudo apt install -y snapd germinate mtools debootstrap eatmydata fdisk gdisk qemu-system-aarch64 qemu-user-static ubuntu-dev-tools
+        run: |
+          sudo apt install -y snapd germinate e2fsprogs mtools debootstrap eatmydata fdisk gdisk qemu-system-aarch64 qemu-user-static
+          sudo apt install -y --no-install-recommends ubuntu-dev-tools
 
       - name: short tests
         if: ${{ matrix.test-scenario == 'short' }}
-        run: sudo go test -timeout 0 -v -test.short -coverprofile=.coverage/coverage-short.out -covermode=atomic ./...
+        run: sudo go test -timeout 0 -v -test.short -coverprofile=.coverage/coverage-short.out -coverpkg $(go list ./... 2> /dev/null | paste -sd,) -covermode=atomic ./...
 
       - name: long tests
         if: ${{ matrix.test-scenario == 'long' }}
-        run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -covermode=atomic ./...
+        run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -coverpkg $(go list ./... 2> /dev/null | paste -sd,) -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5.5.3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
           flags: unittests
           files: .coverage/coverage-*.out
           verbose: true
+
+      - name: Upload coverage report to artifacts
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ubuntu-image-coverage-${{ matrix.test-scenario }}
+          path: .coverage/coverage-*.out
+          retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: true
+
+  mkfs-conf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: apt-update
+        run: sudo apt update
+
+      - name: install-test-dependencies
+        run: sudo apt install -y devscripts
+
+      - name: check mkfs conf updates
+        id: check-mkfs
+        shell: bash
+        run: ./tools/check-mkfs-confs.sh

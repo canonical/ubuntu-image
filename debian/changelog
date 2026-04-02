@@ -1,3 +1,177 @@
+ubuntu-image (3.10.8) UNRELEASED; urgency=medium
+
+  * Add support for gadgets defining a system-boot-state partition
+
+ -- Alfonso Sanchez-Beato <alfonso.sanchez-beato@canonical.com>  Thu, 19 Mar 2026 08:31:36 -0400
+
+ubuntu-image (3.10.7) UNRELEASED; urgency=medium
+
+  * Use diversion instead of backup/restore to prepare chroot, avoiding
+    restoring old file version
+
+ -- Alexis Cellier <alexis.cellier@canonical.com>  Fri, 30 Jan 2026 12:01:20 +0100
+
+ubuntu-image (3.10.6) UNRELEASED; urgency=medium
+
+  [ Sebastian Weyer ]
+  * i/helper: fix RestoreResolvConf function (LP: #2138450)
+  
+  [ Alexis Cellier ]
+  * i/imagedefinition: remove unsupported iso artifacts entry
+  
+ -- Paul Mars <paul.mars@canonical.com>  Wed, 19 Jan 2025 09:27:14 +0000
+
+ubuntu-image (3.10.4) UNRELEASED; urgency=medium
+
+  * i/statemachine: add riscv64-efi GRUB target (LP: #2134449)
+
+ -- Heinrich Schuchardt <heinrich.schuchardt@canonical.com>  Tue, 09 Dec 2025 19:45:26 +0100
+
+ubuntu-image (3.10.3) UNRELEASED; urgency=medium
+
+  * Pass snapdusergo build tag.
+
+ -- Maciej Borzecki <maciej.borzecki@canonical.com>  Thu, 27 Nov 2025 12:48:12 +0000
+
+ubuntu-image (3.10.2) UNRELEASED; urgency=medium
+
+  * Only call grub-install with --target=i386-pc when a BIOS partition is
+    present.
+  * Do not fail but only warn (and return) when root filesystem or boot
+    filesystem partitions were not found when trying to install grub.
+    
+ -- Paul Mars <paul.mars@canonical.com>  Wed, 10 Nov 2025 10:30:14 +0000
+    
+ubuntu-image (3.10.1) UNRELEASED; urgency=medium
+
+  [ Alexis Cellier ]
+  * Fix gzip rootfs test by shifting a bit the size
+  * Display warnings about Deb822 format only when meaningful
+
+ -- Alexis Cellier <alexis.cellier@canonical.com>  Tue, 21 Oct 2025 10:45:06 +0000
+
+ubuntu-image (3.10.0) UNRELEASED; urgency=medium
+
+  [ Alexis Cellier ]
+  * add upgrade_packages state which upgrades packages installed by
+    debootstrap according to the configured rootfs pocket.
+  [ Paul Mars ]
+  * Properly install grub and update /boot/efi.
+
+ -- Alexis Cellier <alexis.cellier@canonical.com>  Mon, 13 Oct 2025 09:36:28 +0000
+
+ubuntu-image (3.9.0) UNRELEASED; urgency=medium
+
+  [ Alfonso Sanchez-Beato ]
+  * Update to snapd packages to 2.72, which now inserts system-user
+    assertions in the auto-import.assert file when --assertion is used.
+
+  [ Paul Mars ]
+  * remove mkfs configuration for oracular and update the questing one.
+  * update go dependencies
+
+ -- Alfonso Sanchez-Beato <alfonso.sanchez-beato@canonical.com>  Mon, 22 Sep 2025 11:06:58 -0400
+
+ubuntu-image (3.8.0) UNRELEASED; urgency=medium
+
+  [ Philip Meulengracht ]
+  * add new CLI option "--allow-snapd-kernel-mismatch" to allow building images that
+    contain mismatched snapd versions between kernel and snapd snap
+  * do not generate volume image for eMMC schemas
+
+  [ Paul Mars ]
+  * add mkfs configuration for questing
+  * update go dependencies
+  * replace test credentials
+
+ -- Philip Meulengracht <philip.meulengracht@canonical.com>  Mon, 19 May 2025 14:07:35 +0200
+
+ubuntu-image (3.7.0) UNRELEASED; urgency=medium
+
+  [ Lorenzo Medici ]
+  * add new CLI option "--assertion" to include assertions from files when
+    building Ubuntu images
+
+ -- Lorenzo Medici <lorenzo.medici@canonical.com>  Wed, 16 Apr 2025 14:57:15 +0200
+
+ubuntu-image (3.6.1) UNRELEASED; urgency=medium
+
+  [ Paul Mars ]
+  * add mkfs configuration for plucky
+  * use /var/tmp as the default workdir
+
+ -- Paul Mars <paul.mars@canonical.com>  Fri, 11 Apr 2025 14:21:14 +0100
+
+ubuntu-image (3.6.0) UNRELEASED; urgency=medium
+
+  [ Andrew Phelps ]
+  * Add support for builing core images with components
+
+ -- Andrew Phelps <andrew.phelps@canonical.com>  Mon, 25 Nov 2024 10:30:04 -0500
+
+ubuntu-image (3.5.1) UNRELEASED; urgency=medium
+
+  [ Paul Mars ]
+  * use a OS-provided temp dir for gpg calls 
+
+ -- Paul Mars <paul.mars@canonical.com>  Wed, 13 Nov 2024 08:47:14 +0100
+
+ubuntu-image (3.5) UNRELEASED; urgency=medium
+
+  [ Paul Mars ]
+  * Update snapd dependency due to a breaking change
+  * Fix deb822 format ubuntu.sources security entry
+  * Improve validation and overall handling of volumes from the
+    gadget.yaml. 
+  * Migrate to core24 and bump minimum series to build to 20.04
+  * Make sure an image definition without gadget nor artifacts
+    section is valid.
+  * Rework partitions handling to avoid overridding GPT header
+    and get the image size mostly right.
+  * Test running ubuntu-image on noble
+  * Make sure the mkfs conf is copied at the right place when building
+    the snap.
+  * Add dosfstools to the snap.
+  * Clean /dev/ to avoid issues when booting or moving the chroot around
+  * Use the proper size from the volume to determine the minimum image
+    size.
+  * Improve sparse file handling when producing tar and qcow2 output
+
+  [ Maciej Borzecki ]
+  * Improve handling of structures without a filesystem.
+
+ -- Paul Mars <paul.mars@canonical.com>  Fri, 19 Apr 2024 15:53:14 +0200
+ 
+ubuntu-image (3.4) UNRELEASED; urgency=medium
+
+  [ Paul Mars ]
+  * Enable not setting any artifact in the image definition
+  * Make the resume feature more reliable
+  * Add a --dry-run flag to only display what would be executed and exit
+  * Refactor several functions to improve readability and maintainability
+  * Display a clear message when gpg would fail to import PPA keys and help
+    users solve the issue until the root cause is fixed
+
+ -- Paul Mars <paul.mars@canonical.com>  Fri, 08 Mar 2024 16:02:07 +0100
+
+ubuntu-image (3.3) UNRELEASED; urgency=medium
+
+  [ Masahiro Nakagawa ]
+  * Add sysfs-overlay option used with --presseed option.
+  * This option is required to generate a preseeding image which enhances
+    the initial boot time of Ubuntu Core 20+.
+
+  [ Paul Mars ]
+  * Improve ARM spread tests
+  * Support deb822 format in sources list
+  * Unmount more reliably after executing commands in the chroot
+  * Support deb822 format for PPAs
+  * Detect new mount points before umounting everything when leaving a chroot
+  * Prevent services/daemons from starting using policy-rc.d, start-stop-daemon
+    and initctl
+
+ -- Masahiro nakagawa <masahiro.nakagawa@canonical.com> Thu, 8 Feb 2024 13:56:00 +0900
+
 ubuntu-image (3.2) UNRELEASED; urgency=medium
 
   [ Paul Mars ]

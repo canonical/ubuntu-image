@@ -7,10 +7,15 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jessevdk/go-flags"
+	"github.com/snapcore/snapd/gadget"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/statemachine"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
 
 var (
@@ -47,6 +52,14 @@ func (mockSM *mockedStateMachine) Teardown() error {
 func (mockSM *mockedStateMachine) SetCommonOpts(commonOpts *commands.CommonOpts, stateMachineOpts *commands.StateMachineOpts) {
 }
 
+func (mockSM *mockedStateMachine) SetSeries() error {
+	return nil
+}
+
+func (mockSM *mockedStateMachine) Architecture() (string, error) {
+	return "", nil
+}
+
 // TestValidCommands tests that certain valid commands are parsed correctly
 func TestValidCommands(t *testing.T) {
 	t.Parallel()
@@ -74,15 +87,6 @@ func TestValidCommands(t *testing.T) {
 				return u.Classic.ClassicArgsPassed.ImageDefinition
 			},
 			want: "image_defintion.yml",
-		},
-		{
-			name:    "valid_pack_command",
-			command: "pack",
-			flags:   []string{"--artifact-type", "raw", "--gadget-dir", "./test-gadget-dir", "--rootfs-dir", "./test"},
-			field: func(u *commands.UbuntuImageCommand) string {
-				return u.Pack.PackOptsPassed.GadgetDir
-			},
-			want: "./test-gadget-dir",
 		},
 	}
 	for _, tc := range testCases {
@@ -125,8 +129,6 @@ func TestInvalidCommands(t *testing.T) {
 		{"invalid_flag", []string{"classic"}, []string{"--nonexistent"}, "unknown flag `nonexistent'"},
 		{"invalid_validation", []string{"snap"}, []string{"--validation=test"}, "unknown flag `validation'"},
 		{"invalid_sector_size", []string{"snap"}, []string{"--sector_size=123"}, "unknown flag `sector_size'"},
-		{"missing_one_flag", []string{"pack"}, []string{"--artifact-type=raw"}, "the required flags `--gadget-dir' and `--rootfs-dir' were not specified"},
-		{"missing_flags", []string{"pack"}, []string{"--artifact-type=raw", "--gadget-dir=./test"}, "the required flag `--rootfs-dir' was not specified"},
 	}
 	for _, tc := range testCases {
 		tc := tc // capture range variable for parallel execution
@@ -145,7 +147,6 @@ func TestInvalidCommands(t *testing.T) {
 			ubuntuImageCommand := &commands.UbuntuImageCommand{}
 			_, gotErr := flags.ParseArgs(ubuntuImageCommand, args)
 			asserter.AssertErrContains(gotErr, tc.expectedError)
-
 		})
 	}
 }
@@ -169,7 +170,7 @@ func TestExitCode(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 			// Override os.Exit temporarily
 			oldOsExit := osExit
@@ -213,7 +214,7 @@ func TestVersion(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			restoreCWD := helper.SaveCWD()
+			restoreCWD := testhelper.SaveCWD()
 			defer restoreCWD()
 			// Override os.Exit temporarily
 			oldOsExit := osExit
@@ -299,7 +300,6 @@ func TestFailedStdoutStderrCapture(t *testing.T) {
 			if got != 1 {
 				t.Errorf("Expected error code on exit, got: %d", got)
 			}
-
 		})
 	}
 }
@@ -341,6 +341,89 @@ func TestExecuteStateMachine(t *testing.T) {
 				whenToFail: tc.whenToFail,
 			})
 			asserter.AssertErrContains(gotErr, tc.expectedError)
+		})
+	}
+}
+
+func Test_initStateMachine(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	type args struct {
+		imageType          string
+		commonOpts         *commands.CommonOpts
+		stateMachineOpts   *commands.StateMachineOpts
+		ubuntuImageCommand *commands.UbuntuImageCommand
+	}
+
+	cmpOpts := []cmp.Option{
+		cmpopts.IgnoreUnexported(
+			statemachine.SnapStateMachine{},
+			statemachine.StateMachine{},
+			gadget.Info{},
+		),
+	}
+
+	tests := []struct {
+		name        string
+		args        args
+		want        statemachine.SmInterface
+		expectedErr string
+	}{
+		{
+			name: "init a snap state machine",
+			args: args{
+				imageType:        "snap",
+				commonOpts:       &commands.CommonOpts{},
+				stateMachineOpts: &commands.StateMachineOpts{},
+				ubuntuImageCommand: &commands.UbuntuImageCommand{
+					Snap: commands.SnapCommand{
+						SnapOptsPassed: commands.SnapOpts{},
+						SnapArgsPassed: commands.SnapArgs{},
+					},
+				},
+			},
+			want: &statemachine.SnapStateMachine{
+				StateMachine: statemachine.StateMachine{},
+				Opts:         commands.SnapOpts{},
+				Args:         commands.SnapArgs{},
+			},
+		},
+		{
+			name: "init a classic state machine",
+			args: args{
+				imageType:        "classic",
+				commonOpts:       &commands.CommonOpts{},
+				stateMachineOpts: &commands.StateMachineOpts{},
+				ubuntuImageCommand: &commands.UbuntuImageCommand{
+					Classic: commands.ClassicCommand{
+						ClassicArgsPassed: commands.ClassicArgs{},
+					},
+				},
+			},
+			want: &statemachine.ClassicStateMachine{
+				Args: commands.ClassicArgs{},
+			},
+		},
+		{
+			name: "fail to init an unknown statemachine",
+			args: args{
+				imageType:          "unknown",
+				commonOpts:         &commands.CommonOpts{},
+				stateMachineOpts:   &commands.StateMachineOpts{},
+				ubuntuImageCommand: &commands.UbuntuImageCommand{},
+			},
+			want:        nil,
+			expectedErr: "unsupported command",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := initStateMachine(tc.args.imageType, tc.args.commonOpts, tc.args.stateMachineOpts, tc.args.ubuntuImageCommand)
+
+			if err != nil || len(tc.expectedErr) != 0 {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+
+			asserter.AssertEqual(tc.want, got, cmpOpts...)
 		})
 	}
 }

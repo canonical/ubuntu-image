@@ -4,6 +4,9 @@ package statemachine
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,141 +15,18 @@ import (
 	"testing"
 
 	diskfs "github.com/diskfs/go-diskfs"
+	diskutils "github.com/diskfs/go-diskfs/disk"
+	partutils "github.com/diskfs/go-diskfs/partition"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
+	"github.com/canonical/ubuntu-image/internal/testhelper"
 )
-
-// TestMakeTemporaryDirectories tests a successful execution of the
-// make_temporary_directories state with and without --workdir
-func TestMakeTemporaryDirectories(t *testing.T) {
-	testCases := []struct {
-		name    string
-		workdir string
-	}{
-		{"with_workdir", "/tmp/make_temporary_directories-" + uuid.NewString()},
-		{"without_workdir", ""},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.stateMachineFlags.WorkDir = tc.workdir
-			err := stateMachine.makeTemporaryDirectories()
-			asserter.AssertErrNil(err, true)
-
-			// make sure workdir was successfully created
-			if _, err := os.Stat(stateMachine.stateMachineFlags.WorkDir); err != nil {
-				t.Errorf("Failed to create workdir %s",
-					stateMachine.stateMachineFlags.WorkDir)
-			}
-			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-		})
-	}
-}
-
-// TestFailedMakeTemporaryDirectories tests some failed executions of the make_temporary_directories state
-func TestFailedMakeTemporaryDirectories(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
-	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-
-	// mock os.Mkdir and test with and without a WorkDir
-	osMkdir = mockMkdir
-	defer func() {
-		osMkdir = os.Mkdir
-	}()
-	err := stateMachine.makeTemporaryDirectories()
-	asserter.AssertErrContains(err, "Failed to create temporary directory")
-
-	stateMachine.stateMachineFlags.WorkDir = testDir
-	err = stateMachine.makeTemporaryDirectories()
-	asserter.AssertErrContains(err, "Error creating temporary directory")
-
-	// mock os.MkdirAll and only test with a WorkDir
-	osMkdirAll = mockMkdirAll
-	defer func() {
-		osMkdirAll = os.MkdirAll
-	}()
-	err = stateMachine.makeTemporaryDirectories()
-	if err == nil {
-		// try adding a workdir to see if that triggers the failure
-		stateMachine.stateMachineFlags.WorkDir = testDir
-		err = stateMachine.makeTemporaryDirectories()
-		asserter.AssertErrContains(err, "Error creating temporary directory")
-	}
-	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-}
-
-// TestDetermineOutputDirectory unit tests the determineOutputDirectory function
-func TestDetermineOutputDirectory(t *testing.T) {
-	testDir1 := "/tmp/determine_output_dir-" + uuid.NewString()
-	testDir2 := "/tmp/determine_output_dir-" + uuid.NewString()
-	cwd, _ := os.Getwd()
-	testCases := []struct {
-		name              string
-		workDir           string
-		outputDir         string
-		expectedOutputDir string
-		cleanUp           bool
-	}{
-		{"no_workdir_no_outputdir", "", "", cwd, false},
-		{"yes_workdir_no_outputdir", testDir1, "", testDir1, true},
-		{"no_workdir_yes_outputdir", "", testDir1, testDir1, true},
-		{"different_workdir_and_outputdir", testDir1, testDir2, testDir2, true},
-		{"same_workdir_and_outputdir", testDir1, testDir1, testDir1, true},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			asserter := helper.Asserter{T: t}
-			var stateMachine StateMachine
-			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-			stateMachine.stateMachineFlags.WorkDir = tc.workDir
-			stateMachine.commonFlags.OutputDir = tc.outputDir
-
-			err := stateMachine.makeTemporaryDirectories()
-			asserter.AssertErrNil(err, true)
-
-			err = stateMachine.determineOutputDirectory()
-			asserter.AssertErrNil(err, true)
-			if tc.cleanUp {
-				t.Cleanup(func() { os.RemoveAll(stateMachine.commonFlags.OutputDir) })
-			}
-
-			// ensure the correct output dir was set and that it exists
-			if stateMachine.commonFlags.OutputDir != tc.expectedOutputDir {
-				t.Errorf("OutputDir set in in struct \"%s\" does not match expected value \"%s\"",
-					stateMachine.commonFlags.OutputDir, tc.expectedOutputDir)
-			}
-			if _, err := os.Stat(stateMachine.commonFlags.OutputDir); err != nil {
-				t.Errorf("Failed to create output directory %s",
-					stateMachine.stateMachineFlags.WorkDir)
-			}
-
-		})
-	}
-}
-
-// TestFailedDetermineOutputDirectory tests failures in the determineOutputDirectory function
-func TestFailedDetermineOutputDirectory(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
-	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-	stateMachine.commonFlags.OutputDir = "testdir"
-
-	// mock os.MkdirAll
-	osMkdirAll = mockMkdirAll
-	defer func() {
-		osMkdirAll = os.MkdirAll
-	}()
-	err := stateMachine.determineOutputDirectory()
-	asserter.AssertErrContains(err, "Error creating OutputDir")
-	osMkdirAll = os.MkdirAll
-}
 
 // TestLoadGadgetYaml tests a successful load of gadget.yaml. It also tests that the unpack
 // directory is preserved if the relevant environment variable is set
@@ -159,7 +39,7 @@ func TestLoadGadgetYaml(t *testing.T) {
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
 
-	preserveDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
+	preserveDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
 	os.Setenv("UBUNTU_IMAGE_PRESERVE_UNPACK", preserveDir)
 	defer func() {
 		os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
@@ -217,6 +97,14 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrContains(err, "Error running InfoFromGadgetYaml")
 
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_no_volumes.yaml")
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrContains(err, "Specify at least one volume.")
+
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget_two_seeded_volumes.yaml")
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrContains(err, "invalid gadget:")
+
 	// set a valid yaml file and preserveDir
 	stateMachine.YamlFilePath = filepath.Join("testdata",
 		"gadget_tree", "meta", "gadget.yaml")
@@ -230,14 +118,14 @@ func TestFailedLoadGadgetYaml(t *testing.T) {
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrContains(err, "Error creating volume dir")
 
-	preserveDir := filepath.Join("/tmp", "ubuntu-image-"+uuid.NewString())
+	preserveDir := filepath.Join(testhelper.DefaultTmpDir, "ubuntu-image-"+uuid.NewString())
 	os.Setenv("UBUNTU_IMAGE_PRESERVE_UNPACK", preserveDir)
 	defer func() {
 		os.Unsetenv("UBUNTU_IMAGE_PRESERVE_UNPACK")
 	}()
 	t.Cleanup(func() { os.RemoveAll(preserveDir) })
 	err = stateMachine.loadGadgetYaml()
-	asserter.AssertErrContains(err, "Error creating preserve_unpack directory")
+	asserter.AssertErrContains(err, "Error creating preserve unpack directory")
 	osMkdirAll = os.MkdirAll
 
 	// mock osutil.CopySpecialFile
@@ -327,6 +215,7 @@ func TestCalculateRootfsSizeNoImageSize(t *testing.T) {
 
 	err := stateMachine.makeTemporaryDirectories()
 	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// set a valid yaml file and load it in
 	stateMachine.YamlFilePath = filepath.Join("testdata",
@@ -341,7 +230,8 @@ func TestCalculateRootfsSizeNoImageSize(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 
 	// rootfs size will be slightly different in different environments
-	correctSizeLower, _ := quantity.ParseSize("8M")
+	correctSizeLower, err := quantity.ParseSize("8M")
+	asserter.AssertErrNil(err, true)
 	correctSizeUpper := correctSizeLower + 100000 // 0.1 MB range
 	if stateMachine.RootfsSize > correctSizeUpper ||
 		stateMachine.RootfsSize < correctSizeLower {
@@ -350,8 +240,41 @@ func TestCalculateRootfsSizeNoImageSize(t *testing.T) {
 			correctSizeUpper.IECString(),
 			stateMachine.RootfsSize.IECString())
 	}
+}
 
-	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+// TestCalculateRootfsSizeBigSizeGadget tests that the rootfs size can be
+// calculated by using the value given in the gadget YAML.
+func TestCalculateRootfsSizeBigSizeGadget(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// set a valid yaml file and load it in
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-big-rootfs.yaml")
+	// ensure unpack exists
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.calculateRootfsSize()
+	asserter.AssertErrNil(err, true)
+
+	// rootfs size will be slightly different in different environments
+	correctSizeLower, err := quantity.ParseSize("1G")
+	asserter.AssertErrNil(err, true)
+	correctSizeUpper := correctSizeLower + 100000 // 0.1 MB range
+	if stateMachine.RootfsSize > correctSizeUpper ||
+		stateMachine.RootfsSize < correctSizeLower {
+		t.Errorf("expected rootfs size between %s and %s, got %s",
+			correctSizeLower.IECString(),
+			correctSizeUpper.IECString(),
+			stateMachine.RootfsSize.IECString())
+	}
 }
 
 // TestCalculateRootfsSizeImageSize tests that the rootfs size can be
@@ -362,8 +285,16 @@ func TestCalculateRootfsSizeImageSize(t *testing.T) {
 		sizeArg      string
 		expectedSize quantity.Size
 	}{
-		{"one_image_size", "4G", 4183818240},
-		{"image_size_per_volume", "pc:4G", 4183818240},
+		{
+			name:         "one image size",
+			sizeArg:      "4G",
+			expectedSize: 4240407040,
+		},
+		{
+			name:         "image size per volume",
+			sizeArg:      "pc:4G",
+			expectedSize: 4240407040,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run("test_calculate_rootfs_size_image_size", func(t *testing.T) {
@@ -424,8 +355,22 @@ func TestFailedCalculateRootfsSize(t *testing.T) {
 	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrNil(err, true)
 
+	// capture stdout, run copy structure content, and ensure the warning was thrown
+	stdout, restoreStdout, err := helper.CaptureStd(&os.Stdout)
+	defer restoreStdout()
+	asserter.AssertErrNil(err, true)
+
 	err = stateMachine.calculateRootfsSize()
-	asserter.AssertErrContains(err, "smaller than actual rootfs contents")
+	asserter.AssertErrNil(err, true)
+
+	// restore stdout and check that the warning was printed
+	restoreStdout()
+	readStdout, err := io.ReadAll(stdout)
+	asserter.AssertErrNil(err, true)
+
+	if !strings.Contains(string(readStdout), "WARNING: rootfs content 8394752 is bigger than requested image size (0). Try using a larger value of --image-size") {
+		t.Errorf("Warning about rootfs content size not present in stdout: \"%s\"", string(readStdout))
+	}
 }
 
 // TestPopulateBootfsContents tests a successful run of the populateBootfsContents state
@@ -725,7 +670,7 @@ func TestFailedPopulatePreparePartitions(t *testing.T) {
 	osMkdir = os.Mkdir
 }
 
-// TestEmptyPartPopulatePreparePartitions performs a successful run a gadget.yaml that has,
+// TestEmptyPartPopulatePreparePartitions performs a successful run with a gadget.yaml that has,
 // besides regular partitions, one empty partition and makes sure that a partition image file
 // has been created for it (LP: #1947863)
 func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
@@ -794,22 +739,73 @@ func TestEmptyPartPopulatePreparePartitions(t *testing.T) {
 }
 
 // TestMakeDiskPartitionSchemes tests that makeDisk() can successfully parse
-// mbr, gpt, and hybrid schemes. It then runs "dumpe2fs" to ensure the
+// mbr, gpt, emmc, and hybrid schemes. It then runs "dumpe2fs" to ensure the
 // resulting disk has the correct type of partition table.
 // We also check various sector sizes while at it and rootfs placements
 func TestMakeDiskPartitionSchemes(t *testing.T) {
 	testCases := []struct {
-		name          string
-		tableType     string
-		sectorSize    string
-		rootfsVolName string
-		rootfsPartNum int
+		name              string
+		tableType         string
+		sectorSize        string
+		rootfsVolName     string
+		rootfsContentPath string
+		rootfsPartNum     int
 	}{
-		{"gpt", "gpt", "512", "pc", 3},
-		{"mbr", "dos", "512", "pc", 3},
-		{"hybrid", "gpt", "512", "pc", 3},
-		{"gpt4k", "PMBR", "4096", "pc", 3}, // PMBR still seems valid GPT
-		{"gpt-efi-only", "gpt", "512", "pc", 2},
+		{
+			name:              "gpt",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree"),
+			rootfsPartNum:     3,
+		},
+		{
+			name:              "mbr",
+			tableType:         "dos",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree"),
+			rootfsPartNum:     3,
+		},
+		{
+			name:              "hybrid",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree"),
+			rootfsPartNum:     3,
+		},
+		// {
+		// 	name:          "gpt4k",
+		// 	tableType:     "gpt",
+		// 	sectorSize:    "4096",
+		// 	rootfsVolName: "pc",
+		// 	rootfsPartNum: 3,
+		// }, // PMBR still seems valid GPT
+		{
+			name:              "gpt-efi-only",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree"),
+			rootfsPartNum:     2,
+		},
+		{
+			name:              "small",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree_piboot"), // bigger than what was calculated based on the rootfs declared in the gadget.yaml
+			rootfsPartNum:     1,
+		},
+		{
+			name:              "emmc",
+			tableType:         "gpt",
+			sectorSize:        "512",
+			rootfsVolName:     "pc",
+			rootfsContentPath: filepath.Join("testdata", "gadget_tree_emmc"),
+			rootfsPartNum:     3,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run("test_make_disk_partition_type_"+tc.name, func(t *testing.T) {
@@ -825,7 +821,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			// also set up an output directory
-			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			outDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() { os.RemoveAll(outDir) })
 			stateMachine.commonFlags.OutputDir = outDir
@@ -847,7 +843,7 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			// set up a "rootfs" that we can eventually copy into the disk
 			err = os.MkdirAll(stateMachine.tempDirs.rootfs, 0755)
 			asserter.AssertErrNil(err, true)
-			err = osutil.CopySpecialFile(filepath.Join("testdata", "gadget_tree"), stateMachine.tempDirs.rootfs)
+			err = osutil.CopySpecialFile(tc.rootfsContentPath, stateMachine.tempDirs.rootfs)
 			asserter.AssertErrNil(err, true)
 
 			// also need to set the rootfs size to avoid partition errors
@@ -879,12 +875,39 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 
 			// now run "dumpe2fs" to ensure the correct type of partition table exists
 			imgFile := filepath.Join(stateMachine.commonFlags.OutputDir, "pc.img")
-			dumpe2fsCommand := *exec.Command("dumpe2fs", imgFile)
+			sfdiskCommand := *exec.Command("sfdisk", "--json", imgFile)
 
-			dumpe2fsBytes, _ := dumpe2fsCommand.CombinedOutput()
-			if !strings.Contains(string(dumpe2fsBytes), tc.tableType) {
+			sfdiskBytes, err := sfdiskCommand.CombinedOutput() // nolint: errcheck
+			// The command will return an error because the image itself is not valid but we do
+			// not care here.
+			t.Logf("sfdiskBytes error: %v\n", err)
+			t.Logf("sfdiskBytes stdout: %v\n", string(sfdiskBytes))
+
+			var sfDiskRes testhelper.SfdiskOutput
+
+			err = json.Unmarshal(sfdiskBytes, &sfDiskRes)
+			t.Logf("unmarshall error: %v\n", err)
+			t.Logf("sfDiskRes: %v\n", sfDiskRes)
+
+			d, err := os.Open(imgFile)
+			asserter.AssertErrNil(err, true)
+
+			sectorSize, err := strconv.Atoi(tc.sectorSize)
+			asserter.AssertErrNil(err, true)
+
+			parTable, err := partutils.Read(d, sectorSize, sectorSize)
+			asserter.AssertErrNil(err, true)
+			t.Logf("partTable: %+v\n", parTable)
+			t.Logf("partTable type: %+v\n", parTable.Type())
+
+			// if !strings.Contains(string(sfdiskBytes), tc.tableType) {
+			// 	t.Errorf("File %s should have partition table %s, instead got \"%s\"",
+			// 		imgFile, tc.tableType, string(sfdiskBytes))
+			// }
+
+			if sfDiskRes.PartitionTable.Label != tc.tableType {
 				t.Errorf("File %s should have partition table %s, instead got \"%s\"",
-					imgFile, tc.tableType, string(dumpe2fsBytes))
+					imgFile, tc.tableType, sfDiskRes.PartitionTable.Label)
 			}
 
 			// ensure the resulting image file is a multiple of the block size
@@ -897,18 +920,18 @@ func TestMakeDiskPartitionSchemes(t *testing.T) {
 			}
 
 			// while at it, ensure that the root partition has been found
-			if stateMachine.rootfsPartNum != tc.rootfsPartNum || stateMachine.rootfsVolName != tc.rootfsVolName {
-				t.Errorf("Root partition volume/numbe not detected correctly, expected %s/%d, got %s/%d",
-					tc.rootfsVolName, tc.rootfsPartNum, stateMachine.rootfsVolName, stateMachine.rootfsPartNum)
+			if stateMachine.RootfsPartNum != tc.rootfsPartNum || stateMachine.RootfsVolName != tc.rootfsVolName {
+				t.Errorf("Root partition volume/number not detected correctly, expected %s/%d, got %s/%d",
+					tc.rootfsVolName, tc.rootfsPartNum, stateMachine.RootfsVolName, stateMachine.RootfsPartNum)
 			}
 		})
 	}
 }
 
-// TestFailedMakeDisk tests failures in the MakeDisk state
-func TestFailedMakeDisk(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-	var stateMachine StateMachine
+// testSetupMakeDiskTest setup needed stateMachine and directories to be used
+// in TestFailedMakeDisk* tests
+func testSetupMakeDiskTest(t *testing.T, asserter *helper.Asserter, stateMachine *StateMachine, yamlFilePath string) {
+	t.Helper()
 	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
 
 	err := stateMachine.makeTemporaryDirectories()
@@ -916,7 +939,7 @@ func TestFailedMakeDisk(t *testing.T) {
 	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 	// also set up an output directory
-	outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+	outDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 	asserter.AssertErrNil(err, true)
 	t.Cleanup(func() { os.RemoveAll(outDir) })
 	stateMachine.commonFlags.OutputDir = outDir
@@ -929,19 +952,20 @@ func TestFailedMakeDisk(t *testing.T) {
 	}
 
 	// set a valid yaml file and load it in
-	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-mbr.yaml")
+	stateMachine.YamlFilePath = yamlFilePath
 	// ensure unpack exists
 	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
 	asserter.AssertErrNil(err, true)
-	err = stateMachine.loadGadgetYaml()
-	asserter.AssertErrNil(err, true)
 
-	// also need to set the rootfs size to avoid partition errors
-	err = stateMachine.calculateRootfsSize()
+	err = stateMachine.loadGadgetYaml()
 	asserter.AssertErrNil(err, true)
 
 	// ensure volumes exists
 	err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// also need to set the rootfs size to avoid partition errors
+	err = stateMachine.calculateRootfsSize()
 	asserter.AssertErrNil(err, true)
 
 	// populate unpack
@@ -953,106 +977,136 @@ func TestFailedMakeDisk(t *testing.T) {
 		asserter.AssertErrNil(err, true)
 	}
 
-	// mock os.RemoveAll
-	osRemoveAll = mockRemoveAll
-	defer func() {
-		osRemoveAll = os.RemoveAll
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error removing old disk image")
-	osRemoveAll = os.RemoveAll
-
-	// mock diskfs.Create
-	diskfsCreate = mockDiskfsCreate
-	defer func() {
-		diskfsCreate = diskfs.Create
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error creating disk image")
-	diskfsCreate = diskfs.Create
-
-	// mock os.Truncate
-	osTruncate = mockTruncate
-	defer func() {
-		osTruncate = os.Truncate
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error resizing disk image")
-	osTruncate = os.Truncate
-
-	// mock diskfs.Create to create a read only disk
-	diskfsCreate = readOnlyDiskfsCreate
-	defer func() {
-		diskfsCreate = diskfs.Create
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error partitioning image file")
-	diskfsCreate = diskfs.Create
-
-	// mock os.OpenFile
-	// errors in file.WriteAt()
-	osOpenFile = mockOpenFile
-	defer func() {
-		osOpenFile = os.OpenFile
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error opening disk to write MBR disk identifier")
-	osOpenFile = os.OpenFile
-
-	// mock rand.Read
-	// errors in generateUniqueDiskID()
-	randRead = mockRandRead
-	defer func() {
-		randRead = rand.Read
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error generating disk ID")
-	randRead = rand.Read
-
-	// mock os.OpenFile to force it to use os.O_APPEND, which causes
-	// errors in file.WriteAt()
-	osOpenFile = mockOpenFileAppend
-	defer func() {
-		osOpenFile = os.OpenFile
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error writing MBR disk identifier")
-	osOpenFile = os.OpenFile
-
-	// mock helper.CopyBlob to simulate a failure in copyDataToImage
-	helperCopyBlob = mockCopyBlob
-	defer func() {
-		helperCopyBlob = helper.CopyBlob
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error writing disk image")
-	helperCopyBlob = helper.CopyBlob
-
-	// Change to GPT for these next tests
-	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-gpt.yaml")
-	err = stateMachine.loadGadgetYaml()
-	asserter.AssertErrNil(err, true)
-
 	err = stateMachine.populateBootfsContents()
 	asserter.AssertErrNil(err, true)
 
 	err = stateMachine.populatePreparePartitions()
 	asserter.AssertErrNil(err, true)
+}
 
-	// mock os.OpenFile to simulate a failure in writeOffsetValues
-	osOpenFile = mockOpenFile
-	defer func() {
-		osOpenFile = os.OpenFile
-	}()
-	// also mock helperCopyBlob to ignore missing files and return success
-	helperCopyBlob = mockCopyBlobSuccess
-	defer func() {
-		helperCopyBlob = helper.CopyBlob
-	}()
-	err = stateMachine.makeDisk()
-	asserter.AssertErrContains(err, "Error opening image file")
-	osOpenFile = os.OpenFile
-	helperCopyBlob = helper.CopyBlob
+// TestFailedMakeDisk tests failures in the MakeDisk state
+func TestFailedMakeDisk(t *testing.T) {
+	testCases := []struct {
+		name         string
+		mockFuncs    func() func()
+		expectedErr  string
+		yamlFilePath string
+	}{
+		{
+			name: "MBR - failing removing old image",
+			mockFuncs: func() func() {
+				osRemoveAll = mockRemoveAll
+				return func() { osRemoveAll = os.RemoveAll }
+			},
+			expectedErr:  "Error removing old disk image",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing creating disk",
+			mockFuncs: func() func() {
+				diskfsCreate = mockDiskfsCreate
+				return func() { diskfsCreate = diskfs.Create }
+			},
+			expectedErr:  "Error creating disk image",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing when creating a read only disk",
+			mockFuncs: func() func() {
+				diskfsCreate = readOnlyDiskfsCreate
+				return func() { diskfsCreate = diskfs.Create }
+			},
+			expectedErr:  "Error partitioning image file",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing opening disk",
+			mockFuncs: func() func() {
+				osOpenFile = mockOpenFile
+				return func() { osOpenFile = os.OpenFile }
+			},
+			expectedErr:  "Error opening disk to write MBR disk identifier",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing generating a disk ID",
+			mockFuncs: func() func() {
+				randRead = mockRandRead
+				return func() { randRead = rand.Read }
+			},
+			expectedErr:  "Error generating disk ID",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing writing to disk",
+			mockFuncs: func() func() {
+				osOpenFile = mockOpenFileAppend
+				return func() { osOpenFile = os.OpenFile }
+			},
+			expectedErr:  "Error writing MBR disk identifier",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "MBR - failing copying blob to disk",
+			mockFuncs: func() func() {
+				helperCopyBlob = mockCopyBlob
+				return func() { helperCopyBlob = helper.CopyBlob }
+			},
+			expectedErr:  "Error writing disk image",
+			yamlFilePath: filepath.Join("testdata", "gadget-mbr.yaml"),
+		},
+		{
+			name: "GPT - failing writing offset",
+			mockFuncs: func() func() {
+				osOpenFile = mockOpenFile
+				helperCopyBlob = mockCopyBlobSuccess
+				return func() {
+					osOpenFile = os.OpenFile
+					helperCopyBlob = helper.CopyBlob
+				}
+			},
+			expectedErr:  "Error opening image file",
+			yamlFilePath: filepath.Join("testdata", "gadget-gpt.yaml"),
+		},
+		{
+			name: "GPT - failing writing to disk image",
+			mockFuncs: func() func() {
+				helperCopyBlob = mockCopyBlob
+				return func() {
+					helperCopyBlob = helper.CopyBlob
+				}
+			},
+			expectedErr:  "Error writing disk image",
+			yamlFilePath: filepath.Join("testdata", "gadget-gpt.yaml"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+			var stateMachine StateMachine
+
+			testSetupMakeDiskTest(t, &asserter, &stateMachine, tc.yamlFilePath)
+
+			if tc.mockFuncs != nil {
+				restoreMock := tc.mockFuncs()
+				t.Cleanup(restoreMock)
+			}
+			err := stateMachine.makeDisk()
+			defer os.Remove("pc.img")
+			if err != nil || len(tc.expectedErr) != 0 {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+// TestFailedMakeDisk_NoOutputDir tests failures in the MakeDisk state
+func TestFailedMakeDisk_NoOutputDir(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+
+	testSetupMakeDiskTest(t, &asserter, &stateMachine, filepath.Join("testdata", "gadget-gpt.yaml"))
 
 	helperCopyBlob = mockCopyBlob
 	defer func() {
@@ -1061,7 +1115,7 @@ func TestFailedMakeDisk(t *testing.T) {
 	stateMachine.cleanWorkDir = true // for coverage!
 	stateMachine.commonFlags.OutputDir = ""
 	defer os.Remove("pc.img")
-	err = stateMachine.makeDisk()
+	err := stateMachine.makeDisk()
 	asserter.AssertErrContains(err, "Error writing disk image")
 	helperCopyBlob = helper.CopyBlob
 
@@ -1075,34 +1129,45 @@ func TestFailedMakeDisk(t *testing.T) {
 // with the flag (LP: #1947867)
 func TestImageSizeFlag(t *testing.T) {
 	testCases := []struct {
-		name       string
-		sizeArg    string
-		gadgetTree string
-		imageSize  map[string]quantity.Size
-		volNames   map[string]string
+		name           string
+		sizeArg        string
+		gadgetTree     string
+		volNames       map[string]string
+		wantImageSizes map[string]quantity.Size
 	}{
 		{
-			"one_volume",
-			"4G",
-			filepath.Join("testdata", "gadget_tree"),
-			map[string]quantity.Size{
-				"pc": 4 * quantity.SizeGiB,
-			},
-			map[string]string{
+			name:       "one volume",
+			sizeArg:    "4G",
+			gadgetTree: filepath.Join("testdata", "gadget_tree"),
+			volNames: map[string]string{
 				"pc": "pc.img",
+			},
+			wantImageSizes: map[string]quantity.Size{
+				"pc": 4*quantity.SizeGiB + 67*quantity.Size(512), // For now add the 67 sectors of the GPT header until we understand why they are added.
 			},
 		},
 		{
-			"multi_volume",
-			"first:4G,second:1G",
-			filepath.Join("testdata", "gadget_tree_multi"),
-			map[string]quantity.Size{
-				"first":  4 * quantity.SizeGiB,
-				"second": 1 * quantity.SizeGiB,
+			name:       "one volume with requested size smaller than needed size",
+			sizeArg:    "4G",
+			gadgetTree: filepath.Join("testdata", "gadget_tree"),
+			volNames: map[string]string{
+				"pc": "pc.img",
 			},
-			map[string]string{
+			wantImageSizes: map[string]quantity.Size{
+				"pc": 4*quantity.SizeGiB + 67*quantity.Size(512), // For now add the 67 sectors of the GPT header until we understand why they are added.
+			},
+		},
+		{
+			name:       "multi volume",
+			sizeArg:    "first:4G,second:1G",
+			gadgetTree: filepath.Join("testdata", "gadget_tree_multi"),
+			volNames: map[string]string{
 				"first":  "first.img",
 				"second": "second.img",
+			},
+			wantImageSizes: map[string]quantity.Size{
+				"first":  4*quantity.SizeGiB + 67*quantity.Size(512), // For now add the 67 sectors of the GPT header until we understand why they are added.
+				"second": 1*quantity.SizeGiB + 67*quantity.Size(512), // For now add the 67 sectors of the GPT header until we understand why they are added.
 			},
 		},
 	}
@@ -1116,12 +1181,12 @@ func TestImageSizeFlag(t *testing.T) {
 
 			err := stateMachine.makeTemporaryDirectories()
 			asserter.AssertErrNil(err, true)
-			//t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
 			// also set up an output directory
-			outDir, err := os.MkdirTemp("/tmp", "ubuntu-image-")
+			outDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
 			asserter.AssertErrNil(err, true)
-			//t.Cleanup(func() { os.RemoveAll(outDir) })
+			t.Cleanup(func() { os.RemoveAll(outDir) })
 			stateMachine.commonFlags.OutputDir = outDir
 
 			// set up volume names
@@ -1153,6 +1218,9 @@ func TestImageSizeFlag(t *testing.T) {
 				asserter.AssertErrNil(err, true)
 			}
 
+			err = stateMachine.parseImageSizes()
+			asserter.AssertErrNil(err, true)
+
 			// also need to set the rootfs size to avoid partition errors
 			err = stateMachine.calculateRootfsSize()
 			asserter.AssertErrNil(err, true)
@@ -1168,16 +1236,387 @@ func TestImageSizeFlag(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 
 			// check the size of the disk(s)
-			for volume, expectedSize := range tc.imageSize {
+			for volume, wantSize := range tc.wantImageSizes {
 				imgFile := filepath.Join(stateMachine.commonFlags.OutputDir, volume+".img")
 				diskImg, err := os.Stat(imgFile)
 				asserter.AssertErrNil(err, true)
-				if diskImg.Size() != int64(expectedSize) {
+				if diskImg.Size() != int64(wantSize) {
 					t.Errorf("--image-size %d was specified, but resulting image is %d bytes",
-						expectedSize, diskImg.Size())
+						wantSize, diskImg.Size())
 				}
 			}
 		})
 
+	}
+}
+
+// TestPopulateGadgetWithEMMC performs a successful run with a gadget.yaml that has,
+// besides regular partitions, one emmc partition and makes sure that no partition image
+// has been created.
+func TestPopulateGadgetWithEMMC(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// set a valid yaml file and load it in
+	stateMachine.YamlFilePath = filepath.Join("testdata",
+		"gadget_tree_emmc", "meta", "gadget.yaml")
+	// ensure unpack exists
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+	asserter.AssertErrNil(err, true)
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+
+	// ensure volumes exists
+	err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// populate unpack
+	files, err := os.ReadDir(filepath.Join("testdata", "gadget_tree_emmc"))
+	asserter.AssertErrNil(err, true)
+	for _, srcFile := range files {
+		srcFile := filepath.Join("testdata", "gadget_tree_emmc", srcFile.Name())
+		err = osutilCopySpecialFile(srcFile, filepath.Join(stateMachine.tempDirs.unpack, "gadget"))
+		asserter.AssertErrNil(err, true)
+	}
+
+	// populate bootfs contents to ensure no failures there
+	err = stateMachine.populateBootfsContents()
+	asserter.AssertErrNil(err, true)
+
+	// calculate rootfs size so the partition sizes can be set correctly
+	err = stateMachine.calculateRootfsSize()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.populatePreparePartitions()
+	asserter.AssertErrNil(err, true)
+
+	// ensure the .img files were created
+	for ii := 0; ii < 3; ii++ {
+		partImg := filepath.Join(stateMachine.tempDirs.volumes,
+			"pc", "part"+strconv.Itoa(ii)+".img")
+		if _, err := os.Stat(partImg); err != nil {
+			t.Errorf("File %s should exist, but does not", partImg)
+		}
+	}
+
+	// ensure emmc .img files were not created
+	emmcImg := filepath.Join(stateMachine.tempDirs.volumes, "my-emmc")
+	entries, err := os.ReadDir(emmcImg)
+	asserter.AssertErrNil(err, true)
+	if len(entries) != 0 {
+		for _, e := range entries {
+			t.Errorf("File %s should not exist", e.Name())
+		}
+	}
+}
+
+func TestPopulatePreparePartitionsWithUbuntuBootStatePart(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine StateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+
+	// Prepare working dirs
+	err := stateMachine.makeTemporaryDirectories()
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+	// Load gadget yaml that contains a system-boot-state structure.
+	stateMachine.YamlFilePath = filepath.Join("testdata", "gadget-ubootpart.yaml")
+
+	// ensure unpack exists as loadGadgetYaml expects it in some cases
+	err = os.MkdirAll(filepath.Join(stateMachine.tempDirs.unpack, "gadget"), 0755)
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.loadGadgetYaml()
+	asserter.AssertErrNil(err, true)
+
+	// ensure volumes exists
+	err = os.MkdirAll(stateMachine.tempDirs.volumes, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// Identify where the system-boot-state structure lives so we can assert the right part*.img
+	var (
+		bootStateVolName string
+		bootStateIdx     = -1
+	)
+	for _, volName := range stateMachine.VolumeOrder {
+		vol := stateMachine.GadgetInfo.Volumes[volName]
+		for i := range vol.Structure {
+			if vol.Structure[i].Role == gadget.SystemBootState {
+				bootStateVolName = volName
+				bootStateIdx = i
+				break
+			}
+		}
+		if bootStateIdx != -1 {
+			break
+		}
+	}
+	asserter.AssertEqual(bootStateIdx != -1, true)
+
+	// Create the expected source file: unpack/ubuntu-boot-state.img
+	want := []byte("boot-state-test-bytes\n")
+	bootStateSrc := filepath.Join(stateMachine.tempDirs.unpack, "ubuntu-boot-state.img")
+	err = os.WriteFile(bootStateSrc, want, 0644) //nolint:gosec
+	asserter.AssertErrNil(err, true)
+
+	// Ensure destination directory exists
+	destDir := filepath.Join(stateMachine.tempDirs.volumes, bootStateVolName)
+	err = os.MkdirAll(destDir, 0755)
+	asserter.AssertErrNil(err, true)
+
+	// Run the state under test
+	err = stateMachine.populatePreparePartitions()
+	asserter.AssertErrNil(err, true)
+
+	// Assert the dest now matches the source content exactly
+	destFile := filepath.Join(destDir, fmt.Sprintf("part%d.img", bootStateIdx))
+	got, err := os.ReadFile(destFile)
+	asserter.AssertErrNil(err, true)
+	asserter.AssertEqual(got, want)
+}
+
+var volume1 = &gadget.Volume{
+	Schema:     "gpt",
+	Bootloader: "grub",
+	Structure: []gadget.VolumeStructure{
+		{
+			VolumeName: "pc",
+			Name:       "mbr",
+			Offset:     createOffsetPointer(0),
+			MinSize:    440,
+			Size:       440,
+			Type:       "mbr",
+			Role:       "mbr",
+			Content: []gadget.VolumeContent{
+				{
+					Image: "pc-boot.img",
+				},
+			},
+			Update: gadget.VolumeUpdate{Edition: 1},
+		},
+		{
+			VolumeName: "pc",
+			Name:       "BIOS Boot",
+			Offset:     createOffsetPointer(1048576),
+			OffsetWrite: &gadget.RelativeOffset{
+				RelativeTo: "mbr",
+				Offset:     quantity.Offset(92),
+			},
+			MinSize: 1048576,
+			Size:    1048576,
+			Type:    "DA,21686148-6449-6E6F-744E-656564454649",
+			Content: []gadget.VolumeContent{
+				{
+					Image: "pc-core.img",
+				},
+			},
+			Update:    gadget.VolumeUpdate{Edition: 2},
+			YamlIndex: 1,
+		},
+		{
+			VolumeName: "pc",
+			Name:       "ubuntu-seed",
+			Label:      "ubuntu-seed",
+			Offset:     createOffsetPointer(2097152),
+			MinSize:    1258291200,
+			Size:       1258291200,
+			Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+			Role:       "system-seed",
+			Filesystem: "vfat",
+			Content:    []gadget.VolumeContent{},
+			Update:     gadget.VolumeUpdate{Edition: 2},
+			YamlIndex:  1,
+		},
+		{
+			VolumeName: "pc",
+			Name:       "ubuntu-data",
+			Label:      "writable",
+			Offset:     createOffsetPointer(1260388352),
+			MinSize:    786432000,
+			Size:       786432000,
+			Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+			Role:       "system-data",
+			Filesystem: "ext4",
+			Content:    []gadget.VolumeContent{},
+			YamlIndex:  2,
+		},
+	},
+	Name: "pc",
+}
+
+var volume2Unaligned = &gadget.Volume{
+	Schema:     "gpt",
+	Bootloader: "grub",
+	Structure: []gadget.VolumeStructure{
+		{
+			VolumeName: "pc",
+			Name:       "mbr",
+			Offset:     createOffsetPointer(0),
+			MinSize:    440,
+			Size:       440,
+			Type:       "mbr",
+			Role:       "mbr",
+			Content: []gadget.VolumeContent{
+				{
+					Image: "pc-boot.img",
+				},
+			},
+			Update: gadget.VolumeUpdate{Edition: 1},
+		},
+		{
+			VolumeName: "pc",
+			Name:       "BIOS Boot",
+			Offset:     createOffsetPointer(1048476),
+			OffsetWrite: &gadget.RelativeOffset{
+				RelativeTo: "mbr",
+				Offset:     quantity.Offset(92),
+			},
+			MinSize: 1048476,
+			Size:    1048476,
+			Type:    "DA,21686148-6449-6E6F-744E-656564454649",
+			Content: []gadget.VolumeContent{
+				{
+					Image: "pc-core.img",
+				},
+			},
+			Update:    gadget.VolumeUpdate{Edition: 2},
+			YamlIndex: 1,
+		},
+		{
+			VolumeName: "pc",
+			Name:       "ubuntu-seed",
+			Label:      "ubuntu-seed",
+			Offset:     createOffsetPointer(2096952),
+			MinSize:    1258291200,
+			Size:       1258291200,
+			Type:       "EF,C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+			Role:       "system-seed",
+			Filesystem: "vfat",
+			Content:    []gadget.VolumeContent{},
+			Update:     gadget.VolumeUpdate{Edition: 2},
+			YamlIndex:  1,
+		},
+		{
+			VolumeName: "pc",
+			Name:       "ubuntu-data",
+			Label:      "writable",
+			Offset:     createOffsetPointer(1260388152),
+			MinSize:    786432000,
+			Size:       786432000,
+			Type:       "83,0FC63DAF-8483-4772-8E79-3D69D8477DE4",
+			Role:       "system-data",
+			Filesystem: "ext4",
+			Content:    []gadget.VolumeContent{},
+			YamlIndex:  2,
+		},
+	},
+	Name: "pc",
+}
+
+func TestStateMachine_createDiskImage(t *testing.T) {
+	cmpOpts := []cmp.Option{
+		cmpopts.IgnoreUnexported(
+			gadget.Volume{},
+			os.File{},
+		),
+		cmpopts.IgnoreFields(
+			diskutils.Disk{},
+			"File",
+			"Info",
+		),
+	}
+	type args struct {
+		volumeName string
+		volume     *gadget.Volume
+		imgName    string
+	}
+	tests := []struct {
+		name        string
+		imageSizes  map[string]quantity.Size
+		sectorSize  quantity.Size
+		args        args
+		wantDiskImg *diskutils.Disk
+		wantImgSize quantity.Size
+		expectedErr string
+	}{
+		{
+			name:       "basic case",
+			sectorSize: quantity.Size(512),
+			args: args{
+				volumeName: "pc",
+				volume:     volume1,
+			},
+			wantDiskImg: &diskutils.Disk{
+				DefaultBlocks:     true,
+				Writable:          true,
+				PhysicalBlocksize: 512,
+				LogicalBlocksize:  512,
+				Size:              2046854656,
+			},
+			wantImgSize: quantity.Size(2046854656),
+		},
+		{
+			name:       "basic case sector size 4k",
+			sectorSize: quantity.Size(4096),
+			args: args{
+				volumeName: "pc",
+				volume:     volume1,
+			},
+			wantDiskImg: &diskutils.Disk{
+				DefaultBlocks:     true,
+				Writable:          true,
+				PhysicalBlocksize: 4096,
+				LogicalBlocksize:  4096,
+				Size:              2046865408,
+			},
+			wantImgSize: quantity.Size(2046865408),
+		},
+		{
+			name:       "size to align to sector size 4k",
+			sectorSize: quantity.Size(4096),
+			args: args{
+				volumeName: "pc",
+				volume:     volume2Unaligned,
+			},
+			wantDiskImg: &diskutils.Disk{
+				DefaultBlocks:     true,
+				Writable:          true,
+				PhysicalBlocksize: 4096,
+				LogicalBlocksize:  4096,
+				Size:              2046865408, // would be 2046820152 if unaligned
+			},
+			wantImgSize: quantity.Size(2046865408),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
+
+			stateMachine := &StateMachine{
+				SectorSize: tc.sectorSize,
+				ImageSizes: tc.imageSizes,
+			}
+
+			outDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
+			asserter.AssertErrNil(err, true)
+			t.Cleanup(func() { os.RemoveAll(outDir) })
+
+			imgPath := filepath.Join(outDir, tc.args.imgName)
+
+			gotDiskImg, err := stateMachine.createDiskImage(tc.args.volumeName, tc.args.volume, imgPath)
+
+			if err != nil || len(tc.expectedErr) != 0 {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+
+			asserter.AssertEqual(tc.wantDiskImg, gotDiskImg, cmpOpts...)
+			asserter.AssertEqual(tc.wantImgSize, quantity.Size(gotDiskImg.Size))
+		})
 	}
 }

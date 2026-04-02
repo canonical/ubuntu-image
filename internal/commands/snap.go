@@ -13,8 +13,12 @@ type SnapOpts struct {
 	AppArmorKernelFeaturesDir string         `long:"apparmor-features-dir" description:"Optional path to apparmor kernel features directory"`
 	PreseedSignKey            string         `long:"preseed-sign-key" description:"Name of the key to use to sign preseed assertion, otherwise use the default key"`
 	Snaps                     []string       `long:"snap" description:"Install extra snaps. These are passed through to \"snap prepare-image\". The snap argument can include additional information about the channel and/or risk with the following syntax: <snap>=<channel|risk>" value-name:"SNAP"`
+	Components                []string       `long:"comp" description:"Install extra components. These are passed through to \"snap prepare-image\"." value-name:"COMPONENT"`
 	CloudInit                 string         `long:"cloud-init" description:"cloud-config data to be copied to the image" value-name:"USER-DATA-FILE"`
 	Revisions                 map[string]int `long:"revision" description:"The revision of a specific snap to install in the image." value-name:"REVISION"`
+	SysfsOverlay              string         `long:"sysfs-overlay" description:"The optional sysfs overlay to used for preseeding. Directories from /sys/class/* and /sys/devices/platform will be bind-mounted to the chroot when preseeding"`
+	ExtraAssertionFilenames   []string       `long:"assertion" description:"Include extra assertions. Each usage indicates the path to a file containing the assertions. The paths are passed through to \"snap-prepare-image\" that validates their contents." value-name:"ASSERTION-FILE"`
+	AllowSnapdKernelMismatch  bool           `long:"allow-snapd-kernel-mismatch" description:"Allow mismatch between snap-bootstrap in the kernel and the snapd snap"`
 }
 
 type SnapCommand struct {

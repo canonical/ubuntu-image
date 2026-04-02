@@ -1,0 +1,84 @@
+name: ubuntu-server-amd64
+display-name: Ubuntu Server amd64
+revision: 1
+architecture: amd64
+series: jammy
+class: preinstalled
+kernel: linux-image-generic
+gadget:
+  url: "https://github.com/snapcore/pc-gadget.git"
+  branch: classic
+  type: "git"
+rootfs:
+  components:
+    - main
+    - universe
+    - restricted
+  sources-list-deb822: true
+  pocket: updates
+  seed:
+    urls:
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+      - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
+    branch: jammy
+    names:
+      - server
+      - minimal
+      - standard
+      - cloud-image
+customization:
+  manual:
+    make-dirs:
+      - path: /etc/foo/bar
+        permissions: 0755
+    add-user:
+      - name: ubuntu2
+        password: ubuntu2
+        password-type: text
+  components:
+    - main
+    - universe
+    - restricted
+    - multiverse
+  pocket: proposed
+  cloud-init:
+    user-data: |
+      #cloud-config
+      chpasswd:
+        expire: true
+        users:
+          - name: ubuntu
+            password: ubuntu
+            type: text
+  extra-snaps:
+    -
+      name: hello
+      channel: candidate
+    -
+      name: core
+    -
+      name: core20
+  extra-ppas:
+    -
+      name: "canonical-foundations/ubuntu-image"
+      fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139"
+    -
+      name: "canonical-foundations/ubuntu-image-private-test"
+      auth: "upils:Z3jNRMLKnSvSbt3J1lk3"
+      fingerprint: "CDE5112BD4104F975FC8A53FD4C0B668FD4C9139"
+  extra-packages:
+    -
+      name: "hello-ubuntu-image-public"
+    -
+      name: "hello-ubuntu-image-private"
+artifacts:
+  img:
+    -
+      name: pc-amd64.img
+  qcow2:
+    -
+      name: pc-amd64.qcow2
+  manifest:
+    name: "filesystem-manifest.txt"
+  filelist:
+    name: "filesystem-filelist.txt"

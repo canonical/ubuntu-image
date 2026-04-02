@@ -1,67 +1,77 @@
-# Ubuntu image builder
+# ubuntu-image: build Ubuntu images
 
-![Build](https://github.com/canonical/ubuntu-image/actions/workflows/build-and-test.yml/badge.svg)
+[![ubuntu-image](https://snapcraft.io/ubuntu-image/badge.svg)](https://snapcraft.io/ubuntu-image)
+![Build](https://github.com/canonical/ubuntu-image/actions/workflows/build-and-test.yml/badge.svg?branch=main)
 [![codecov](https://codecov.io/gh/canonical/ubuntu-image/branch/main/graph/badge.svg?token=F9jE9HKo1a)](https://codecov.io/gh/canonical/ubuntu-image)
 [![Go Report Card](https://goreportcard.com/badge/github.com/canonical/ubuntu-image)](https://goreportcard.com/report/github.com/canonical/ubuntu-image)
 
+ubuntu-image is a tool used for generating bootable images. You can use it to build Ubuntu images such as:
 
-This tool is used to build Ubuntu images.  Currently builds Ubuntu Core snap-based
-images from model assertions and Ubuntu classic preinstalled images using image definition
-files, but it will be generalized to build more (eventually all) Ubuntu images.
+- Snap-based Ubuntu Core images from model assertions
 
+- Classical preinstalled Ubuntu images using image definitions
 
-# Requirements
+The future versions of this tool will be more generalized, allowing users to build a wider range of Ubuntu images, including ISO/installer.
 
-Ubuntu 18.04 (Bionic Beaver) is the minimum platform requirement, but Ubuntu
-20.04 (Focal Fossa) or newer is recommended. All required third party packages are available in the
-Ubuntu archive.
+## Getting started
 
-If you want to run the test suite locally, you should install all the build
-dependencies named in the `debian/control` file.  The easiest way to do that
-is to run::
+### Requirements
 
-    $ sudo apt build-dep ./
+* Ubuntu 20.04 (Focal Fossa) or newer (recommended: Ubuntu 24.04 (Noble Numbat))
 
-from the directory containing the `debian` subdirectory.  Alternatively of
-course, you can just install the packages named in the `Build-Depends` field.
+* Ability to install snaps ([SnapStore: ubuntu-image](https://snapcraft.io/ubuntu-image))
 
+### Quickstart
 
-# Project details
+See [Build your first Ubuntu Core image](https://ubuntu.com/core/docs/build-an-image) for instructions on how to use ubuntu-image to build an Ubuntu core image on a **Raspberry Pi**.
+
+> [!IMPORTANT] 
+> `ubuntu-image` requires **elevated permissions**. Run it with **root** privileges or using `sudo`.
+
+## Building images
+
+ubuntu-image offers two basic sub-commands for building snap-based and classical images.
+
+### Building snap-based images
+
+To build a snap-based image with ubuntu-image, you need a [model assertion](https://ubuntu.com/core/docs/reference/assertions/model). A model assertion is a YAML file that describes a particular combination of core, kernel, and gadget snaps, along with other declarations, signed with a digital signature asserting its authenticity. The `ubuntu-image` command only requires the path to this model assertion to build snap-based images.
+
+To build snap-based images with `ubuntu-image`, use the following command:
+
+```
+ubuntu-image snap model.assertion
+```
+
+See [Build your first Ubuntu Core image](https://ubuntu.com/core/docs/build-an-image) for more information on building snap-based images using ubuntu-image. To build an image with custom snaps, see [Build an image with custom snaps](https://ubuntu.com/core/docs/custom-images).
+
+### Building classical images
+
+Classical images are built from image definitions, which are YAML files. The image definition YAML file specifies the various configurations required to build a classical image, including the path to the `gadget.yaml` file. See [Image Definition](internal/imagedefinition/README.rst) for the detailed specification of what is supported in the image definition YAML file.
+
+To build classical images with ubuntu-image, use the following command:
+
+```
+ubuntu-image classic image_definition.yaml
+```
+
+## Building and testing ubuntu-image
+
+See [Contributing to ubuntu-image](/CONTRIBUTING.md) for instructions on how to set up, build, and test ubuntu-image in development mode.
+
+## License
+
+The ubuntu-image project is licensed under [GNU General Public License v3.0](/LICENSE).
+
+## Contributing to ubuntu-image
+
+To learn how to contribute to the ubuntu-image project, see [Contributing to ubuntu-image](/CONTRIBUTING.md).
+
+## Project details
 
 * Project home: https://github.com/Canonical/ubuntu-image
 * Report bugs at: https://bugs.launchpad.net/ubuntu-image
 * Git clone: https://github.com/Canonical/ubuntu-image.git
-* Manual page: man ubuntu-image
-  (https://github.com/Canonical/ubuntu-image/blob/main/ubuntu-image.rst)
-
-The "gadget.yaml" specification has moved to [the snapcraft forum](https://forum.snapcraft.io/t/gadget-snaps)
-
-# Build Instructions
-
-* Ensure golang >= 1.21 is installed
-* Clone the git repository using `git clone https://github.com/canonical/ubuntu-image.git`
-* `cd` into the newly cloned repository
-* Run `go build -o . ./...`
-* The newly compiled executable `ubuntu-image` will be created in the current directory
-
-
-# Release process
-
-ubuntu-image is released as a snap on [the snapstore](https://snapcraft.io/ubuntu-image).
-
-When changes are merged in main, a new snap is automatically built and pushed to the `latest/edge` channel.
-
-When we think we have a "stable enough" version that we don't want to break with future merges in main, we want to promote it to `latest/candidate`. To do so:
-  - create a new branch
-  - update the version in `snapcraft.yaml`, copyrights, changelog, etc.
-  - commit, tag X.Y and push
-  - merge
-  - let it build and appear in `latest/edge`
-  - promote it to `latest/candidate`
-
-After a couple of weeks, if our "early adopters" are happy and we did not break any build or if we did not spot any major fix to do, promote this version from `latest/candidate` to `latest/stable`.
-
-This way, our users can choose between:
-- the `latest/edge` channel updated as soon as we merge changes.
-- the `latest/candidate` channel with new features / bug fix but with potentially some newly introduced bug. This channel would be good to let users test requested features.
-- the `latest/stable` channel that should hopefully contain a rather "bug free" version because it was tested in more various situations.
+* Reference page: [`ubuntu-image` syntax and options](https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/ubuntu-image.html)
+* Building a gadget snap: [Building a gadget snap](https://ubuntu.com/core/docs/gadget-building)
+* Gadget tree: [pc-gadget](https://github.com/snapcore/pc-gadget)
+* `gadget.yaml` specification: [Gadget snaps](https://forum.snapcraft.io/t/gadget-snaps)

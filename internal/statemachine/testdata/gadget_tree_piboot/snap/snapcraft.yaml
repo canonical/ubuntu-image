@@ -30,7 +30,7 @@ parts:
       # but only use the cross-compiling sources when actually cross compiling
       # as otherwise its just safer to use the build environment - it offers
       # much more flexibility.
-      if [ "$SNAPCRAFT_ARCH_TRIPLET" = "x86_64-linux-gnu" ] || [ -z "$SNAPCRAFT_ARCH_TRIPLET" ]; then
+      if [ "$CRAFT_ARCH_TRIPLET_BUILD_FOR" = "x86_64-linux-gnu" ] || [ -z "$CRAFT_ARCH_TRIPLET_BUILD_FOR" ]; then
         OPTIONAL_ARGS="SERIES_HOST=\"focal\" SOURCES_HOST=\"./helpers/cross-sources.list\" SOURCES_D_HOST=\"./helpers\""
       fi
       make -C $SNAPCRAFT_PART_SRC core \
@@ -59,12 +59,12 @@ parts:
     plugin: nil
     override-build: |
       set -x
-      if [ "$SNAPCRAFT_ARCH_TRIPLET" = "x86_64-linux-gnu" ] || [ -z "$SNAPCRAFT_ARCH_TRIPLET" ]; then
+      if [ "$CRAFT_ARCH_TRIPLET_BUILD_FOR" = "x86_64-linux-gnu" ] || [ -z "$CRAFT_ARCH_TRIPLET_BUILD_FOR" ]; then
         # manually set since new snapcraft doesn't like --target-arch when 
         # building with lxd/multipass
         BUILD_ARCH_TRIPLET=aarch64-linux-gnu
       else
-        BUILD_ARCH_TRIPLET=$SNAPCRAFT_ARCH_TRIPLET
+        BUILD_ARCH_TRIPLET=$CRAFT_ARCH_TRIPLET_BUILD_FOR
       fi
       export TREE="${SNAPCRAFT_STAGE:-.}/psplash"
       . ${TREE}/config
@@ -79,7 +79,7 @@ parts:
       ./make-image-header.sh "$SPLASH" CORE psplash-core
       aclocal
       autoreconf --install
-      if ! dpkg-architecture -t "${SNAPCRAFT_ARCH_TRIPLET}" -e \
+      if ! dpkg-architecture -t "${CRAFT_ARCH_TRIPLET_BUILD_FOR}" -e \
           $(dpkg-architecture -q DEB_BUILD_ARCH)
       then
         export CROSS_COMPILE=$(dpkg-architecture \

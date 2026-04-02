@@ -11,6 +11,7 @@ gadget:
   branch: "classic-redesign"
   type: "git"
 rootfs:
+  sources-list-deb822: true
   seed:
     urls:
       - "git://git.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/+git/"
