@@ -92,4 +92,4 @@ require (
 	gopkg.in/macaroon.v1 v1.0.0 // indirect
 )
 
-replace github.com/snapcore/snapd => /r/snapd
+replace github.com/snapcore/snapd => github.com/ML-PA-Consulting-GmbH/snapd v0.0.0-20260402110430-9a254582b34b

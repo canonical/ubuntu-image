@@ -12,14 +12,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -30,18 +22,14 @@ jobs:
         go-version: '1.26'
 
     - name: Build binary
-      env:
-        GOOS: ${{ matrix.goos }}
-        GOARCH: ${{ matrix.goarch }}
-        GOPRIVATE: github.com/ML-PA-Consulting-GmbH/*
       run: |
-        go build -o ubuntu-image-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/ubuntu-image/
+        go build -o ubuntu-image ./cmd/ubuntu-image/
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ubuntu-image-${{ matrix.goos }}-${{ matrix.goarch }}
-        path: ubuntu-image-${{ matrix.goos }}-${{ matrix.goarch }}
+        name: ubuntu-image
+        path: ubuntu-image
 
   release:
     needs: build
@@ -55,6 +43,4 @@ jobs:
     - name: Create release
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          ubuntu-image-linux-amd64/ubuntu-image-linux-amd64
-          ubuntu-image-linux-arm64/ubuntu-image-linux-arm64
+        files: ubuntu-image/ubuntu-image
