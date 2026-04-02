@@ -972,6 +972,95 @@ func TestPreseedFlag(t *testing.T) {
 	asserter.AssertErrNil(err, true)
 }
 
+func TestValidationSetSequencesFlag(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := testhelper.SaveCWD()
+	defer restoreCWD()
+
+	var calledOpts *image.Options
+	imagePrepare = func(opts *image.Options) error {
+		calledOpts = opts
+		return nil
+	}
+	defer func() {
+		imagePrepare = image.Prepare
+	}()
+
+	var stateMachine SnapStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidationSets")
+	workDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.stateMachineFlags.Thru = "prepare_image"
+	stateMachine.Opts.Sequences = map[string]int{
+		"test-validation-set": 7,
+	}
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.Run()
+	asserter.AssertErrNil(err, true)
+
+	if calledOpts == nil {
+		t.Fatal("options passed to image.Prepare are nil")
+	}
+
+	if calledOpts.SeedManifest == nil {
+		t.Fatal("expected SeedManifest to be populated")
+	}
+
+	expectedValidationSets := calledOpts.SeedManifest.AllowedValidationSets()
+	if len(expectedValidationSets) != 1 {
+		t.Fatalf("expected 1 validation-set override, got %d", len(expectedValidationSets))
+	}
+
+	expected := expectedValidationSets[0]
+	if expected.AccountID != "CA5GLZgNQWPhspDQK63Er46Uxz2SO7ez" {
+		t.Fatalf("expected account-id %q, got %q", "CA5GLZgNQWPhspDQK63Er46Uxz2SO7ez", expected.AccountID)
+	}
+	if expected.Name != "test-validation-set" {
+		t.Fatalf("expected validation-set name %q, got %q", "test-validation-set", expected.Name)
+	}
+	if expected.Sequence != 7 {
+		t.Fatalf("expected sequence %d, got %d", 7, expected.Sequence)
+	}
+	if expected.Pinned {
+		t.Fatal("expected validation-set sequence override to be non-pinned")
+	}
+
+	err = stateMachine.Teardown()
+	asserter.AssertErrNil(err, true)
+}
+
+func TestValidationSetSequencesFlagMissingValidationSet(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	restoreCWD := testhelper.SaveCWD()
+	defer restoreCWD()
+
+	var stateMachine SnapStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.Args.ModelAssertion = filepath.Join("testdata", "modelAssertionValidationSets")
+	workDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(workDir) })
+	stateMachine.stateMachineFlags.WorkDir = workDir
+	stateMachine.stateMachineFlags.Thru = "prepare_image"
+	stateMachine.Opts.Sequences = map[string]int{
+		"missing-validation-set": 7,
+	}
+
+	err = stateMachine.Setup()
+	asserter.AssertErrNil(err, true)
+
+	err = stateMachine.Run()
+	asserter.AssertErrContains(err, "error dealing with validation-set sequence missing-validation-set: validation-set not present in model assertion")
+}
+
 func TestSnapStateMachine_decodeModelAssertion(t *testing.T) {
 	type fields struct {
 		Args commands.SnapArgs
