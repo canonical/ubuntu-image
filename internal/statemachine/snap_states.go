@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/interfaces/builtin"
 	"github.com/snapcore/snapd/seed/seedwriter"
@@ -69,15 +70,45 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 // imageOptsSeedManifest sets up the pre-provided manifest if revisions are passed
 func (snapStateMachine *SnapStateMachine) imageOptsSeedManifest() (*seedwriter.Manifest, error) {
-	if len(snapStateMachine.Opts.Revisions) == 0 {
+	if len(snapStateMachine.Opts.Revisions) == 0 && len(snapStateMachine.Opts.Sequences) == 0 {
 		return nil, nil
 	}
+
+	var modelValidationSets map[string]*asserts.ModelValidationSet
+	if len(snapStateMachine.Opts.Sequences) > 0 {
+		model, err := snapStateMachine.decodeModelAssertion()
+		if err != nil {
+			return nil, err
+		}
+
+		modelValidationSets = make(map[string]*asserts.ModelValidationSet, len(model.ValidationSets()))
+		for _, validationSet := range model.ValidationSets() {
+			if _, ok := modelValidationSets[validationSet.Name]; ok {
+				return nil, fmt.Errorf("error dealing with validation-set sequence %s: validation-set name is ambiguous in model assertion", validationSet.Name)
+			}
+			modelValidationSets[validationSet.Name] = validationSet
+		}
+	}
+
 	seedManifest := seedwriter.NewManifest()
 	for snapName, snapRev := range snapStateMachine.Opts.Revisions {
 		fmt.Printf("WARNING: revision %d for snap %s may not be the latest available version!\n", snapRev, snapName)
 		err := seedManifest.SetAllowedSnapRevision(snapName, snap.R(snapRev))
 		if err != nil {
 			return nil, fmt.Errorf("error dealing with snap revision %s: %w", snapName, err)
+		}
+	}
+
+	for validationSetName, sequence := range snapStateMachine.Opts.Sequences {
+		validationSet, ok := modelValidationSets[validationSetName]
+		if !ok {
+			return nil, fmt.Errorf("error dealing with validation-set sequence %s: validation-set not present in model assertion", validationSetName)
+		}
+
+		fmt.Printf("WARNING: sequence %d for validation-set %s may not be the latest available sequence!\n", sequence, validationSetName)
+		err := seedManifest.SetAllowedValidationSet(validationSet.AccountID, validationSet.Name, sequence, false)
+		if err != nil {
+			return nil, fmt.Errorf("error dealing with validation-set sequence %s: %w", validationSetName, err)
 		}
 	}
 
