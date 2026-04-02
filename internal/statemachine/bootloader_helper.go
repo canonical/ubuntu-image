@@ -6,13 +6,18 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/snapcore/snapd/bootloader"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/osutil"
 
 	"github.com/canonical/ubuntu-image/internal/arch"
 	"github.com/canonical/ubuntu-image/internal/helper"
 )
+
+// ubuntuBootStatePrepareTimeFile is the file name with the content that will
+// be copied to the system-boot-state partition at image preparation time.
+// This constant is defined here because it is not yet available in our snapd fork
+// (it was added in canonical's snapd as bootloader.UbuntuBootStatePrepareTimeFile).
+const ubuntuBootStatePrepareTimeFile = "ubuntu-boot-state.img"
 
 // handleLkBootloader handles the special "lk" bootloader case where some extra
 // files need to be added to the bootfs
@@ -51,7 +56,7 @@ func (stateMachine *StateMachine) handleLkBootloader(volume *gadget.Volume) erro
 func (stateMachine *StateMachine) handleUbootPart(partIdx int, volumeName string) error {
 	partName := fmt.Sprintf("part%d", partIdx)
 	// This file has the content of the boot state partition
-	partFile := filepath.Join(stateMachine.tempDirs.unpack, bootloader.UbuntuBootStatePrepareTimeFile)
+	partFile := filepath.Join(stateMachine.tempDirs.unpack, ubuntuBootStatePrepareTimeFile)
 	destFile := filepath.Join(stateMachine.tempDirs.volumes,
 		volumeName, partName+".img")
 	if err := osutil.CopyFile(partFile, destFile, osutil.CopyFlagDefault); err != nil {

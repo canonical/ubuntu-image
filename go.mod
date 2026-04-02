@@ -23,13 +23,18 @@ require (
 	github.com/canonical/cpuid v0.0.0-20220614022739-219e067757cb // indirect
 	github.com/canonical/go-kbkdf v0.0.0-20250104172618-3b1308f9acf9 // indirect
 	github.com/canonical/go-password-validator v0.0.0-20250617132709-1b205303ca54 // indirect
-	github.com/chai2010/gettext-go v1.0.3 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/djherbis/times v1.6.0 // indirect
 	github.com/elliotwutingfeng/asciiset v0.0.0-20240214025120-24af97c84155 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
+	github.com/google/go-configfs-tsm v0.3.3-0.20240919001351-b4b5b84fdcbc // indirect
+	github.com/google/go-sev-guest v0.12.1 // indirect
+	github.com/google/go-tdx-guest v0.3.2-0.20241009005452-097ee70d0843 // indirect
+	github.com/google/go-tpm v0.9.5 // indirect
+	github.com/google/go-tpm-tools v0.4.5 // indirect
+	github.com/google/logger v1.1.1 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
@@ -38,11 +43,14 @@ require (
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
+	github.com/snapcore/go-gettext v0.0.0-20191107141714-82bbea49e785 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.etcd.io/bbolt v1.3.9 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/sync v0.10.0 // indirect
+	google.golang.org/protobuf v1.35.1 // indirect
 )
 
 require (
@@ -83,3 +91,5 @@ require (
 	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af // indirect
 	gopkg.in/macaroon.v1 v1.0.0 // indirect
 )
+
+replace github.com/snapcore/snapd => /r/snapd

@@ -1,4 +1,4 @@
-name: Create Release Artifact
+name: Build and Release
 
 on:
   push:
@@ -6,65 +6,55 @@ on:
       - '*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.26'
 
-    - name: Extract versions from tag
-      id: extract_versions
-      run: |
-        TAG_NAME=${GITHUB_REF##*/}
-        UBUNTU_IMAGE_VERSION=$TAG_NAME
-        echo "UBUNTU_IMAGE_VERSION=$UBUNTU_IMAGE_VERSION" >> $GITHUB_ENV
-
-    # - name: Download snapd tarball
-    #   run: |
-    #     SNAPD_URL=https://github.com/ML-PA-Consulting-GmbH/snapd/releases/download/v${{ env.SNAPD_VERSION }}/snapd_v${{ env.SNAPD_VERSION }}.tar
-    #     curl -L $SNAPD_URL -o /tmp/snapd_v${{ env.SNAPD_VERSION }}.tar
-
-    # - name: Untar snapd
-    #   run: |
-    #     mkdir -p /tmp/snapd
-    #     tar -xf /tmp/snapd_v${{ env.SNAPD_VERSION }}.tar -C /tmp/snapd
-    #     ls -la /tmp/snapd
-
-    - name: Pull dependencies and update go.mod
-      run: |
-        # go mod edit -replace github.com/snapcore/snapd=/tmp/snapd
-        go mod tidy
-        go mod vendor
-
-    - name: Create tarball
-      run: |
-        tar cfah /tmp/ubuntu-image_${{ env.UBUNTU_IMAGE_VERSION }}.tar .
-
-    - name: Get release ID
-      id: get_release
-      run: |
-        TAG_NAME=${GITHUB_REF##*/}
-        RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" | jq -r .id)
-        echo "RELEASE_ID=${RELEASE_ID}" >> $GITHUB_ENV
-        echo "Tag name: $TAG_NAME"
-        echo "Release ID: $RELEASE_ID"
+    - name: Build binary
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        GOPRIVATE: github.com/ML-PA-Consulting-GmbH/*
+      run: |
+        go build -o ubuntu-image-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/ubuntu-image/
 
-
-    - name: Upload release asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
       with:
-        upload_url: "https://uploads.github.com/repos/${{ github.repository }}/releases/${{ env.RELEASE_ID }}/assets?name=ubuntu-image_${{ env.UBUNTU_IMAGE_VERSION }}.tar"
-        asset_path: /tmp/ubuntu-image_${{ env.UBUNTU_IMAGE_VERSION }}.tar
-        asset_name: ubuntu-image_${{ env.UBUNTU_IMAGE_VERSION }}.tar
-        asset_content_type: application/x-tar
+        name: ubuntu-image-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: ubuntu-image-${{ matrix.goos }}-${{ matrix.goarch }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Create release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          ubuntu-image-linux-amd64/ubuntu-image-linux-amd64
+          ubuntu-image-linux-arm64/ubuntu-image-linux-arm64

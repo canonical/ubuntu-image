@@ -13,7 +13,7 @@ build/
 coverage.txt
 
 # Images built in the file tree
-*.img
+/*.img
 *.qcow2
 
 # Packaging artefacts
@@ -28,3 +28,10 @@ ubuntu-image*.snap
 
 # Work dirs
 tmp/
+work/
+
+# Build output
+bin/
+
+# Seed manifests from builds
+seed.manifest

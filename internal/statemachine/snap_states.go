@@ -10,13 +10,42 @@ import (
 	"github.com/snapcore/snapd/interfaces/builtin"
 	"github.com/snapcore/snapd/seed/seedwriter"
 	"github.com/snapcore/snapd/snap"
+
+	"github.com/canonical/ubuntu-image/internal/commands"
 )
 
 var prepareImageState = stateFunc{"prepare_image", (*StateMachine).prepareImage}
 
+// resolveOfflineDir discovers snaps and assertions from the same directory as the model assertion.
+func resolveOfflineDir(modelPath string, opts *commands.SnapOpts) error {
+	dir := filepath.Dir(modelPath)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("cannot read offline directory %q: %w", dir, err)
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		switch {
+		case filepath.Ext(e.Name()) == ".snap":
+			opts.Snaps = append(opts.Snaps, path)
+		case filepath.Ext(e.Name()) == ".assert" && e.Name() != "model.assert":
+			opts.ExtraAssertionFilenames = append(opts.ExtraAssertionFilenames, path)
+		}
+	}
+	opts.AllowSnapdKernelMismatch = true
+	return nil
+}
+
 // Prepare the image
 func (stateMachine *StateMachine) prepareImage() error {
 	snapStateMachine := stateMachine.parent.(*SnapStateMachine)
+
+	if err := resolveOfflineDir(snapStateMachine.Args.ModelAssertion, &snapStateMachine.Opts); err != nil {
+		return err
+	}
 
 	imageOpts := &image.Options{
 		ModelFile:                 snapStateMachine.Args.ModelAssertion,
