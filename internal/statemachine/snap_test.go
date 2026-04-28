@@ -1013,22 +1013,22 @@ func TestValidationSetSequencesFlag(t *testing.T) {
 		t.Fatal("expected SeedManifest to be populated")
 	}
 
-	expectedValidationSets := calledOpts.SeedManifest.AllowedValidationSets()
-	if len(expectedValidationSets) != 1 {
-		t.Fatalf("expected 1 validation-set override, got %d", len(expectedValidationSets))
+	validationSets := calledOpts.SeedManifest.AllowedValidationSets()
+	if len(validationSets) != 1 {
+		t.Fatalf("expected 1 validation-set override, got %d", len(validationSets))
 	}
 
-	expected := expectedValidationSets[0]
-	if expected.AccountID != "CA5GLZgNQWPhspDQK63Er46Uxz2SO7ez" {
-		t.Fatalf("expected account-id %q, got %q", "CA5GLZgNQWPhspDQK63Er46Uxz2SO7ez", expected.AccountID)
+	validationSet := validationSets[0]
+	if validationSet.AccountID != "CA5GLZgNQWPhspDQK63Er46Uxz2SO7ez" {
+		t.Fatalf("expected account-id %q, got %q", "CA5GLZgNQWPhspDQK63Er46Uxz2SO7ez", validationSet.AccountID)
 	}
-	if expected.Name != "test-validation-set" {
-		t.Fatalf("expected validation-set name %q, got %q", "test-validation-set", expected.Name)
+	if validationSet.Name != "test-validation-set" {
+		t.Fatalf("expected validation-set name %q, got %q", "test-validation-set", validationSet.Name)
 	}
-	if expected.Sequence != 7 {
-		t.Fatalf("expected sequence %d, got %d", 7, expected.Sequence)
+	if validationSet.Sequence != 7 {
+		t.Fatalf("expected sequence %d, got %d", 7, validationSet.Sequence)
 	}
-	if expected.Pinned {
+	if validationSet.Pinned {
 		t.Fatal("expected validation-set sequence override to be non-pinned")
 	}
 
