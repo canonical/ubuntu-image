@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/image"
@@ -74,20 +75,14 @@ func (snapStateMachine *SnapStateMachine) imageOptsSeedManifest() (*seedwriter.M
 		return nil, nil
 	}
 
-	var modelValidationSets map[string]*asserts.ModelValidationSet
+	var modelValidationSets []*asserts.ModelValidationSet
 	if len(snapStateMachine.Opts.Sequences) > 0 {
 		model, err := snapStateMachine.decodeModelAssertion()
 		if err != nil {
 			return nil, err
 		}
 
-		modelValidationSets = make(map[string]*asserts.ModelValidationSet, len(model.ValidationSets()))
-		for _, validationSet := range model.ValidationSets() {
-			if _, ok := modelValidationSets[validationSet.Name]; ok {
-				return nil, fmt.Errorf("error dealing with validation-set sequence %s: validation-set name is ambiguous in model assertion", validationSet.Name)
-			}
-			modelValidationSets[validationSet.Name] = validationSet
-		}
+		modelValidationSets = model.ValidationSets()
 	}
 
 	seedManifest := seedwriter.NewManifest()
@@ -100,19 +95,47 @@ func (snapStateMachine *SnapStateMachine) imageOptsSeedManifest() (*seedwriter.M
 	}
 
 	for validationSetName, sequence := range snapStateMachine.Opts.Sequences {
-		validationSet, ok := modelValidationSets[validationSetName]
-		if !ok {
-			return nil, fmt.Errorf("error dealing with validation-set sequence %s: validation-set not present in model assertion", validationSetName)
+		validationSet, err := resolveValidationSetSequence(validationSetName, modelValidationSets)
+		if err != nil {
+			return nil, fmt.Errorf("error dealing with validation-set sequence %s: %w", validationSetName, err)
 		}
 
 		fmt.Printf("WARNING: sequence %d for validation-set %s may not be the latest available sequence!\n", sequence, validationSetName)
-		err := seedManifest.SetAllowedValidationSet(validationSet.AccountID, validationSet.Name, sequence, false)
+		err = seedManifest.SetAllowedValidationSet(validationSet.AccountID, validationSet.Name, sequence, false)
 		if err != nil {
 			return nil, fmt.Errorf("error dealing with validation-set sequence %s: %w", validationSetName, err)
 		}
 	}
 
 	return seedManifest, nil
+}
+
+func resolveValidationSetSequence(validationSetRef string, modelValidationSets []*asserts.ModelValidationSet) (*asserts.ModelValidationSet, error) {
+	accountID, validationSetName, hasAccountID := strings.Cut(validationSetRef, "/")
+	if !hasAccountID {
+		var match *asserts.ModelValidationSet
+		for _, validationSet := range modelValidationSets {
+			if validationSet.Name != validationSetRef {
+				continue
+			}
+			if match != nil {
+				return nil, fmt.Errorf("validation-set name is ambiguous in model assertion")
+			}
+			match = validationSet
+		}
+		if match == nil {
+			return nil, fmt.Errorf("validation-set not present in model assertion")
+		}
+		return match, nil
+	}
+
+	for _, validationSet := range modelValidationSets {
+		if validationSet.AccountID == accountID && validationSet.Name == validationSetName {
+			return validationSet, nil
+		}
+	}
+
+	return nil, fmt.Errorf("validation-set not present in model assertion")
 }
 
 // imageOptsCustomizations prepares the Customizations options to give to image.Prepare
