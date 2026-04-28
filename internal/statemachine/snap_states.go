@@ -68,7 +68,7 @@ func (stateMachine *StateMachine) prepareImage() error {
 	return nil
 }
 
-// imageOptsSeedManifest sets up the pre-provided manifest if revisions are passed
+// imageOptsSeedManifest sets up the pre-provided manifest when snap revision overrides or validation-set sequence overrides are passed
 func (snapStateMachine *SnapStateMachine) imageOptsSeedManifest() (*seedwriter.Manifest, error) {
 	if len(snapStateMachine.Opts.Revisions) == 0 && len(snapStateMachine.Opts.Sequences) == 0 {
 		return nil, nil
