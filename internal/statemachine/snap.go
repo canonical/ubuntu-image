@@ -7,6 +7,7 @@ import (
 
 	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/seed/seedwriter"
+	"github.com/snapcore/snapd/snap"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 )
@@ -34,6 +35,11 @@ type SnapStateMachine struct {
 	// manifestSeedManifest, when set by the --manifest pipeline, takes
 	// precedence over Opts.Revisions in imageOptsSeedManifest.
 	manifestSeedManifest *seedwriter.Manifest
+
+	// manifestSnapURL, when set by the --manifest pipeline, becomes
+	// image.Options.SnapDownloadURL so the snapd-fork URL hook
+	// resolves blob URLs via m2cp instead of the Canonical store API.
+	manifestSnapURL func(name string, revision snap.Revision, snapID string) (string, error)
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run().

@@ -13,6 +13,7 @@ import (
 
 	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/asserts/sysdb"
+	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/seed/seedwriter"
 	"github.com/snapcore/snapd/snap"
 
@@ -67,7 +68,102 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	}
 	snapStateMachine.manifestSeedManifest = sm
 
-	return fmt.Errorf("next step (configure store URL via SNAPPY_FORCE_API_URL) not yet implemented")
+	if err := configureStoreURLFromM2cp(); err != nil {
+		return err
+	}
+
+	snapStateMachine.manifestSnapURL = buildSnapDownloadURL(m.Model.Architecture)
+	fmt.Printf("=> snapd SnapDownloadURL hook wired (m2cp store app download --url)\n")
+
+	return nil
+}
+
+// buildSnapDownloadURL returns the callback handed to
+// image.Options.SnapDownloadURL: per requested snap, it shells out to
+// `m2cp store app download <name> <ARCH> <revision> --url` and returns
+// the temporary signed URL. snapd then HTTP-GETs that URL and runs the
+// rest of the seed pipeline unchanged. m2cp is expected to be on PATH.
+func buildSnapDownloadURL(arch string) func(name string, rev snap.Revision, snapID string) (string, error) {
+	upperArch := strings.ToUpper(arch)
+	return func(name string, rev snap.Revision, snapID string) (string, error) {
+		revStr := rev.String()
+		fmt.Printf("=> URL: m2cp store app download %s %s %s --url\n", name, upperArch, revStr)
+		cmd := exec.Command("m2cp", "store", "app", "download", name, upperArch, revStr, "--url")
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			return "", fmt.Errorf("m2cp app download --url %s %s %s: %w (stderr: %s)",
+				name, upperArch, revStr, err, strings.TrimSpace(stderr.String()))
+		}
+		url := strings.TrimSpace(stdout.String())
+		if url == "" {
+			return "", fmt.Errorf("m2cp returned empty URL for %s %s (stderr: %s)",
+				name, revStr, strings.TrimSpace(stderr.String()))
+		}
+		fmt.Printf("   -> %s\n", redactSignedURL(url))
+		return url, nil
+	}
+}
+
+// redactSignedURL trims the Azure Blob SAS query so logs don't carry
+// a long-lived-looking signature. The path + start/end times are kept;
+// the sig= parameter is masked.
+func redactSignedURL(u string) string {
+	q := strings.Index(u, "?")
+	if q < 0 {
+		return u
+	}
+	host := u[:q]
+	params := strings.Split(u[q+1:], "&")
+	for i, p := range params {
+		if strings.HasPrefix(p, "sig=") {
+			params[i] = "sig=<redacted>"
+		}
+	}
+	return host + "?" + strings.Join(params, "&")
+}
+
+// configureStoreURLFromM2cp reads the active store URL from
+// `m2cp user status --json` (it's the GraphQL endpoint, e.g.
+// https://host/graphql), strips the /graphql suffix to land on the
+// snap-store HTTP base, and exports SNAPPY_FORCE_API_URL so snapd's
+// store client targets this appstore for the rest of the build.
+func configureStoreURLFromM2cp() error {
+	fmt.Printf("=> discovering store URL: m2cp user status --json\n")
+	cmd := exec.Command("m2cp", "user", "status", "--json")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("m2cp user status --json: %w", err)
+	}
+	var resp userStatusResponse
+	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		return fmt.Errorf("parsing m2cp user status JSON: %w", err)
+	}
+	graphqlURL := resp.Output.Session.Store
+	if graphqlURL == "" {
+		return fmt.Errorf("m2cp user status returned empty store URL (not logged in?)")
+	}
+	if !strings.HasSuffix(graphqlURL, "/graphql") {
+		return fmt.Errorf("expected store URL to end in /graphql, got %q", graphqlURL)
+	}
+	base := strings.TrimSuffix(graphqlURL, "/graphql")
+	fmt.Printf("   graphql:    %s\n", graphqlURL)
+	fmt.Printf("   snap-store: %s\n", base)
+	if err := os.Setenv("SNAPPY_FORCE_API_URL", base); err != nil {
+		return fmt.Errorf("setting SNAPPY_FORCE_API_URL: %w", err)
+	}
+	return nil
+}
+
+type userStatusResponse struct {
+	Output struct {
+		Session struct {
+			Store string `json:"store"`
+		} `json:"session"`
+	} `json:"output"`
 }
 
 // resolveRevisionsViaM2cp looks each pinned snap up via
@@ -143,6 +239,7 @@ func injectTrustFromM2cp() error {
 	}
 	dec := asserts.NewDecoder(&stdout)
 	var trusted []asserts.Assertion
+	var skipped int
 	for {
 		a, err := dec.Decode()
 		if errors.Is(err, io.EOF) {
@@ -152,13 +249,26 @@ func injectTrustFromM2cp() error {
 			return fmt.Errorf("decoding trust bundle: %w", err)
 		}
 		describeAssertion(a)
-		trusted = append(trusted, a)
+		// Only account and account-key can be trust anchors. Anything
+		// else (e.g. the store assertion) is informational here.
+		switch a.(type) {
+		case *asserts.Account, *asserts.AccountKey:
+			trusted = append(trusted, a)
+		default:
+			skipped++
+		}
 	}
 	if len(trusted) == 0 {
 		return fmt.Errorf("trust bundle is empty")
 	}
 	sysdb.InjectTrusted(trusted)
-	fmt.Printf("   injected %d trusted assertions into snapd sysdb\n", len(trusted))
+	// image.Prepare caches sysdb.Trusted() in a package-level var at
+	// init time, so InjectTrusted alone won't reach it. MockTrusted
+	// (named for tests, but the right tool here) refreshes that cache
+	// with the now-expanded trust set.
+	image.MockTrusted(sysdb.Trusted())
+	fmt.Printf("   injected %d trust anchors into snapd sysdb (+ %d non-anchor assertions skipped, image package cache refreshed)\n",
+		len(trusted), skipped)
 	return nil
 }
 
@@ -204,6 +314,11 @@ func (snapStateMachine *SnapStateMachine) manifestStageDir() (string, error) {
 // writeM2cpStdout runs `m2cp <args...>` and writes its stdout to dst.
 // m2cp's `Task-Id:` chatter goes to stderr, so stdout is the clean
 // payload (an assertion bundle, in the cases we use this for).
+//
+// Trailing whitespace is stripped and a single trailing newline is
+// added: snapd's assertion decoder uses bytes.LastIndex(buf, "\n\n")
+// to split content from signature, so a trailing blank line at EOF
+// would make it mistake the signature for the body.
 func writeM2cpStdout(dst string, args ...string) error {
 	cmd := exec.Command("m2cp", args...)
 	var stdout bytes.Buffer
@@ -212,5 +327,6 @@ func writeM2cpStdout(dst string, args ...string) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("m2cp %s: %w", strings.Join(args, " "), err)
 	}
-	return os.WriteFile(dst, stdout.Bytes(), 0o644)
+	payload := append(bytes.TrimRight(stdout.Bytes(), "\r\n \t"), '\n')
+	return os.WriteFile(dst, payload, 0o644)
 }
