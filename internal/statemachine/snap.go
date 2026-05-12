@@ -39,6 +39,12 @@ func (snapStateMachine *SnapStateMachine) Setup() error {
 	// set the states that will be used for this image type
 	snapStateMachine.states = snapStates
 
+	if snapStateMachine.Opts.Manifest != "" {
+		if err := snapStateMachine.prepareFromManifest(); err != nil {
+			return err
+		}
+	}
+
 	if err := snapStateMachine.setConfDefDir(snapStateMachine.parent.(*SnapStateMachine).Args.ModelAssertion); err != nil {
 		return err
 	}
