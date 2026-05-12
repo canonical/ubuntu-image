@@ -2,11 +2,16 @@ package statemachine
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/snapcore/snapd/asserts"
+	"github.com/snapcore/snapd/asserts/sysdb"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 )
@@ -49,7 +54,66 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	fmt.Printf("   wrote %s (%d bytes)\n", modelPath, info.Size())
 	snapStateMachine.Args.ModelAssertion = modelPath
 
-	return fmt.Errorf("next step (fetch trust bundle + InjectTrusted) not yet implemented")
+	if err := injectTrustFromM2cp(); err != nil {
+		return err
+	}
+
+	return fmt.Errorf("next step (resolve versions + configure store URL) not yet implemented")
+}
+
+// injectTrustFromM2cp pulls the tenant's trust bundle (account +
+// account-keys, all signed by the appstore root) via m2cp and installs
+// them into snapd's sysdb so seedwriter chain verification accepts
+// assertions signed by this store. The bundle stays in memory --
+// nothing is written to disk.
+func injectTrustFromM2cp() error {
+	fmt.Printf("=> fetching trust bundle: m2cp store system assertion\n")
+	cmd := exec.Command("m2cp", "store", "system", "assertion")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("m2cp store system assertion: %w", err)
+	}
+	dec := asserts.NewDecoder(&stdout)
+	var trusted []asserts.Assertion
+	for {
+		a, err := dec.Decode()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("decoding trust bundle: %w", err)
+		}
+		describeAssertion(a)
+		trusted = append(trusted, a)
+	}
+	if len(trusted) == 0 {
+		return fmt.Errorf("trust bundle is empty")
+	}
+	sysdb.InjectTrusted(trusted)
+	fmt.Printf("   injected %d trusted assertions into snapd sysdb\n", len(trusted))
+	return nil
+}
+
+func describeAssertion(a asserts.Assertion) {
+	switch v := a.(type) {
+	case *asserts.Account:
+		fmt.Printf("   account      account-id=%s display-name=%q validation=%s\n",
+			v.AccountID(), v.DisplayName(), v.Validation())
+	case *asserts.AccountKey:
+		fmt.Printf("   account-key  account-id=%s name=%s sha3-384=%s\n",
+			v.AccountID(), v.Name(), v.PublicKeyID())
+	case *asserts.Store:
+		url := ""
+		if u := v.URL(); u != nil {
+			url = u.String()
+		}
+		fmt.Printf("   store        store=%s operator-id=%s url=%q\n",
+			v.Store(), v.OperatorID(), url)
+	default:
+		fmt.Printf("   %s\n", a.Type().Name)
+	}
 }
 
 // manifestStageDir returns a directory under the active workdir (or a
