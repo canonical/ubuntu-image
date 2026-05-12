@@ -6,100 +6,17 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/interfaces/builtin"
 	"github.com/snapcore/snapd/seed/seedwriter"
 	"github.com/snapcore/snapd/snap"
-
-	"github.com/canonical/ubuntu-image/internal/commands"
 )
 
 var prepareImageState = stateFunc{"prepare_image", (*StateMachine).prepareImage}
 
-// resolveOfflineDir discovers .snap files in the model assertion's
-// directory and adds them to opts.Snaps.
-func resolveOfflineDir(modelPath string, opts *commands.SnapOpts) error {
-	dir := filepath.Dir(modelPath)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("cannot read offline directory %q: %w", dir, err)
-	}
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".snap" {
-			continue
-		}
-		opts.Snaps = append(opts.Snaps, filepath.Join(dir, e.Name()))
-	}
-	opts.AllowSnapdKernelMismatch = true
-	return nil
-}
-
-// loadOfflineAssertions decodes every .assert file in the model
-// assertion's directory (except the model itself) and returns a
-// retrieve function indexed by Ref.Unique(). It is plugged into
-// image.Options.AssertionRetrieve so the seedwriter resolves
-// snap-revision / snap-declaration / account / account-key from
-// local files instead of the snap store.
-func loadOfflineAssertions(modelPath string) (func(*asserts.Ref) (asserts.Assertion, error), error) {
-	dir := filepath.Dir(modelPath)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read offline directory %q: %w", dir, err)
-	}
-	index := map[string]asserts.Assertion{}
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".assert" || e.Name() == "model.assert" {
-			continue
-		}
-		path := filepath.Join(dir, e.Name())
-		f, err := os.Open(path)
-		if err != nil {
-			return nil, fmt.Errorf("cannot open %q: %w", path, err)
-		}
-		dec := asserts.NewDecoder(f)
-		for {
-			a, derr := dec.Decode()
-			if derr == io.EOF {
-				break
-			}
-			if derr != nil {
-				f.Close()
-				return nil, fmt.Errorf("cannot decode assertion in %q: %w", path, derr)
-			}
-			index[a.Ref().Unique()] = a
-		}
-		f.Close()
-	}
-	return func(ref *asserts.Ref) (asserts.Assertion, error) {
-		if a, ok := index[ref.Unique()]; ok {
-			return a, nil
-		}
-		return nil, &asserts.NotFoundError{Type: ref.Type, Headers: refPrimaryKeyHeaders(ref)}
-	}, nil
-}
-
-func refPrimaryKeyHeaders(ref *asserts.Ref) map[string]string {
-	h := make(map[string]string, len(ref.PrimaryKey))
-	for i, name := range ref.Type.PrimaryKey {
-		if i < len(ref.PrimaryKey) {
-			h[name] = ref.PrimaryKey[i]
-		}
-	}
-	return h
-}
-
 // Prepare the image
 func (stateMachine *StateMachine) prepareImage() error {
 	snapStateMachine := stateMachine.parent.(*SnapStateMachine)
-
-	if err := resolveOfflineDir(snapStateMachine.Args.ModelAssertion, &snapStateMachine.Opts); err != nil {
-		return err
-	}
-	retrieve, err := loadOfflineAssertions(snapStateMachine.Args.ModelAssertion)
-	if err != nil {
-		return err
-	}
 
 	imageOpts := &image.Options{
 		ModelFile:                 snapStateMachine.Args.ModelAssertion,
@@ -114,9 +31,9 @@ func (stateMachine *StateMachine) prepareImage() error {
 		Components:                snapStateMachine.Opts.Components,
 		ExtraAssertionsFiles:      snapStateMachine.Opts.ExtraAssertionFilenames,
 		AllowSnapdKernelMismatch:  snapStateMachine.Opts.AllowSnapdKernelMismatch,
-		AssertionRetrieve:         retrieve,
 	}
 
+	var err error
 	imageOpts.Snaps, imageOpts.SnapChannels, err = parseSnapsAndChannels(
 		snapStateMachine.Opts.Snaps)
 	if err != nil {
