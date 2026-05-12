@@ -64,6 +64,12 @@ func (stateMachine *StateMachine) prepareImage() error {
 		return fmt.Errorf("Error preparing image: %s", err.Error())
 	}
 
+	if snapStateMachine.manifest != nil {
+		if err := writeBuildYAML(snapStateMachine); err != nil {
+			return fmt.Errorf("writing build.yaml: %w", err)
+		}
+	}
+
 	snapStateMachine.YamlFilePath = filepath.Join(stateMachine.tempDirs.unpack, "gadget", gadgetYamlPathInTree)
 
 	return nil

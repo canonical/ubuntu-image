@@ -1,5 +1,10 @@
 package commands
 
+// BuilderVersion is set from main.go at startup so the manifest-mode
+// build.yaml can record which ubuntu-image produced the image. Empty
+// when the binary was built without ldflags-injected Version.
+var BuilderVersion string
+
 // SnapArgs holds the model Assertion
 type SnapArgs struct {
 	ModelAssertion string `positional-arg-name:"model_assertion" description:"Path to the model assertion file. This argument must be given unless the state machine is being resumed, in which case it cannot be given."`

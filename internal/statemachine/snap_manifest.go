@@ -9,13 +9,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/asserts/sysdb"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/seed/seedwriter"
 	"github.com/snapcore/snapd/snap"
+	"gopkg.in/yaml.v2"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 )
@@ -68,9 +71,12 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	}
 	snapStateMachine.manifestSeedManifest = sm
 
-	if err := configureStoreURLFromM2cp(); err != nil {
+	storeURL, err := configureStoreURLFromM2cp()
+	if err != nil {
 		return err
 	}
+	snapStateMachine.manifestStoreURL = storeURL
+	snapStateMachine.manifest = m
 
 	snapStateMachine.manifestSnapURL = buildSnapDownloadURL(m.Model.Architecture)
 	fmt.Printf("=> snapd SnapDownloadURL hook wired (m2cp store app download --url)\n")
@@ -200,35 +206,36 @@ func redactSignedURL(u string) string {
 // configureStoreURLFromM2cp reads the active store URL from
 // `m2cp user status --json` (it's the GraphQL endpoint, e.g.
 // https://host/graphql), strips the /graphql suffix to land on the
-// snap-store HTTP base, and exports SNAPPY_FORCE_API_URL so snapd's
-// store client targets this appstore for the rest of the build.
-func configureStoreURLFromM2cp() error {
+// snap-store HTTP base, exports SNAPPY_FORCE_API_URL so snapd's
+// store client targets this appstore for the rest of the build, and
+// returns the snap-store base URL so it can be recorded in build.yaml.
+func configureStoreURLFromM2cp() (string, error) {
 	fmt.Printf("=> discovering store URL: m2cp user status --json\n")
 	cmd := exec.Command("m2cp", "user", "status", "--json")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("m2cp user status --json: %w", err)
+		return "", fmt.Errorf("m2cp user status --json: %w", err)
 	}
 	var resp userStatusResponse
 	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
-		return fmt.Errorf("parsing m2cp user status JSON: %w", err)
+		return "", fmt.Errorf("parsing m2cp user status JSON: %w", err)
 	}
 	graphqlURL := resp.Output.Session.Store
 	if graphqlURL == "" {
-		return fmt.Errorf("m2cp user status returned empty store URL (not logged in?)")
+		return "", fmt.Errorf("m2cp user status returned empty store URL (not logged in?)")
 	}
 	if !strings.HasSuffix(graphqlURL, "/graphql") {
-		return fmt.Errorf("expected store URL to end in /graphql, got %q", graphqlURL)
+		return "", fmt.Errorf("expected store URL to end in /graphql, got %q", graphqlURL)
 	}
 	base := strings.TrimSuffix(graphqlURL, "/graphql")
 	fmt.Printf("   graphql:    %s\n", graphqlURL)
 	fmt.Printf("   snap-store: %s\n", base)
 	if err := os.Setenv("SNAPPY_FORCE_API_URL", base); err != nil {
-		return fmt.Errorf("setting SNAPPY_FORCE_API_URL: %w", err)
+		return "", fmt.Errorf("setting SNAPPY_FORCE_API_URL: %w", err)
 	}
-	return nil
+	return base, nil
 }
 
 type userStatusResponse struct {
@@ -237,6 +244,92 @@ type userStatusResponse struct {
 			Store string `json:"store"`
 		} `json:"session"`
 	} `json:"output"`
+}
+
+// buildYAML is the schema written to <seed>/systems/<label>/build.yaml
+// at the end of a manifest-mode build. Field order is the order
+// keys appear in the YAML output. Every field is always present;
+// unknown values fall back to "not set" so the schema is stable
+// regardless of env or linker flags.
+type buildYAML struct {
+	Builder        string `yaml:"builder"`
+	BuilderVersion string `yaml:"builder-version"`
+	AppstoreURL    string `yaml:"appstore-url"`
+	ModelName      string `yaml:"model-name"`
+	ModelRevision  string `yaml:"model-revision"`
+	Arch           string `yaml:"arch"`
+	Date           string `yaml:"date"`
+	Version        string `yaml:"version"`
+	Commit         string `yaml:"commit"`
+	Repo           string `yaml:"repo"`
+	Grade          string `yaml:"grade"`
+}
+
+const notSet = "not set"
+
+// writeBuildYAML emits build.yaml into each /systems/<label>/ entry
+// of the seedwriter's output. Called at the end of prepareImage in
+// manifest mode so the resulting image carries machine-readable
+// provenance (which builder, which store, which model, when).
+func writeBuildYAML(snapStateMachine *SnapStateMachine) error {
+	seedRoot := filepath.Join(snapStateMachine.tempDirs.unpack, "system-seed", "systems")
+	entries, err := os.ReadDir(seedRoot)
+	if err != nil {
+		return fmt.Errorf("scanning %s for system labels: %w", seedRoot, err)
+	}
+
+	info := assembleBuildYAML(snapStateMachine)
+	body, err := yaml.Marshal(info)
+	if err != nil {
+		return fmt.Errorf("marshalling build.yaml: %w", err)
+	}
+
+	wrote := 0
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		path := filepath.Join(seedRoot, e.Name(), "build.yaml")
+		fmt.Printf("=> writing %s (%d bytes)\n", path, len(body))
+		if err := os.WriteFile(path, body, 0o644); err != nil {
+			return fmt.Errorf("writing %s: %w", path, err)
+		}
+		wrote++
+	}
+	if wrote == 0 {
+		return fmt.Errorf("no /systems/<label>/ directories under %s; build.yaml not written", seedRoot)
+	}
+	return nil
+}
+
+func assembleBuildYAML(snapStateMachine *SnapStateMachine) buildYAML {
+	envOr := func(k string) string {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+		return notSet
+	}
+	builderVersion := commands.BuilderVersion
+	if builderVersion == "" {
+		builderVersion = notSet
+	}
+	storeURL := snapStateMachine.manifestStoreURL
+	if storeURL == "" {
+		storeURL = notSet
+	}
+	return buildYAML{
+		Builder:        "ubuntu-image",
+		BuilderVersion: builderVersion,
+		AppstoreURL:    storeURL,
+		ModelName:      snapStateMachine.manifest.Model.Name,
+		ModelRevision:  strconv.Itoa(snapStateMachine.manifest.Model.Revision),
+		Arch:           snapStateMachine.manifest.Model.Architecture,
+		Date:           time.Now().UTC().Format(time.RFC3339),
+		Version:        envOr("BUILD_VERSION"),
+		Commit:         envOr("BUILD_COMMIT"),
+		Repo:           envOr("BUILD_REPO"),
+		Grade:          envOr("BUILD_GRADE"),
+	}
 }
 
 // resolveRevisionsViaM2cp looks each pinned snap up via

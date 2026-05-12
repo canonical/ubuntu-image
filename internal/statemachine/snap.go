@@ -32,6 +32,16 @@ type SnapStateMachine struct {
 	Opts commands.SnapOpts
 	Args commands.SnapArgs
 
+	// manifest, when set by the --manifest pipeline, is the parsed
+	// input manifest. Stashed so the end-of-prepareImage step can
+	// emit a build.yaml that reflects what was actually built.
+	manifest *commands.OnlineManifest
+
+	// manifestStoreURL, when set by the --manifest pipeline, is the
+	// store URL discovered via `m2cp user status --json`. Emitted
+	// into build.yaml as appstore-url.
+	manifestStoreURL string
+
 	// manifestSeedManifest, when set by the --manifest pipeline, takes
 	// precedence over Opts.Revisions in imageOptsSeedManifest.
 	manifestSeedManifest *seedwriter.Manifest

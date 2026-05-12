@@ -115,6 +115,8 @@ func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdou
 }
 
 func main() { //nolint: gocyclo
+	commands.BuilderVersion = Version
+
 	commonOpts := new(commands.CommonOpts)
 	stateMachineOpts := new(commands.StateMachineOpts)
 	ubuntuImageCommand := new(commands.UbuntuImageCommand)
