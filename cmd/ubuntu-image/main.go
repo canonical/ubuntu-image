@@ -17,7 +17,6 @@ import (
 	"os"
 
 	"github.com/jessevdk/go-flags"
-	"github.com/snapcore/snapd/snapdenv"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -116,8 +115,6 @@ func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdou
 }
 
 func main() { //nolint: gocyclo
-	snapdenv.SetTrustLevel(snapdenv.TrustInsecure)
-
 	commonOpts := new(commands.CommonOpts)
 	stateMachineOpts := new(commands.StateMachineOpts)
 	ubuntuImageCommand := new(commands.UbuntuImageCommand)
