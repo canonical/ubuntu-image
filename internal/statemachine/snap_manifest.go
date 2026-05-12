@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/asserts/sysdb"
+	"github.com/snapcore/snapd/seed/seedwriter"
+	"github.com/snapcore/snapd/snap"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 )
@@ -58,7 +61,70 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 		return err
 	}
 
-	return fmt.Errorf("next step (resolve versions + configure store URL) not yet implemented")
+	sm, err := resolveRevisionsViaM2cp(m.Model.Architecture, m.Snaps)
+	if err != nil {
+		return err
+	}
+	snapStateMachine.manifestSeedManifest = sm
+
+	return fmt.Errorf("next step (configure store URL via SNAPPY_FORCE_API_URL) not yet implemented")
+}
+
+// resolveRevisionsViaM2cp looks each pinned snap up via
+// `m2cp store snap info <name> <arch> --json`, finds the revision
+// whose snapVersion matches the manifest's pinned version, and
+// returns a seedwriter.Manifest with all of them set as the only
+// allowed revision for that snap.
+func resolveRevisionsViaM2cp(arch string, pins []commands.OnlineManifestSnap) (*seedwriter.Manifest, error) {
+	fmt.Printf("=> resolving %d snap revisions via m2cp (arch=%s)\n", len(pins), arch)
+	sm := seedwriter.NewManifest()
+	for _, p := range pins {
+		rev, err := resolveSnapRevision(p.Name, arch, p.Version)
+		if err != nil {
+			return nil, err
+		}
+		if err := sm.SetAllowedSnapRevision(p.Name, snap.R(rev)); err != nil {
+			return nil, fmt.Errorf("pinning %s revision %d: %w", p.Name, rev, err)
+		}
+		fmt.Printf("   %-32s %-10s -> revision %d\n", p.Name, p.Version, rev)
+	}
+	return sm, nil
+}
+
+// snapInfoResponse is the minimal slice of `m2cp store snap info --json`
+// we need to map a (name, version) pin to a concrete revision.
+type snapInfoResponse struct {
+	Output struct {
+		SnapDeclaration struct {
+			SnapName      string             `json:"snapName"`
+			SnapRevisions []snapInfoRevision `json:"snapRevisions"`
+		} `json:"snapDeclaration"`
+	} `json:"output"`
+}
+
+type snapInfoRevision struct {
+	Revision    int    `json:"revision"`
+	SnapVersion string `json:"snapVersion"`
+}
+
+func resolveSnapRevision(name, arch, version string) (int, error) {
+	cmd := exec.Command("m2cp", "store", "snap", "info", name, arch, "--json")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return 0, fmt.Errorf("m2cp store snap info %s %s: %w", name, arch, err)
+	}
+	var resp snapInfoResponse
+	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		return 0, fmt.Errorf("parsing snap info JSON for %s: %w", name, err)
+	}
+	for _, r := range resp.Output.SnapDeclaration.SnapRevisions {
+		if r.SnapVersion == version {
+			return r.Revision, nil
+		}
+	}
+	return 0, fmt.Errorf("snap %q has no revision with version %q (arch %s)", name, version, arch)
 }
 
 // injectTrustFromM2cp pulls the tenant's trust bundle (account +

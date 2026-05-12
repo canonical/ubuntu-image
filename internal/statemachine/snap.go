@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/snapcore/snapd/asserts"
+	"github.com/snapcore/snapd/seed/seedwriter"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
 )
@@ -29,6 +30,10 @@ type SnapStateMachine struct {
 	StateMachine
 	Opts commands.SnapOpts
 	Args commands.SnapArgs
+
+	// manifestSeedManifest, when set by the --manifest pipeline, takes
+	// precedence over Opts.Revisions in imageOptsSeedManifest.
+	manifestSeedManifest *seedwriter.Manifest
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run().

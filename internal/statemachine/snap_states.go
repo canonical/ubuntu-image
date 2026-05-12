@@ -69,6 +69,9 @@ func (stateMachine *StateMachine) prepareImage() error {
 
 // imageOptsSeedManifest sets up the pre-provided manifest if revisions are passed
 func (snapStateMachine *SnapStateMachine) imageOptsSeedManifest() (*seedwriter.Manifest, error) {
+	if snapStateMachine.manifestSeedManifest != nil {
+		return snapStateMachine.manifestSeedManifest, nil
+	}
 	if len(snapStateMachine.Opts.Revisions) == 0 {
 		return nil, nil
 	}
