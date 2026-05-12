@@ -75,7 +75,80 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	snapStateMachine.manifestSnapURL = buildSnapDownloadURL(m.Model.Architecture)
 	fmt.Printf("=> snapd SnapDownloadURL hook wired (m2cp store app download --url)\n")
 
+	retrieve, err := prefetchAssertionsViaM2cp(m.Model.Architecture, m.Snaps, sm)
+	if err != nil {
+		return err
+	}
+	snapStateMachine.manifestAssertionRetrieve = retrieve
+	fmt.Printf("=> snapd AssertionRetrieve hook wired (m2cp store snap assertion)\n")
+
+	// Manifest mode = explicit version pinning; the user is taking
+	// responsibility for the kernel/snapd combination. Force the
+	// snapd-version-vs-kernel check off so a deliberate pin doesn't
+	// trip snapd's defensive check.
+	if !snapStateMachine.Opts.AllowSnapdKernelMismatch {
+		snapStateMachine.Opts.AllowSnapdKernelMismatch = true
+		fmt.Printf("=> AllowSnapdKernelMismatch forced on (manifest mode)\n")
+	}
+
 	return nil
+}
+
+// prefetchAssertionsViaM2cp pulls the snap-revision + snap-declaration
+// (and any prerequisite) assertions for every pinned snap via
+// `m2cp store snap assertion <name> <arch> -r <rev>`, decodes them
+// into an in-memory index, and returns a function suitable for
+// image.Options.AssertionRetrieve. Trust anchors (account,
+// account-key) already live in sysdb via injectTrustFromM2cp, so the
+// chain verifies as usual.
+func prefetchAssertionsViaM2cp(arch string, pins []commands.OnlineManifestSnap, sm *seedwriter.Manifest) (func(*asserts.Ref) (asserts.Assertion, error), error) {
+	fmt.Printf("=> prefetching %d snap-assertion bundles via m2cp (arch=%s)\n", len(pins), arch)
+	idx := map[string]asserts.Assertion{}
+	for _, p := range pins {
+		rev := sm.AllowedSnapRevision(p.Name)
+		if rev.Unset() {
+			return nil, fmt.Errorf("internal: no allowed revision pinned for %q", p.Name)
+		}
+		cmd := exec.Command("m2cp", "store", "snap", "assertion", p.Name, arch, "-r", rev.String())
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			return nil, fmt.Errorf("m2cp store snap assertion %s %s -r %s: %w (stderr: %s)",
+				p.Name, arch, rev.String(), err, strings.TrimSpace(stderr.String()))
+		}
+		dec := asserts.NewDecoder(&stdout)
+		added := 0
+		for {
+			a, err := dec.Decode()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				return nil, fmt.Errorf("decoding assertion bundle for %s: %w", p.Name, err)
+			}
+			idx[a.Ref().Unique()] = a
+			added++
+		}
+		fmt.Printf("   %-32s %-10s -> %d assertions indexed\n", p.Name, p.Version, added)
+	}
+	fmt.Printf("   total assertions in index: %d\n", len(idx))
+	return func(ref *asserts.Ref) (asserts.Assertion, error) {
+		if a, ok := idx[ref.Unique()]; ok {
+			return a, nil
+		}
+		return nil, &asserts.NotFoundError{Type: ref.Type, Headers: refPrimaryKeyHeaders(ref)}
+	}, nil
+}
+
+func refPrimaryKeyHeaders(ref *asserts.Ref) map[string]string {
+	h := make(map[string]string, len(ref.PrimaryKey))
+	for i, name := range ref.Type.PrimaryKey {
+		if i < len(ref.PrimaryKey) {
+			h[name] = ref.PrimaryKey[i]
+		}
+	}
+	return h
 }
 
 // buildSnapDownloadURL returns the callback handed to

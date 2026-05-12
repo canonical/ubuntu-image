@@ -40,6 +40,12 @@ type SnapStateMachine struct {
 	// image.Options.SnapDownloadURL so the snapd-fork URL hook
 	// resolves blob URLs via m2cp instead of the Canonical store API.
 	manifestSnapURL func(name string, revision snap.Revision, snapID string) (string, error)
+
+	// manifestAssertionRetrieve, when set by the --manifest pipeline,
+	// becomes image.Options.AssertionRetrieve so snapd resolves
+	// snap-revision / snap-declaration / account / account-key from
+	// an m2cp-prefetched in-memory index instead of the store.
+	manifestAssertionRetrieve func(ref *asserts.Ref) (asserts.Assertion, error)
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run().

@@ -10,6 +10,14 @@ MANIFEST="$HERE/manifest.yaml"
 WORK="$HERE/work"
 OUT="$HERE/out"
 
+# Prefer the freshly-built m2cp (which has --url) over the system one
+# by prepending its build dir to PATH. Drop once the system binary
+# catches up.
+DEV_M2CP_DIR="/r/M2CP.2/Tools/m2cp/build/linux-amd64"
+if [[ -x "$DEV_M2CP_DIR/m2cp" ]]; then
+    export PATH="$DEV_M2CP_DIR:$PATH"
+fi
+
 rm -rf "$WORK" "$OUT"
 mkdir -p "$WORK" "$OUT"
 
