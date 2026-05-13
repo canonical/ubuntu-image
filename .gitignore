@@ -1,6 +1,8 @@
 # Binary
 cmd/ubuntu-image/ubuntu-image
-ubuntu-image
+cmd/ubuntu-image/liot-image
+/ubuntu-image
+/liot-image
 
 # Generated binaries and corresponding assets
 build/
