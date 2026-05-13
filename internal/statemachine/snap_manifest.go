@@ -39,6 +39,12 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	for _, s := range m.Snaps {
 		fmt.Printf("     - %-32s %s\n", s.Name, s.Version)
 	}
+	if len(m.ExtraSnaps) > 0 {
+		fmt.Printf("   extra snaps:  %d\n", len(m.ExtraSnaps))
+		for _, s := range m.ExtraSnaps {
+			fmt.Printf("     - %-32s %s\n", s.Name, s.Version)
+		}
+	}
 
 	stageDir, err := snapStateMachine.manifestStageDir()
 	if err != nil {
@@ -65,11 +71,23 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 		return err
 	}
 
-	sm, err := resolveRevisionsViaM2cp(m.Model.Architecture, m.Snaps)
+	allPins := append([]commands.OnlineManifestSnap{}, m.Snaps...)
+	allPins = append(allPins, m.ExtraSnaps...)
+
+	sm, err := resolveRevisionsViaM2cp(m.Model.Architecture, allPins)
 	if err != nil {
 		return err
 	}
 	snapStateMachine.manifestSeedManifest = sm
+
+	// Inject extras into image.Options.Snaps via SnapOpts. The
+	// seedwriter will treat these as additional snaps to include in
+	// the seed beyond what the model declares. Revision pinning
+	// already lives in the SeedManifest above, so we don't need to
+	// pass channel info -- just the names.
+	for _, s := range m.ExtraSnaps {
+		snapStateMachine.Opts.Snaps = append(snapStateMachine.Opts.Snaps, s.Name)
+	}
 
 	storeURL, err := configureStoreURLFromM2cp()
 	if err != nil {
@@ -81,7 +99,7 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	snapStateMachine.manifestSnapURL = buildSnapDownloadURL(m.Model.Architecture)
 	fmt.Printf("=> snapd SnapDownloadURL hook wired (m2cp store app download --url)\n")
 
-	retrieve, err := prefetchAssertionsViaM2cp(m.Model.Architecture, m.Snaps, sm)
+	retrieve, err := prefetchAssertionsViaM2cp(m.Model.Architecture, allPins, sm)
 	if err != nil {
 		return err
 	}
@@ -303,12 +321,6 @@ func writeBuildYAML(snapStateMachine *SnapStateMachine) error {
 }
 
 func assembleBuildYAML(snapStateMachine *SnapStateMachine) buildYAML {
-	envOr := func(k string) string {
-		if v := os.Getenv(k); v != "" {
-			return v
-		}
-		return notSet
-	}
 	builderVersion := commands.BuilderVersion
 	if builderVersion == "" {
 		builderVersion = notSet
@@ -317,6 +329,7 @@ func assembleBuildYAML(snapStateMachine *SnapStateMachine) buildYAML {
 	if storeURL == "" {
 		storeURL = notSet
 	}
+	mb := snapStateMachine.manifest.Build
 	return buildYAML{
 		Builder:        "ubuntu-image",
 		BuilderVersion: builderVersion,
@@ -325,10 +338,38 @@ func assembleBuildYAML(snapStateMachine *SnapStateMachine) buildYAML {
 		ModelRevision:  strconv.Itoa(snapStateMachine.manifest.Model.Revision),
 		Arch:           snapStateMachine.manifest.Model.Architecture,
 		Date:           time.Now().UTC().Format(time.RFC3339),
-		Version:        envOr("BUILD_VERSION"),
-		Commit:         envOr("BUILD_COMMIT"),
-		Repo:           envOr("BUILD_REPO"),
-		Grade:          envOr("BUILD_GRADE"),
+		Version:        resolveBuildField("BUILD_VERSION", "version", mb.Version),
+		Commit:         resolveBuildField("BUILD_COMMIT", "commit", mb.Commit),
+		Repo:           resolveBuildField("BUILD_REPO", "repo", mb.Repo),
+		Grade:          resolveBuildField("BUILD_GRADE", "grade", mb.Grade),
+	}
+}
+
+// resolveBuildField applies env-over-manifest-over-notset precedence
+// to one of the BUILD_* fields. Every non-default outcome (env in
+// use, manifest in use, env overriding manifest) is logged so the
+// build trace explains the value that landed in build.yaml.
+func resolveBuildField(envKey, manifestKey, manifestVal string) string {
+	envVal := os.Getenv(envKey)
+	switch {
+	case envVal != "" && manifestVal != "" && envVal != manifestVal:
+		fmt.Printf("=> build.%s: env %s=%q OVERRIDES manifest build.%s=%q\n",
+			manifestKey, envKey, envVal, manifestKey, manifestVal)
+		return envVal
+	case envVal != "" && manifestVal != "" && envVal == manifestVal:
+		fmt.Printf("=> build.%s: env %s and manifest agree (%q)\n",
+			manifestKey, envKey, envVal)
+		return envVal
+	case envVal != "" && manifestVal == "":
+		fmt.Printf("=> build.%s: %s=%q (manifest unset)\n",
+			manifestKey, envKey, envVal)
+		return envVal
+	case envVal == "" && manifestVal != "":
+		fmt.Printf("=> build.%s: manifest=%q (env %s unset)\n",
+			manifestKey, manifestVal, envKey)
+		return manifestVal
+	default:
+		return notSet
 	}
 }
 
