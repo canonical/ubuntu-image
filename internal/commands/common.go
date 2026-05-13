@@ -29,6 +29,11 @@ type StateMachineOpts struct {
 
 // UbuntuImageCommand is needed for the parser to store positional arguments and flags
 type UbuntuImageCommand struct {
-	Snap    SnapCommand    `command:"snap"`
-	Classic ClassicCommand `command:"classic"`
+	// Hidden subcommands: still callable explicitly for debugging
+	// and back-compat with upstream ubuntu-image, but not advertised.
+	// The default mode of this binary is the bare-recipe flow
+	// dispatched from main.go.
+	Snap    SnapCommand    `command:"snap" hidden:"yes"`
+	Classic ClassicCommand `command:"classic" hidden:"yes"`
+	Model   ModelCommand   `command:"model" hidden:"yes" description:"Render the model.json an L-IoT recipe would push to the appstore. Debugging aid: no network, no build, just YAML -> JSON to stdout."`
 }

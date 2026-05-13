@@ -117,6 +117,22 @@ func parseFlags(parser *flags.Parser, restoreStdout, restoreStderr func(), stdou
 func main() { //nolint: gocyclo
 	commands.BuilderVersion = Version
 
+	// L-IoT bare-recipe form: `ubuntu-image <recipe.yaml>` runs
+	// preflight + summary, then rewrites os.Args so the parser
+	// sees `snap --manifest <recipe>` and the existing pipeline
+	// runs. With no args or -h/--help, print a customer-facing
+	// quick-help instead of go-flags' noisy default.
+	if liotMaybeShowQuickHelp() {
+		osExit(0)
+		return
+	}
+	if recipe := liotDetectRecipe(); recipe != "" {
+		if !liotPreflightAndBanner(recipe) {
+			osExit(1)
+			return
+		}
+	}
+
 	commonOpts := new(commands.CommonOpts)
 	stateMachineOpts := new(commands.StateMachineOpts)
 	ubuntuImageCommand := new(commands.UbuntuImageCommand)
@@ -179,6 +195,18 @@ func main() { //nolint: gocyclo
 	var imageType string
 	if parser.Active != nil {
 		imageType = parser.Active.Name
+	}
+
+	// `model` is a stateless transformation (YAML -> JSON); short-
+	// circuit before the state-machine pipeline.
+	if imageType == "model" {
+		if err := runModelCommand(ubuntuImageCommand.Model.ModelArgsPassed.Manifest); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+			osExit(1)
+			return
+		}
+		osExit(0)
+		return
 	}
 
 	// init the state machine
