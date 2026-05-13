@@ -340,52 +340,45 @@ func writeModelJSON(dst string, m *commands.OnlineManifest) error {
 	return nil
 }
 
-// modelPushResponse maps the JSON returned by
-// `m2cp store system model push -u <file> "<msg>" --json`. We only
-// pull the revision out; the appstore returns the full signed model
-// alongside but we re-fetch via `m2cp store model assertion` for
-// consistency with the rest of the pipeline.
+// modelPushResponse maps the --json output of
+// `m2cp store system model push -i`. The -i (idempotent) flag
+// guarantees a revision in the response whether the model was
+// created, updated, or already at the requested content.
 type modelPushResponse struct {
 	Output struct {
-		Revision int `json:"revision"`
+		Revision int    `json:"revision"`
+		Error    string `json:"error"`
 	} `json:"output"`
 }
 
-// pushModelGetRevision pushes the model.json twice:
+// pushModelGetRevision drives the appstore's model push with the
+// -i (idempotent) flag: a single call that always succeeds when
+// the requested state is achievable, returning the revision
+// regardless of whether the model was created, updated, or
+// already at the requested content.
 //
-//  1. Plain push -- creates the model if it doesn't exist; errors
-//     are ignored because they typically mean "model already exists",
-//     which is the case `-u` handles below.
-//  2. push -u --json -- always succeeds (creates or updates); the
-//     JSON response carries the assigned revision.
-//
-// Both calls together make the push idempotent regardless of whether
-// the model is brand new or already in the store.
+// Requires m2cp >= v5.7.x with the idempotent flag.
 func pushModelGetRevision(jsonPath, msg string) (int, error) {
-	fmt.Printf("=> m2cp store system model push %s %q (create-if-new, errors ignored)\n", jsonPath, msg)
-	createCmd := exec.Command("m2cp", "store", "system", "model", "push", jsonPath, msg)
-	createCmd.Stdout = os.Stderr
-	createCmd.Stderr = os.Stderr
-	if err := createCmd.Run(); err != nil {
-		// Expected when the model already exists. The -u path will
-		// authoritatively create-or-update next.
-		fmt.Printf("   first push returned %v (treated as already-exists)\n", err)
-	}
-
-	fmt.Printf("=> m2cp store system model push -u %s %q --json (idempotent, returns revision)\n", jsonPath, msg)
-	updateCmd := exec.Command("m2cp", "store", "system", "model", "push", "-u", jsonPath, msg, "--json")
-	var stdout bytes.Buffer
-	updateCmd.Stdout = &stdout
-	updateCmd.Stderr = os.Stderr
-	if err := updateCmd.Run(); err != nil {
-		return 0, fmt.Errorf("m2cp store system model push -u: %w", err)
+	fmt.Printf("=> m2cp store system model push -i --json %s %q\n", jsonPath, msg)
+	cmd := exec.Command("m2cp", "store", "system", "model", "push", "-i", "--json", jsonPath, msg)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return 0, fmt.Errorf("m2cp store system model push -i: %w (stderr=%q)",
+			err, strings.TrimSpace(stderr.String()))
 	}
 	var resp modelPushResponse
 	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
-		return 0, fmt.Errorf("parsing model push response: %w", err)
+		return 0, fmt.Errorf("parsing m2cp push response: %w (stdout=%q)",
+			err, strings.TrimSpace(stdout.String()))
+	}
+	if resp.Output.Error != "" {
+		return 0, fmt.Errorf("m2cp: %s", resp.Output.Error)
 	}
 	if resp.Output.Revision <= 0 {
-		return 0, fmt.Errorf("model push returned no revision (raw: %s)", stdout.String())
+		return 0, fmt.Errorf("m2cp returned no revision (raw=%q)",
+			strings.TrimSpace(stdout.String()))
 	}
 	fmt.Printf("   revision: %d\n", resp.Output.Revision)
 	return resp.Output.Revision, nil
