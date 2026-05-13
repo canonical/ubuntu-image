@@ -22,24 +22,48 @@ import (
 // The `snap`, `classic`, and `model` subcommands stay hidden but
 // callable explicitly for debugging.
 
-// liotDetectRecipe returns the recipe path if the bare-yaml form
-// was used. We look at os.Args[1] only: anything starting with `-`
-// is a flag (let go-flags handle it), and the three known
-// subcommand names short-circuit the bare-yaml dispatch.
-func liotDetectRecipe() string {
-	if len(os.Args) < 2 {
-		return ""
+// liotScanArgs detects the bare-yaml form (any arg ending in .yaml
+// or .yml) and the --dry-run flag, regardless of position. Either
+// can come before or after the other:
+//
+//	ubuntu-image recipe.yaml
+//	ubuntu-image --dry-run recipe.yaml
+//	ubuntu-image recipe.yaml --dry-run
+//
+// Recipe identification by extension is robust enough for the
+// shapes customers actually type. Subcommand invocations
+// (snap/classic/model) don't carry .yaml files as their first
+// positional so they fall through to go-flags untouched.
+func liotScanArgs() (recipe string, dryRun bool) {
+	for _, a := range os.Args[1:] {
+		switch {
+		case a == "--dry-run":
+			dryRun = true
+		case isYAMLSuffix(a):
+			if recipe == "" {
+				recipe = a
+			}
+		}
 	}
-	a := os.Args[1]
-	if strings.HasPrefix(a, "-") {
-		return ""
-	}
-	switch a {
-	case "snap", "classic", "model":
-		return ""
-	}
-	return a
+	return recipe, dryRun
 }
+
+func isYAMLSuffix(p string) bool {
+	l := strings.ToLower(p)
+	return strings.HasSuffix(l, ".yaml") || strings.HasSuffix(l, ".yml")
+}
+
+// LiotPreflightStatus is the three-way return of the bare-yaml
+// preflight: failed (exit non-zero), continue (hand off to the
+// rewritten state-machine pipeline), or dry-run (preflight passed
+// in --dry-run mode; exit zero without pushing or building).
+type LiotPreflightStatus int
+
+const (
+	LiotPreflightFailed LiotPreflightStatus = iota
+	LiotPreflightContinue
+	LiotPreflightDryRun
+)
 
 // liotMaybeShowQuickHelp prints a short L-IoT-specific usage message
 // when the user invoked the tool with no arguments or with -h/--help.
@@ -81,30 +105,40 @@ Output is written to ./out/ by default. Use -O DIR to override.
 See README.md for the recipe schema.
 `
 
-// liotPreflightAndBanner runs the two preflight checks (m2cp on
-// PATH, m2cp session active), prints the session + recipe summary,
-// and rewrites os.Args so the existing snap+manifest pipeline picks
-// up from here. On preflight failure it writes a customer-facing
-// message to stderr and returns false so the caller exits.
-func liotPreflightAndBanner(recipePath string) bool {
+// liotPreflightAndBanner runs the preflight checks (m2cp on PATH,
+// m2cp session active, recipe parses, every recipe snap exists in
+// the appstore), prints the session + recipe summary, and rewrites
+// os.Args so the existing snap+manifest pipeline picks up from
+// here.
+//
+// Returns:
+//   - LiotPreflightFailed: a preflight check failed; caller exits 1.
+//   - LiotPreflightDryRun: --dry-run requested and preflight passed;
+//     caller exits 0 without pushing or building.
+//   - LiotPreflightContinue: preflight passed; caller hands off to
+//     the state-machine pipeline through the rewritten args.
+func liotPreflightAndBanner(recipePath string, dryRun bool) LiotPreflightStatus {
 	fmt.Fprintln(os.Stderr, "[L-IoT Image Builder]")
+	if dryRun {
+		fmt.Fprintln(os.Stderr, "(dry-run mode: preflight only; nothing will be pushed or built)")
+	}
 	fmt.Fprintln(os.Stderr)
 
 	if _, err := exec.LookPath(commands.M2cpCLI); err != nil {
 		fmt.Fprintf(os.Stderr, "%s CLI not found on PATH.\n", commands.M2cpCLI)
 		fmt.Fprintln(os.Stderr, "Install it first, then re-run this command.")
-		return false
+		return LiotPreflightFailed
 	}
 
 	session, err := m2cpSessionStatus()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s session check failed: %v\n", commands.M2cpCLI, err)
-		return false
+		return LiotPreflightFailed
 	}
 	if !session.LoggedIn {
 		fmt.Fprintln(os.Stderr, "Not logged in to an appstore.")
 		fmt.Fprintf(os.Stderr, "Run '%s user login' first, then re-run this command.\n", commands.M2cpCLI)
-		return false
+		return LiotPreflightFailed
 	}
 	fmt.Fprintf(os.Stderr, "Tenant: %s\n", session.Tenant)
 	fmt.Fprintf(os.Stderr, "Store:  %s\n", strings.TrimSuffix(session.StoreURL, "/graphql"))
@@ -113,7 +147,7 @@ func liotPreflightAndBanner(recipePath string) bool {
 	m, err := commands.LoadOnlineManifest(recipePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Recipe %s: %v\n", recipePath, err)
-		return false
+		return LiotPreflightFailed
 	}
 	fmt.Fprintf(os.Stderr, "Recipe: %s\n", recipePath)
 	fmt.Fprintf(os.Stderr, "  Model:        %s\n", m.Model.Name)
@@ -127,13 +161,25 @@ func liotPreflightAndBanner(recipePath string) bool {
 	fmt.Fprintln(os.Stderr)
 
 	if !liotPreflightSnapsExist(m) {
-		return false
+		return LiotPreflightFailed
+	}
+
+	if dryRun {
+		fmt.Fprintln(os.Stderr, "Dry-run: preflight passed. Re-run without --dry-run to push and build.")
+		return LiotPreflightDryRun
 	}
 
 	// Rewrite os.Args: insert `snap --manifest <recipe>` after the
 	// program name, drop the original recipe arg, and inject a
 	// default `-O ./bin/` if the user didn't already pass one.
-	rest := os.Args[2:]
+	// The recipe path may be anywhere in args, not just position 1.
+	rest := make([]string, 0, len(os.Args)-1)
+	for _, a := range os.Args[1:] {
+		if a == recipePath {
+			continue
+		}
+		rest = append(rest, a)
+	}
 	newArgs := make([]string, 0, len(os.Args)+4)
 	newArgs = append(newArgs, os.Args[0], "snap", "--manifest", recipePath)
 	if !hasOutputDirFlag(rest) {
@@ -141,7 +187,7 @@ func liotPreflightAndBanner(recipePath string) bool {
 	}
 	newArgs = append(newArgs, rest...)
 	os.Args = newArgs
-	return true
+	return LiotPreflightContinue
 }
 
 // hasOutputDirFlag reports whether -O / --output-dir was passed

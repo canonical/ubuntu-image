@@ -121,14 +121,19 @@ func main() { //nolint: gocyclo
 	// preflight + summary, then rewrites os.Args so the parser
 	// sees `snap --manifest <recipe>` and the existing pipeline
 	// runs. With no args or -h/--help, print a customer-facing
-	// quick-help instead of go-flags' noisy default.
+	// quick-help instead of go-flags' noisy default. With
+	// --dry-run, exit after preflight without pushing or building.
 	if liotMaybeShowQuickHelp() {
 		osExit(0)
 		return
 	}
-	if recipe := liotDetectRecipe(); recipe != "" {
-		if !liotPreflightAndBanner(recipe) {
+	if recipe, dryRun := liotScanArgs(); recipe != "" {
+		switch liotPreflightAndBanner(recipe, dryRun) {
+		case LiotPreflightFailed:
 			osExit(1)
+			return
+		case LiotPreflightDryRun:
+			osExit(0)
 			return
 		}
 	}
