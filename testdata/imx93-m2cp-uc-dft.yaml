@@ -1,18 +1,26 @@
-# Test recipe matching the reference testdata/imx93-m2cp-uc-dft.json --
-# used to verify `ubuntu-image model <yaml>` renders the same JSON
-# shape the appstore push step consumes.
+# Test recipe matching testdata/imx93-m2cp-uc-dft.json's snap set.
+# Used to verify the render-and-push pipeline against a known model.
+#
+# Versions known from the operator's "latest" list are filled in.
+# Snaps whose latest version we don't have a reference for are
+# left at "0.0.0" -- the model-render path doesn't need versions,
+# but builds will fail at the revision-resolution step until real
+# values are supplied.
 
 model:
-  name: imx93-m2cp-uc
+  name: imx93-m2cp-uc-dft
   architecture: arm64
   base: core24
   grade: signed
   storage-safety: prefer-encrypted
 
 snaps:
-  - name: snapd
-    type: snapd
-    version: "4.3.0.42"
+  - name: m2cp-os-imx93-gadget
+    type: gadget
+    version: "0.0.0"
+  - name: m2cp-os-imx93-kernel
+    type: kernel
+    version: "0.0.0"
   - name: core20
     type: base
     version: "1.2.0"
@@ -22,36 +30,27 @@ snaps:
   - name: core24
     type: base
     version: "1.2.0"
-  - name: edge-os-kernel-vtg
-    type: kernel
-    version: "6.1.5"
-  - name: edge-os-gadget
-    type: gadget
-    version: "6.1.6"
-  - name: m2cp-coap
-    type: app
-    version: "6.4.0"
+  - name: snapd
+    type: snapd
+    version: "4.3.0.42"
   - name: m2cp-gateway
     type: app
     version: "3.1.0"
   - name: m2cp-message-hub
     type: app
     version: "4.4.0"
+  - name: m2cp-sys-net-lte-coap
+    type: app
+    version: "0.0.0"
   - name: m2cp-sys-timesync
     type: app
     version: "2.2.0"
-  - name: m2cp-vtg-config
+  - name: m2cp-coap
     type: app
-    version: "1.1.1"
-  - name: m2cp-vtg-net-lte-uart
+    version: "6.4.0"
+  - name: m2cp-config-knorr
     type: app
-    version: "1.2.1"
-  - name: dev-m2cpctl
+    version: "0.0.0"
+  - name: m2cp-coap-knorr
     type: app
-    version: "4.3.0-dev"
-  - name: liot-sdk-golang
-    type: app
-    version: "13.0.2"
-  - name: edge-os-sentinel
-    type: app
-    version: "24.3.1"
+    version: "0.0.0"

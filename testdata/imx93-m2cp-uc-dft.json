@@ -1,0 +1,92 @@
+{
+  "type": "model",
+  "series": "16",
+  "authority-id": "PLACEHOLDER",
+  "brand-id": "PLACEHOLDER",
+  "model": "imx93-m2cp-uc",
+  "architecture": "arm64",
+  "timestamp": "2024-10-28T08:58:53+00:00",
+  "base": "core20",
+  "grade": "signed",
+  "storage-safety": "prefer-encrypted",
+  "snaps": [
+    {
+      "name": "m2cp-os-imx93-gadget",
+      "type": "gadget",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "m2cp-os-imx93-kernel",
+      "type": "kernel",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "core20",
+      "type": "base",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "core22",
+      "type": "base",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "core24",
+      "type": "base",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "m2cp-gateway",
+      "type": "app",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "snapd",
+      "type": "snapd",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "m2cp-message-hub",
+      "type": "app",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "m2cp-sys-net-lte-coap",
+      "type": "app",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "m2cp-sys-timesync",
+      "type": "app",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "m2cp-coap",
+      "type": "app",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "m2cp-config-knorr",
+      "type": "app",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    },
+    {
+      "name": "m2cp-coap-knorr",
+      "type": "app",
+      "default-channel": "latest/stable",
+      "id": "PLACEHOLDER"
+    }
+  ]
+}
