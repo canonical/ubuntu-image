@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
 	"github.com/canonical/ubuntu-image/internal/commands"
@@ -89,20 +90,20 @@ func liotPreflightAndBanner(recipePath string) bool {
 	fmt.Fprintln(os.Stderr, "[L-IoT Image Builder]")
 	fmt.Fprintln(os.Stderr)
 
-	if _, err := exec.LookPath("m2cp"); err != nil {
-		fmt.Fprintln(os.Stderr, "m2cp CLI not found on PATH.")
+	if _, err := exec.LookPath(commands.M2cpCLI); err != nil {
+		fmt.Fprintf(os.Stderr, "%s CLI not found on PATH.\n", commands.M2cpCLI)
 		fmt.Fprintln(os.Stderr, "Install it first, then re-run this command.")
 		return false
 	}
 
 	session, err := m2cpSessionStatus()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "m2cp session check failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%s session check failed: %v\n", commands.M2cpCLI, err)
 		return false
 	}
 	if !session.LoggedIn {
 		fmt.Fprintln(os.Stderr, "Not logged in to an appstore.")
-		fmt.Fprintln(os.Stderr, "Run 'm2cp user login' first, then re-run this command.")
+		fmt.Fprintf(os.Stderr, "Run '%s user login' first, then re-run this command.\n", commands.M2cpCLI)
 		return false
 	}
 	fmt.Fprintf(os.Stderr, "Tenant: %s\n", session.Tenant)
@@ -124,6 +125,10 @@ func liotPreflightAndBanner(recipePath string) bool {
 		fmt.Fprintf(os.Stderr, "  Extra snaps:  %d\n", len(m.ExtraSnaps))
 	}
 	fmt.Fprintln(os.Stderr)
+
+	if !liotPreflightSnapsExist(m) {
+		return false
+	}
 
 	// Rewrite os.Args: insert `snap --manifest <recipe>` after the
 	// program name, drop the original recipe arg, and inject a
@@ -163,6 +168,89 @@ type m2cpUserStatus struct {
 	StoreURL string
 }
 
+// liotPreflightSnapsExist verifies, before any push, that every
+// snap the recipe references already exists in the appstore for
+// the target architecture. A single `m2cp store snap list -a <arch>
+// --json` call gives us the full catalog; we then compare names.
+//
+// If anything is missing we print a clear, actionable list:
+//
+//	Missing from appstore:
+//	  - edge-os-kernel-vtg
+//	  - edge-os-gadget
+//
+//	Upload them first with:
+//	  m2cp store app push <snap-file>
+//
+// and refuse to proceed -- otherwise the build would fail later
+// at the model-push step with a single error per call, hiding the
+// full set of work the operator has to do.
+func liotPreflightSnapsExist(m *commands.OnlineManifest) bool {
+	fmt.Fprintf(os.Stderr, "Checking that recipe snaps exist in the appstore (arch=%s)...\n", m.Model.Architecture)
+	available, err := listAppstoreSnapNames(m.Model.Architecture)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  could not list appstore snaps: %v\n", err)
+		return false
+	}
+	var missing []string
+	seen := map[string]bool{}
+	for _, s := range m.Snaps {
+		if !available[s.Name] && !seen[s.Name] {
+			missing = append(missing, s.Name)
+			seen[s.Name] = true
+		}
+	}
+	for _, s := range m.ExtraSnaps {
+		if !available[s.Name] && !seen[s.Name] {
+			missing = append(missing, s.Name)
+			seen[s.Name] = true
+		}
+	}
+	if len(missing) == 0 {
+		fmt.Fprintf(os.Stderr, "  all %d snaps present\n\n", len(m.Snaps)+len(m.ExtraSnaps))
+		return true
+	}
+	sort.Strings(missing)
+	fmt.Fprintln(os.Stderr, "  Missing from the appstore:")
+	for _, n := range missing {
+		fmt.Fprintf(os.Stderr, "    - %s\n", n)
+	}
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "Upload each missing snap with:\n  %s store app push <path-to-snap-file>\n\n",
+		commands.M2cpCLI)
+	fmt.Fprintln(os.Stderr, "Then re-run this command.")
+	return false
+}
+
+// listAppstoreSnapNames returns the set of snap names available in
+// the appstore for the given architecture. One m2cp call, cheap to
+// scan even for stores with thousands of snaps.
+func listAppstoreSnapNames(arch string) (map[string]bool, error) {
+	cmd := exec.Command(commands.M2cpCLI, "store", "snap", "list", "-a", arch, "--json")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("%s store snap list: %w (stderr=%q)",
+			commands.M2cpCLI, err, strings.TrimSpace(stderr.String()))
+	}
+	var resp struct {
+		Output struct {
+			SnapDeclarations []struct {
+				SnapName string `json:"snapName"`
+			} `json:"snapDeclarations"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		return nil, fmt.Errorf("parsing %s snap list: %w", commands.M2cpCLI, err)
+	}
+	out := map[string]bool{}
+	for _, d := range resp.Output.SnapDeclarations {
+		out[d.SnapName] = true
+	}
+	return out, nil
+}
+
 type m2cpStatusJSON struct {
 	Output struct {
 		Status  string `json:"status"`
@@ -177,7 +265,7 @@ type m2cpStatusJSON struct {
 }
 
 func m2cpSessionStatus() (m2cpUserStatus, error) {
-	cmd := exec.Command("m2cp", "user", "status", "--json")
+	cmd := exec.Command(commands.M2cpCLI, "user", "status", "--json")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr

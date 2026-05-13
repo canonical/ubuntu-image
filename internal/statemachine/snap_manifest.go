@@ -158,7 +158,7 @@ func prefetchAssertionsViaM2cp(arch string, pins []commands.OnlineManifestSnap, 
 		if rev.Unset() {
 			return nil, fmt.Errorf("internal: no allowed revision pinned for %q", p.Name)
 		}
-		cmd := exec.Command("m2cp", "store", "snap", "assertion", p.Name, arch, "-r", rev.String())
+		cmd := exec.Command(commands.M2cpCLI, "store", "snap", "assertion", p.Name, arch, "-r", rev.String())
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
@@ -210,7 +210,7 @@ func buildSnapDownloadURL(arch string) func(name string, rev snap.Revision, snap
 	return func(name string, rev snap.Revision, snapID string) (string, error) {
 		revStr := rev.String()
 		fmt.Printf("=> URL: m2cp store app download %s %s %s --url\n", name, upperArch, revStr)
-		cmd := exec.Command("m2cp", "store", "app", "download", name, upperArch, revStr, "--url")
+		cmd := exec.Command(commands.M2cpCLI, "store", "app", "download", name, upperArch, revStr, "--url")
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
@@ -254,7 +254,7 @@ func redactSignedURL(u string) string {
 // returns the snap-store base URL so it can be recorded in build.yaml.
 func configureStoreURLFromM2cp() (string, error) {
 	fmt.Printf("=> discovering store URL: m2cp user status --json\n")
-	cmd := exec.Command("m2cp", "user", "status", "--json")
+	cmd := exec.Command(commands.M2cpCLI, "user", "status", "--json")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
@@ -294,7 +294,7 @@ type userStatusResponse struct {
 // build.yaml. Format is "Display Name <email>" when both fields
 // are present, else whichever one we have.
 func fetchM2cpBuiltBy() (string, error) {
-	cmd := exec.Command("m2cp", "user", "info", "--json")
+	cmd := exec.Command(commands.M2cpCLI, "user", "info", "--json")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
@@ -352,24 +352,32 @@ type modelPushResponse struct {
 }
 
 // pushModelGetRevision drives the appstore's model push with the
-// -i (idempotent) flag: a single call that always succeeds when
-// the requested state is achievable, returning the revision
-// regardless of whether the model was created, updated, or
-// already at the requested content.
+// -i (idempotent) flag: a single call that always returns a
+// revision when the requested state is achievable, regardless of
+// whether the model was created, updated, or already at the
+// requested content.
 //
 // Requires m2cp >= v5.7.x with the idempotent flag.
+//
+// m2cp returns a non-zero exit on errors but still writes a JSON
+// envelope to stdout containing output.error -- so we always
+// parse stdout, surfacing whichever of output.revision or
+// output.error is present. That way the caller sees the actual
+// server-side error message instead of a bare "exit status 1".
 func pushModelGetRevision(jsonPath, msg string) (int, error) {
 	fmt.Printf("=> m2cp store system model push -i --json %s %q\n", jsonPath, msg)
-	cmd := exec.Command("m2cp", "store", "system", "model", "push", "-i", "--json", jsonPath, msg)
+	cmd := exec.Command(commands.M2cpCLI, "store", "system", "model", "push", "-i", "--json", jsonPath, msg)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return 0, fmt.Errorf("m2cp store system model push -i: %w (stderr=%q)",
-			err, strings.TrimSpace(stderr.String()))
-	}
+	runErr := cmd.Run()
+
 	var resp modelPushResponse
 	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		if runErr != nil {
+			return 0, fmt.Errorf("m2cp push failed: %w (stdout=%q stderr=%q)",
+				runErr, strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()))
+		}
 		return 0, fmt.Errorf("parsing m2cp push response: %w (stdout=%q)",
 			err, strings.TrimSpace(stdout.String()))
 	}
@@ -377,6 +385,10 @@ func pushModelGetRevision(jsonPath, msg string) (int, error) {
 		return 0, fmt.Errorf("m2cp: %s", resp.Output.Error)
 	}
 	if resp.Output.Revision <= 0 {
+		if runErr != nil {
+			return 0, fmt.Errorf("m2cp push failed: %w (raw=%q)",
+				runErr, strings.TrimSpace(stdout.String()))
+		}
 		return 0, fmt.Errorf("m2cp returned no revision (raw=%q)",
 			strings.TrimSpace(stdout.String()))
 	}
@@ -537,7 +549,7 @@ type snapInfoRevision struct {
 }
 
 func resolveSnapRevision(name, arch, version string) (int, error) {
-	cmd := exec.Command("m2cp", "store", "snap", "info", name, arch, "--json")
+	cmd := exec.Command(commands.M2cpCLI, "store", "snap", "info", name, arch, "--json")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
@@ -563,7 +575,7 @@ func resolveSnapRevision(name, arch, version string) (int, error) {
 // nothing is written to disk.
 func injectTrustFromM2cp() error {
 	fmt.Printf("=> fetching trust bundle: m2cp store system assertion\n")
-	cmd := exec.Command("m2cp", "store", "system", "assertion")
+	cmd := exec.Command(commands.M2cpCLI, "store", "system", "assertion")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
@@ -653,7 +665,7 @@ func (snapStateMachine *SnapStateMachine) manifestStageDir() (string, error) {
 // to split content from signature, so a trailing blank line at EOF
 // would make it mistake the signature for the body.
 func writeM2cpStdout(dst string, args ...string) error {
-	cmd := exec.Command("m2cp", args...)
+	cmd := exec.Command(commands.M2cpCLI, args...)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
