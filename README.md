@@ -1,77 +1,163 @@
-# ubuntu-image: build Ubuntu images
+# L-IoT Image Builder for Ubuntu Core based systems
 
-[![ubuntu-image](https://snapcraft.io/ubuntu-image/badge.svg)](https://snapcraft.io/ubuntu-image)
-![Build](https://github.com/canonical/ubuntu-image/actions/workflows/build-and-test.yml/badge.svg?branch=main)
-[![codecov](https://codecov.io/gh/canonical/ubuntu-image/branch/main/graph/badge.svg?token=F9jE9HKo1a)](https://codecov.io/gh/canonical/ubuntu-image)
-[![Go Report Card](https://goreportcard.com/badge/github.com/canonical/ubuntu-image)](https://goreportcard.com/report/github.com/canonical/ubuntu-image)
+Based on Canonical's [ubuntu-image](https://github.com/canonical/ubuntu-image),
+extended to build images against our self-hosted, snap-store-compatible
+appstore from a single YAML recipe file.
 
-ubuntu-image is a tool used for generating bootable images. You can use it to build Ubuntu images such as:
+The binary is still invoked as `ubuntu-image` (the file is renamed to
+keep the upstream interface stable); this repo and the manifest-mode
+workflow are what the "L-IoT Image Builder" name refers to.
 
-- Snap-based Ubuntu Core images from model assertions
+For the fork's architectural changes (snapd hooks, manifest pipeline,
+build.yaml generation), see [MODIFICATIONS.md](MODIFICATIONS.md).
 
-- Classical preinstalled Ubuntu images using image definitions
+## What it does
 
-The future versions of this tool will be more generalized, allowing users to build a wider range of Ubuntu images, including ISO/installer.
+Given one YAML recipe file and an active Appstore session using the `m2cp` CLI tool, produce a
+bootable Ubuntu Core image whose seeded snaps come from our appstore
+at the exact revisions pinned in the recipe. The output is
+bit-identical to one built against a Canonical-style snap store:
+every assertion is verified, every snap blob is sha3-checked, no
+`--dangerous` or sideload paths involved.
 
-## Getting started
+## Prerequisites
 
-### Requirements
+- Linux (Ubuntu 22.04+ recommended)
+- `m2cp` CLI on `PATH`, with an active session for the target store
+  (`m2cp user login`)
+- The matching snapd fork at `/r/snapd` (linked via `go.work`)
 
-* Ubuntu 20.04 (Focal Fossa) or newer (recommended: Ubuntu 24.04 (Noble Numbat))
+## Usage
 
-* Ability to install snaps ([SnapStore: ubuntu-image](https://snapcraft.io/ubuntu-image))
-
-### Quickstart
-
-See [Build your first Ubuntu Core image](https://ubuntu.com/core/docs/build-an-image) for instructions on how to use ubuntu-image to build an Ubuntu core image on a **Raspberry Pi**.
-
-> [!IMPORTANT] 
-> `ubuntu-image` requires **elevated permissions**. Run it with **root** privileges or using `sudo`.
-
-## Building images
-
-ubuntu-image offers two basic sub-commands for building snap-based and classical images.
-
-### Building snap-based images
-
-To build a snap-based image with ubuntu-image, you need a [model assertion](https://ubuntu.com/core/docs/reference/assertions/model). A model assertion is a YAML file that describes a particular combination of core, kernel, and gadget snaps, along with other declarations, signed with a digital signature asserting its authenticity. The `ubuntu-image` command only requires the path to this model assertion to build snap-based images.
-
-To build snap-based images with `ubuntu-image`, use the following command:
+The recipe file is a YAML descriptor. It can be named anything; we
+suggest a self-describing convention that captures the OS line, the
+target board, and the build version:
 
 ```
-ubuntu-image snap model.assertion
+liot-uc-imx93-1.2.3.yaml      # ubuntu-core build for imx93 board, v1.2.3
+liot-uc-imx8mp-2.0.0.yaml     # ubuntu-core build for imx8mp board, v2.0.0
 ```
 
-See [Build your first Ubuntu Core image](https://ubuntu.com/core/docs/build-an-image) for more information on building snap-based images using ubuntu-image. To build an image with custom snaps, see [Build an image with custom snaps](https://ubuntu.com/core/docs/custom-images).
+(`uc` = ubuntu-core; other OS lines would use their own prefix.)
 
-### Building classical images
-
-Classical images are built from image definitions, which are YAML files. The image definition YAML file specifies the various configurations required to build a classical image, including the path to the `gadget.yaml` file. See [Image Definition](internal/imagedefinition/README.rst) for the detailed specification of what is supported in the image definition YAML file.
-
-To build classical images with ubuntu-image, use the following command:
+To build an image:
 
 ```
-ubuntu-image classic image_definition.yaml
+ubuntu-image snap --manifest liot-uc-imx93-1.2.3.yaml -O ./out/
 ```
 
-## Building and testing ubuntu-image
+The builder:
 
-See [Contributing to ubuntu-image](/CONTRIBUTING.md) for instructions on how to set up, build, and test ubuntu-image in development mode.
+1. Reads the recipe.
+2. Fetches the model assertion from the store via m2cp.
+3. Pulls the trust bundle from the store and installs it into
+   snapd's assertion database for this build.
+4. Resolves every pinned snap *version* to a *revision* via m2cp
+   (versions are bijective with revisions in the target appstore).
+5. Hands snapd a URL resolver and an assertion retriever so its
+   normal seed pipeline talks to the appstore instead of the
+   Canonical metadata API.
+6. Writes a `build.yaml` into the seed describing what was built.
+
+Every step narrates itself to stderr in plain language so the build
+log is a readable audit trail. The output of step 6 means an image
+is self-identifying: see "Inspecting an image" below.
+
+## Recipe schema
+
+```yaml
+# REQUIRED: which Ubuntu Core model to build.
+# Fetched from the store via `m2cp store model assertion`.
+model:
+  name: edge-imx93-uc-vtg
+  revision: 1
+  architecture: arm64
+
+# OPTIONAL: provenance metadata, copied into the seed's build.yaml.
+# Each field can be overridden at build time by the matching BUILD_*
+# env var; the override is announced in the build log. If neither
+# the manifest nor env supplies a value, "not set" is written.
+build:
+  version: "1.2.3"
+  commit: "abc1234de56789f0fedcba0123456789abcdef01"
+  repo: "github.com/foo/bar"
+  grade: "stable"     # one of: stable, experimental, edge
+
+# REQUIRED: every snap the model declares, pinned by version.
+# The builder resolves each to a concrete revision via
+# `m2cp store snap info` before the build starts.
+snaps:
+  - name: snapd
+    version: "4.3.0.42"
+  - name: core24
+    version: "1.2.0"
+  - name: mlpa-os-imx-kernel
+    version: "6.1.5"
+  # ... one entry per snap in the model
+
+# OPTIONAL: snaps not declared by the model but still seeded into
+# the image. Same name+version format. Treated by the seedwriter as
+# additional snaps; they end up in the image alongside the
+# model-declared ones.
+extra-snaps:
+  - name: htop
+    version: "3.0.5"
+```
+
+The recipe is meant to be self-contained: given the file and an
+active m2cp session, the same artifact rebuilds with no additional
+flags or env vars.
+
+## What ends up in the image
+
+A bootable disk image (e.g. `.img`) plus, in the seed partition:
+
+```
+systems/<label>/
+├── model                      # the model assertion
+├── assertions/                # account + account-key + snap chain
+├── snaps/                     # the pinned .snap blobs
+└── build.yaml                 # provenance (see below)
+```
+
+And in the output directory alongside the image:
+
+```
+seed.manifest                  # name + revision for each seeded snap
+```
+
+## build.yaml contents
+
+The builder writes a stable schema with 11 keys; unknown values
+become `"not set"` so the shape is the same on every image:
+
+| key | source |
+|---|---|
+| `builder` | always `"ubuntu-image"` (this binary) |
+| `builder-version` | linker-set `Version`, else `"not set"` |
+| `appstore-url` | snap-store URL discovered via `m2cp user status --json` |
+| `model-name` | from the recipe |
+| `model-revision` | from the recipe |
+| `arch` | from the recipe |
+| `date` | UTC ISO 8601 at build start |
+| `version` | `$BUILD_VERSION`, else `build.version` from recipe, else `"not set"` |
+| `commit` | `$BUILD_COMMIT`, else `build.commit` from recipe, else `"not set"` |
+| `repo` | `$BUILD_REPO`, else `build.repo` from recipe, else `"not set"` |
+| `grade` | `$BUILD_GRADE`, else `build.grade` from recipe, else `"not set"` |
+
+## Inspecting an image
+
+`m2cp image analyze <image.img(.xz)>` reads back `build.yaml` and
+the model assertion's identity headers. The cryptographically-signed
+model name, revision, and brand-id (under `model-name`,
+`model-revision`, `model-brand-id`) take precedence over any
+descriptive fields in `build.yaml`. Output honors `--json`.
+
+The same tool also reads images that **weren't** built with this
+fork — it falls back to whatever `build.yaml` (or none) the other
+build pipeline wrote, supplementing with whatever the model
+assertion authoritatively provides.
 
 ## License
 
-The ubuntu-image project is licensed under [GNU General Public License v3.0](/LICENSE).
-
-## Contributing to ubuntu-image
-
-To learn how to contribute to the ubuntu-image project, see [Contributing to ubuntu-image](/CONTRIBUTING.md).
-
-## Project details
-
-* Project home: https://github.com/Canonical/ubuntu-image
-* Report bugs at: https://bugs.launchpad.net/ubuntu-image
-* Git clone: https://github.com/Canonical/ubuntu-image.git
-* Reference page: [`ubuntu-image` syntax and options](https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/ubuntu-image.html)
-* Building a gadget snap: [Building a gadget snap](https://ubuntu.com/core/docs/gadget-building)
-* Gadget tree: [pc-gadget](https://github.com/snapcore/pc-gadget)
-* `gadget.yaml` specification: [Gadget snaps](https://forum.snapcraft.io/t/gadget-snaps)
+GPL-3.0, inherited from upstream ubuntu-image. See [LICENSE](LICENSE).
