@@ -33,11 +33,16 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("   model:        %s rev %d\n", m.Model.Name, m.Model.Revision)
+	if err := m.ValidateForBuild(); err != nil {
+		return err
+	}
+	fmt.Printf("   model:        %s\n", m.Model.Name)
 	fmt.Printf("   architecture: %s\n", m.Model.Architecture)
-	fmt.Printf("   pinned snaps: %d\n", len(m.Snaps))
+	fmt.Printf("   base:         %s\n", m.Model.Base)
+	fmt.Printf("   grade:        %s\n", m.Model.Grade)
+	fmt.Printf("   model snaps:  %d\n", len(m.Snaps))
 	for _, s := range m.Snaps {
-		fmt.Printf("     - %-32s %s\n", s.Name, s.Version)
+		fmt.Printf("     - %-32s %-9s %s\n", s.Name, s.Type, s.Version)
 	}
 	if len(m.ExtraSnaps) > 0 {
 		fmt.Printf("   extra snaps:  %d\n", len(m.ExtraSnaps))
@@ -52,11 +57,21 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	}
 	fmt.Printf("=> manifest staging dir: %s\n", stageDir)
 
+	jsonPath := filepath.Join(stageDir, "model.json")
+	if err := writeModelJSON(jsonPath, m); err != nil {
+		return fmt.Errorf("generating model.json: %w", err)
+	}
+	revision, err := pushModelGetRevision(jsonPath, fmt.Sprintf("ubuntu-image build %s", m.Model.Name))
+	if err != nil {
+		return err
+	}
+	snapStateMachine.manifestModelRevision = revision
+
 	fmt.Printf("=> fetching model assertion: m2cp store model assertion m2cp %s %d\n",
-		m.Model.Name, m.Model.Revision)
+		m.Model.Name, revision)
 	modelPath := filepath.Join(stageDir, "model.assert")
 	if err := writeM2cpStdout(modelPath,
-		"store", "model", "assertion", "m2cp", m.Model.Name, fmt.Sprintf("%d", m.Model.Revision),
+		"store", "model", "assertion", "m2cp", m.Model.Name, strconv.Itoa(revision),
 	); err != nil {
 		return fmt.Errorf("fetching model assertion: %w", err)
 	}
@@ -95,6 +110,16 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	}
 	snapStateMachine.manifestStoreURL = storeURL
 	snapStateMachine.manifest = m
+
+	builtBy, err := fetchM2cpBuiltBy()
+	if err != nil {
+		// Not fatal -- the image still builds; we just lose the
+		// "who built it" line in build.yaml.
+		fmt.Printf("=> warning: could not fetch builder identity: %v\n", err)
+	} else {
+		snapStateMachine.manifestBuiltBy = builtBy
+		fmt.Printf("=> built by: %s\n", builtBy)
+	}
 
 	snapStateMachine.manifestSnapURL = buildSnapDownloadURL(m.Model.Architecture)
 	fmt.Printf("=> snapd SnapDownloadURL hook wired (m2cp store app download --url)\n")
@@ -264,6 +289,108 @@ type userStatusResponse struct {
 	} `json:"output"`
 }
 
+// fetchM2cpBuiltBy pulls the developer identity (from
+// `m2cp user info --json`) so we can record who built the image in
+// build.yaml. Format is "Display Name <email>" when both fields
+// are present, else whichever one we have.
+func fetchM2cpBuiltBy() (string, error) {
+	cmd := exec.Command("m2cp", "user", "info", "--json")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("m2cp user info --json: %w", err)
+	}
+	var resp struct {
+		Output struct {
+			Email string `json:"developerAccountSshKeyEmail"`
+			Name  string `json:"developerAccountSshKeyname"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		return "", fmt.Errorf("parsing m2cp user info: %w", err)
+	}
+	name := strings.TrimSpace(resp.Output.Name)
+	email := strings.TrimSpace(resp.Output.Email)
+	switch {
+	case name != "" && email != "":
+		return fmt.Sprintf("%s <%s>", name, email), nil
+	case email != "":
+		return email, nil
+	case name != "":
+		return name, nil
+	default:
+		return "", fmt.Errorf("m2cp user info returned no name or email")
+	}
+}
+
+// writeModelJSON renders the recipe's model definition (via
+// commands.RenderModelJSON, the shared definition) and writes it to
+// dst with narration.
+func writeModelJSON(dst string, m *commands.OnlineManifest) error {
+	body, err := commands.RenderModelJSON(m)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(dst, body, 0o644); err != nil {
+		return err
+	}
+	fmt.Printf("=> wrote model.json: %s (%d bytes, %d snaps, grade=%s)\n",
+		dst, len(body), len(m.Snaps), m.Model.Grade)
+	return nil
+}
+
+// modelPushResponse maps the JSON returned by
+// `m2cp store system model push -u <file> "<msg>" --json`. We only
+// pull the revision out; the appstore returns the full signed model
+// alongside but we re-fetch via `m2cp store model assertion` for
+// consistency with the rest of the pipeline.
+type modelPushResponse struct {
+	Output struct {
+		Revision int `json:"revision"`
+	} `json:"output"`
+}
+
+// pushModelGetRevision pushes the model.json twice:
+//
+//  1. Plain push -- creates the model if it doesn't exist; errors
+//     are ignored because they typically mean "model already exists",
+//     which is the case `-u` handles below.
+//  2. push -u --json -- always succeeds (creates or updates); the
+//     JSON response carries the assigned revision.
+//
+// Both calls together make the push idempotent regardless of whether
+// the model is brand new or already in the store.
+func pushModelGetRevision(jsonPath, msg string) (int, error) {
+	fmt.Printf("=> m2cp store system model push %s %q (create-if-new, errors ignored)\n", jsonPath, msg)
+	createCmd := exec.Command("m2cp", "store", "system", "model", "push", jsonPath, msg)
+	createCmd.Stdout = os.Stderr
+	createCmd.Stderr = os.Stderr
+	if err := createCmd.Run(); err != nil {
+		// Expected when the model already exists. The -u path will
+		// authoritatively create-or-update next.
+		fmt.Printf("   first push returned %v (treated as already-exists)\n", err)
+	}
+
+	fmt.Printf("=> m2cp store system model push -u %s %q --json (idempotent, returns revision)\n", jsonPath, msg)
+	updateCmd := exec.Command("m2cp", "store", "system", "model", "push", "-u", jsonPath, msg, "--json")
+	var stdout bytes.Buffer
+	updateCmd.Stdout = &stdout
+	updateCmd.Stderr = os.Stderr
+	if err := updateCmd.Run(); err != nil {
+		return 0, fmt.Errorf("m2cp store system model push -u: %w", err)
+	}
+	var resp modelPushResponse
+	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		return 0, fmt.Errorf("parsing model push response: %w", err)
+	}
+	if resp.Output.Revision <= 0 {
+		return 0, fmt.Errorf("model push returned no revision (raw: %s)", stdout.String())
+	}
+	fmt.Printf("   revision: %d\n", resp.Output.Revision)
+	return resp.Output.Revision, nil
+}
+
 // buildYAML is the schema written to <seed>/systems/<label>/build.yaml
 // at the end of a manifest-mode build. Field order is the order
 // keys appear in the YAML output. Every field is always present;
@@ -272,6 +399,7 @@ type userStatusResponse struct {
 type buildYAML struct {
 	Builder        string `yaml:"builder"`
 	BuilderVersion string `yaml:"builder-version"`
+	BuiltBy        string `yaml:"built-by"`
 	AppstoreURL    string `yaml:"appstore-url"`
 	ModelName      string `yaml:"model-name"`
 	ModelRevision  string `yaml:"model-revision"`
@@ -329,19 +457,24 @@ func assembleBuildYAML(snapStateMachine *SnapStateMachine) buildYAML {
 	if storeURL == "" {
 		storeURL = notSet
 	}
+	builtBy := snapStateMachine.manifestBuiltBy
+	if builtBy == "" {
+		builtBy = notSet
+	}
 	mb := snapStateMachine.manifest.Build
 	return buildYAML{
 		Builder:        "ubuntu-image",
 		BuilderVersion: builderVersion,
+		BuiltBy:        builtBy,
 		AppstoreURL:    storeURL,
 		ModelName:      snapStateMachine.manifest.Model.Name,
-		ModelRevision:  strconv.Itoa(snapStateMachine.manifest.Model.Revision),
+		ModelRevision:  strconv.Itoa(snapStateMachine.manifestModelRevision),
 		Arch:           snapStateMachine.manifest.Model.Architecture,
 		Date:           time.Now().UTC().Format(time.RFC3339),
 		Version:        resolveBuildField("BUILD_VERSION", "version", mb.Version),
 		Commit:         resolveBuildField("BUILD_COMMIT", "commit", mb.Commit),
 		Repo:           resolveBuildField("BUILD_REPO", "repo", mb.Repo),
-		Grade:          resolveBuildField("BUILD_GRADE", "grade", mb.Grade),
+		Grade:          snapStateMachine.manifest.Model.Grade,
 	}
 }
 

@@ -1,0 +1,57 @@
+# Test recipe matching the reference testdata/imx93-m2cp-uc-dft.json --
+# used to verify `ubuntu-image model <yaml>` renders the same JSON
+# shape the appstore push step consumes.
+
+model:
+  name: imx93-m2cp-uc
+  architecture: arm64
+  base: core24
+  grade: signed
+  storage-safety: prefer-encrypted
+
+snaps:
+  - name: snapd
+    type: snapd
+    version: "4.3.0.42"
+  - name: core20
+    type: base
+    version: "1.2.0"
+  - name: core22
+    type: base
+    version: "1.2.0"
+  - name: core24
+    type: base
+    version: "1.2.0"
+  - name: edge-os-kernel-vtg
+    type: kernel
+    version: "6.1.5"
+  - name: edge-os-gadget
+    type: gadget
+    version: "6.1.6"
+  - name: m2cp-coap
+    type: app
+    version: "6.4.0"
+  - name: m2cp-gateway
+    type: app
+    version: "3.1.0"
+  - name: m2cp-message-hub
+    type: app
+    version: "4.4.0"
+  - name: m2cp-sys-timesync
+    type: app
+    version: "2.2.0"
+  - name: m2cp-vtg-config
+    type: app
+    version: "1.1.1"
+  - name: m2cp-vtg-net-lte-uart
+    type: app
+    version: "1.2.1"
+  - name: dev-m2cpctl
+    type: app
+    version: "4.3.0-dev"
+  - name: liot-sdk-golang
+    type: app
+    version: "13.0.2"
+  - name: edge-os-sentinel
+    type: app
+    version: "24.3.1"

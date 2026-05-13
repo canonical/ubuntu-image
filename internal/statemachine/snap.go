@@ -42,6 +42,16 @@ type SnapStateMachine struct {
 	// into build.yaml as appstore-url.
 	manifestStoreURL string
 
+	// manifestModelRevision is the model revision returned by the
+	// appstore after the idempotent model push. Snaps reference it
+	// via the AllowedSnapRevision pin; build.yaml records it.
+	manifestModelRevision int
+
+	// manifestBuiltBy is the developer identity (typically
+	// "Name <email>") from `m2cp user info --json`. Recorded in
+	// build.yaml so the image carries provenance for who built it.
+	manifestBuiltBy string
+
 	// manifestSeedManifest, when set by the --manifest pipeline, takes
 	// precedence over Opts.Revisions in imageOptsSeedManifest.
 	manifestSeedManifest *seedwriter.Manifest
