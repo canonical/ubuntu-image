@@ -36,7 +36,5 @@ bin/
 # Seed manifests from builds
 seed.manifest
 
-# Online-store integration test scratch
-test-online-store/work/
-test-online-store/out/
-test-online-store/ubuntu-image
+# Online-store integration test scratch -- entire dir is local-only
+test-online-store/
