@@ -40,3 +40,6 @@ seed.manifest
 
 # Online-store integration test scratch -- entire dir is local-only
 test-online-store/
+testdata/
+
+/.claude
