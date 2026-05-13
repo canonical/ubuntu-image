@@ -23,13 +23,13 @@ jobs:
 
     - name: Build binary
       run: |
-        go build -o ubuntu-image ./cmd/ubuntu-image/
+        go build -o liot-image ./cmd/ubuntu-image/
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ubuntu-image
-        path: ubuntu-image
+        name: liot-image
+        path: liot-image
 
   release:
     needs: build
@@ -43,4 +43,4 @@ jobs:
     - name: Create release
       uses: softprops/action-gh-release@v2
       with:
-        files: ubuntu-image/ubuntu-image
+        files: liot-image/liot-image
