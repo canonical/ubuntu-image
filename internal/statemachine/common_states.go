@@ -1,14 +1,21 @@
 package statemachine
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 
 	diskfs "github.com/diskfs/go-diskfs"
 	diskutils "github.com/diskfs/go-diskfs/disk"
+	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil"
@@ -297,7 +304,109 @@ func (stateMachine *StateMachine) populateBootfsContents() error {
 			}
 		}
 	}
+	stateMachine.narrateSeedContents()
 	return nil
+}
+
+// narrateSeedContents walks the staged rootfs and prints what was
+// packaged into the seed: every .snap blob, every assertion file,
+// and -- for each assertion file -- the contained assertions with
+// their key headers. Silent if no seed-shaped content is found, so
+// classic builds aren't spammed.
+func (stateMachine *StateMachine) narrateSeedContents() {
+	rootfs := stateMachine.tempDirs.rootfs
+	if _, err := os.Stat(rootfs); err != nil {
+		return
+	}
+	var snaps, assertFiles []string
+	err := filepath.WalkDir(rootfs, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		rel, _ := filepath.Rel(rootfs, p)
+		switch {
+		case strings.HasSuffix(rel, ".snap"):
+			snaps = append(snaps, rel)
+		case strings.HasSuffix(rel, ".assert"),
+			strings.Contains(rel, "/assertions/"),
+			filepath.Base(rel) == "model",
+			filepath.Base(rel) == "auto-import.assert":
+			assertFiles = append(assertFiles, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		fmt.Printf("=> seed inspection: could not walk %s: %v\n", rootfs, err)
+		return
+	}
+	if len(snaps) == 0 && len(assertFiles) == 0 {
+		return
+	}
+	sort.Strings(snaps)
+	sort.Strings(assertFiles)
+	fmt.Printf("=> seed contents in %s:\n", rootfs)
+	for _, s := range snaps {
+		info, err := os.Stat(filepath.Join(rootfs, s))
+		if err != nil {
+			continue
+		}
+		fmt.Printf("   snap   %-50s %d bytes\n", s, info.Size())
+	}
+	for _, rel := range assertFiles {
+		full := filepath.Join(rootfs, rel)
+		data, err := os.ReadFile(full)
+		if err != nil {
+			continue
+		}
+		dec := asserts.NewDecoder(bytes.NewReader(data))
+		printedHeader := false
+		for {
+			a, err := dec.Decode()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				if !printedHeader {
+					fmt.Printf("   file   %s (%d bytes, not parseable as assertions)\n", rel, len(data))
+				}
+				break
+			}
+			if !printedHeader {
+				fmt.Printf("   file   %s\n", rel)
+				printedHeader = true
+			}
+			describeSeedAssertion(a)
+		}
+	}
+}
+
+func describeSeedAssertion(a asserts.Assertion) {
+	switch v := a.(type) {
+	case *asserts.Account:
+		fmt.Printf("     account          id=%s display-name=%q validation=%s\n",
+			v.AccountID(), v.DisplayName(), v.Validation())
+	case *asserts.AccountKey:
+		role := "intermediate"
+		if v.SignKeyID() == v.PublicKeyID() {
+			role = "root"
+		}
+		fmt.Printf("     account-key      id=%s name=%s role=%s sha3-384=%s\n",
+			v.AccountID(), v.Name(), role, v.PublicKeyID())
+	case *asserts.Model:
+		fmt.Printf("     model            brand=%s model=%s grade=%s\n",
+			v.BrandID(), v.Model(), v.Grade())
+	case *asserts.SnapDeclaration:
+		fmt.Printf("     snap-declaration name=%s id=%s publisher=%s\n",
+			v.SnapName(), v.SnapID(), v.PublisherID())
+	case *asserts.SnapRevision:
+		fmt.Printf("     snap-revision    id=%s rev=%d size=%d\n",
+			v.SnapID(), v.SnapRevision(), v.SnapSize())
+	case *asserts.Store:
+		fmt.Printf("     store            store=%s operator-id=%s\n",
+			v.Store(), v.OperatorID())
+	default:
+		fmt.Printf("     %s\n", a.Type().Name)
+	}
 }
 
 // layoutVolume generates a LaidOutVolume to be used with a gadget.NewMountedFilesystemWriter
