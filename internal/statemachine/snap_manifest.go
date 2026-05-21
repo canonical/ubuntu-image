@@ -82,7 +82,8 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	fmt.Printf("   wrote %s (%d bytes)\n", modelPath, info.Size())
 	snapStateMachine.Args.ModelAssertion = modelPath
 
-	if err := injectTrustFromM2cp(); err != nil {
+	intermediateKeys, err := injectTrustFromM2cp()
+	if err != nil {
 		return err
 	}
 
@@ -124,7 +125,7 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	snapStateMachine.manifestSnapURL = buildSnapDownloadURL(m.Model.Architecture)
 	fmt.Printf("=> snapd SnapDownloadURL hook wired (m2cp store app download --url)\n")
 
-	retrieve, err := prefetchAssertionsViaM2cp(m.Model.Architecture, allPins, sm)
+	retrieve, err := prefetchAssertionsViaM2cp(m.Model.Architecture, allPins, sm, intermediateKeys)
 	if err != nil {
 		return err
 	}
@@ -147,12 +148,22 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 // (and any prerequisite) assertions for every pinned snap via
 // `m2cp store snap assertion <name> <arch> -r <rev>`, decodes them
 // into an in-memory index, and returns a function suitable for
-// image.Options.AssertionRetrieve. Trust anchors (account,
-// account-key) already live in sysdb via injectTrustFromM2cp, so the
-// chain verifies as usual.
-func prefetchAssertionsViaM2cp(arch string, pins []commands.OnlineManifestSnap, sm *seedwriter.Manifest) (func(*asserts.Ref) (asserts.Assertion, error), error) {
+// image.Options.AssertionRetrieve. The appstore root is the snapd
+// fork's compiled-in trust anchor, so the chain stops there exactly
+// like Canonical's setup; intermediate signing keys come through
+// this index and the seedwriter writes them to the seed.
+func prefetchAssertionsViaM2cp(arch string, pins []commands.OnlineManifestSnap, sm *seedwriter.Manifest, extras []asserts.Assertion) (func(*asserts.Ref) (asserts.Assertion, error), error) {
 	fmt.Printf("=> prefetching %d snap-assertion bundles via m2cp (arch=%s)\n", len(pins), arch)
 	idx := map[string]asserts.Assertion{}
+	// Seed the index with the trust-bundle's non-root assertions
+	// (intermediate signing keys and the operator's account). They
+	// aren't trust anchors, so the seedwriter's fetcher will walk to
+	// them via this callback and write them to the seed -- which is
+	// exactly what the device's snap-bootstrap needs to resolve the
+	// chain at boot.
+	for _, a := range extras {
+		idx[a.Ref().Unique()] = a
+	}
 	for _, p := range pins {
 		rev := sm.AllowedSnapRevision(p.Name)
 		if rev.Unset() {
@@ -569,21 +580,32 @@ func resolveSnapRevision(name, arch, version string) (int, error) {
 }
 
 // injectTrustFromM2cp pulls the tenant's trust bundle (account +
-// account-keys, all signed by the appstore root) via m2cp and installs
-// them into snapd's sysdb so seedwriter chain verification accepts
-// assertions signed by this store. The bundle stays in memory --
-// nothing is written to disk.
-func injectTrustFromM2cp() error {
+// account-keys, all signed by the appstore root) via
+// `m2cp store system assertion` and installs *only the root
+// account-key* (plus the operator account) into snapd's sysdb. The
+// remaining account-keys -- intermediate signing keys -- are
+// returned so the prefetcher can hand them to the seedwriter through
+// AssertionRetrieve. That way the seedwriter writes them into the
+// seed's assertions/ directory, which is what snap-bootstrap needs
+// at boot to resolve the chain (the device's snapd has the appstore
+// root compiled in but not the intermediates, just like Canonical's
+// setup with their own keys).
+//
+// The discriminator for "root" is self-signing: an account-key whose
+// SignKeyID equals its own PublicKeyID was signed by itself.
+//
+// Bundle stays in memory; nothing is written to disk.
+func injectTrustFromM2cp() ([]asserts.Assertion, error) {
 	fmt.Printf("=> fetching trust bundle: m2cp store system assertion\n")
 	cmd := exec.Command(commands.M2cpCLI, "store", "system", "assertion")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("m2cp store system assertion: %w", err)
+		return nil, fmt.Errorf("m2cp store system assertion: %w", err)
 	}
 	dec := asserts.NewDecoder(&stdout)
-	var trusted []asserts.Assertion
+	var trustAnchors, intermediates []asserts.Assertion
 	var skipped int
 	for {
 		a, err := dec.Decode()
@@ -591,30 +613,37 @@ func injectTrustFromM2cp() error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("decoding trust bundle: %w", err)
+			return nil, fmt.Errorf("decoding trust bundle: %w", err)
 		}
 		describeAssertion(a)
-		// Only account and account-key can be trust anchors. Anything
-		// else (e.g. the store assertion) is informational here.
-		switch a.(type) {
-		case *asserts.Account, *asserts.AccountKey:
-			trusted = append(trusted, a)
+		switch v := a.(type) {
+		case *asserts.Account:
+			// The operator account is the namespace owner; it's a
+			// trust anchor in the same sense Canonical's own account
+			// is compiled into upstream snapd.
+			trustAnchors = append(trustAnchors, a)
+		case *asserts.AccountKey:
+			if v.SignKeyID() == v.PublicKeyID() {
+				trustAnchors = append(trustAnchors, a)
+			} else {
+				intermediates = append(intermediates, a)
+			}
 		default:
 			skipped++
 		}
 	}
-	if len(trusted) == 0 {
-		return fmt.Errorf("trust bundle is empty")
+	if len(trustAnchors) == 0 {
+		return nil, fmt.Errorf("trust bundle has no root account-key")
 	}
-	sysdb.InjectTrusted(trusted)
+	sysdb.InjectTrusted(trustAnchors)
 	// image.Prepare caches sysdb.Trusted() in a package-level var at
 	// init time, so InjectTrusted alone won't reach it. MockTrusted
 	// (named for tests, but the right tool here) refreshes that cache
 	// with the now-expanded trust set.
 	image.MockTrusted(sysdb.Trusted())
-	fmt.Printf("   injected %d trust anchors into snapd sysdb (+ %d non-anchor assertions skipped, image package cache refreshed)\n",
-		len(trusted), skipped)
-	return nil
+	fmt.Printf("   injected %d trust anchor(s) into snapd sysdb; %d intermediate signing key(s) deferred to seed (+ %d non-anchor assertions skipped)\n",
+		len(trustAnchors), len(intermediates), skipped)
+	return intermediates, nil
 }
 
 func describeAssertion(a asserts.Assertion) {
@@ -623,8 +652,12 @@ func describeAssertion(a asserts.Assertion) {
 		fmt.Printf("   account      account-id=%s display-name=%q validation=%s\n",
 			v.AccountID(), v.DisplayName(), v.Validation())
 	case *asserts.AccountKey:
-		fmt.Printf("   account-key  account-id=%s name=%s sha3-384=%s\n",
-			v.AccountID(), v.Name(), v.PublicKeyID())
+		role := "intermediate"
+		if v.SignKeyID() == v.PublicKeyID() {
+			role = "root"
+		}
+		fmt.Printf("   account-key  account-id=%s name=%s sha3-384=%s role=%s\n",
+			v.AccountID(), v.Name(), v.PublicKeyID(), role)
 	case *asserts.Store:
 		url := ""
 		if u := v.URL(); u != nil {
