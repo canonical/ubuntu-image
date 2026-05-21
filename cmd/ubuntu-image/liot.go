@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -23,29 +24,31 @@ import (
 // callable explicitly for debugging.
 
 // liotScanArgs detects the bare-yaml form (any arg ending in .yaml
-// or .yml) and the --dry-run flag, regardless of position. Either
-// can come before or after the other:
+// or .yml) and the L-IoT flags --dry-run and --xz, regardless of
+// position. Any combination is accepted:
 //
-//	ubuntu-image recipe.yaml
-//	ubuntu-image --dry-run recipe.yaml
-//	ubuntu-image recipe.yaml --dry-run
+//	liot-image recipe.yaml
+//	liot-image --dry-run recipe.yaml
+//	liot-image --xz recipe.yaml --dry-run
 //
 // Recipe identification by extension is robust enough for the
 // shapes customers actually type. Subcommand invocations
 // (snap/classic/model) don't carry .yaml files as their first
 // positional so they fall through to go-flags untouched.
-func liotScanArgs() (recipe string, dryRun bool) {
+func liotScanArgs() (recipe string, dryRun, xz bool) {
 	for _, a := range os.Args[1:] {
 		switch {
 		case a == "--dry-run":
 			dryRun = true
+		case a == "--xz":
+			xz = true
 		case isYAMLSuffix(a):
 			if recipe == "" {
 				recipe = a
 			}
 		}
 	}
-	return recipe, dryRun
+	return recipe, dryRun, xz
 }
 
 func isYAMLSuffix(p string) bool {
@@ -86,22 +89,30 @@ func liotMaybeShowQuickHelp() bool {
 const liotUsage = `L-IoT Image Builder for Ubuntu Core based systems
 
 Usage:
-  ubuntu-image <recipe.yaml>
+  liot-image [--dry-run] [--xz] <recipe.yaml>
 
 Build a bootable image from a single YAML recipe file. The recipe
 pins the model and the snaps that go into the image; the builder
 syncs the model with the appstore, resolves snap versions, and
 produces a .img plus a seed.manifest.
 
+Flags:
+  --dry-run   Run preflight (m2cp present, session active, all
+              recipe snaps in the appstore) and exit. Nothing
+              pushed or built.
+  --xz        After building, xz-compress the image in place.
+
 Prerequisites:
-  m2cp CLI on PATH (https://m2cp.example/install)
+  m2cp CLI on PATH
   An active appstore session:  m2cp user login
 
 Example:
   m2cp user login
-  ubuntu-image liot-uc-imx93-1.2.3.yaml
+  liot-image liot-uc-imx93-1.2.3.yaml
 
-Output is written to ./out/ by default. Use -O DIR to override.
+Output is written to ./bin/ by default; use -O DIR to override.
+The image is named after the recipe, so liot-uc-imx93-1.2.3.yaml
+produces liot-uc-imx93-1.2.3.img (or .img.xz with --xz).
 See README.md for the recipe schema.
 `
 
@@ -117,7 +128,8 @@ See README.md for the recipe schema.
 //     caller exits 0 without pushing or building.
 //   - LiotPreflightContinue: preflight passed; caller hands off to
 //     the state-machine pipeline through the rewritten args.
-func liotPreflightAndBanner(recipePath string, dryRun bool) LiotPreflightStatus {
+func liotPreflightAndBanner(recipePath string, dryRun, xz bool) LiotPreflightStatus {
+
 	fmt.Fprintln(os.Stderr, "[L-IoT Image Builder]")
 	if dryRun {
 		fmt.Fprintln(os.Stderr, "(dry-run mode: preflight only; nothing will be pushed or built)")
@@ -128,6 +140,13 @@ func liotPreflightAndBanner(recipePath string, dryRun bool) LiotPreflightStatus 
 		fmt.Fprintf(os.Stderr, "%s CLI not found on PATH.\n", commands.M2cpCLI)
 		fmt.Fprintln(os.Stderr, "Install it first, then re-run this command.")
 		return LiotPreflightFailed
+	}
+
+	if xz {
+		if _, err := exec.LookPath("xz"); err != nil {
+			fmt.Fprintln(os.Stderr, "xz not found on PATH; install it or drop --xz.")
+			return LiotPreflightFailed
+		}
 	}
 
 	session, err := m2cpSessionStatus()
@@ -170,12 +189,13 @@ func liotPreflightAndBanner(recipePath string, dryRun bool) LiotPreflightStatus 
 	}
 
 	// Rewrite os.Args: insert `snap --manifest <recipe>` after the
-	// program name, drop the original recipe arg, and inject a
-	// default `-O ./bin/` if the user didn't already pass one.
-	// The recipe path may be anywhere in args, not just position 1.
+	// program name, drop the original recipe arg and any L-IoT-only
+	// flags (which go-flags wouldn't recognise), and inject a
+	// default `-O ./bin/` if the user didn't already pass one. The
+	// recipe path may be anywhere in args, not just position 1.
 	rest := make([]string, 0, len(os.Args)-1)
 	for _, a := range os.Args[1:] {
-		if a == recipePath {
+		if a == recipePath || a == "--xz" || a == "--dry-run" {
 			continue
 		}
 		rest = append(rest, a)
@@ -188,6 +208,67 @@ func liotPreflightAndBanner(recipePath string, dryRun bool) LiotPreflightStatus 
 	newArgs = append(newArgs, rest...)
 	os.Args = newArgs
 	return LiotPreflightContinue
+}
+
+// liotPostBuild does the bare-recipe finishing touches after the
+// state machine has produced the raw image:
+//
+//  1. Rename `<volume>.img` to `<recipe-basename>.img`. The volume
+//     name is whatever the gadget snap's gadget.yaml declared (e.g.
+//     "imx93.img"), which rarely matches anything the operator
+//     recognises; the recipe basename is the only filename they have
+//     direct control over.
+//  2. If xz is set, compress the renamed image in place to
+//     `<recipe-basename>.img.xz`.
+//
+// Skipped (with a note) when the build produced more than one .img,
+// since each volume needs its own name and we can't collapse them
+// onto a single recipe basename.
+func liotPostBuild(recipePath, outputDir string, xz bool) {
+	base := strings.TrimSuffix(filepath.Base(recipePath), filepath.Ext(recipePath))
+	entries, err := os.ReadDir(outputDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not read output dir %s: %v\n", outputDir, err)
+		return
+	}
+	var imgs []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".img") {
+			imgs = append(imgs, e.Name())
+		}
+	}
+	if len(imgs) == 0 {
+		return
+	}
+	if len(imgs) > 1 {
+		fmt.Fprintf(os.Stderr, "Multi-volume build (%d images); skipping rename and --xz.\n", len(imgs))
+		return
+	}
+
+	src := filepath.Join(outputDir, imgs[0])
+	dst := filepath.Join(outputDir, base+".img")
+	if src != dst {
+		fmt.Fprintf(os.Stderr, "Renaming output: %s -> %s\n", filepath.Base(src), filepath.Base(dst))
+		if err := os.Rename(src, dst); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: rename failed: %v\n", err)
+			return
+		}
+	}
+
+	if !xz {
+		fmt.Fprintf(os.Stderr, "Image: %s\n", dst)
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "Compressing with xz: %s\n", filepath.Base(dst))
+	cmd := exec.Command("xz", "-T0", "-v", dst)
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: xz compression failed: %v\n", err)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "Image: %s.xz\n", dst)
 }
 
 // hasOutputDirFlag reports whether -O / --output-dir was passed

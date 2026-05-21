@@ -4,9 +4,9 @@ Based on Canonical's [ubuntu-image](https://github.com/canonical/ubuntu-image),
 extended to build images against our self-hosted, snap-store-compatible
 appstore from a single YAML recipe file.
 
-The binary is still invoked as `ubuntu-image` (the file is renamed to
-keep the upstream interface stable); this repo and the manifest-mode
-workflow are what the "L-IoT Image Builder" name refers to.
+The released binary is `liot-image`; the source tree, Go module, and
+`cmd/ubuntu-image/` directory keep their upstream names. "L-IoT Image
+Builder" refers to this repo and the manifest-mode workflow.
 
 For the fork's architectural changes (snapd hooks, manifest pipeline,
 build.yaml generation), see [MODIFICATIONS.md](MODIFICATIONS.md).
@@ -43,8 +43,22 @@ liot-uc-imx8mp-2.0.0.yaml     # ubuntu-core build for imx8mp board, v2.0.0
 To build an image:
 
 ```
-ubuntu-image snap --manifest liot-uc-imx93-1.2.3.yaml -O ./out/
+liot-image liot-uc-imx93-1.2.3.yaml
 ```
+
+That's the whole interface: one positional argument, the recipe.
+The produced image is named after the recipe — `liot-uc-imx93-1.2.3.yaml`
+yields `liot-uc-imx93-1.2.3.img` — rather than after the gadget's
+internal volume name. Output lands in `./bin/` by default; pass `-O
+DIR` to override.
+
+Two optional flags:
+
+- `--dry-run` runs preflight (m2cp on PATH, session active, every
+  recipe snap present in the appstore) and exits without pushing or
+  building.
+- `--xz` xz-compresses the image in place once the build finishes,
+  producing `<recipe>.img.xz`. Requires `xz` on PATH.
 
 The builder:
 
@@ -66,12 +80,18 @@ is self-identifying: see "Inspecting an image" below.
 ## Recipe schema
 
 ```yaml
-# REQUIRED: which Ubuntu Core model to build.
-# Fetched from the store via `m2cp store model assertion`.
+# REQUIRED: the user-controlled portion of the model assertion. The
+# builder renders model.json from these fields and pushes it to the
+# appstore, which fills authority-id, brand-id and per-snap snap-ids
+# server-side, signs, and returns the assigned revision. The model
+# revision is therefore an *output* of the push step and is not
+# specified here.
 model:
   name: edge-imx93-uc-vtg
-  revision: 1
   architecture: arm64
+  base: core24
+  grade: signed                     # one of: signed, secured, dangerous (default: signed)
+  storage-safety: prefer-encrypted  # optional
 
 # OPTIONAL: provenance metadata, copied into the seed's build.yaml.
 # Each field can be overridden at build time by the matching BUILD_*
@@ -81,24 +101,33 @@ build:
   version: "1.2.3"
   commit: "abc1234de56789f0fedcba0123456789abcdef01"
   repo: "github.com/foo/bar"
-  grade: "stable"     # one of: stable, experimental, edge
 
-# REQUIRED: every snap the model declares, pinned by version.
-# The builder resolves each to a concrete revision via
+# REQUIRED: every snap the model declares, pinned by version. The
+# `type` is required and feeds the generated model.json. The builder
+# resolves each version to a concrete revision via
 # `m2cp store snap info` before the build starts.
 snaps:
   - name: snapd
+    type: snapd
     version: "4.3.0.42"
   - name: core24
+    type: base
     version: "1.2.0"
-  - name: mlpa-os-imx-kernel
+  - name: m2cp-os-imx93-gadget
+    type: gadget
+    version: "5.5.12"
+  - name: m2cp-os-imx93-kernel
+    type: kernel
     version: "6.1.5"
+  - name: m2cp-gateway
+    type: app
+    version: "3.1.0"
   # ... one entry per snap in the model
 
 # OPTIONAL: snaps not declared by the model but still seeded into
-# the image. Same name+version format. Treated by the seedwriter as
-# additional snaps; they end up in the image alongside the
-# model-declared ones.
+# the image. Only name + version are needed (these aren't part of
+# the model, so no `type`). Treated by the seedwriter as additional
+# snaps; they end up in the image alongside the model-declared ones.
 extra-snaps:
   - name: htop
     version: "3.0.5"
@@ -128,22 +157,23 @@ seed.manifest                  # name + revision for each seeded snap
 
 ## build.yaml contents
 
-The builder writes a stable schema with 11 keys; unknown values
+The builder writes a stable schema with 12 keys; unknown values
 become `"not set"` so the shape is the same on every image:
 
 | key | source |
 |---|---|
 | `builder` | always `"ubuntu-image"` (this binary) |
 | `builder-version` | linker-set `Version`, else `"not set"` |
+| `built-by` | developer identity from `m2cp user info --json`, else `"not set"` |
 | `appstore-url` | snap-store URL discovered via `m2cp user status --json` |
 | `model-name` | from the recipe |
-| `model-revision` | from the recipe |
+| `model-revision` | revision returned by the appstore when the model was pushed |
 | `arch` | from the recipe |
 | `date` | UTC ISO 8601 at build start |
 | `version` | `$BUILD_VERSION`, else `build.version` from recipe, else `"not set"` |
 | `commit` | `$BUILD_COMMIT`, else `build.commit` from recipe, else `"not set"` |
 | `repo` | `$BUILD_REPO`, else `build.repo` from recipe, else `"not set"` |
-| `grade` | `$BUILD_GRADE`, else `build.grade` from recipe, else `"not set"` |
+| `grade` | from `model.grade` in the recipe |
 
 ## Inspecting an image
 

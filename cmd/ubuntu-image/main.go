@@ -127,8 +127,9 @@ func main() { //nolint: gocyclo
 		osExit(0)
 		return
 	}
-	if recipe, dryRun := liotScanArgs(); recipe != "" {
-		switch liotPreflightAndBanner(recipe, dryRun) {
+	liotRecipe, liotDryRun, liotXz := liotScanArgs()
+	if liotRecipe != "" {
+		switch liotPreflightAndBanner(liotRecipe, liotDryRun, liotXz) {
 		case LiotPreflightFailed:
 			osExit(1)
 			return
@@ -228,5 +229,11 @@ func main() { //nolint: gocyclo
 		fmt.Printf("Error: %s\n", err.Error())
 		osExit(1)
 		return
+	}
+
+	// Bare-recipe finishing touches: rename the gadget-volume-named
+	// .img to match the recipe basename, and optionally xz it.
+	if liotRecipe != "" {
+		liotPostBuild(liotRecipe, commonOpts.OutputDir, liotXz)
 	}
 }
