@@ -162,8 +162,8 @@ become `"not set"` so the shape is the same on every image:
 
 | key | source |
 |---|---|
-| `builder` | always `"ubuntu-image"` (this binary) |
-| `builder-version` | linker-set `Version`, else `"not set"` |
+| `builder` | always `"liot-image"` (this binary) |
+| `builder-version` | linker-set `Version` (set from `git describe --tags --always --dirty` by build.sh and the release workflow), else `"not set"` |
 | `built-by` | developer identity from `m2cp user info --json`, else `"not set"` |
 | `appstore-url` | snap-store URL discovered via `m2cp user status --json` |
 | `model-name` | from the recipe |

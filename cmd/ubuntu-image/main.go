@@ -193,7 +193,7 @@ func main() { //nolint: gocyclo
 		if Version == "" {
 			Version = os.Getenv("SNAP_VERSION")
 		}
-		fmt.Printf("ubuntu-image %s\n", Version)
+		fmt.Printf("liot-image %s\n", Version)
 		osExit(0)
 		return
 	}

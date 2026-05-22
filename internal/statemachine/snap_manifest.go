@@ -479,7 +479,7 @@ func assembleBuildYAML(snapStateMachine *SnapStateMachine) buildYAML {
 	}
 	mb := snapStateMachine.manifest.Build
 	return buildYAML{
-		Builder:        "ubuntu-image",
+		Builder:        "liot-image",
 		BuilderVersion: builderVersion,
 		BuiltBy:        builtBy,
 		AppstoreURL:    storeURL,
