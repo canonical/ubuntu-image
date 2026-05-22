@@ -127,7 +127,16 @@ func main() { //nolint: gocyclo
 		osExit(0)
 		return
 	}
-	liotRecipe, liotDryRun, liotXz := liotScanArgs()
+	liotRecipe, liotDryRun, liotXz, liotModelOnly := liotScanArgs()
+	if liotRecipe != "" && liotModelOnly {
+		if err := runModelCommand(liotRecipe); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+			osExit(1)
+			return
+		}
+		osExit(0)
+		return
+	}
 	if liotRecipe != "" {
 		switch liotPreflightAndBanner(liotRecipe, liotDryRun, liotXz) {
 		case LiotPreflightFailed:

@@ -49,16 +49,23 @@ liot-image liot-uc-imx93-1.2.3.yaml
 That's the whole interface: one positional argument, the recipe.
 The produced image is named after the recipe — `liot-uc-imx93-1.2.3.yaml`
 yields `liot-uc-imx93-1.2.3.img` — rather than after the gadget's
-internal volume name. Output lands in `./bin/` by default; pass `-O
-DIR` to override.
+internal volume name. Alongside the image, a
+`liot-uc-imx93-1.2.3.model.json` sidecar is written so operators
+have a self-contained reference for the exact model definition the
+appstore was asked to sign. Output lands in `./bin/` by default;
+pass `-O DIR` to override.
 
-Two optional flags:
+Three optional flags:
 
 - `--dry-run` runs preflight (m2cp on PATH, session active, every
   recipe snap present in the appstore) and exits without pushing or
   building.
 - `--xz` xz-compresses the image in place once the build finishes,
-  producing `<recipe>.img.xz`. Requires `xz` on PATH.
+  producing `<recipe>.img.xz`. The model.json sidecar stays
+  uncompressed. Requires `xz` on PATH.
+- `--model` renders the recipe's model.json to stdout and exits.
+  Pure transformation: no network, no build. Useful for inspecting
+  exactly what will be sent to the appstore.
 
 The builder:
 

@@ -24,31 +24,34 @@ import (
 // callable explicitly for debugging.
 
 // liotScanArgs detects the bare-yaml form (any arg ending in .yaml
-// or .yml) and the L-IoT flags --dry-run and --xz, regardless of
-// position. Any combination is accepted:
+// or .yml) and the L-IoT flags --dry-run, --xz, and --model,
+// regardless of position. Any combination is accepted:
 //
 //	liot-image recipe.yaml
 //	liot-image --dry-run recipe.yaml
 //	liot-image --xz recipe.yaml --dry-run
+//	liot-image --model recipe.yaml
 //
 // Recipe identification by extension is robust enough for the
 // shapes customers actually type. Subcommand invocations
 // (snap/classic/model) don't carry .yaml files as their first
 // positional so they fall through to go-flags untouched.
-func liotScanArgs() (recipe string, dryRun, xz bool) {
+func liotScanArgs() (recipe string, dryRun, xz, modelOnly bool) {
 	for _, a := range os.Args[1:] {
 		switch {
 		case a == "--dry-run":
 			dryRun = true
 		case a == "--xz":
 			xz = true
+		case a == "--model":
+			modelOnly = true
 		case isYAMLSuffix(a):
 			if recipe == "" {
 				recipe = a
 			}
 		}
 	}
-	return recipe, dryRun, xz
+	return recipe, dryRun, xz, modelOnly
 }
 
 func isYAMLSuffix(p string) bool {
@@ -89,7 +92,7 @@ func liotMaybeShowQuickHelp() bool {
 const liotUsage = `L-IoT Image Builder for Ubuntu Core based systems
 
 Usage:
-  liot-image [--dry-run] [--xz] <recipe.yaml>
+  liot-image [--dry-run] [--xz] [--model] <recipe.yaml>
 
 Build a bootable image from a single YAML recipe file. The recipe
 pins the model and the snaps that go into the image; the builder
@@ -101,6 +104,8 @@ Flags:
               recipe snaps in the appstore) and exit. Nothing
               pushed or built.
   --xz        After building, xz-compress the image in place.
+  --model     Render the recipe's model.json to stdout and exit.
+              Pure transformation: no network, no build.
 
 Prerequisites:
   m2cp CLI on PATH
@@ -195,7 +200,7 @@ func liotPreflightAndBanner(recipePath string, dryRun, xz bool) LiotPreflightSta
 	// recipe path may be anywhere in args, not just position 1.
 	rest := make([]string, 0, len(os.Args)-1)
 	for _, a := range os.Args[1:] {
-		if a == recipePath || a == "--xz" || a == "--dry-run" {
+		if a == recipePath || a == "--xz" || a == "--dry-run" || a == "--model" {
 			continue
 		}
 		rest = append(rest, a)
@@ -218,8 +223,13 @@ func liotPreflightAndBanner(recipePath string, dryRun, xz bool) LiotPreflightSta
 //     "imx93.img"), which rarely matches anything the operator
 //     recognises; the recipe basename is the only filename they have
 //     direct control over.
-//  2. If xz is set, compress the renamed image in place to
-//     `<recipe-basename>.img.xz`.
+//  2. Write a `<recipe-basename>.model.json` sidecar next to the
+//     image -- the same model.json the appstore push step consumed
+//     -- so operators have a self-contained reference for what
+//     model definition produced this image.
+//  3. If xz is set, compress the renamed image in place to
+//     `<recipe-basename>.img.xz`. The model.json sidecar stays
+//     uncompressed (tiny + meant to be read directly).
 //
 // Skipped (with a note) when the build produced more than one .img,
 // since each volume needs its own name and we can't collapse them
@@ -255,8 +265,15 @@ func liotPostBuild(recipePath, outputDir string, xz bool) {
 		}
 	}
 
+	modelPath := filepath.Join(outputDir, base+".model.json")
+	if err := writeModelSidecar(recipePath, modelPath); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not write %s: %v\n", filepath.Base(modelPath), err)
+	} else {
+		fmt.Fprintf(os.Stderr, "Model:  %s\n", modelPath)
+	}
+
 	if !xz {
-		fmt.Fprintf(os.Stderr, "Image: %s\n", dst)
+		fmt.Fprintf(os.Stderr, "Image:  %s\n", dst)
 		return
 	}
 
@@ -268,7 +285,22 @@ func liotPostBuild(recipePath, outputDir string, xz bool) {
 		fmt.Fprintf(os.Stderr, "warning: xz compression failed: %v\n", err)
 		return
 	}
-	fmt.Fprintf(os.Stderr, "Image: %s.xz\n", dst)
+	fmt.Fprintf(os.Stderr, "Image:  %s.xz\n", dst)
+}
+
+// writeModelSidecar renders the recipe's model definition through the
+// same path the build flow uses to push to the appstore
+// (commands.RenderModelJSON) and writes it next to the image.
+func writeModelSidecar(recipePath, dst string) error {
+	m, err := commands.LoadOnlineManifest(recipePath)
+	if err != nil {
+		return err
+	}
+	body, err := commands.RenderModelJSON(m)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, body, 0644)
 }
 
 // hasOutputDirFlag reports whether -O / --output-dir was passed
