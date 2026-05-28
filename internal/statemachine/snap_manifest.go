@@ -381,7 +381,11 @@ func pushModelGetRevision(jsonPath, msg string) (int, error) {
 	cmd := exec.Command(commands.M2cpCLI, "store", "system", "model", "push", "-i", "--json", jsonPath, msg)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	// Tee m2cp's stderr to our own: it carries the per-revision
+	// idempotent scan narration (the same diff --dry-run shows), which
+	// we want visible during a normal build too. The buffer copy is
+	// kept for error messages below.
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
 	runErr := cmd.Run()
 
 	var resp modelPushResponse
