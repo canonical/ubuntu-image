@@ -1253,9 +1253,25 @@ var generatePackageManifestState = stateFunc{"generate_package_manifest", (*Stat
 func (stateMachine *StateMachine) generatePackageManifest() error {
 	classicStateMachine := stateMachine.parent.(*ClassicStateMachine)
 
-	outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
-		classicStateMachine.ImageDef.Artifacts.Manifest.ManifestName)
-	return generateClassicManifest(stateMachine.tempDirs.rootfs, outputPath, classicStateMachine.commonFlags.Debug)
+	if classicStateMachine.ImageDef.Artifacts.Manifest != nil {
+		outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
+			classicStateMachine.ImageDef.Artifacts.Manifest.ManifestName)
+		err := generateClassicManifest(stateMachine.tempDirs.rootfs, outputPath, classicStateMachine.commonFlags.Debug)
+		if err != nil {
+			return err
+		}
+	}
+
+	if classicStateMachine.ImageDef.Artifacts.ManifestV2 != nil {
+		outputPath := filepath.Join(stateMachine.commonFlags.OutputDir,
+			classicStateMachine.ImageDef.Artifacts.ManifestV2.ManifestName)
+		err := generateClassicManifestV2(stateMachine.tempDirs.rootfs, outputPath, classicStateMachine.commonFlags.Debug)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 var generateFilelistState = stateFunc{"generate_filelist", (*StateMachine).generateFilelist}

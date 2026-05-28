@@ -2866,54 +2866,96 @@ UUID=1234-5678	/	ext4	defaults	0	0
 
 // TestGeneratePackageManifest tests if classic image manifest generation works
 func TestGeneratePackageManifest(t *testing.T) {
-	asserter := helper.Asserter{T: t}
-
-	// Setup the exec.Command mock
-	testCaseName = "TestGeneratePackageManifest"
-	execCommand = fakeExecCommand
-	t.Cleanup(func() {
-		execCommand = exec.Command
-	})
-	// We need the output directory set for this
-	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
-	asserter.AssertErrNil(err, true)
-	t.Cleanup(func() { os.RemoveAll(outputDir) })
-
-	var stateMachine ClassicStateMachine
-	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
-	stateMachine.parent = &stateMachine
-	stateMachine.commonFlags.OutputDir = outputDir
-	stateMachine.ImageDef = imagedefinition.ImageDefinition{
-		Architecture: arch.GetHostArch(),
-		Series:       getHostSuite(),
-		Rootfs: &imagedefinition.Rootfs{
-			Archive: "ubuntu",
-		},
-		Customization: &imagedefinition.Customization{},
-		Artifacts: &imagedefinition.Artifact{
-			Manifest: &imagedefinition.Manifest{
-				ManifestName: "filesystem.manifest",
+	testCases := []struct {
+		name            string
+		artifacts       *imagedefinition.Artifact
+		expectedContent []string
+	}{
+		{
+			name: "TestGeneratePackageManifest",
+			artifacts: &imagedefinition.Artifact{
+				Manifest: &imagedefinition.Manifest{
+					ManifestName: "filesystem.manifest",
+				},
 			},
+			expectedContent: []string{"foo 1.2", "bar 1.4-1ubuntu4.1", "libbaz 0.1.3ubuntu2"},
+		},
+		{
+			name: "TestGeneratePackageManifestV2",
+			artifacts: &imagedefinition.Artifact{
+				ManifestV2: &imagedefinition.Manifest{
+					ManifestName: "filesystem.manifest",
+				},
+			},
+			expectedContent: []string{"foo\t1.2", "bar\t1.4-1ubuntu4.1", "libbaz\t0.1.3ubuntu2", "snap:snapd\tstable\t25939"},
 		},
 	}
-	err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
-	asserter.AssertErrNil(err, true)
-	t.Cleanup(func() { os.RemoveAll(stateMachine.commonFlags.OutputDir) })
 
-	err = stateMachine.generatePackageManifest()
-	asserter.AssertErrNil(err, true)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := helper.Asserter{T: t}
 
-	os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
-	// Check if manifest file got generated and if it has expected contents
-	manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
-	manifestBytes, err := os.ReadFile(manifestPath)
-	asserter.AssertErrNil(err, true)
-	// The order of packages shouldn't matter
-	examplePackages := []string{"foo\t1.2", "bar\t1.4-1ubuntu4.1", "libbaz\t0.1.3ubuntu2"}
-	for _, pkg := range examplePackages {
-		if !strings.Contains(string(manifestBytes), pkg) {
-			t.Errorf("filesystem.manifest does not contain expected package: %s", pkg)
-		}
+			// Setup the exec.Command mock
+			testCaseName = tc.name
+			execCommand = fakeExecCommand
+			t.Cleanup(func() {
+				execCommand = exec.Command
+			})
+			// We need the output directory set for this
+			outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
+			asserter.AssertErrNil(err, true)
+			t.Cleanup(func() { os.RemoveAll(outputDir) })
+
+			var stateMachine ClassicStateMachine
+			stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+			stateMachine.parent = &stateMachine
+			stateMachine.commonFlags.OutputDir = outputDir
+			stateMachine.ImageDef = imagedefinition.ImageDefinition{
+				Architecture: arch.GetHostArch(),
+				Series:       getHostSuite(),
+				Rootfs: &imagedefinition.Rootfs{
+					Archive: "ubuntu",
+				},
+				Customization: &imagedefinition.Customization{},
+				Artifacts:     tc.artifacts,
+			}
+			err = osMkdirAll(stateMachine.commonFlags.OutputDir, 0755)
+			asserter.AssertErrNil(err, true)
+			t.Cleanup(func() { os.RemoveAll(stateMachine.commonFlags.OutputDir) })
+
+			err = stateMachine.makeTemporaryDirectories()
+			asserter.AssertErrNil(err, true)
+			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
+
+			seedPath := filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "snapd", "seed", "seed.yaml")
+			err = os.MkdirAll(filepath.Dir(seedPath), 0755)
+			asserter.AssertErrNil(err, true)
+			//nolint:gosec,G306
+			err = os.WriteFile(seedPath,
+				[]byte(`snaps:
+- name: snapd
+  snap-id: PMrrV4ml8uWuEUDBT8dSGnKUYbevVhc4
+  channel: stable
+  contact: https://github.com/snapcore/snapd/issues
+  file: snapd_25939.snap`),
+				0644)
+			asserter.AssertErrNil(err, true)
+			err = stateMachine.generatePackageManifest()
+			asserter.AssertErrNil(err, true)
+
+			os.RemoveAll(stateMachine.stateMachineFlags.WorkDir)
+			// Check if manifest file got generated and if it has expected contents
+			manifestPath := filepath.Join(stateMachine.commonFlags.OutputDir, "filesystem.manifest")
+			manifestBytes, err := os.ReadFile(manifestPath)
+			asserter.AssertErrNil(err, true)
+			// The order of packages shouldn't matter
+			examplePackages := tc.expectedContent
+			for _, pkg := range examplePackages {
+				if !strings.Contains(string(manifestBytes), pkg) {
+					t.Errorf("filesystem.manifest does not contain expected package: %s", pkg)
+				}
+			}
+		})
 	}
 }
 

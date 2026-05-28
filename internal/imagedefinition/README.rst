@@ -323,6 +323,12 @@ The following specification defines what is supported in the YAML:
       manifest:
         # Name to output the manifest file.
         name: <string>
+      # A manifest-v2 file is a list of all packages and snaps with their
+      # version numbers (and channel for snaps) that are included in the
+      # rootfs of the image. It has the same format as the livecd-rootfs one.
+      manifest-v2:
+        # Name to output the manifest-v2 file.
+        name: <string>
       # A filelist is a list of all files in the rootfs of the image.
       filelist:
         # Name to output the filelist file.

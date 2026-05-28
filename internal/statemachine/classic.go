@@ -530,7 +530,7 @@ func (stateMachine *StateMachine) addArtifactsStates(c *ClassicStateMachine, sta
 		stateMachine.addQcow2States(states)
 	}
 
-	if c.ImageDef.Artifacts.Manifest != nil {
+	if c.ImageDef.Artifacts.Manifest != nil || c.ImageDef.Artifacts.ManifestV2 != nil {
 		*states = append(*states, generatePackageManifestState)
 	}
 
