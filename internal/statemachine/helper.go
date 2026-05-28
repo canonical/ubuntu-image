@@ -298,8 +298,34 @@ func WriteSnapManifest(snapsDir string, outputPath string) error {
 	return nil
 }
 
-// generateClassicManifest generate the classic manifest file for the given rootfs
+// generateClassicManifest generates the classic manifest file for the given rootfs
 func generateClassicManifest(rootfs string, outputPath string, debug bool) error {
+	adminDir := filepath.Join(rootfs, "var", "lib", "dpkg")
+	cmd := execCommand("dpkg-query", fmt.Sprintf("--admindir=%s", adminDir), "-W", "--showformat=${Package} ${Version}\n")
+	cmdOutput := helper.SetCommandOutput(cmd, debug)
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Error generating package list with command \"%s\". "+
+			"Error is \"%s\". Full output below:\n%s",
+			cmd.String(), err.Error(), cmdOutput.String())
+	}
+
+	// write the output to a file on successful executions
+	manifest, err := osCreate(outputPath)
+	if err != nil {
+		return fmt.Errorf("Error creating manifest file: %s", err.Error())
+	}
+	defer manifest.Close()
+	_, err = manifest.Write(cmdOutput.Bytes())
+	if err != nil {
+		return fmt.Errorf("error writing the manifest file: %w", err)
+	}
+	return nil
+}
+
+// generateClassicManifestV2 generates the classic manifest file for the given rootfs
+// V2 has the same output as the livecd-rootfs tool.
+func generateClassicManifestV2(rootfs string, outputPath string, debug bool) error {
 	// get package list
 	adminDir := filepath.Join(rootfs, "var", "lib", "dpkg")
 	cmd := execCommand("dpkg-query", "--show", fmt.Sprintf("--admindir=%s", adminDir))
@@ -323,11 +349,14 @@ func generateClassicManifest(rootfs string, outputPath string, debug bool) error
 
 	seedPath := filepath.Join(rootfs, "var", "lib", "snapd", "seed", "seed.yaml")
 	if _, err := os.Stat(seedPath); err != nil {
-		// no seed.yaml file
-		return nil
+		if os.IsNotExist(err) {
+			// no seed.yaml file
+			return nil
+		}
+		return fmt.Errorf("Error stating the snap seed file: %w", err)
 	}
 	// read snap list from seed.yaml
-	data, err := os.ReadFile(seedPath)
+	data, err := osReadFile(seedPath)
 	if err != nil {
 		return fmt.Errorf("Error reading the snap seed file: %w", err)
 	}
