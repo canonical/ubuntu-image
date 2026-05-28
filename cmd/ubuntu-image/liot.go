@@ -101,8 +101,10 @@ produces a .img plus a seed.manifest.
 
 Flags:
   --dry-run   Run preflight (m2cp present, session active, all
-              recipe snaps in the appstore) and exit. Nothing
-              pushed or built.
+              recipe snaps in the appstore) plus a model scan that
+              reports whether the model would reuse an existing
+              appstore revision or be pushed as a new one, then
+              exit. Nothing pushed or built.
   --xz        After building, xz-compress the image in place.
   --model     Render the recipe's model.json to stdout and exit.
               Pure transformation: no network, no build.
@@ -189,6 +191,11 @@ func liotPreflightAndBanner(recipePath string, dryRun, xz bool) LiotPreflightSta
 	}
 
 	if dryRun {
+		fmt.Fprintln(os.Stderr, "Model dry-run: checking whether this model is already in the appstore...")
+		if err := liotModelDryRun(m); err != nil {
+			fmt.Fprintf(os.Stderr, "  model dry-run scan failed: %v\n", err)
+		}
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Dry-run: preflight passed. Re-run without --dry-run to push and build.")
 		return LiotPreflightDryRun
 	}
@@ -301,6 +308,34 @@ func writeModelSidecar(recipePath, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, body, 0644)
+}
+
+// liotModelDryRun renders the recipe's model.json and asks m2cp
+// whether pushing it would reuse an existing revision or create a new
+// one -- without pushing. The m2cp scan narrates every existing
+// revision with its snap delta, so dry-run surfaces exactly what
+// would change before any build or push happens.
+func liotModelDryRun(m *commands.OnlineManifest) error {
+	body, err := commands.RenderModelJSON(m)
+	if err != nil {
+		return fmt.Errorf("rendering model.json: %w", err)
+	}
+	tmp, err := os.CreateTemp("", "liot-model-*.json")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(body); err != nil {
+		tmp.Close()
+		return err
+	}
+	tmp.Close()
+
+	cmd := exec.Command(commands.M2cpCLI, "store", "system", "model", "push",
+		"--dry-run", tmp.Name(), "dry-run (not pushed)")
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // hasOutputDirFlag reports whether -O / --output-dir was passed

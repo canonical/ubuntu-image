@@ -58,8 +58,10 @@ pass `-O DIR` to override.
 Three optional flags:
 
 - `--dry-run` runs preflight (m2cp on PATH, session active, every
-  recipe snap present in the appstore) and exits without pushing or
-  building.
+  recipe snap present in the appstore) plus a model scan — it reports
+  whether the recipe's model would reuse an existing appstore revision
+  or be pushed as a new one (with a per-revision snap diff) — then
+  exits without pushing or building.
 - `--xz` xz-compresses the image in place once the build finishes,
   producing `<recipe>.img.xz`. The model.json sidecar stays
   uncompressed. Requires `xz` on PATH.
