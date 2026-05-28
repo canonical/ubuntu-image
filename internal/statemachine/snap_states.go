@@ -18,13 +18,21 @@ var prepareImageState = stateFunc{"prepare_image", (*StateMachine).prepareImage}
 func (stateMachine *StateMachine) prepareImage() error {
 	snapStateMachine := stateMachine.parent.(*SnapStateMachine)
 
+	// In manifest mode, name the seed manifest after the recipe
+	// (e.g. imx93-m2cp-uc-vtg.seed.manifest) to match the image
+	// naming; otherwise keep the default seed.manifest.
+	seedManifestName := "seed.manifest"
+	if base := snapStateMachine.manifestOutputBase(); base != "" {
+		seedManifestName = base + ".seed.manifest"
+	}
+
 	imageOpts := &image.Options{
 		ModelFile:                 snapStateMachine.Args.ModelAssertion,
 		Preseed:                   snapStateMachine.Opts.Preseed,
 		PreseedSignKey:            snapStateMachine.Opts.PreseedSignKey,
 		AppArmorKernelFeaturesDir: snapStateMachine.Opts.AppArmorKernelFeaturesDir,
 		SysfsOverlay:              snapStateMachine.Opts.SysfsOverlay,
-		SeedManifestPath:          filepath.Join(stateMachine.commonFlags.OutputDir, "seed.manifest"),
+		SeedManifestPath:          filepath.Join(stateMachine.commonFlags.OutputDir, seedManifestName),
 		PrepareDir:                snapStateMachine.tempDirs.unpack,
 		Channel:                   snapStateMachine.commonFlags.Channel,
 		Customizations:            snapStateMachine.imageOptsCustomizations(),

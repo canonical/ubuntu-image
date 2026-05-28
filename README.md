@@ -158,11 +158,18 @@ systems/<label>/
 └── build.yaml                 # provenance (see below)
 ```
 
-And in the output directory alongside the image:
+And in the output directory, all named after the recipe basename
+(so a `liot-uc-imx93-1.2.3.yaml` recipe yields):
 
 ```
-seed.manifest                  # name + revision for each seeded snap
+liot-uc-imx93-1.2.3.img            # the disk image
+liot-uc-imx93-1.2.3.seed.manifest  # name + revision for each seeded snap
+liot-uc-imx93-1.2.3.model.json     # the rendered model definition (bare-recipe form)
 ```
+
+The image and seed.manifest are named from the recipe by the build
+pipeline itself, so the naming holds however the builder is invoked.
+(Multi-volume gadgets keep per-volume `<volume>.img` names.)
 
 ## build.yaml contents
 

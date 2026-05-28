@@ -30,12 +30,27 @@ const (
 	schemaEMMC = "emmc"
 )
 
-// for snap/core image builds, the image name is always <volume-name>.img for
-// each volume in the gadget. This function stores that info in the struct
+// for snap/core image builds, the image name is normally <volume-name>.img
+// for each volume in the gadget. In manifest mode with a single volume we
+// instead name it after the recipe basename (e.g. imx93-m2cp-uc-vtg.img
+// rather than imx93.img), since the volume name is buried in the gadget and
+// rarely matches anything the operator recognises. Multi-volume gadgets keep
+// per-volume names to avoid collisions.
 func (stateMachine *StateMachine) setArtifactNames() error {
 	stateMachine.VolumeNames = make(map[string]string)
+
+	base := ""
+	if sm, ok := stateMachine.parent.(*SnapStateMachine); ok {
+		base = sm.manifestOutputBase()
+	}
+	useBase := base != "" && len(stateMachine.GadgetInfo.Volumes) == 1
+
 	for volumeName := range stateMachine.GadgetInfo.Volumes {
-		stateMachine.VolumeNames[volumeName] = volumeName + ".img"
+		name := volumeName
+		if useBase {
+			name = base
+		}
+		stateMachine.VolumeNames[volumeName] = name + ".img"
 	}
 	return nil
 }

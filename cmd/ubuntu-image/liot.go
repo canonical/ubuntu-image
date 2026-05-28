@@ -223,53 +223,25 @@ func liotPreflightAndBanner(recipePath string, dryRun, xz bool) LiotPreflightSta
 }
 
 // liotPostBuild does the bare-recipe finishing touches after the
-// state machine has produced the raw image:
+// state machine has produced the image. The image and seed.manifest
+// are already named after the recipe by the manifest pipeline
+// (setArtifactNames / prepareImage), so here we only:
 //
-//  1. Rename `<volume>.img` to `<recipe-basename>.img`. The volume
-//     name is whatever the gadget snap's gadget.yaml declared (e.g.
-//     "imx93.img"), which rarely matches anything the operator
-//     recognises; the recipe basename is the only filename they have
-//     direct control over.
-//  2. Write a `<recipe-basename>.model.json` sidecar next to the
+//  1. Write a `<recipe-basename>.model.json` sidecar next to the
 //     image -- the same model.json the appstore push step consumed
-//     -- so operators have a self-contained reference for what
-//     model definition produced this image.
-//  3. If xz is set, compress the renamed image in place to
+//     -- so operators have a self-contained reference for what model
+//     definition produced this image.
+//  2. If xz is set, compress the image in place to
 //     `<recipe-basename>.img.xz`. The model.json sidecar stays
 //     uncompressed (tiny + meant to be read directly).
 //
-// Skipped (with a note) when the build produced more than one .img,
-// since each volume needs its own name and we can't collapse them
-// onto a single recipe basename.
+// No-op if the recipe-named image isn't present (e.g. a multi-volume
+// gadget, which keeps per-volume names).
 func liotPostBuild(recipePath, outputDir string, xz bool) {
 	base := strings.TrimSuffix(filepath.Base(recipePath), filepath.Ext(recipePath))
-	entries, err := os.ReadDir(outputDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not read output dir %s: %v\n", outputDir, err)
+	img := filepath.Join(outputDir, base+".img")
+	if _, err := os.Stat(img); err != nil {
 		return
-	}
-	var imgs []string
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".img") {
-			imgs = append(imgs, e.Name())
-		}
-	}
-	if len(imgs) == 0 {
-		return
-	}
-	if len(imgs) > 1 {
-		fmt.Fprintf(os.Stderr, "Multi-volume build (%d images); skipping rename and --xz.\n", len(imgs))
-		return
-	}
-
-	src := filepath.Join(outputDir, imgs[0])
-	dst := filepath.Join(outputDir, base+".img")
-	if src != dst {
-		fmt.Fprintf(os.Stderr, "Renaming output: %s -> %s\n", filepath.Base(src), filepath.Base(dst))
-		if err := os.Rename(src, dst); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: rename failed: %v\n", err)
-			return
-		}
 	}
 
 	modelPath := filepath.Join(outputDir, base+".model.json")
@@ -280,19 +252,19 @@ func liotPostBuild(recipePath, outputDir string, xz bool) {
 	}
 
 	if !xz {
-		fmt.Fprintf(os.Stderr, "Image:  %s\n", dst)
+		fmt.Fprintf(os.Stderr, "Image:  %s\n", img)
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "Compressing with xz: %s\n", filepath.Base(dst))
-	cmd := exec.Command("xz", "-T0", "-v", dst)
+	fmt.Fprintf(os.Stderr, "Compressing with xz: %s\n", filepath.Base(img))
+	cmd := exec.Command("xz", "-T0", "-v", img)
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: xz compression failed: %v\n", err)
 		return
 	}
-	fmt.Fprintf(os.Stderr, "Image:  %s.xz\n", dst)
+	fmt.Fprintf(os.Stderr, "Image:  %s.xz\n", img)
 }
 
 // writeModelSidecar renders the recipe's model definition through the

@@ -23,6 +23,21 @@ import (
 	"github.com/canonical/ubuntu-image/internal/commands"
 )
 
+// manifestOutputBase returns the recipe basename (filename without
+// extension) for naming build outputs -- the image and seed.manifest
+// -- after the recipe rather than the gadget's internal volume name
+// (e.g. "imx93-m2cp-uc-vtg" from "imx93-m2cp-uc-vtg.yaml"). Returns ""
+// when not in manifest mode, so callers fall back to the default
+// names.
+func (snapStateMachine *SnapStateMachine) manifestOutputBase() string {
+	p := snapStateMachine.Opts.Manifest
+	if p == "" {
+		return ""
+	}
+	b := filepath.Base(p)
+	return strings.TrimSuffix(b, filepath.Ext(b))
+}
+
 // prepareFromManifest loads the online manifest and (eventually) drives
 // m2cp to fetch the model assertion, bootstrap trust, and resolve snap
 // versions to revisions. Every step narrates itself.
