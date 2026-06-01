@@ -225,6 +225,7 @@ func TestExecHelperProcess(t *testing.T) {
 		"TestFailedUpdateGrubLosetup",
 		"TestFailedMakeQcow2Image",
 		"TestFailedGeneratePackageManifest",
+		"TestFailedGeneratePackageManifestV2",
 		"TestFailedGenerateFilelist",
 		"TestFailedGerminate",
 		"TestFailedSetupLiveBuildCommands",

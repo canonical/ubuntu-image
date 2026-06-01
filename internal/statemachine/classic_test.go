@@ -22,6 +22,7 @@ import (
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/seed"
+	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/store"
 	"github.com/xeipuuv/gojsonschema"
 	"gopkg.in/yaml.v2"
@@ -2927,19 +2928,26 @@ func TestGeneratePackageManifest(t *testing.T) {
 			asserter.AssertErrNil(err, true)
 			t.Cleanup(func() { os.RemoveAll(stateMachine.stateMachineFlags.WorkDir) })
 
-			seedPath := filepath.Join(stateMachine.tempDirs.rootfs, "var", "lib", "snapd", "seed", "seed.yaml")
-			err = os.MkdirAll(filepath.Dir(seedPath), 0755)
-			asserter.AssertErrNil(err, true)
-			//nolint:gosec,G306
-			err = os.WriteFile(seedPath,
-				[]byte(`snaps:
-- name: snapd
-  snap-id: PMrrV4ml8uWuEUDBT8dSGnKUYbevVhc4
-  channel: stable
-  contact: https://github.com/snapcore/snapd/issues
-  file: snapd_25939.snap`),
-				0644)
-			asserter.AssertErrNil(err, true)
+			seedOpen = func(seedDir string, label string) (seed.Seed, error) {
+				return &mockSeed{
+					snaps: []*seed.Snap{
+						{
+							Path: "snapd_25939.snap",
+							SideInfo: &snap.SideInfo{
+								RealName: "snapd",
+								Revision: snap.R(25939),
+							},
+							Channel: "stable",
+						},
+					},
+					loadAssertionsFailure: seed.ErrNoAssertions,
+					loadMetaFailure:       nil,
+				}, nil
+			}
+			t.Cleanup(func() {
+				seedOpen = seed.Open
+			})
+
 			err = stateMachine.generatePackageManifest()
 			asserter.AssertErrNil(err, true)
 
@@ -3010,6 +3018,109 @@ func TestFailedGeneratePackageManifest(t *testing.T) {
 	})
 	err = stateMachine.generatePackageManifest()
 	asserter.AssertErrContains(err, "Error generating package list with command")
+}
+
+// TestFailedGeneratePackageManifestV2 tests if classic manifest generation failures are reported
+func TestFailedGeneratePackageManifestV2(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	var stateMachine ClassicStateMachine
+	stateMachine.commonFlags, stateMachine.stateMachineFlags = helper.InitCommonOpts()
+	stateMachine.parent = &stateMachine
+	stateMachine.ImageDef = imagedefinition.ImageDefinition{
+		Architecture: arch.GetHostArch(),
+		Series:       getHostSuite(),
+		Rootfs: &imagedefinition.Rootfs{
+			Archive: "ubuntu",
+		},
+		Customization: &imagedefinition.Customization{},
+		Artifacts: &imagedefinition.Artifact{
+			ManifestV2: &imagedefinition.Manifest{
+				ManifestName: "filesystem.manifest",
+			},
+		},
+	}
+
+	// We need the output directory set for this
+	outputDir, err := os.MkdirTemp(testhelper.DefaultTmpDir, "ubuntu-image-")
+	asserter.AssertErrNil(err, true)
+	t.Cleanup(func() { os.RemoveAll(outputDir) })
+	stateMachine.commonFlags.OutputDir = outputDir
+
+	// Setup the mock for exec.Command - making those fail
+	testCaseName = "TestFailedGeneratePackageManifestV2"
+	execCommand = fakeExecCommand
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+	err = stateMachine.generatePackageManifest()
+	asserter.AssertErrContains(err, "Error generating package list with command")
+
+	// Setup the mock for exec.Command - making those succeed
+	testCaseName = "TestGeneratePackageManifestV2"
+	// Setup the mock for os.Create, making those fail
+	osCreate = mockCreate
+	t.Cleanup(func() {
+		osCreate = os.Create
+	})
+	err = stateMachine.generatePackageManifest()
+	asserter.AssertErrContains(err, "Error creating manifest file")
+
+	osCreate = os.Create
+	// Setup the mock seed - making those failed on seedOpen
+	seedOpen = func(seedDir string, label string) (seed.Seed, error) {
+		return nil, fmt.Errorf("fail")
+	}
+	t.Cleanup(func() {
+		seedOpen = seed.Open
+	})
+	err = stateMachine.generatePackageManifest()
+	asserter.AssertErrContains(err, "Error opening the seed file")
+
+	// Setup the mock seed - making those failed on LoadAssertion
+	seedOpen = func(seedDir string, label string) (seed.Seed, error) {
+		return &mockSeed{
+			snaps: []*seed.Snap{
+				{},
+			},
+			loadAssertionsFailure: fmt.Errorf("fail"),
+			loadMetaFailure:       nil,
+		}, nil
+	}
+	err = stateMachine.generatePackageManifest()
+	asserter.AssertErrContains(err, "Error loading assertions")
+
+	// Setup the mock seed - making those failed on LoadMeta
+	seedOpen = func(seedDir string, label string) (seed.Seed, error) {
+		return &mockSeed{
+			snaps: []*seed.Snap{
+				{},
+			},
+			loadAssertionsFailure: nil,
+			loadMetaFailure:       fmt.Errorf("fail"),
+		}, nil
+	}
+	err = stateMachine.generatePackageManifest()
+	asserter.AssertErrContains(err, "Error loading meta-data")
+
+	// Setup the mock seed - making those failed on Iter callback (bad path)
+	seedOpen = func(seedDir string, label string) (seed.Seed, error) {
+		return &mockSeed{
+			snaps: []*seed.Snap{
+				{
+					Path: "snapd25939.snap",
+					SideInfo: &snap.SideInfo{
+						RealName: "snapd",
+						Revision: snap.R(25939),
+					},
+					Channel: "stable",
+				},
+			},
+			loadAssertionsFailure: seed.ErrNoAssertions,
+			loadMetaFailure:       nil,
+		}, nil
+	}
+	err = stateMachine.generatePackageManifest()
+	asserter.AssertErrContains(err, "Error parsing snap filename")
 }
 
 // TestGenerateFilelist tests if classic image filelist generation works
