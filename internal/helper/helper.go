@@ -109,7 +109,7 @@ func CopyBlob(ddArgs []string) error {
 // bools are supported
 func SetDefaults(needsDefaults interface{}) error {
 	value := reflect.ValueOf(needsDefaults)
-	if value.Kind() != reflect.Ptr {
+	if value.Kind() != reflect.Pointer {
 		return fmt.Errorf("The argument to SetDefaults must be a pointer")
 	}
 	elem := value.Elem()
@@ -122,7 +122,7 @@ func SetDefaults(needsDefaults interface{}) error {
 			if err != nil {
 				return err
 			}
-		} else if field.Type().Kind() == reflect.Ptr {
+		} else if field.Type().Kind() == reflect.Pointer {
 			err := setDefaultToPtr(field, elem, i)
 			if err != nil {
 				return err
@@ -217,7 +217,7 @@ func setDefaultToBasicType(field reflect.Value, elem reflect.Value, fieldIndex i
 // if it gets merged this can be deleted
 func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema *jsonschema.Schema) error {
 	value := reflect.ValueOf(Interface)
-	if value.Kind() != reflect.Ptr {
+	if value.Kind() != reflect.Pointer {
 		return fmt.Errorf("The argument to CheckEmptyFields must be a pointer")
 	}
 	elem := value.Elem()
@@ -231,7 +231,7 @@ func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema
 			if err != nil {
 				return err
 			}
-		} else if field.Type().Kind() == reflect.Ptr {
+		} else if field.Type().Kind() == reflect.Pointer {
 			// otherwise if it's just a pointer to a nested struct
 			// search it for empty required fields
 			err := checkEmptyFieldsInPtr(field, result, schema)
@@ -268,7 +268,7 @@ func CheckEmptyFields(Interface interface{}, result *gojsonschema.Result, schema
 func checkEmptyFieldsInSlice(field reflect.Value, result *gojsonschema.Result, schema *jsonschema.Schema) error {
 	for i := 0; i < field.Cap(); i++ {
 		sliceElem := field.Index(i)
-		if sliceElem.Kind() == reflect.Ptr && sliceElem.Elem().Kind() == reflect.Struct {
+		if sliceElem.Kind() == reflect.Pointer && sliceElem.Elem().Kind() == reflect.Struct {
 			err := CheckEmptyFields(sliceElem.Interface(), result, schema)
 			if err != nil {
 				return err
@@ -463,7 +463,7 @@ func CalculateSHA256(fileName string) (string, error) {
 // are supported
 func CheckTags(searchStruct interface{}, tag string) (string, error) {
 	value := reflect.ValueOf(searchStruct)
-	if value.Kind() != reflect.Ptr {
+	if value.Kind() != reflect.Pointer {
 		return "", fmt.Errorf("The argument to CheckTags must be a pointer")
 	}
 	elem := value.Elem()
