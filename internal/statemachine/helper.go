@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -21,7 +20,6 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
-	"gopkg.in/yaml.v2"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
@@ -347,43 +345,40 @@ func generateClassicManifestV2(rootfs string, outputPath string, debug bool) err
 		return fmt.Errorf("Error writing to the manifest file: %w", err)
 	}
 
-	seedPath := filepath.Join(rootfs, "var", "lib", "snapd", "seed", "seed.yaml")
-	if _, err := os.Stat(seedPath); err != nil {
-		if os.IsNotExist(err) {
-			// no seed.yaml file
-			return nil
-		}
-		return fmt.Errorf("Error stating the snap seed file: %w", err)
-	}
-	// read snap list from seed.yaml
-	data, err := osReadFile(seedPath)
+	// open the seed and run LoadAssertions and LoadMeta to get a list of snaps
+	snapdDir := filepath.Join(rootfs, "var", "lib", "snapd")
+	seedDir := filepath.Join(snapdDir, "seed")
+	preseed, err := seedOpen(seedDir, "")
 	if err != nil {
-		return fmt.Errorf("Error reading the snap seed file: %w", err)
+		return fmt.Errorf("Error opening the seed file: %w", err)
 	}
-	var seed struct {
-		Snaps []struct {
-			File    string `yaml:"file"`
-			Name    string `yaml:"name"`
-			Channel string `yaml:"channel"`
-		} `yaml:"snaps"`
-	}
-	if err := yaml.Unmarshal(data, &seed); err != nil {
-		return fmt.Errorf("Error parsing the snap seed file: %w", err)
+	err = preseed.LoadAssertions(nil, nil)
+	if err != nil {
+		if err != seed.ErrNoAssertions {
+			return fmt.Errorf("Error loading assertions: %w", err)
+		}
+	} else {
+		measurer := timings.New(nil)
+		if err := preseed.LoadMeta(seed.AllModes, nil, measurer); err != nil {
+			return fmt.Errorf("Error loading meta-data: %w", err)
+		}
 	}
 
-	// write snap list to the manifest
-	nonDigits := regexp.MustCompile(`[^0-9]`)
-	for _, snap := range seed.Snaps {
-		file := snap.File
-		revision := file[strings.LastIndex(file, "_")+1:]
-		revision = nonDigits.ReplaceAllString(revision, "")
-		// Write formatted line: "snap:<name>\t<channel>\t<revision>\n"
-		if _, err := fmt.Fprintf(manifest, "snap:%s\t%s\t%s\n", snap.Name, snap.Channel, revision); err != nil {
+	// iterate over the snaps in the seed and add them to the manifest
+	return preseed.Iter(func(snap *seed.Snap) error {
+		base := strings.TrimSuffix(snap.Path, ".snap")
+		idx := strings.LastIndex(base, "_")
+		if idx == -1 {
+			return fmt.Errorf("Error parsing snap filename %q: expected format <name>_<revision>.snap", snap.Path)
+		}
+		revision := base[idx+1:]
+		// write formatted line: "snap:<name>\t<channel>\t<revision>\n"
+		if _, err := fmt.Fprintf(manifest, "snap:%s\t%s\t%s\n", snap.SnapName(), snap.Channel, revision); err != nil {
 			return fmt.Errorf("Error writing to the manifest file: %w", err)
 		}
-	}
+		return nil
+	})
 
-	return nil
 }
 
 // getHostSuite checks the release name of the host system to use as a default if --suite is not passed

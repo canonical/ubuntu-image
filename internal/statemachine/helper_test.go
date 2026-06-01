@@ -13,10 +13,13 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
+	"github.com/snapcore/snapd/snap"
+	"github.com/snapcore/snapd/timings"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
 	"github.com/canonical/ubuntu-image/internal/imagedefinition"
@@ -1031,6 +1034,58 @@ func (m *mockEnvHolder) Setenv(key, value string) error {
 
 	return os.Setenv(key, value)
 }
+
+type mockSeed struct {
+	snaps                 []*seed.Snap
+	loadAssertionsFailure error
+	loadMetaFailure       error
+}
+
+func (f *mockSeed) LoadAssertions(db asserts.RODatabase, commitTo func(*asserts.Batch) error) error {
+	return f.loadAssertionsFailure
+}
+
+func (f *mockSeed) LoadMeta(string, seed.ContainerHandler, timings.Measurer) error {
+	return f.loadMetaFailure
+}
+
+func (f *mockSeed) Iter(fnc func(sn *seed.Snap) error) error {
+	for _, sn := range f.snaps {
+		if err := fnc(sn); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *mockSeed) Model() *asserts.Model { return nil }
+
+func (f *mockSeed) Brand() (*asserts.Account, error) { return nil, nil }
+
+func (f *mockSeed) SetParallelism(n int) {}
+
+func (f *mockSeed) LoadEssentialMeta([]snap.Type, timings.Measurer) error { return nil }
+
+func (f *mockSeed) LoadEssentialMetaWithSnapHandler([]snap.Type, seed.ContainerHandler, timings.Measurer) error {
+	return nil
+}
+
+func (f *mockSeed) UsesSnapdSnap() bool { return false }
+
+func (f *mockSeed) EssentialSnaps() []*seed.Snap { return f.snaps }
+
+func (f *mockSeed) ModeSnaps(mode string) ([]*seed.Snap, error) { return f.snaps, nil }
+
+func (f *mockSeed) ModeSnap(snapName, mode string) (*seed.Snap, error) {
+	for _, sn := range f.snaps {
+		if sn.SnapName() == snapName {
+			return sn, nil
+		}
+	}
+	return nil, nil
+}
+
+func (f *mockSeed) NumSnaps() int { return len(f.snaps) }
 
 func TestStateMachine_setMk2fsConf(t *testing.T) {
 	type fields struct {
