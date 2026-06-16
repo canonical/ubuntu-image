@@ -15,9 +15,11 @@ against a Canonical-style snap store.
 ## Part 1 — snapd fork (`/r/snapd`)
 
 The fork is consumed by ubuntu-image via `go.work` pointing at the
-local directory. The patch surface for the online-store flow is two
-files, additions only, ~30 lines + one ~70-line helper function.
-Symmetric with the pre-existing `AssertionRetrieve` hook.
+local directory (branch `liot-image`). The patch surface is
+additions only, symmetric with the pre-existing `AssertionRetrieve`
+hook: the online-store flow (`SnapDownloadURL`, ~30 lines + one
+~70-line helper) plus the `AllowExtraSnaps` seed-composition relaxation
+(~32 lines across `image/` and `seed/seedwriter/`).
 
 ### `image/options.go`
 
@@ -83,6 +85,40 @@ New import: `github.com/snapcore/snapd/snap` (for `snap.Revision`).
    downstream.
 
 New import: `net/http`.
+
+### `image/options.go` + `seed/seedwriter` (`AllowExtraSnaps`)
+
+A second, independent addition supports seeding snaps that are **not
+declared in the model** at `signed`/`secured` grade.
+
+At non-dangerous grade, snapd's seedwriter
+(`policy20.checkAllowedDangerous`, `seed/seedwriter/seed20.go`)
+rejects any snap added to the seed that the model does not declare —
+the policy behind the error *"cannot override channels, add devmode
+snaps, local snaps, or extra snaps/components with a model of grade
+higher than dangerous"*. Manifest mode injects `extra-snaps` via
+`image.Options.Snaps` (the `--snap` path), which snapd classifies as
+extra snaps, so the build was blocked.
+
+The fix is an opt-in flag, off by default, that makes a model of any
+grade behave — for these seed-composition checks only — as if it were
+dangerous:
+
+- `image.Options.AllowExtraSnaps bool` (`image/options.go`)
+- `seedwriter.Options.AllowExtraSnaps bool` (`seed/seedwriter/writer.go`)
+- `image_linux.go` threads the former into the latter
+  (`wOpts.AllowExtraSnaps = opts.AllowExtraSnaps`)
+- `policy20.checkAllowedDangerous` returns early (nil) when the flag
+  is set (`seed/seedwriter/seed20.go`)
+
+~32 lines, additions only. **Build-time only** — it affects which
+snaps the image builder is willing to compose into the seed. The
+device is unaffected: the on-device snapd reads the seed and installs
+the seeded snaps at run-mode boot independently of this flag (the
+run-mode load path has no grade gate; the seedwriter's grade gate is
+the only obstacle, and only at build time). The trust model is "the
+manifest author pins an exact snap set and verifies the image out of
+band."
 
 ### What stays unchanged in snapd
 
@@ -218,10 +254,14 @@ fork ("m2cp", meaning the Ubuntu Core family).
   And added the `prepareFromManifest()` call at the top of `Setup`
   when `Opts.Manifest` is set.
 
-- **`internal/statemachine/snap_states.go`** — wires the three hooks
+- **`internal/statemachine/snap_states.go`** — wires the hooks
   into `image.Options`:
   - `SnapDownloadURL: snapStateMachine.manifestSnapURL`
   - `AssertionRetrieve: snapStateMachine.manifestAssertionRetrieve`
+  - `AllowExtraSnaps: snapStateMachine.Opts.Manifest != ""` — on in
+    manifest mode only, so the recipe's `extra-snaps` (snaps not in
+    the signed model) are accepted into the seed; normal builds keep
+    upstream's dangerous-only restriction
   - Precedence check in `imageOptsSeedManifest` so
     `manifestSeedManifest` wins over the existing `Opts.Revisions`
     path

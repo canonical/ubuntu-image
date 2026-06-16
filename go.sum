@@ -1,7 +1,7 @@
 dario.cat/mergo v1.0.0 h1:AGCNq9Evsj31mOgNPcLyXc+4PNABt905YmuqPYYpBWk=
 dario.cat/mergo v1.0.0/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
-github.com/ML-PA-Consulting-GmbH/snapd v0.0.0-20260513070306-8beb7b48d4f5 h1:KyPDNxYHNJG4aV/smNsVP2gGV30nJ89iQ6Znl9BJnRk=
-github.com/ML-PA-Consulting-GmbH/snapd v0.0.0-20260513070306-8beb7b48d4f5/go.mod h1:vFJaXsYMqAmga8QnInHd/FlPultMPPFNYpO+X71jVkc=
+github.com/ML-PA-Consulting-GmbH/snapd v0.0.0-20260616121109-74612dfac72e h1:fP5l/AGjXMqIhmA3qogH9p+GZFojouwAV2OfvpKbJVM=
+github.com/ML-PA-Consulting-GmbH/snapd v0.0.0-20260616121109-74612dfac72e/go.mod h1:vFJaXsYMqAmga8QnInHd/FlPultMPPFNYpO+X71jVkc=
 github.com/Microsoft/go-winio v0.5.2/go.mod h1:WpS1mjBmmwHBEWmogvA2mj8546UReBk4v8QkMxJ6pZY=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
