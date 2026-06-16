@@ -18,8 +18,8 @@ The fork is consumed by ubuntu-image via `go.work` pointing at the
 local directory (branch `liot-image`). The patch surface is
 additions only, symmetric with the pre-existing `AssertionRetrieve`
 hook: the online-store flow (`SnapDownloadURL`, ~30 lines + one
-~70-line helper) plus the `AllowExtraSnaps` seed-composition relaxation
-(~32 lines across `image/` and `seed/seedwriter/`).
+~70-line helper) plus the `AllowExtraSnaps`/`SnapIDForName`
+seed-composition relaxations across `image/` and `seed/seedwriter/`.
 
 ### `image/options.go`
 
@@ -86,39 +86,52 @@ New import: `github.com/snapcore/snapd/snap` (for `snap.Revision`).
 
 New import: `net/http`.
 
-### `image/options.go` + `seed/seedwriter` (`AllowExtraSnaps`)
+### `image/options.go` + `seed/seedwriter` (`AllowExtraSnaps`, `SnapIDForName`)
 
 A second, independent addition supports seeding snaps that are **not
-declared in the model** at `signed`/`secured` grade.
+declared in the model** at `signed`/`secured` grade. Manifest mode
+injects `extra-snaps` (e.g. `core24`, pulled in as the base of a
+modeled app) via `image.Options.Snaps` (the `--snap` path); snapd
+classifies them as extra snaps. A seed of any non-dangerous grade
+otherwise forbids extra snaps in four distinct places, so the fix is
+one opt-in flag honored at all four, plus a snap-id resolver:
 
-At non-dangerous grade, snapd's seedwriter
-(`policy20.checkAllowedDangerous`, `seed/seedwriter/seed20.go`)
-rejects any snap added to the seed that the model does not declare —
-the policy behind the error *"cannot override channels, add devmode
-snaps, local snaps, or extra snaps/components with a model of grade
-higher than dangerous"*. Manifest mode injects `extra-snaps` via
-`image.Options.Snaps` (the `--snap` path), which snapd classifies as
-extra snaps, so the build was blocked.
+**`AllowExtraSnaps`** — `bool` on both `image.Options` and
+`seedwriter.Options`; `image_linux.go` threads one into the other.
+When set, the seedwriter treats a model of any grade as dangerous for
+these seed-composition checks only (`seed/seedwriter/seed20.go`,
+`writer.go`):
 
-The fix is an opt-in flag, off by default, that makes a model of any
-grade behave — for these seed-composition checks only — as if it were
-dangerous:
+1. `policy20.checkAllowedDangerous` — the up-front gate behind *"cannot
+   override channels, add devmode snaps, local snaps, or extra
+   snaps/components with a model of grade higher than dangerous"*.
+   Returns nil when the flag is set.
+2. `Writer.checkBase` — a model app's base may be supplied by an extra
+   snap downloaded in a *later* batch, so it isn't in `availableByMode`
+   when the app is checked. The flag defers (skips) the base check, as
+   dangerous mode already does for option snaps.
+3. `tree20.writeMeta` — extra snaps are written to `options.yaml`,
+   which was rejected (*"unexpected non-model snap overrides with grade
+   …"*) above dangerous grade. The flag permits it.
 
-- `image.Options.AllowExtraSnaps bool` (`image/options.go`)
-- `seedwriter.Options.AllowExtraSnaps bool` (`seed/seedwriter/writer.go`)
-- `image_linux.go` threads the former into the latter
-  (`wOpts.AllowExtraSnaps = opts.AllowExtraSnaps`)
-- `policy20.checkAllowedDangerous` returns early (nil) when the flag
-  is set (`seed/seedwriter/seed20.go`)
+**`SnapIDForName`** — `func(name string) (string, error)` on
+`image.Options`, used by the `SnapDownloadURL` download path
+(`downloadSnapsViaURLHook`). An extra snap's store-assigned snap-id is
+neither in the model nor in the `.snap` blob, so without it the
+seedwriter fails (*"snap-id should have been set"*). The hook resolves
+it (ubuntu-image supplies it from the prefetched snap-declarations,
+see Part 2) and stamps `snap.Info.SnapID` before `SetInfo`.
 
-~32 lines, additions only. **Build-time only** — it affects which
-snaps the image builder is willing to compose into the seed. The
-device is unaffected: the on-device snapd reads the seed and installs
-the seeded snaps at run-mode boot independently of this flag (the
-run-mode load path has no grade gate; the seedwriter's grade gate is
-the only obstacle, and only at build time). The trust model is "the
+Additions only. **Build-time only** — these affect which snaps the
+image builder composes into the seed; the model assertion is never
+modified (an extra snap stays out of the signed model). The device is
+unaffected: the on-device snapd reads the seed and installs every
+seeded snap at run-mode boot independently of these flags (the
+run-mode load path has no grade gate). The trust model is "the
 manifest author pins an exact snap set and verifies the image out of
-band."
+band." Verified end-to-end: an arm64 `signed`-grade build with
+`core24` in `extra-snaps` produces an image whose `seed.manifest`
+lists `core24` while the seeded model assertion does not.
 
 ### What stays unchanged in snapd
 
@@ -222,7 +235,10 @@ fork ("m2cp", meaning the Ubuntu Core family).
   - `prefetchAssertionsViaM2cp` — per snap,
     `m2cp store snap assertion <name> <arch> -r <revision>`, decodes
     the bundle, indexes by `Ref.Unique()`, returns a function suitable
-    for `image.Options.AssertionRetrieve`
+    for `image.Options.AssertionRetrieve`. Also harvests a
+    snap-name→snap-id map from the decoded `snap-declaration`
+    assertions and returns a resolver for `image.Options.SnapIDForName`
+    (needed to stamp the snap-id of extra snaps)
   - `manifestStageDir` — workdir layout for the model.assert file
   - Helpers: `writeM2cpStdout`, `describeAssertion`,
     `redactSignedURL`, `refPrimaryKeyHeaders`,
@@ -245,11 +261,12 @@ fork ("m2cp", meaning the Ubuntu Core family).
   truthy, which was making `model_assertion` falsely required at
   parse time when `--manifest` should be the input instead).
 
-- **`internal/statemachine/snap.go`** — added three fields to
+- **`internal/statemachine/snap.go`** — added fields to
   `SnapStateMachine`:
   - `manifestSeedManifest *seedwriter.Manifest`
   - `manifestSnapURL func(name, revision, snapID) (string, error)`
   - `manifestAssertionRetrieve func(*asserts.Ref) (asserts.Assertion, error)`
+  - `manifestSnapIDForName func(name string) (string, error)`
 
   And added the `prepareFromManifest()` call at the top of `Setup`
   when `Opts.Manifest` is set.
@@ -262,6 +279,9 @@ fork ("m2cp", meaning the Ubuntu Core family).
     manifest mode only, so the recipe's `extra-snaps` (snaps not in
     the signed model) are accepted into the seed; normal builds keep
     upstream's dangerous-only restriction
+  - `SnapIDForName: snapStateMachine.manifestSnapIDForName` — resolves
+    an extra snap's snap-id (not known from the model) for the URL-hook
+    download path
   - Precedence check in `imageOptsSeedManifest` so
     `manifestSeedManifest` wins over the existing `Opts.Revisions`
     path

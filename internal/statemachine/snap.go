@@ -66,6 +66,12 @@ type SnapStateMachine struct {
 	// snap-revision / snap-declaration / account / account-key from
 	// an m2cp-prefetched in-memory index instead of the store.
 	manifestAssertionRetrieve func(ref *asserts.Ref) (asserts.Assertion, error)
+
+	// manifestSnapIDForName, when set by the --manifest pipeline,
+	// becomes image.Options.SnapIDForName so the URL-hook download
+	// path can stamp the snap-id of extra snaps (not declared in the
+	// model) from the prefetched snap-declarations.
+	manifestSnapIDForName func(name string) (string, error)
 }
 
 // Setup assigns variables and calls other functions that must be executed before Run().

@@ -140,11 +140,12 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 	snapStateMachine.manifestSnapURL = buildSnapDownloadURL(m.Model.Architecture)
 	fmt.Printf("=> snapd SnapDownloadURL hook wired (m2cp store app download --url)\n")
 
-	retrieve, err := prefetchAssertionsViaM2cp(m.Model.Architecture, allPins, sm, deferredTrust)
+	retrieve, snapIDForName, err := prefetchAssertionsViaM2cp(m.Model.Architecture, allPins, sm, deferredTrust)
 	if err != nil {
 		return err
 	}
 	snapStateMachine.manifestAssertionRetrieve = retrieve
+	snapStateMachine.manifestSnapIDForName = snapIDForName
 	fmt.Printf("=> snapd AssertionRetrieve hook wired (m2cp store snap assertion)\n")
 
 	// Manifest mode = explicit version pinning; the user is taking
@@ -167,9 +168,14 @@ func (snapStateMachine *SnapStateMachine) prepareFromManifest() error {
 // fork's compiled-in trust anchor, so the chain stops there exactly
 // like Canonical's setup; intermediate signing keys come through
 // this index and the seedwriter writes them to the seed.
-func prefetchAssertionsViaM2cp(arch string, pins []commands.OnlineManifestSnap, sm *seedwriter.Manifest, extras []asserts.Assertion) (func(*asserts.Ref) (asserts.Assertion, error), error) {
+func prefetchAssertionsViaM2cp(arch string, pins []commands.OnlineManifestSnap, sm *seedwriter.Manifest, extras []asserts.Assertion) (func(*asserts.Ref) (asserts.Assertion, error), func(string) (string, error), error) {
 	fmt.Printf("=> prefetching %d snap-assertion bundles via m2cp (arch=%s)\n", len(pins), arch)
 	idx := map[string]asserts.Assertion{}
+	// snap-name -> snap-id, harvested from the snap-declaration
+	// assertions below. Extra snaps (not in the model) have no
+	// snap-id from the model nor in the .snap blob, so the snapd
+	// URL-hook download path resolves it through this map.
+	nameToID := map[string]string{}
 	// Seed the index with the trust-bundle's non-anchor assertions
 	// (intermediate signing keys and every non-root account -- e.g.
 	// publisher brands like "knorr"). They aren't trust anchors, so
@@ -183,14 +189,14 @@ func prefetchAssertionsViaM2cp(arch string, pins []commands.OnlineManifestSnap, 
 	for _, p := range pins {
 		rev := sm.AllowedSnapRevision(p.Name)
 		if rev.Unset() {
-			return nil, fmt.Errorf("internal: no allowed revision pinned for %q", p.Name)
+			return nil, nil, fmt.Errorf("internal: no allowed revision pinned for %q", p.Name)
 		}
 		cmd := exec.Command(commands.M2cpCLI, "store", "snap", "assertion", p.Name, arch, "-r", rev.String())
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
-			return nil, fmt.Errorf("m2cp store snap assertion %s %s -r %s: %w (stderr: %s)",
+			return nil, nil, fmt.Errorf("m2cp store snap assertion %s %s -r %s: %w (stderr: %s)",
 				p.Name, arch, rev.String(), err, strings.TrimSpace(stderr.String()))
 		}
 		dec := asserts.NewDecoder(&stdout)
@@ -201,20 +207,30 @@ func prefetchAssertionsViaM2cp(arch string, pins []commands.OnlineManifestSnap, 
 				break
 			}
 			if err != nil {
-				return nil, fmt.Errorf("decoding assertion bundle for %s: %w", p.Name, err)
+				return nil, nil, fmt.Errorf("decoding assertion bundle for %s: %w", p.Name, err)
 			}
 			idx[a.Ref().Unique()] = a
+			if decl, ok := a.(*asserts.SnapDeclaration); ok {
+				nameToID[decl.SnapName()] = decl.SnapID()
+			}
 			added++
 		}
 		fmt.Printf("   %-32s %-10s -> %d assertions indexed\n", p.Name, p.Version, added)
 	}
 	fmt.Printf("   total assertions in index: %d\n", len(idx))
-	return func(ref *asserts.Ref) (asserts.Assertion, error) {
+	retrieve := func(ref *asserts.Ref) (asserts.Assertion, error) {
 		if a, ok := idx[ref.Unique()]; ok {
 			return a, nil
 		}
 		return nil, &asserts.NotFoundError{Type: ref.Type, Headers: refPrimaryKeyHeaders(ref)}
-	}, nil
+	}
+	snapIDForName := func(name string) (string, error) {
+		if id, ok := nameToID[name]; ok {
+			return id, nil
+		}
+		return "", fmt.Errorf("no prefetched snap-declaration for %q", name)
+	}
+	return retrieve, snapIDForName, nil
 }
 
 func refPrimaryKeyHeaders(ref *asserts.Ref) map[string]string {
