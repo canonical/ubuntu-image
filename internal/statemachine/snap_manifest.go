@@ -458,6 +458,7 @@ type buildYAML struct {
 	Arch           string `yaml:"arch"`
 	Date           string `yaml:"date"`
 	Version        string `yaml:"version"`
+	Release        string `yaml:"release"`
 	Commit         string `yaml:"commit"`
 	Repo           string `yaml:"repo"`
 	Grade          string `yaml:"grade"`
@@ -524,6 +525,7 @@ func assembleBuildYAML(snapStateMachine *SnapStateMachine) buildYAML {
 		Arch:           snapStateMachine.manifest.Model.Architecture,
 		Date:           time.Now().UTC().Format(time.RFC3339),
 		Version:        resolveBuildField("BUILD_VERSION", "version", mb.Version),
+		Release:        resolveBuildField("BUILD_RELEASE", "release", mb.Release),
 		Commit:         resolveBuildField("BUILD_COMMIT", "commit", mb.Commit),
 		Repo:           resolveBuildField("BUILD_REPO", "repo", mb.Repo),
 		Grade:          snapStateMachine.manifest.Model.Grade,

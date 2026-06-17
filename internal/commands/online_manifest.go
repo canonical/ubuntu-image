@@ -53,6 +53,7 @@ type OnlineManifestModel struct {
 // `grade` column now sources from model.grade.
 type OnlineManifestBuild struct {
 	Version string `yaml:"version"`
+	Release string `yaml:"release"`
 	Commit  string `yaml:"commit"`
 	Repo    string `yaml:"repo"`
 }
