@@ -41,14 +41,14 @@ jobs:
 
       - name: short tests
         if: ${{ matrix.test-scenario == 'short' }}
-        run: sudo go test -timeout 0 -v -test.short -coverprofile=.coverage/coverage-short.out -coverpkg $(go list ./... 2> /dev/null | paste -sd,) -covermode=atomic ./...
+        run: sudo env "PATH=$PATH" GOTOOLCHAIN=local go test -timeout 0 -v -test.short -coverprofile=.coverage/coverage-short.out -coverpkg $(go list ./... 2> /dev/null | paste -sd,) -covermode=atomic ./...
 
       - name: long tests
         if: ${{ matrix.test-scenario == 'long' }}
-        run: sudo go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -coverpkg $(go list ./... 2> /dev/null | paste -sd,) -covermode=atomic ./...
+        run: sudo env "PATH=$PATH" GOTOOLCHAIN=local go test -timeout 0 -v -coverprofile=.coverage/coverage-long.out -coverpkg $(go list ./... 2> /dev/null | paste -sd,) -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5.5.3
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
