@@ -2,8 +2,6 @@ module github.com/canonical/ubuntu-image
 
 go 1.25
 
-toolchain go1.25.8
-
 require (
 	github.com/diskfs/go-diskfs v1.4.1-0.20240716094240-ec697b09567e
 	github.com/go-git/go-git/v5 v5.16.5
