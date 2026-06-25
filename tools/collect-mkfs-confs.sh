@@ -33,12 +33,12 @@ for FULL_SERIES in $TOTAL_SERIES; do
     # Collect configurations from amd64 packages for now. This is working under the assumption the configuration
     # is the same for every arch. This may be wrong now or in the future.
     cd "$TMP_DIR" && \
-    pull-lp-debs -a amd64 -p debs -d "$PKG $SERIES_RELEASE"-updates > in_updates.txt || true
+    pull-lp-debs --no-verify-signature -a amd64 -p debs -d "$PKG $SERIES_RELEASE"-updates > in_updates.txt || true
     IN_UPDATES=$(grep "Found" "$TMP_DIR"/in_updates.txt || true)
 
     if [ -z "$IN_UPDATES" ]; then
         cd "$TMP_DIR" && \
-        pull-lp-debs -a amd64 -p debs -d $PKG "$SERIES_CODENAME"
+        pull-lp-debs --no-verify-signature -a amd64 -p debs -d $PKG "$SERIES_CODENAME"
         SERIES_RELEASE_POCKET="$SERIES_RELEASE"
     fi
 
