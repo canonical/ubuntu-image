@@ -1,7 +1,7 @@
-xenial,1.42.13-1ubuntu1.2
 bionic,1.44.1-1ubuntu1.4
 focal,1.45.5-2ubuntu1.2
 jammy,1.46.5-2ubuntu1.2
 noble,1.47.0-2.4~exp1ubuntu4.1
 questing,1.47.2-3ubuntu2
 resolute,1.47.2-3ubuntu4
+stonking,1.47.4-1
