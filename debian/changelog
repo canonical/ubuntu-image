@@ -1,6 +1,10 @@
 ubuntu-image (3.10.9) UNRELEASED; urgency=medium
 
+  [ Alexis Cellier ]
   * Add manifest-v2 artifacts to generate a livecd-rootfs formatted manifest
+  [ Justin Cattle ]
+  * feat: Enable specifying a validation-set sequence number without locking it
+  in the model assertion
 
  -- Alexis Cellier <alexis.cellier@canonical.com>  Mon, 01 Jun 2026 23:25:20 +0000
 
