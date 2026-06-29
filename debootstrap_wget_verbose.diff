@@ -1,0 +1,11 @@
+--- functions	2026-03-12 12:24:16.826766227 +0100
++++ functions	2026-03-12 12:24:42.743834794 +0100
+@@ -94,7 +94,7 @@
+ 		ret=$({ { wget $@ 2>&1 >/dev/null || echo $? >&2; } | "$PKGDETAILS" "WGET%" "$PROGRESS_NOW" "$PROGRESS_NEXT" "$PROGRESS_END" >&3; } 2>&1)
+ 		: ${ret:=0}
+ 	else
+-		wget ${NVSWITCH:+"$NVSWITCH"} "$@"
++		wget ${NVSWITCH:+"$NVSWITCH"} -v "$@" >>"$TARGET/debootstrap/debootstrap.log"
+ 		ret=$?
+ 	fi
+ 	return $ret
