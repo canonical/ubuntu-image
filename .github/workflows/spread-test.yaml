@@ -47,7 +47,7 @@ jobs:
 
   spread:
     name: Build a ${{ matrix.series }} image on ${{ matrix.group }} (${{ matrix.systems }})
-    runs-on: [self-hosted, ubuntu-image]
+    runs-on: [self-hosted, spread-enabled]
     needs: [snap-build-amd64, snap-build-arm64]
     strategy:
       fail-fast: false
@@ -159,13 +159,13 @@ jobs:
             # Register a problem matcher to highlight spread failures
             echo "::add-matcher::.github/spread-problem-matcher.json"
 
-            BACKEND=google
+            BACKEND=openstack
             SERIES=${{ matrix.series }}
 
             if [[ "${{ matrix.systems }}" =~ -arm- ]]; then
-              BACKEND=google-arm
+              BACKEND=openstack-arm
             elif [[ "${{ matrix.group }}" =~ -crossbuild ]]; then
-              BACKEND=google-crossbuild
+              BACKEND=openstack-crossbuild
             fi
 
             RUN_TESTS=""
@@ -201,9 +201,9 @@ jobs:
                 echo "Running spread log parser"
                 ./tests/lib/external/snapd-testing-tools/utils/log-parser spread.log --output spread-results.json
 
-                BACKEND=google
+                BACKEND=openstack
                 if [[ "${{ matrix.systems }}" =~ -arm- ]]; then
-                  BACKEND=google-arm
+                  BACKEND=openstack-arm
                 fi
 
                 echo "Determining which tests were executed"
