@@ -2152,6 +2152,9 @@ func TestPrepareClassicImage(t *testing.T) {
 					Channel:  "latest/stable",
 				},
 				{
+					SnapName: "core26",
+				},
+				{
 					SnapName: "core24",
 				},
 				{
@@ -2171,7 +2174,7 @@ func TestPrepareClassicImage(t *testing.T) {
 
 	// check that the lxd and hello snaps, as well as lxd's base, core20
 	// were prepared in the correct location
-	snaps := map[string]string{"lxd": "stable", "hello": "candidate", "core20": "stable", "core22": "stable", "core24": "stable"}
+	snaps := map[string]string{"lxd": "stable", "hello": "candidate", "core20": "stable", "core22": "stable", "core24": "stable", "core26": "stable"}
 	for snapName, snapChannel := range snaps {
 		// reach out to the snap store to find the revision
 		// of the snap for the specified channel
@@ -5181,6 +5184,9 @@ func TestPreseedResetChroot(t *testing.T) {
 				},
 				{
 					SnapName: "core24",
+				},
+				{
+					SnapName: "core26",
 				},
 			},
 		},
