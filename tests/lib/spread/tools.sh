@@ -15,3 +15,18 @@ EOF
   systemctl daemon-reload
   systemctl restart snapd.service
 }
+
+tools.setup_system_proxy() {
+    mkdir -p "$SNAPD_WORK_DIR"
+    if [ "${SNAPD_USE_PROXY:-}" = true ]; then    
+        cp -f /etc/environment "$SNAPD_WORK_DIR"/environment.bak
+        {
+            echo "HTTPS_PROXY=$HTTPS_PROXY"
+            echo "HTTP_PROXY=$HTTP_PROXY"
+            echo "https_proxy=$HTTPS_PROXY"
+            echo "http_proxy=$HTTP_PROXY"
+            echo "NO_PROXY=$NO_PROXY"
+            echo "no_proxy=$NO_PROXY"
+        } >> /etc/environment
+    fi
+}
