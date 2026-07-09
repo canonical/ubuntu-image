@@ -16,6 +16,8 @@ jobs:
 
     - name: Build ubuntu-image snap
       uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1.3.0
+      with:
+        snapcraft-channel: 8.x/stable
 
     - name: Uploading ubuntu-image snap artifact
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -37,6 +39,8 @@ jobs:
 
     - name: Build ubuntu-image snap
       uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1.3.0
+      with:
+        snapcraft-channel: 8.x/stable
 
     - name: Uploading ubuntu-image snap artifact
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
