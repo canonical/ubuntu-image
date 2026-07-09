@@ -17,16 +17,19 @@ EOF
 }
 
 tools.setup_system_proxy() {
-    mkdir -p "$SNAPD_WORK_DIR"
-    if [ "${SNAPD_USE_PROXY:-}" = true ]; then    
-        cp -f /etc/environment "$SNAPD_WORK_DIR"/environment.bak
-        {
-            echo "HTTPS_PROXY=$HTTPS_PROXY"
-            echo "HTTP_PROXY=$HTTP_PROXY"
-            echo "https_proxy=$HTTPS_PROXY"
-            echo "http_proxy=$HTTP_PROXY"
-            echo "NO_PROXY=$NO_PROXY"
-            echo "no_proxy=$NO_PROXY"
-        } >> /etc/environment
-    fi
+  if [ "${SNAPD_USE_PROXY:-}" != true ]; then
+    return
+  fi
+
+  local UBUNTU_IMAGE_WORKDIR="/var/tmp/ubuntu-image-work-dir"
+  mkdir -p "$UBUNTU_IMAGE_WORKDIR"
+  cp -f /etc/environment "$UBUNTU_IMAGE_WORKDIR"/environment.bak
+  {
+      echo "HTTPS_PROXY=$HTTPS_PROXY"
+      echo "HTTP_PROXY=$HTTP_PROXY"
+      echo "https_proxy=$HTTPS_PROXY"
+      echo "http_proxy=$HTTP_PROXY"
+      echo "NO_PROXY=$NO_PROXY"
+      echo "no_proxy=$NO_PROXY"
+  } >> /etc/environment
 }
