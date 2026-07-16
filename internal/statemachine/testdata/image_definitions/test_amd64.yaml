@@ -57,6 +57,8 @@ customization:
       name: core
     -
       name: core20
+    -
+      name: core22
   extra-ppas:
     -
       name: "canonical-foundations/ubuntu-image"

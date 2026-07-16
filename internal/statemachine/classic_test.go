@@ -5183,6 +5183,9 @@ func TestPreseedResetChroot(t *testing.T) {
 					SnapName: "core20",
 				},
 				{
+					SnapName: "core22",
+				},
+				{
 					SnapName: "core24",
 				},
 				{
@@ -5457,6 +5460,9 @@ func TestPreseedClassicImage(t *testing.T) {
 				},
 				{
 					SnapName: "core20",
+				},
+				{
+					SnapName: "core22",
 				},
 			},
 		},
