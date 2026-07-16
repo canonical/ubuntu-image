@@ -98,6 +98,7 @@ prepare: |
   . $SPREAD_PATH/tests/lib/spread/tools.sh
   if [ -n "$HTTP_PROXY" ]; then
     tools.setup_system_proxy
+    tools.setup_git_protocol
     # The snapd daemon doesn't see the environment variables, so we must modify its config
     # to use a proxy with it. Came from:
     # https://github.com/canonical/snapd/blob/619cc925793591348db21bb45fa4af65288d2c42/tests/lib/prepare.sh#L90

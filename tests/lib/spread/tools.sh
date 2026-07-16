@@ -33,3 +33,15 @@ tools.setup_system_proxy() {
       echo "no_proxy=$NO_PROXY"
   } >> /etc/environment
 }
+
+tools.setup_git_protocol() {
+  if [ -z "$HTTP_PROXY" ]; then
+    return
+  fi
+
+  # The OpenStack PS7 environment only allows egress through an HTTP proxy.
+  # The git:// protocol (port 9418) is not proxied by HTTP_PROXY/HTTPS_PROXY
+  # environment variables, so rewrite git:// URLs to https:// to ensure git
+  # operations (e.g. germinate seed cloning) go through the proxy.
+  git config --global url."https://".insteadOf "git://"
+}
