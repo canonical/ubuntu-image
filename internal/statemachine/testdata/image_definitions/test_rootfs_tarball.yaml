@@ -28,6 +28,7 @@ customization:
   extra-snaps:
     - name: core
     - name: core20
+    - name: core22
 artifacts:
   rootfs-tarball:
     name: "rootfs.tar"

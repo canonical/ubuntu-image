@@ -904,7 +904,7 @@ func TestFailedGetPreseededSnaps(t *testing.T) {
 	// free of large .snap files
 	//nolint:gosec,G204
 	snapPrepareImage := *exec.Command("snap", "prepare-image", "--arch=amd64",
-		"--classic", "--snap=core20", "--snap=core22", "--snap=snapd", "--snap=lxd",
+		"--classic", "--snap=core20", "--snap=core22", "--snap=core24", "--snap=snapd", "--snap=lxd",
 		filepath.Join("testdata", "modelAssertionClassic"),
 		stateMachine.tempDirs.rootfs)
 	err = snapPrepareImage.Run()
