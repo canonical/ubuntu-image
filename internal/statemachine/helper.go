@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
 
@@ -209,17 +211,20 @@ func makeFS(structure *gadget.VolumeStructure, contentRoot string, partImg strin
 		return fmt.Errorf("Error preparing env for mkfs: %s", err.Error())
 	}
 
+	opts := &mkfs.MakeOptions{
+		Label:      structure.Label,
+		DeviceSize: structure.Size,
+		SectorSize: sectorSize,
+	}
 	if hasC {
-		err := mkfsMakeWithContent(structure.Filesystem, partImg, structure.Label,
-			contentRoot, structure.Size, sectorSize)
-		if err != nil {
+		opts.ContentRootDir = contentRoot
+	}
+
+	err = mkfsMake(context.TODO(), structure.Filesystem, partImg, opts)
+	if err != nil {
+		if hasC {
 			return fmt.Errorf("Error running mkfs with content: %s", err.Error())
 		}
-		return nil
-	}
-	err = mkfsMake(structure.Filesystem, partImg, structure.Label,
-		structure.Size, sectorSize)
-	if err != nil {
 		return fmt.Errorf("Error running mkfs: %s", err.Error())
 	}
 

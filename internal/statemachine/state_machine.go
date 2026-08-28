@@ -63,7 +63,6 @@ var osSetenv = os.Setenv
 var osutilCopyFile = osutil.CopyFile
 var osutilCopySpecialFile = osutil.CopySpecialFile
 var execCommand = exec.Command
-var mkfsMakeWithContent = mkfs.MakeWithContent
 var mkfsMake = mkfs.Make
 var diskfsCreate = diskfs.Create
 var randRead = rand.Read
