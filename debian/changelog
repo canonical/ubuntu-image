@@ -1,8 +1,11 @@
 ubuntu-image (3.10.10) UNRELEASED; urgency=medium
 
+  [ Oliver Reiche ]
   * Fix missing explicit dependency on gpgv
+  [ Andrew Phelps ]
+  * Update snapd version to ensure new boot assets are used in images
 
- -- Oliver Reiche <oliver.reiche@canonical.com>  Wed, 02 Sep 2026 13:05:12 +0200
+ -- Andrew Phelps <andrew.phelps@canonical.com>  Wed, 02 Sep 2026 09:39:27 -0400
 
 ubuntu-image (3.10.9) UNRELEASED; urgency=medium
 
