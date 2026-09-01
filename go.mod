@@ -22,6 +22,7 @@ require (
 	github.com/canonical/go-kbkdf v0.0.0-20250104172618-3b1308f9acf9 // indirect
 	github.com/canonical/go-password-validator v0.0.0-20250617132709-1b205303ca54 // indirect
 	github.com/chai2010/gettext-go v1.0.3 // indirect
+	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/djherbis/times v1.6.0 // indirect
@@ -44,8 +45,8 @@ require (
 )
 
 require (
-	github.com/snapcore/secboot v0.0.0-20260320145120-26dce572077a // indirect
-	github.com/snapcore/snapd v0.0.0-20260323170113-e13b1f65ffd9
+	github.com/snapcore/secboot v0.0.0-20260814094831-dd95d855ad64 // indirect
+	github.com/snapcore/snapd v0.0.0-20260901171049-fa2fe8db73ef
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
@@ -64,11 +65,10 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
-	github.com/canonical/go-efilib v1.7.1-0.20260310185303-7166aa858b24 // indirect
+	github.com/canonical/go-efilib v1.8.0 // indirect
 	github.com/canonical/go-sp800.90a-drbg v0.0.0-20210314144037-6eeb1040d6c3 // indirect
-	github.com/canonical/go-tpm2 v1.15.0 // indirect
+	github.com/canonical/go-tpm2 v1.16.2 // indirect
 	github.com/canonical/tcglog-parser v0.0.0-20240924110432-d15eaf652981 // indirect
-	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
