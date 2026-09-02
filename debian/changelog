@@ -1,3 +1,9 @@
+ubuntu-image (3.10.10) UNRELEASED; urgency=medium
+
+  * Fix missing explicit dependency on gpgv
+
+ -- Oliver Reiche <oliver.reiche@canonical.com>  Wed, 02 Sep 2026 13:05:12 +0200
+
 ubuntu-image (3.10.9) UNRELEASED; urgency=medium
 
   [ Alexis Cellier ]
