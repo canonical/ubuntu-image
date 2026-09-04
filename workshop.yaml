@@ -1,0 +1,7 @@
+name: ubuntu-image-dev
+base: ubuntu@24.04
+sdks:
+  - name: go # Necessary build and test toolchains.
+    channel: 1.25
+    # Publisher:  Dmitry Lyfar (dlyfar)
+    # https://github.com/canonical/go-sdk
