@@ -404,8 +404,9 @@ This mandatory field specifies the Ubuntu release name as it should appear in
 apt sources. For example, to produce an image for the 24.04 release, this
 should be "noble". Example values include:
 
+* resolute
+* stonking
 * noble
-* questing
 * focal
 * jammy
 
