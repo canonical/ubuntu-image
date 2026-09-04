@@ -37,12 +37,15 @@ backends:
       - ubuntu-20.04-64:
           image: snapd-spread/ubuntu-20.04-64
           workers: 1
+          storage: 50G
       - ubuntu-22.04-64:
           image: snapd-spread/ubuntu-22.04-64
           workers: 1
+          storage: 50G
       - ubuntu-24.04-64:
           image: snapd-spread/ubuntu-24.04-64
           workers: 1
+          storage: 50G
   openstack-crossbuild:
     type: openstack
     key: '$(HOST: echo "$OS_CREDENTIALS_AMD64_PS7")'
@@ -57,6 +60,7 @@ backends:
       - ubuntu-24.04-64:
           image: snapd-spread/ubuntu-24.04-64
           workers: 1
+          storage: 50G
   openstack-arm:
     type: openstack
     key: '$(HOST: echo "$OS_CREDENTIALS_ARM64_PS7")'
@@ -72,12 +76,15 @@ backends:
       - ubuntu-20.04-arm-64:
           image: snapd-spread/ubuntu-20.04-arm-64
           workers: 1
+          storage: 50G
       - ubuntu-22.04-arm-64:
           image: snapd-spread/ubuntu-22.04-arm-64
           workers: 1
+          storage: 50G
       - ubuntu-24.04-arm-64:
           image: snapd-spread/ubuntu-24.04-arm-64
           workers: 1
+          storage: 50G
   qemu:
     memory: 4G
     systems:
