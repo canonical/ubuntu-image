@@ -58,17 +58,22 @@ jobs:
       matrix:
         include:
           - group: ubuntu-devel
-            series: questing
+            series: stonking
             arch: amd64
             systems: 'ubuntu-24.04-64'
             tests: 'tests/commons/... tests/amd64/...'
           - group: ubuntu-devel-crossbuild
-            series: questing
+            series: stonking
             arch: amd64
             systems: 'ubuntu-24.04-64'
             tests: 'tests/amd64-crossbuild/...'
           - group: ubuntu-latest
             series: noble
+            arch: amd64
+            systems: 'ubuntu-24.04-64'
+            tests: 'tests/amd64/...'
+          - group: ubuntu-latest
+            series: resolute
             arch: amd64
             systems: 'ubuntu-24.04-64'
             tests: 'tests/amd64/...'
@@ -83,7 +88,7 @@ jobs:
             systems: 'ubuntu-20.04-64 ubuntu-22.04-64'
             tests: 'tests/commons/... tests/amd64/...'
           - group: ubuntu-arm-devel
-            series: questing
+            series: stonking
             arch: arm64
             systems: 'ubuntu-24.04-arm-64'
             tests: 'tests/commons/... tests/arm64/...'
