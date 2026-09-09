@@ -129,6 +129,7 @@ type Manual struct {
 // Fstab defines the information that gets rendered into an fstab
 type Fstab struct {
 	Label        string `yaml:"label"           json:"Label"`
+	UsePartLabel bool   `yaml:"use-part-label"  json:"UsePartLabel,omitempty"`
 	Mountpoint   string `yaml:"mountpoint"      json:"Mountpoint"`
 	FSType       string `yaml:"filesystem-type" json:"FSType"`
 	MountOptions string `yaml:"mount-options"   json:"MountOptions" default:"defaults"`

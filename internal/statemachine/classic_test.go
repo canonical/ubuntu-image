@@ -4893,6 +4893,22 @@ func TestCustomizeFstab(t *testing.T) {
 LABEL=system-boot	/boot/firmware	vfat	defaults	0	1
 `,
 		},
+		{
+			name: "one entry with use-part-label",
+			fstab: []*imagedefinition.Fstab{
+				{
+					Label:        "writable",
+                    UsePartLabel: true,
+					Mountpoint:   "/",
+					FSType:       "ext4",
+					MountOptions: "defaults",
+					Dump:         true,
+					FsckOrder:    1,
+				},
+			},
+			expectedFstab: `PARTLABEL=writable	/	ext4	defaults	1	1
+`,
+		},
 	}
 
 	for _, tc := range testCases {
