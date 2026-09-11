@@ -1,3 +1,9 @@
+ubuntu-image (3.10.11) UNRELEASED; urgency=medium
+
+  * Update to account for instance name vs. snap name APIs in snapd
+
+ -- Andrew Phelps <andrew.phelps@canonical.com>  Fri, 11 Sep 2026 10:13:44 -0400
+
 ubuntu-image (3.10.10) UNRELEASED; urgency=medium
 
   [ Oliver Reiche ]
