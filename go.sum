@@ -132,8 +132,8 @@ github.com/skeema/knownhosts v1.3.1 h1:X2osQ+RAjK76shCbvhHHHVl3ZlgDm8apHEHFqRjnB
 github.com/skeema/knownhosts v1.3.1/go.mod h1:r7KTdC8l4uxWRyK2TpQZ/1o5HaSzh06ePQNxPwTcfiY=
 github.com/snapcore/secboot v0.0.0-20260814094831-dd95d855ad64 h1:jZBwQI4+0/dypcKdQk9v5yi5pfKMVvXs/KG2XQlNjyI=
 github.com/snapcore/secboot v0.0.0-20260814094831-dd95d855ad64/go.mod h1:/J5bNHw8HkyxuUZRrk2LUzkne3zO/kEwJlm+/oB16SE=
-github.com/snapcore/snapd v0.0.0-20260901171049-fa2fe8db73ef h1:wnJ1VpgxblAOb+4u58VcqC0CNHYxe+7pXL21asrgIko=
-github.com/snapcore/snapd v0.0.0-20260901171049-fa2fe8db73ef/go.mod h1:S5g4xFl/g3criGb6Dtfj6W78nSEq0twblMwXKWuNmFg=
+github.com/snapcore/snapd v0.0.0-20260911121130-33f12754e3af h1:V9xy04hJIybunTbQ3hP7Hx+WpQcthecHG5Fh67pXs7g=
+github.com/snapcore/snapd v0.0.0-20260911121130-33f12754e3af/go.mod h1:S5g4xFl/g3criGb6Dtfj6W78nSEq0twblMwXKWuNmFg=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=

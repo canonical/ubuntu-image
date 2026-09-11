@@ -837,7 +837,7 @@ func getPreseededSnaps(rootfs string) (seededSnaps map[string]string, err error)
 
 	// iterate over the snaps in the seed and add them to the list
 	err = preseed.Iter(func(sn *seed.Snap) error {
-		seededSnaps[sn.SnapName()] = sn.Channel
+		seededSnaps[sn.SnapName().String()] = sn.Channel
 		return nil
 	})
 	if err != nil {
