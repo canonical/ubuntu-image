@@ -46,7 +46,7 @@ require (
 
 require (
 	github.com/snapcore/secboot v0.0.0-20260814094831-dd95d855ad64 // indirect
-	github.com/snapcore/snapd v0.0.0-20260901171049-fa2fe8db73ef
+	github.com/snapcore/snapd v0.0.0-20260911121130-33f12754e3af
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect

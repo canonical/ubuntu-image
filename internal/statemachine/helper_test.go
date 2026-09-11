@@ -1078,7 +1078,7 @@ func (f *mockSeed) ModeSnaps(mode string) ([]*seed.Snap, error) { return f.snaps
 
 func (f *mockSeed) ModeSnap(snapName, mode string) (*seed.Snap, error) {
 	for _, sn := range f.snaps {
-		if sn.SnapName() == snapName {
+		if sn.SnapName().String() == snapName {
 			return sn, nil
 		}
 	}
