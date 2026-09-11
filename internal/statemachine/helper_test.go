@@ -132,22 +132,17 @@ func TestFailedCopyStructureContent(t *testing.T) {
 	Mke2fsConfigEnv = OldMke2fsConfigEnv
 	Mke2fsBasepath = OldMke2fsBasepath
 
-	// mock gadget.MkfsWithContent
-	mkfsMakeWithContent = mockMkfsWithContent
-	t.Cleanup(func() {
-		mkfsMakeWithContent = mkfs.MakeWithContent
-	})
-	err = stateMachine.copyStructureContent(&rootfsStruct, "",
-		filepath.Join(testhelper.DefaultTmpDir, uuid.NewString()+".img"))
-	asserter.AssertErrContains(err, "Error running mkfs with content")
-	mkfsMakeWithContent = mkfs.MakeWithContent
-
-	// mock mkfs.Mkfs
-	rootfsStruct.Content = nil // to trigger the "empty partition" case
+	// mock mkfs.Make
 	mkfsMake = mockMkfs
 	t.Cleanup(func() {
 		mkfsMake = mkfs.Make
 	})
+
+	err = stateMachine.copyStructureContent(&rootfsStruct, "",
+		filepath.Join(testhelper.DefaultTmpDir, uuid.NewString()+".img"))
+	asserter.AssertErrContains(err, "Error running mkfs with content")
+
+	rootfsStruct.Content = nil // to trigger the "empty partition" case
 	err = stateMachine.copyStructureContent(&rootfsStruct, "",
 		filepath.Join(testhelper.DefaultTmpDir, uuid.NewString()+".img"))
 	asserter.AssertErrContains(err, "Error running mkfs")

@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"github.com/snapcore/snapd/gadget/quantity"
 	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil"
+	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
 	"github.com/xeipuuv/gojsonschema"
 
@@ -93,10 +95,7 @@ func mockNewMountedFilesystemWriter(*gadget.LaidOutStructure, *gadget.LaidOutStr
 	gadget.ContentObserver) (*gadget.MountedFilesystemWriter, error) {
 	return nil, fmt.Errorf("Test Error")
 }
-func mockMkfsWithContent(typ, img, label, contentRootDir string, deviceSize, sectorSize quantity.Size) error {
-	return fmt.Errorf("Test Error")
-}
-func mockMkfs(typ, img, label string, deviceSize, sectorSize quantity.Size) error {
+func mockMkfs(ctx context.Context, typ, img string, opts *mkfs.MakeOptions) error {
 	return fmt.Errorf("Test Error")
 }
 func mockReadDir(string) ([]os.DirEntry, error) {
