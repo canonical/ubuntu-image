@@ -101,11 +101,10 @@ func WrapCmdError(cmd *exec.Cmd, err error, stderr ...[]byte) error {
 		}
 	}
 	if len(bytes.TrimSpace(stderrBytes)) > 0 {
-		return fmt.Errorf("Error running command \"%s\": %s: %s",
-			cmd.String(), err.Error(), bytes.TrimSpace(stderrBytes))
+		return fmt.Errorf("Error running command \"%s\": %w: %s",
+			cmd.String(), err, bytes.TrimSpace(stderrBytes))
 	}
-	return fmt.Errorf("Error running command \"%s\": %s",
-		cmd.String(), err.Error())
+	return fmt.Errorf("Error running command \"%s\": %w", cmd.String(), err)
 }
 
 // Du recurses through a directory similar to du and adds all the sizes of files together

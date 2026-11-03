@@ -2,7 +2,6 @@ package statemachine
 
 import (
 	"fmt"
-	"os/exec"
 	"slices"
 	"strings"
 
@@ -15,7 +14,7 @@ func isSeriesEqualOrOlder(a, b string) (bool, error) {
 		return true, nil
 	}
 	// ubuntu-distro-info --all returns series sorted by release date
-	cmd := exec.Command("ubuntu-distro-info", "--all")
+	cmd := execCommand("ubuntu-distro-info", "--all")
 	outputBytes, err := cmd.Output()
 	if err != nil {
 		return true, helper.WrapCmdError(cmd, err)

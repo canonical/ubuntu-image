@@ -1,6 +1,7 @@
 package statemachine
 
 import (
+	"os/exec"
 	"testing"
 
 	"github.com/canonical/ubuntu-image/internal/helper"
@@ -62,4 +63,19 @@ func Test_isSeriesEqualOrOlder(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test_isSeriesEqualOrOlder_failingCommand tests that a failing
+// ubuntu-distro-info command propagates the command and exit status
+func Test_isSeriesEqualOrOlder_failingCommand(t *testing.T) {
+	asserter := helper.Asserter{T: t}
+	execCommand = func(string, ...string) *exec.Cmd { return exec.Command("false") }
+	t.Cleanup(func() {
+		execCommand = exec.Command
+	})
+
+	_, err := isSeriesEqualOrOlder("noble", "jammy")
+	asserter.AssertErrContains(err, "Error running command \"")
+	asserter.AssertErrContains(err, "false\"")
+	asserter.AssertErrContains(err, "exit status 1")
 }

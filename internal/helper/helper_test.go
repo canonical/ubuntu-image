@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -774,6 +775,16 @@ func TestWrapCmdError(t *testing.T) {
 	// explicitly captured stderr takes precedence over the captured one
 	wrapped = WrapCmdError(cmd, err, []byte("explicitly captured stderr"))
 	asserter.AssertErrContains(wrapped, "exit status 1: explicitly captured stderr")
+
+	// the underlying error stays in the error chain so errors.As keeps working
+	var exitErr *exec.ExitError
+	if !errors.As(wrapped, &exitErr) {
+		t.Error("Expected wrapped error to unwrap to *exec.ExitError")
+	}
+	if !strings.Contains(string(exitErr.Stderr), "du: failure detail") {
+		t.Errorf("Expected unwrapped stderr to contain \"du: failure detail\", got \"%s\"",
+			exitErr.Stderr)
+	}
 }
 
 // TestFailedDu tests that a failing du command propagates du's stderr in the
