@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -912,9 +913,12 @@ func resetPreseeding(imageOpts *image.Options, chroot string, debug, verbose boo
 	// We need to use the snap-preseed binary for the reset as well, as using
 	// preseed.ClassicReset() might leave us in a chroot jail
 	cmd := execCommand("/usr/lib/snapd/snap-preseed", "--reset", chroot)
+	var snapPreseedStderr bytes.Buffer
+	cmd.Stderr = &snapPreseedStderr
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("Error resetting preseeding in the chroot. Error is \"%s\"", err.Error())
+		return fmt.Errorf("Error resetting preseeding in the chroot: %s",
+			helper.WrapCmdError(cmd, err, snapPreseedStderr.Bytes()))
 	}
 
 	return nil

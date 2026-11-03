@@ -420,7 +420,7 @@ func TestStateMachine_setupGrub_failed(t *testing.T) {
 		execCommand = exec.Command
 	})
 	err = stateMachine.setupGrub("", 0, 0, true, stateMachine.ImageDef.Architecture)
-	asserter.AssertErrContains(err, "Error running losetup command")
+	asserter.AssertErrContains(err, "losetup")
 
 	// now test a command failure that isn't losetup
 	testCaseName = "TestFailedUpdateGrubOther"

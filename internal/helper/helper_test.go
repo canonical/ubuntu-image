@@ -730,3 +730,75 @@ func Test_DivertExec(t *testing.T) {
 		})
 	}
 }
+
+// TestWrapCmdError tests that WrapCmdError includes the failing command and,
+// when available, the child's stderr in the returned error message
+func TestWrapCmdError(t *testing.T) {
+	t.Parallel()
+	asserter := Asserter{T: t}
+
+	// an error that is not an *exec.ExitError has no stderr to propagate
+	err := fmt.Errorf("exec: \"not-a-binary\": executable file not found in $PATH")
+	wrapped := WrapCmdError(exec.Command("not-a-binary"), err)
+	asserter.AssertEqual(
+		"Error running command \"not-a-binary\": exec: \"not-a-binary\": executable file not found in $PATH",
+		wrapped.Error(),
+	)
+
+	// a nil error is returned as nil
+	asserter.AssertErrNil(WrapCmdError(exec.Command("true"), nil), false)
+
+	shPath, err := exec.LookPath("sh")
+	asserter.AssertErrNil(err, true)
+
+	// a command that fails without writing anything to stderr
+	cmd := exec.Command("sh", "-c", "exit 1")
+	err = cmd.Run()
+	asserter.AssertErrContains(err, "exit status 1")
+	wrapped = WrapCmdError(cmd, err)
+	asserter.AssertEqual(
+		fmt.Sprintf("Error running command \"%s -c exit 1\": exit status 1", shPath),
+		wrapped.Error(),
+	)
+
+	// a command that fails and writes diagnostics to stderr, captured by Output()
+	cmd = exec.Command("sh", "-c", "echo du: failure detail >&2; exit 1")
+	_, err = cmd.Output()
+	asserter.AssertErrContains(err, "exit status 1")
+	wrapped = WrapCmdError(cmd, err)
+	asserter.AssertEqual(
+		fmt.Sprintf("Error running command \"%s -c echo du: failure detail >&2; exit 1\": exit status 1: du: failure detail", shPath),
+		wrapped.Error(),
+	)
+
+	// explicitly captured stderr takes precedence over the captured one
+	wrapped = WrapCmdError(cmd, err, []byte("explicitly captured stderr"))
+	asserter.AssertErrContains(wrapped, "exit status 1: explicitly captured stderr")
+}
+
+// TestFailedDu tests that a failing du command propagates du's stderr in the
+// error message instead of only the exit status
+func TestFailedDu(t *testing.T) {
+	t.Parallel()
+	asserter := Asserter{T: t}
+
+	_, err := Du(filepath.Join(t.TempDir(), "does-not-exist"))
+	asserter.AssertErrContains(err, "Error running command \"")
+	asserter.AssertErrContains(err, "du -s -B1")
+	asserter.AssertErrContains(err, "exit status 1")
+	asserter.AssertErrContains(err, "du: cannot access")
+	asserter.AssertErrContains(err, "No such file or directory")
+}
+
+// TestFailedCopyBlob tests that a failing dd command propagates dd's stderr
+// in the error message instead of only the exit status
+func TestFailedCopyBlob(t *testing.T) {
+	t.Parallel()
+	asserter := Asserter{T: t}
+
+	err := CopyBlob([]string{"if=/does/not/exist", "of=/dev/null"})
+	asserter.AssertErrContains(err, "Error running command \"")
+	asserter.AssertErrContains(err, "dd if=/does/not/exist of=/dev/null")
+	asserter.AssertErrContains(err, "exit status 1")
+	asserter.AssertErrContains(err, "dd: failed to open '/does/not/exist': No such file or directory")
+}
