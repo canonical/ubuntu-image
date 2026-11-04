@@ -78,6 +78,35 @@ func RunScript(hookScript string) error {
 	return nil
 }
 
+// WrapCmdError wraps an error returned by a failed subprocess with the
+// failing command line and, when available, the child's stderr. When a
+// command run with exec.Cmd.Output() fails, the exec package captures the
+// child's stderr into (*exec.ExitError).Stderr, but err.Error() only yields
+// "exit status N" which hides the child's own diagnostic message (e.g.
+// "du: cannot access '...': No such file or directory"). Callers which
+// captured the child's stderr themselves (e.g. into a bytes.Buffer) can
+// pass it as the optional stderr argument; it takes precedence over the
+// stderr captured by the exec package.
+func WrapCmdError(cmd *exec.Cmd, err error, stderr ...[]byte) error {
+	if err == nil {
+		return nil
+	}
+	var stderrBytes []byte
+	if len(stderr) > 0 && len(stderr[0]) > 0 {
+		stderrBytes = stderr[0]
+	} else {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			stderrBytes = exitErr.Stderr
+		}
+	}
+	if len(bytes.TrimSpace(stderrBytes)) > 0 {
+		return fmt.Errorf("Error running command \"%s\": %w: %s",
+			cmd.String(), err, bytes.TrimSpace(stderrBytes))
+	}
+	return fmt.Errorf("Error running command \"%s\": %w", cmd.String(), err)
+}
+
 // Du recurses through a directory similar to du and adds all the sizes of files together
 func Du(path string) (quantity.Size, error) {
 	duCommand := *exec.Command("du", "-s", "-B1")
@@ -85,7 +114,7 @@ func Du(path string) (quantity.Size, error) {
 
 	duBytes, err := duCommand.Output()
 	if err != nil {
-		return quantity.Size(0), err
+		return quantity.Size(0), WrapCmdError(&duCommand, err)
 	}
 	sizeString := strings.Split(string(duBytes), "\t")[0]
 	size, err := quantity.ParseSize(sizeString)
@@ -97,8 +126,13 @@ func CopyBlob(ddArgs []string) error {
 	ddCommand := *exec.Command("dd")
 	ddCommand.Args = append(ddCommand.Args, ddArgs...)
 
+	// capture the child's stderr so it can be propagated in the error
+	// message, as Run() would otherwise send it to /dev/null
+	var ddStderr bytes.Buffer
+	ddCommand.Stderr = &ddStderr
+
 	if err := ddCommand.Run(); err != nil {
-		return fmt.Errorf("Command \"%s\" returned with %s", ddCommand.String(), err.Error())
+		return WrapCmdError(&ddCommand, err, ddStderr.Bytes())
 	}
 	return nil
 }

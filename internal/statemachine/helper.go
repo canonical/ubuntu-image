@@ -862,11 +862,7 @@ func associateLoopDevice(path string, sectorSize quantity.Size) (string, *exec.C
 	var losetupOutput []byte
 	losetupOutput, err := losetupCmd.Output()
 	if err != nil {
-		err = fmt.Errorf("Error running losetup command \"%s\". Error is %s",
-			losetupCmd.String(),
-			err.Error(),
-		)
-		return "", nil, err
+		return "", nil, helper.WrapCmdError(losetupCmd, err)
 	}
 
 	loopUsed := strings.TrimSpace(string(losetupOutput))

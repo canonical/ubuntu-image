@@ -339,6 +339,7 @@ func TestFailedCalculateRootfsSize(t *testing.T) {
 
 	err := stateMachine.calculateRootfsSize()
 	asserter.AssertErrContains(err, "Error getting rootfs size")
+	asserter.AssertErrContains(err, "du: cannot access")
 
 	// now set a value of --image-size that is too small to hold the rootfs
 	stateMachine.commonFlags.Size = "1M"
