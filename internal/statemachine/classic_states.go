@@ -758,7 +758,14 @@ func (stateMachine *StateMachine) customizeFstab() error {
 		} else {
 			dumpString = "0"
 		}
-		fstabEntry := fmt.Sprintf("LABEL=%s\t%s\t%s\t%s\t%s\t%d",
+		var matchField string
+		if fstab.UsePartLabel {
+			matchField = "PARTLABEL"
+		} else {
+			matchField = "LABEL"
+		}
+		fstabEntry := fmt.Sprintf("%s=%s\t%s\t%s\t%s\t%s\t%d",
+			matchField,
 			fstab.Label,
 			fstab.Mountpoint,
 			fstab.FSType,

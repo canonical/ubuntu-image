@@ -284,6 +284,8 @@ The following specification defines what is supported in the YAML:
         -
           # the value of LABEL= for the fstab entry
           label: <string>
+          # instead of using LABEL=, use PARTLABEL= for the fstab entry
+          use-part-label: <bool> (optional)
           # where to mount the partition
           mountpoint: <string>
           # the filesystem type
