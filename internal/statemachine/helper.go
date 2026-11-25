@@ -609,8 +609,8 @@ func applyDefaultSnapChannel(imageOpts *image.Options, series string) error {
 	}
 	var coreRe = regexp.MustCompile(`^core[0-9]{2}$`)
 	for _, name := range imageOpts.Snaps {
-		// coreXX and bare don't have ubuntu channels
-		if name == "bare" || coreRe.MatchString(name) {
+		// coreXX, snapd and bare snaps don't have ubuntu channels
+		if name == "bare" || name == "snapd" || coreRe.MatchString(name) {
 			continue
 		}
 		if hasChannel[name] || strings.HasSuffix(name, ".snap") {
