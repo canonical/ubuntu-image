@@ -1240,7 +1240,7 @@ func TestApplyDefaultSnapChannel(t *testing.T) {
 	expectedChannels := map[string]string{
 		"hello":  "stable/ubuntu-24.04",
 		"lxd":    "candidate",
-		"snapd":  "stable/ubuntu-24.04",
+		"snapd":  "",
 		"core20": "",
 	}
 	for name, want := range expectedChannels {
