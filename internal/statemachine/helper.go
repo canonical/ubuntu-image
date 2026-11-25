@@ -515,9 +515,11 @@ func generateUniqueDiskID(existing *[][]byte) ([]byte, error) {
 // ubuntuVersion shells out to `ubuntu-distro-info` to resolve a series
 // codename (e.g. "noble") to its release version (e.g. "24.04").
 func ubuntuVersion(series string) (string, error) {
-	if matched, _ := regexp.MatchString(`^[0-9]+\.[0-9]+$`, series); matched {
+	var versionRe = regexp.MustCompile(`^[0-9]{2}\.[0-9]{2}$`)
+	if versionRe.MatchString(series) {
 		return series, nil
 	}
+	// #nosec G204 -- series comes from a fixed list of Ubuntu codenames
 	cmd := exec.Command("ubuntu-distro-info", "--series="+series, "--release")
 	var out, stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -597,40 +599,9 @@ func applyDefaultSnapChannel(imageOpts *image.Options, series string) error {
 		return err
 	}
 
-	// snaps that already have an explicit channel/track from another
-	// source must be left untouched
-	hasChannel := make(map[string]bool, len(imageOpts.SnapChannels))
-	for name, channel := range imageOpts.SnapChannels {
-		if channel != "" {
-			hasChannel[name] = true
-		}
-	}
-
-	if imageOpts.ModelFile != "" {
-		model, err := decodeModelAssertionFile(imageOpts.ModelFile)
-		if err != nil {
-			return err
-		}
-		for _, modelSnap := range model.AllSnaps() {
-			name := string(modelSnap.SnapName())
-			if hasChannel[name] {
-				continue
-			}
-			if modelSnap.PinnedTrack != "" || modelSnap.DefaultChannel != snapdLatestStableChannel {
-				// the model assertion already pins this snap to a
-				// specific track/channel, don't override it
-				hasChannel[name] = true
-				continue
-			}
-			if modelSnap.Presence == "optional" {
-				// don't force-install an optional snap just to
-				// give it a default channel
-				continue
-			}
-			if !helper.SliceHasElement(imageOpts.Snaps, name) {
-				imageOpts.Snaps = append(imageOpts.Snaps, name)
-			}
-		}
+	hasChannel, err := snapsWithExplicitChannel(imageOpts)
+	if err != nil {
+		return err
 	}
 
 	if imageOpts.SnapChannels == nil {
@@ -649,6 +620,53 @@ func applyDefaultSnapChannel(imageOpts *image.Options, series string) error {
 	}
 
 	return nil
+}
+
+// snapsWithExplicitChannel returns the set of snap names that already have
+// an explicit channel/track assigned, either via imageOpts.SnapChannels or
+// via a pinned track/channel in the model assertion. As a side effect, it
+// also appends to imageOpts.Snaps any mandatory model snap that isn't
+// already present, so it can later be assigned the default channel.
+func snapsWithExplicitChannel(imageOpts *image.Options) (map[string]bool, error) {
+	// snaps that already have an explicit channel/track from another
+	// source must be left untouched
+	hasChannel := make(map[string]bool, len(imageOpts.SnapChannels))
+	for name, channel := range imageOpts.SnapChannels {
+		if channel != "" {
+			hasChannel[name] = true
+		}
+	}
+
+	if imageOpts.ModelFile == "" {
+		return hasChannel, nil
+	}
+
+	model, err := decodeModelAssertionFile(imageOpts.ModelFile)
+	if err != nil {
+		return nil, err
+	}
+	for _, modelSnap := range model.AllSnaps() {
+		name := string(modelSnap.SnapName())
+		if hasChannel[name] {
+			continue
+		}
+		if modelSnap.PinnedTrack != "" || modelSnap.DefaultChannel != snapdLatestStableChannel {
+			// the model assertion already pins this snap to a
+			// specific track/channel, don't override it
+			hasChannel[name] = true
+			continue
+		}
+		if modelSnap.Presence == "optional" {
+			// don't force-install an optional snap just to
+			// give it a default channel
+			continue
+		}
+		if !helper.SliceHasElement(imageOpts.Snaps, name) {
+			imageOpts.Snaps = append(imageOpts.Snaps, name)
+		}
+	}
+
+	return hasChannel, nil
 }
 
 // parseSnapsAndChannels converts the command line arguments to a format that is expected
