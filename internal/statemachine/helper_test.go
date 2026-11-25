@@ -16,6 +16,7 @@ import (
 	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/osutil/mkfs"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/snap"
@@ -1165,5 +1166,133 @@ func TestStateMachine_setMk2fsConf(t *testing.T) {
 			}
 			asserter.AssertEqual(tt.want, got)
 		})
+	}
+}
+
+// TestDefaultSnapChannel tests that the default snap channel is correctly
+// computed from either a release codename or an already-numeric series.
+func TestDefaultSnapChannel(t *testing.T) {
+	tests := []struct {
+		name        string
+		series      string
+		want        string
+		expectedErr string
+	}{
+		{
+			name:   "classic codename noble",
+			series: "noble",
+			want:   "stable/ubuntu-24.04",
+		},
+		{
+			name:   "classic codename resolute",
+			series: "resolute",
+			want:   "stable/ubuntu-26.04",
+		},
+		{
+			name:   "snap series already numeric",
+			series: "24.04",
+			want:   "stable/ubuntu-24.04",
+		},
+		{
+			name:        "unknown codename",
+			series:      "not-a-series",
+			expectedErr: "ubuntu-distro-info failed for series",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			asserter := &helper.Asserter{T: t}
+
+			got, err := defaultSnapChannel(tc.series)
+
+			if tc.expectedErr == "" {
+				asserter.AssertErrNil(err, true)
+				asserter.AssertEqual(tc.want, got)
+			} else {
+				asserter.AssertErrContains(err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+// TestApplyDefaultSnapChannel tests that applyDefaultSnapChannel pins snaps
+// with no channel from the command line, the model assertion ("seed"), or
+// the extra-snaps field to stable/ubuntu-<version>, while leaving snaps
+// that already have an explicit channel/track untouched.
+func TestApplyDefaultSnapChannel(t *testing.T) {
+	asserter := &helper.Asserter{T: t}
+
+	imageOpts := &image.Options{
+		// "hello" came from --snap with no channel, "lxd" came from
+		// --snap=lxd=candidate
+		Snaps:        []string{"hello", "lxd"},
+		SnapChannels: map[string]string{"lxd": "candidate"},
+		// modelAssertion20 declares: snapd and core20 with no explicit
+		// default-channel (so they implicitly get "latest/stable",
+		// treated as "no channel given"), and pc/pc-kernel pinned to
+		// the "20/stable" track (an explicit channel, must be kept)
+		ModelFile: filepath.Join("testdata", "modelAssertion20"),
+	}
+
+	err := applyDefaultSnapChannel(imageOpts, "noble")
+	asserter.AssertErrNil(err, true)
+
+	expectedChannels := map[string]string{
+		"hello":  "stable/ubuntu-24.04",
+		"lxd":    "candidate",
+		"snapd":  "stable/ubuntu-24.04",
+		"core20": "",
+	}
+	for name, want := range expectedChannels {
+		got, ok := imageOpts.SnapChannels[name]
+		if !ok && expectedChannels[name] != "" {
+			t.Errorf("expected a channel to be set for snap %q, but none was", name)
+			continue
+		}
+		asserter.AssertEqual(want, got)
+	}
+
+	for _, name := range []string{"pc", "pc-kernel"} {
+		if _, ok := imageOpts.SnapChannels[name]; ok {
+			t.Errorf("expected no channel override for pinned-track snap %q, but got %q",
+				name, imageOpts.SnapChannels[name])
+		}
+	}
+
+	for _, name := range []string{"snapd", "core20"} {
+		if !helper.SliceHasElement(imageOpts.Snaps, name) {
+			t.Errorf("expected model snap %q to be added to imageOpts.Snaps", name)
+		}
+	}
+	for _, name := range []string{"pc", "pc-kernel"} {
+		if helper.SliceHasElement(imageOpts.Snaps, name) {
+			t.Errorf("expected pinned-track model snap %q not to be added to imageOpts.Snaps", name)
+		}
+	}
+}
+
+// TestApplyDefaultSnapChannel_OptionalNotForced tests that an optional model
+// snap with no channel given is not force-added to the seed just to assign
+// it a default channel.
+func TestApplyDefaultSnapChannel_OptionalNotForced(t *testing.T) {
+	asserter := &helper.Asserter{T: t}
+
+	imageOpts := &image.Options{
+		ModelFile: filepath.Join("testdata", "modelAssertionPartialChannels"),
+	}
+
+	err := applyDefaultSnapChannel(imageOpts, "noble")
+	asserter.AssertErrNil(err, true)
+
+	if helper.SliceHasElement(imageOpts.Snaps, "test-snapd-sh") {
+		t.Errorf("expected optional snap %q not to be force-added", "test-snapd-sh")
+	}
+	if _, ok := imageOpts.SnapChannels["test-snapd-sh"]; ok {
+		t.Errorf("expected no channel to be set for skipped optional snap %q", "test-snapd-sh")
+	}
+	// pc was declared without a default-channel in this fixture, so it
+	// should get the default
+	if got := imageOpts.SnapChannels["pc"]; got != "stable/ubuntu-24.04" {
+		t.Errorf("expected pc to get the default channel, got %q", got)
 	}
 }

@@ -855,6 +855,16 @@ func (stateMachine *StateMachine) prepareClassicImage() error {
 
 	setModelFile(imageOpts, classicStateMachine.ImageDef.ModelAssertion, stateMachine.ConfDefPath)
 
+	// when no explicit --channel was given, pin every snap that still has
+	// no channel (from the command line, the model assertion, or the
+	// extra-snaps field) to the stable/ubuntu-<version> track instead of
+	// letting it fall back to snapd's plain "stable" default
+	if stateMachine.commonFlags.Channel == "" {
+		if err := applyDefaultSnapChannel(imageOpts, classicStateMachine.ImageDef.Series); err != nil {
+			return err
+		}
+	}
+
 	imageOpts.Classic = true
 	imageOpts.Architecture = classicStateMachine.ImageDef.Architecture
 	imageOpts.PrepareDir = classicStateMachine.tempDirs.chroot

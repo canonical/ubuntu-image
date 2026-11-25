@@ -42,6 +42,16 @@ func (stateMachine *StateMachine) prepareImage() error {
 		return err
 	}
 
+	// when no explicit --channel was given, pin every snap that still has
+	// no channel (from the command line or the model assertion, i.e. the
+	// "seed") to the stable/ubuntu-<version> track instead of letting it
+	// fall back to snapd's plain "stable" default
+	if snapStateMachine.commonFlags.Channel == "" {
+		if err := applyDefaultSnapChannel(imageOpts, snapStateMachine.series); err != nil {
+			return err
+		}
+	}
+
 	imageOpts.SeedManifest, err = snapStateMachine.imageOptsSeedManifest()
 	if err != nil {
 		return fmt.Errorf("Error preparing image: %s", err.Error())

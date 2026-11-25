@@ -1,0 +1,6 @@
+snaps:
+- name: snapd
+  snap-id: PMrrV4ml8uWuEUDBT8dSGnKUYbevVhc4
+  channel: stable
+  contact: https://github.com/snapcore/snapd/issues
+  file: snapd_25939.snap
