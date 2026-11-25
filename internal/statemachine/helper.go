@@ -10,14 +10,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/gadget"
 	"github.com/snapcore/snapd/gadget/quantity"
+	"github.com/snapcore/snapd/image"
 	"github.com/snapcore/snapd/seed"
 	"github.com/snapcore/snapd/timings"
 
@@ -507,6 +510,163 @@ func generateUniqueDiskID(existing *[][]byte) ([]byte, error) {
 	}
 	*existing = append(*existing, randomBytes)
 	return randomBytes, nil
+}
+
+// ubuntuVersion shells out to `ubuntu-distro-info` to resolve a series
+// codename (e.g. "noble") to its release version (e.g. "24.04").
+func ubuntuVersion(series string) (string, error) {
+	var versionRe = regexp.MustCompile(`^[0-9]{2}\.[0-9]{2}$`)
+	if versionRe.MatchString(series) {
+		return series, nil
+	}
+	// #nosec G204 -- series comes from a fixed list of Ubuntu codenames
+	cmd := exec.Command("ubuntu-distro-info", "--series="+series, "--release")
+	var out, stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("ubuntu-distro-info failed for series %q: %w (stderr: %s)",
+			series, err, strings.TrimSpace(stderr.String()))
+	}
+	return strings.TrimSuffix(strings.TrimSpace(out.String()), " LTS"), nil
+}
+
+// defaultSnapChannel returns the channel to use for snaps when no channel
+// has been specified on the command line, in the seed, or via the
+// extra-snaps field of the image definition. It defaults to the stable risk
+// level on the track associated with the Ubuntu version being built, e.g.
+// "stable/ubuntu-24.04".
+func defaultSnapChannel(series string) (string, error) {
+	version, err := ubuntuVersion(series)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("stable/ubuntu-%s", version), nil
+}
+
+// reservedModelHeaders are headers that are postponed, not implemented or
+// abandoned, not finalized; don't let them sneak in into a used model
+// assertion
+var reservedModelHeaders = []string{"core", "os", "class", "allowed-modes"}
+
+// decodeModelAssertionFile reads and decodes the model assertion found at
+// the given path.
+func decodeModelAssertionFile(fn string) (*asserts.Model, error) {
+	rawAssert, err := os.ReadFile(fn)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read model assertion: %s", err)
+	}
+
+	assertion, err := asserts.Decode(rawAssert)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode model assertion %q: %s", fn, err)
+	}
+	modelAssertion, ok := assertion.(*asserts.Model)
+	if !ok {
+		return nil, fmt.Errorf("assertion in %q is not a model assertion", fn)
+	}
+
+	for _, rsvd := range reservedModelHeaders {
+		if modelAssertion.Header(rsvd) != nil {
+			return nil, fmt.Errorf("model assertion cannot have reserved/unsupported header %q set", rsvd)
+		}
+	}
+
+	return modelAssertion, nil
+}
+
+// snapdLatestStableChannel is the channel snapd's model assertion parser
+// implicitly assigns to a snap listed in the model's "snaps" header when no
+// "default-channel" was given, and the only value a track-less
+// "default-channel: latest/stable" can resolve to (a track is mandatory).
+// Either way, it means no specific channel/track was actually requested for
+// that snap in the model assertion (the "seed").
+const snapdLatestStableChannel = "latest/stable"
+
+// applyDefaultSnapChannel ensures that every snap that doesn't already have
+// a channel assigned -- whether from the command line (--snap), the model
+// assertion (the "seed"), or the extra-snaps field of a classic image
+// definition -- is pinned to the stable risk level of the track matching
+// the Ubuntu version being built (e.g. "stable/ubuntu-24.04"), rather than
+// falling back to snapd's plain "stable" default.
+//
+// It must be called after imageOpts.Snaps, imageOpts.SnapChannels and
+// imageOpts.ModelFile have been populated from all other sources.
+func applyDefaultSnapChannel(imageOpts *image.Options, series string) error {
+	defaultChannel, err := defaultSnapChannel(series)
+	if err != nil {
+		return err
+	}
+
+	hasChannel, err := snapsWithExplicitChannel(imageOpts)
+	if err != nil {
+		return err
+	}
+
+	if imageOpts.SnapChannels == nil {
+		imageOpts.SnapChannels = make(map[string]string)
+	}
+	var coreRe = regexp.MustCompile(`^core[0-9]{2}$`)
+	for _, name := range imageOpts.Snaps {
+		// coreXX, snapd and bare snaps don't have ubuntu channels
+		if name == "bare" || name == "snapd" || coreRe.MatchString(name) {
+			continue
+		}
+		if hasChannel[name] || strings.HasSuffix(name, ".snap") {
+			continue
+		}
+		imageOpts.SnapChannels[name] = defaultChannel
+	}
+
+	return nil
+}
+
+// snapsWithExplicitChannel returns the set of snap names that already have
+// an explicit channel/track assigned, either via imageOpts.SnapChannels or
+// via a pinned track/channel in the model assertion. As a side effect, it
+// also appends to imageOpts.Snaps any mandatory model snap that isn't
+// already present, so it can later be assigned the default channel.
+func snapsWithExplicitChannel(imageOpts *image.Options) (map[string]bool, error) {
+	// snaps that already have an explicit channel/track from another
+	// source must be left untouched
+	hasChannel := make(map[string]bool, len(imageOpts.SnapChannels))
+	for name, channel := range imageOpts.SnapChannels {
+		if channel != "" {
+			hasChannel[name] = true
+		}
+	}
+
+	if imageOpts.ModelFile == "" {
+		return hasChannel, nil
+	}
+
+	model, err := decodeModelAssertionFile(imageOpts.ModelFile)
+	if err != nil {
+		return nil, err
+	}
+	for _, modelSnap := range model.AllSnaps() {
+		name := string(modelSnap.SnapName())
+		if hasChannel[name] {
+			continue
+		}
+		if modelSnap.PinnedTrack != "" || modelSnap.DefaultChannel != snapdLatestStableChannel {
+			// the model assertion already pins this snap to a
+			// specific track/channel, don't override it
+			hasChannel[name] = true
+			continue
+		}
+		if modelSnap.Presence == "optional" {
+			// don't force-install an optional snap just to
+			// give it a default channel
+			continue
+		}
+		if !helper.SliceHasElement(imageOpts.Snaps, name) {
+			imageOpts.Snaps = append(imageOpts.Snaps, name)
+		}
+	}
+
+	return hasChannel, nil
 }
 
 // parseSnapsAndChannels converts the command line arguments to a format that is expected

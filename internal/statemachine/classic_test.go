@@ -4416,7 +4416,7 @@ func TestCreateChroot(t *testing.T) {
 ## See the sources.list(5) manual page for further settings.
 Types: deb
 URIs: http://archive.ubuntu.com/ubuntu/
-Suites: noble noble-updates noble-proposed
+Suites: resolute resolute-updates resolute-proposed
 Components: main restricted
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
@@ -4424,7 +4424,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 ## this should mirror your choices in the previous section.
 Types: deb
 URIs: http://security.ubuntu.com/ubuntu/
-Suites: noble-security
+Suites: resolute-security
 Components: main restricted
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
