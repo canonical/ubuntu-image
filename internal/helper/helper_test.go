@@ -579,7 +579,7 @@ func Test_DivertExecWithFake_fail(t *testing.T) {
 	})
 	divert, _ := DivertExecWithFake(workDir, testFile, "replaced", true)
 	err = divert()
-	asserter.AssertErrContains(err, fmt.Sprintf("Fail to run command /usr/sbin/chroot %s dpkg-divert --local", workDir))
+	asserter.AssertErrContains(err, fmt.Sprintf("Fail to run command /usr/bin/chroot %s dpkg-divert --local", workDir))
 	runCmd = RunCmd
 
 	// Mock the DpkgDivert (as we cannot execute dpkg-divert)
@@ -626,7 +626,7 @@ func Test_DivertExecWithFake_fail(t *testing.T) {
 	})
 	_, undivert = DivertExecWithFake(workDir, testFile, "replaced", true)
 	err = undivert(nil)
-	asserter.AssertErrContains(err, fmt.Sprintf("Fail to run command /usr/sbin/chroot %s dpkg-divert --remove", workDir))
+	asserter.AssertErrContains(err, fmt.Sprintf("Fail to run command /usr/bin/chroot %s dpkg-divert --remove", workDir))
 	runCmd = RunCmd
 }
 

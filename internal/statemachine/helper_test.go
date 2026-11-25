@@ -603,10 +603,10 @@ func Test_manualAddUser(t *testing.T) {
 			},
 			expectedCmds: []expectedCmd{
 				{
-					cmd: "/usr/sbin/chroot fakedir useradd testuser --uid 123",
+					cmd: "/usr/bin/chroot fakedir useradd testuser --uid 123",
 				},
 				{
-					cmd: "/usr/sbin/chroot fakedir passwd --expire testuser",
+					cmd: "/usr/bin/chroot fakedir passwd --expire testuser",
 				},
 			},
 		},
@@ -636,36 +636,36 @@ func Test_manualAddUser(t *testing.T) {
 			},
 			expectedCmds: []expectedCmd{
 				{
-					cmd: "/usr/sbin/chroot fakedir useradd testuser1 --uid 123",
+					cmd: "/usr/bin/chroot fakedir useradd testuser1 --uid 123",
 				},
 				{
-					cmd: "/usr/sbin/chroot fakedir passwd --expire testuser1",
+					cmd: "/usr/bin/chroot fakedir passwd --expire testuser1",
 				},
 				{
-					cmd: "/usr/sbin/chroot fakedir useradd testuser2 --uid 456",
+					cmd: "/usr/bin/chroot fakedir useradd testuser2 --uid 456",
 				},
 				{
-					cmd: "/usr/sbin/chroot fakedir passwd --expire testuser2",
+					cmd: "/usr/bin/chroot fakedir passwd --expire testuser2",
 				},
 				{
-					cmd: "/usr/sbin/chroot fakedir useradd testuser3 --uid 789",
+					cmd: "/usr/bin/chroot fakedir useradd testuser3 --uid 789",
 				},
 				{
-					cmd:   "/usr/sbin/chroot fakedir chpasswd",
+					cmd:   "/usr/bin/chroot fakedir chpasswd",
 					stdin: "testuser3:test",
 				},
 				{
-					cmd: "/usr/sbin/chroot fakedir passwd --expire testuser3",
+					cmd: "/usr/bin/chroot fakedir passwd --expire testuser3",
 				},
 				{
-					cmd: "/usr/sbin/chroot fakedir useradd testuser4 --uid 0123",
+					cmd: "/usr/bin/chroot fakedir useradd testuser4 --uid 0123",
 				},
 				{
-					cmd:   "/usr/sbin/chroot fakedir chpasswd -e",
+					cmd:   "/usr/bin/chroot fakedir chpasswd -e",
 					stdin: "testuser4:hash_value",
 				},
 				{
-					cmd: "/usr/sbin/chroot fakedir passwd --expire testuser4",
+					cmd: "/usr/bin/chroot fakedir passwd --expire testuser4",
 				},
 			},
 		},
